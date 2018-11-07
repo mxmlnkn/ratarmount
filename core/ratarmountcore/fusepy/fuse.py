@@ -1093,7 +1093,7 @@ class FUSE(object):
         if self.raw_fi:
             return self.operations('create', path, mode, fi)
         else:
-            fi.fh = self.operations('create', path, mode)
+            fi.fh = self.operations('create', path, mode, fi.flags)
             return 0
 
     def ftruncate(self, path, length, fip):
@@ -1209,8 +1209,9 @@ class Operations(object):
     @_nullable_dummy_function
     def create(self, path, mode, fi=None):
         '''
-        When raw_fi is False (default case), fi is None and create should
-        return a numerical file handle.
+        When raw_fi is False (default case), create should return a
+        numerical file handle and the signature of create becomes:
+          create(self, path, mode, flags)
 
         When raw_fi is True the file handle should be set directly by create
         and return 0.
