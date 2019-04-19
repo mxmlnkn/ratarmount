@@ -4,6 +4,7 @@ import os, re, sys, stat, tarfile, pickle, fuse
 from collections import namedtuple
 from timeit import default_timer as timer
 
+
 printDebug = 1
 
 def overrides( parentClass ):
@@ -15,9 +16,15 @@ def overrides( parentClass ):
 
 FileInfo = namedtuple( "FileInfo", "offset size mtime mode type linkname uid gid istar" )
 
+
 class IndexedTar:
+    """
+    This class reads once through a whole TAR archive and stores TAR file offsets for all packed files
+    in an index to support fast seeking to a given file.
+    """
+
     def __init__( self, pathToTar = None, fileObject = None, writeIndex = False ):
-        self.tarFileName = pathToTar
+        self.tarFileName = os.path.normpath( pathToTar )
         self.fileIndex = {}
         self.dirIndex = {}
 
@@ -56,14 +63,16 @@ class IndexedTar:
                         print( "[Info] Could not write TAR index to file. Subsequent mounts might be slow!" )
 
     def isDir( self, path ):
-        return path in self.dirIndex
+        return os.path.normpath( path ) in self.dirIndex
 
     def getDirInfo( self, path ):
+        path = os.path.normpath( path )
         if path in self.dirIndex:
             return self.dirIndex[path]
         return None
 
     def getFileInfo( self, path, listDir = False ):
+        path = os.path.normpath( path )
         if not listDir and path in self.dirIndex:
             return self.dirIndex[path]
 
@@ -79,10 +88,12 @@ class IndexedTar:
         return p
 
     def exists( self, path ):
+        path = os.path.normpath( path )
         return self.isDir( path ) or isinstance( self.getFileInfo( path ), FileInfo )
 
     @staticmethod
     def setFileInfo( fileIndex, path, fileInfo ):
+        path = os.path.normpath( path )
         p = fileIndex
         for name in path.split( '/' )[:-1]:
             if not name:
@@ -133,7 +144,9 @@ class IndexedTar:
                 indexedTar = IndexedTar( tarInfo.name, fileObject = fileObject, writeIndex = False )
                 fileObject.seek( fileObject.tell() ) # might be especially necessary if the .tar is not actually a tar!
 
-            path = "/" + tarInfo.name
+            # Add a leading '/' as a convention where '/' represents the TAR root folder
+            # Partly, done because fusepy specifies paths in a mounted directory like this
+            path = os.path.normpath( "/" + tarInfo.name )
 
             if indexedTar is not None and ( indexedTar.dirIndex or indexedTar.fileIndex ):
                 # actually apply the recursive tar mounting
@@ -151,7 +164,7 @@ class IndexedTar:
                     print( "[Warning]", path, "already exists in database and will be overwritten!" )
 
                 for dir, info in indexedTar.dirIndex.items():
-                    self.dirIndex[path + dir] = info
+                    self.dirIndex[os.path.normpath( path + dir )] = info
                 self.dirIndex[path] = fileInfo
                 self.setFileInfo( self.fileIndex, path, indexedTar.fileIndex )
             else:
@@ -218,7 +231,18 @@ class IndexedTar:
         if printDebug >= 1:
             print( "Loading offset dictionary from", indexFileName, "took {:.2f}s".format( t1 - t0 ) )
 
+
 class TarMount( fuse.Operations ):
+    """
+    This class implements the fusepy interface in order to create a mounted file system view
+    to a TAR archive.
+    This class can and is relatively thin as it only has to create and manage an IndexedTar
+    object and query it for directory or file contents.
+    It also adds a layer over the file permissions as all files must be read-only even
+    if the TAR reader reports the file as originally writable because no TAR write support
+    is planned.
+    """
+
     def __init__( self, pathToMount ):
         self.tarFileName = pathToMount
         self.tarFile = open( self.tarFileName, 'rb' )
@@ -305,6 +329,7 @@ class TarMount( fuse.Operations ):
 
         self.tarFile.seek( fileInfo.offset + offset, os.SEEK_SET )
         return self.tarFile.read( length )
+
 
 if __name__ == '__main__':
     if len( sys.argv ) < 2 or "--help" in sys.argv or "-h" in sys.argv:
