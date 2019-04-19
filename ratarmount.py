@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, re, sys, stat, tarfile, pickle, fuse
+import os, re, sys, stat, tarfile, pickle, fuse, argparse
 from collections import namedtuple
 from timeit import default_timer as timer
 
@@ -23,41 +23,51 @@ class IndexedTar:
     in an index to support fast seeking to a given file.
     """
 
-    def __init__( self, pathToTar = None, fileObject = None, writeIndex = False ):
+    def __init__( self, pathToTar = None, fileObject = None, writeIndex = False, clearIndexCache = False ):
         self.tarFileName = os.path.normpath( pathToTar )
         self.fileIndex = {}
         self.dirIndex = {}
+
+        self.cacheFolder = os.path.expanduser( "~/.ratarmount" ) # will be used for storing if current path is read-only
+        self.possibleIndexFilePaths = [
+            self.tarFileName + ".index.pickle",
+            self.cacheFolder + "/" + self.tarFileName.replace( "/", "_" ) + ".index.pickle"
+        ]
+        self.indexFileName = self.possibleIndexFilePaths[0] # this is the actual index file, which will be used
+
+        if clearIndexCache:
+            for indexPath in self.possibleIndexFilePaths:
+                if os.path.isfile( indexPath ):
+                    os.remove( indexPath )
 
         if fileObject is not None:
             if writeIndex:
                 print( "Can't write out index for file object input. Ignoring this option." )
             self.createIndex( fileObject )
         else:
-            self.indexFileName = self.tarFileName + ".index.pickle"
-            self.cacheFolder = os.path.expanduser( "~/.ratarmount" )
-            self.altIndexFileName = self.cacheFolder + "/" + self.tarFileName.replace( "/", "_" ) + ".index.pickle"
-
-            for indexPath in [ self.indexFileName, self.altIndexFileName ]:
+            for indexPath in self.possibleIndexFilePaths:
                 if not self.dirIndex and not self.fileIndex and os.path.isfile( indexPath ):
-                    if os.path.getsize( indexPath ) > 0:
-                        self.loadIndex( indexPath )
-                    else:
+                    if os.path.getsize( indexPath ) == 0:
                         os.remove( indexPath )
+                    else:
+                        self.loadIndex( indexPath )
 
             if not self.dirIndex and not self.fileIndex:
                 with open( self.tarFileName, 'rb' ) as file:
                     self.createIndex( file )
 
                 if writeIndex:
-                    try:
+                    for indexPath in self.possibleIndexFilePaths:
                         try:
-                            f = open( self.indexFileName, 'wb' )
+                            f = open( indexPath, 'wb' )
                             f.close()
+                            os.remove( indexPath )
+                            self.indexFileName = indexPath
                         except IOError:
                             if not os.path.exists( self.cacheFolder ):
                                 os.mkdir( self.cacheFolder )
-                            self.indexFileName = self.altIndexFileName
 
+                    try:
                         self.writeIndex( self.indexFileName )
                     except IOError:
                         print( "[Info] Could not write TAR index to file. Subsequent mounts might be slow!" )
@@ -243,10 +253,10 @@ class TarMount( fuse.Operations ):
     is planned.
     """
 
-    def __init__( self, pathToMount ):
+    def __init__( self, pathToMount, clearIndexCache = False ):
         self.tarFileName = pathToMount
         self.tarFile = open( self.tarFileName, 'rb' )
-        self.indexedTar = IndexedTar( self.tarFileName, writeIndex = True )
+        self.indexedTar = IndexedTar( self.tarFileName, writeIndex = True, clearIndexCache = clearIndexCache )
 
         # make the mount point read only and executable if readable, i.e., allow directory listing
         tarStats = os.stat( self.tarFileName )
@@ -332,23 +342,37 @@ class TarMount( fuse.Operations ):
 
 
 if __name__ == '__main__':
-    if len( sys.argv ) < 2 or "--help" in sys.argv or "-h" in sys.argv:
-        print( """Usage:
-    ratarmount <path to tar> [<mount path>]
+    parser = argparse.ArgumentParser( description = '''\
+        If no mount path is specified, then the tar will be mounted to a folder of the same name but without a file extension.
+        TAR files contained inside the tar and even TARs in TARs in TARs will be mounted recursively at folders of the same name barred the file extension '.tar'.
 
-If no mount path is specified, then the tar will be mounted to a folder of the same name but without a file extension.
-TAR files contained inside the tar and even TARs in TARs in TARs will be mounted recursively at folders of the same name barred the file extension '.tar'.
+        In order to reduce the mounting time, the created index for random access to files inside the tar will be saved to <path to tar>.index.pickle. If it can't be saved there, it will be saved in ~/.ratarmount/<path to tar: '/' -> '_'>.index.pickle.
+        ''' )
 
-In order to reduce the mounting time, the created index for random access to files inside the tar will be saved to <path to tar>.index.pickle. If it can't be saved there, it will be saved in ~/.ratarmount/<path to tar: '/' -> '_'>.index.pickle.
-""" )
+    parser.add_argument( '-r', '--recreate-index', action='store_true', default = False,
+                         help = 'if specified, pre-existing .index files will be deleted and newly created' )
 
-    tarToMount = sys.argv[1]
-    mountPath = sys.argv[2] if len( sys.argv ) >= 3 else os.path.splitext( tarToMount )[0]
+    parser.add_argument( 'tarfilepath', metavar = 'tar-file-path',
+                         type = argparse.FileType( 'r' ), nargs = 1,
+                         help = 'the path to the TAR archive to be mounted' )
+    parser.add_argument( 'mountpath', metavar = 'mount-path',
+                         type = argparse.FileType( 'w' ), nargs = '?',
+                         help = 'the path to a folder to mount the TAR contents into' )
+
+    args = parser.parse_args()
+
+    tarToMount = args.tarfilepath[0].name
+    mountPath = args.mountpath
+    if mountPath is None:
+        mountPath = os.path.splitext( tarToMount )[0]
+
     mountPathWasCreated = False
     if not os.path.exists( mountPath ):
         os.mkdir( mountPath )
 
     foreground = False
-    fuse.FUSE( operations = TarMount( pathToMount = tarToMount ), mountpoint = mountPath, foreground = foreground )
+    fuse.FUSE( operations = TarMount( pathToMount = tarToMount, clearIndexCache = args.recreate_index ),
+               mountpoint = mountPath,
+               foreground = foreground )
     if mountPathWasCreated and foreground:
         os.rmdir( mountPath )
