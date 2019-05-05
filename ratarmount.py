@@ -125,7 +125,12 @@ class IndexedTar:
 
         self.dirIndex = {}
         self.fileIndex = {}
-        loadedTarFile = tarfile.open( fileobj = fileObject )
+        try:
+            loadedTarFile = tarfile.open( fileobj = fileObject, mode = 'r:' )
+        except tarfile.ReadError as exception:
+            print( "Archive can't be opened! This might happen for compressed TAR archives, which currently is not supported." )
+            raise exception
+
         for tarInfo in loadedTarFile:
             mode = tarInfo.mode
             if tarInfo.isdir() : mode |= stat.S_IFDIR
@@ -361,6 +366,13 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     tarToMount = args.tarfilepath[0].name
+    try:
+        tarfile.open( tarToMount, mode = 'r:' )
+    except tarfile.ReadError:
+        print( "Archive", tarToMount, "can't be opened!",
+               "This might happen for compressed TAR archives, which currently is not supported." )
+        exit( 1 )
+
     mountPath = args.mountpath
     if mountPath is None:
         mountPath = os.path.splitext( tarToMount )[0]
