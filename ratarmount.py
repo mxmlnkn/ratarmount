@@ -184,7 +184,7 @@ class IndexedTar:
                     self.dirIndex[os.path.normpath( path + dir )] = info
                 self.dirIndex[path] = fileInfo
                 self.setFileInfo( self.fileIndex, path, indexedTar.fileIndex )
-            else:
+            elif path != '/':
                 if self.exists( path ):
                     fileInfo = self.getFileInfo( path )
                     if fileInfo.istar:
