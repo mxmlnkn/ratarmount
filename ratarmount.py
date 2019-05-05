@@ -355,8 +355,7 @@ if __name__ == '__main__':
     parser.add_argument( 'tarfilepath', metavar = 'tar-file-path',
                          type = argparse.FileType( 'r' ), nargs = 1,
                          help = 'the path to the TAR archive to be mounted' )
-    parser.add_argument( 'mountpath', metavar = 'mount-path',
-                         type = argparse.FileType( 'w' ), nargs = '?',
+    parser.add_argument( 'mountpath', metavar = 'mount-path', nargs = '?',
                          help = 'the path to a folder to mount the TAR contents into' )
 
     args = parser.parse_args()
