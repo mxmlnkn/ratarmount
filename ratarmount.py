@@ -23,10 +23,12 @@ class IndexedTar:
     in an index to support fast seeking to a given file.
     """
 
-    def __init__( self, pathToTar = None, fileObject = None, writeIndex = False, clearIndexCache = False ):
+    def __init__( self, pathToTar = None, fileObject = None, writeIndex = False, clearIndexCache = False,
+                  recursive = False ):
         self.tarFileName = os.path.normpath( pathToTar )
         self.fileIndex = {}
         self.dirIndex = {}
+        self.mountRecursively = recursive
 
         self.cacheFolder = os.path.expanduser( "~/.ratarmount" ) # will be used for storing if current path is read-only
         self.possibleIndexFilePaths = [
@@ -152,7 +154,7 @@ class IndexedTar:
 
             # open contained tars for recursive mounting
             indexedTar = None
-            if tarInfo.isfile() and tarInfo.name.endswith( ".tar" ):
+            if self.mountRecursively and tarInfo.isfile() and tarInfo.name.endswith( ".tar" ):
                 oldPos = fileObject.tell()
                 if oldPos != tarInfo.offset_data:
                     fileObject.seek( tarInfo.offset_data )
@@ -258,10 +260,11 @@ class TarMount( fuse.Operations ):
     is planned.
     """
 
-    def __init__( self, pathToMount, clearIndexCache = False ):
+    def __init__( self, pathToMount, clearIndexCache = False, recursive = False ):
         self.tarFileName = pathToMount
         self.tarFile = open( self.tarFileName, 'rb' )
-        self.indexedTar = IndexedTar( self.tarFileName, writeIndex = True, clearIndexCache = clearIndexCache )
+        self.indexedTar = IndexedTar( self.tarFileName, writeIndex = True,
+                                      clearIndexCache = clearIndexCache, recursive = recursive )
 
         # make the mount point read only and executable if readable, i.e., allow directory listing
         tarStats = os.stat( self.tarFileName )
@@ -354,8 +357,11 @@ if __name__ == '__main__':
         In order to reduce the mounting time, the created index for random access to files inside the tar will be saved to <path to tar>.index.pickle. If it can't be saved there, it will be saved in ~/.ratarmount/<path to tar: '/' -> '_'>.index.pickle.
         ''' )
 
-    parser.add_argument( '-r', '--recreate-index', action='store_true', default = False,
+    parser.add_argument( '-c', '--recreate-index', action='store_true', default = False,
                          help = 'if specified, pre-existing .index files will be deleted and newly created' )
+
+    parser.add_argument( '-r', '--recursive', action='store_true', default = False,
+                         help = 'mount TAR archives inside the mounted TAR recursively. Note that this only has an effect when creating an index. If an index already exists, then this option will be effectively ignored. Recreate the index if you want change the recursive mounting policy anyways.' )
 
     parser.add_argument( 'tarfilepath', metavar = 'tar-file-path',
                          type = argparse.FileType( 'r' ), nargs = 1,
@@ -382,7 +388,10 @@ if __name__ == '__main__':
         os.mkdir( mountPath )
 
     foreground = False
-    fuse.FUSE( operations = TarMount( pathToMount = tarToMount, clearIndexCache = args.recreate_index ),
+    fuse.FUSE( operations = TarMount(
+                   pathToMount = tarToMount,
+                   clearIndexCache = args.recreate_index,
+                   recursive = args.recursive ),
                mountpoint = mountPath,
                foreground = foreground )
     if mountPathWasCreated and foreground:
