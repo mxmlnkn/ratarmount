@@ -326,6 +326,9 @@ class TarMount( fuse.Operations ):
 
     @overrides( fuse.Operations )
     def readlink( self, path ):
+        if printDebug >= 2:
+            print( "[readlink( path =", path, ")]" )
+
         fileInfo = self.indexedTar.getFileInfo( path )
         if not isinstance( fileInfo, FileInfo ):
             raise fuse.FuseOSError( fuse.errno.EROFS )
@@ -357,6 +360,9 @@ if __name__ == '__main__':
         In order to reduce the mounting time, the created index for random access to files inside the tar will be saved to <path to tar>.index.pickle. If it can't be saved there, it will be saved in ~/.ratarmount/<path to tar: '/' -> '_'>.index.pickle.
         ''' )
 
+    parser.add_argument( '-d', '--debug', action='store_true', default = False,
+                         help = 'keeps the python program in foreground so it can print debug output when the mounted path is accessed.' )
+
     parser.add_argument( '-c', '--recreate-index', action='store_true', default = False,
                          help = 'if specified, pre-existing .index files will be deleted and newly created' )
 
@@ -387,7 +393,9 @@ if __name__ == '__main__':
     if not os.path.exists( mountPath ):
         os.mkdir( mountPath )
 
-    foreground = False
+    foreground = args.debug
+    if args.debug:
+        printDebug = 3
     fuse.FUSE( operations = TarMount(
                    pathToMount = tarToMount,
                    clearIndexCache = args.recreate_index,
