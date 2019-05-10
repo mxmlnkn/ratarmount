@@ -61,13 +61,19 @@ class IndexedTar:
                 if writeIndex:
                     for indexPath in self.possibleIndexFilePaths:
                         try:
+                            folder = os.path.dirname( indexPath )
+                            if not os.path.exists( folder ):
+                                os.mkdir( folder )
+
                             f = open( indexPath, 'wb' )
                             f.close()
                             os.remove( indexPath )
                             self.indexFileName = indexPath
+
+                            break
                         except IOError:
-                            if not os.path.exists( self.cacheFolder ):
-                                os.mkdir( self.cacheFolder )
+                            if printDebug >= 2:
+                                print( "Could not create file:", indexPath )
 
                     try:
                         self.writeIndex( self.indexFileName )
@@ -217,6 +223,8 @@ class IndexedTar:
     def writeIndex( self, outFileName ):
         with open( outFileName, 'wb' ) as outFile:
             pickle.dump( ( self.dirIndex, self.fileIndex ), outFile )
+            if printDebug >= 1:
+                print( "Written index to", outFileName )
 
     def loadIndex( self, indexFileName ):
         if printDebug >= 1:
@@ -377,7 +385,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    tarToMount = args.tarfilepath[0].name
+    tarToMount = os.path.abspath( args.tarfilepath[0].name )
     try:
         tarfile.open( tarToMount, mode = 'r:' )
     except tarfile.ReadError:
