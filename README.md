@@ -17,7 +17,28 @@ pip3 --user fusepy
 
 # Usage
 
-    python3 ratarmount.py <path to tar> [<mount path>]
+```
+usage: ratarmount.py [-h] [-d] [-c] [-r] tar-file-path [mount-path]
+
+If no mount path is specified, then the tar will be mounted to a folder of the
+same name but without a file extension.
+
+positional arguments:
+  tar-file-path         the path to the TAR archive to be mounted
+  mount-path            the path to a folder to mount the TAR contents into
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -d, --debug           keeps the python program in foreground so it can print
+                        debug output when the mounted path is accessed.
+  -c, --recreate-index  if specified, pre-existing .index files will be
+                        deleted and newly created
+  -r, --recursive       mount TAR archives inside the mounted TAR recursively.
+                        Note that this only has an effect when creating an
+                        index. If an index already exists, then this option
+                        will be effectively ignored. Recreate the index if you
+                        want change the recursive mounting policy anyways.
+```
 
 Index files are if possible created to / if existing loaded from these file locations in order:
 
