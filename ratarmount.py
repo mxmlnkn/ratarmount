@@ -26,7 +26,15 @@ class IndexedTar:
     def __init__( self, pathToTar = None, fileObject = None, writeIndex = False, clearIndexCache = False,
                   recursive = False ):
         self.tarFileName = os.path.normpath( pathToTar )
+        # Stores the file hierarchy in a dictionary with keys being either the file and containing file metainformation
+        # or keys being a folder name and containing recursively defined dictionary.
         self.fileIndex = {}
+        # Stores metainformation for each folder.
+        # In contrast to fileIndex the directory information are not stored as a tree but as a flat list
+        # leading to duplication of path prefix (shared parent folders).
+        # @note Was used because a fileIndex entry can't have a metainformation tuple and a dictionary with
+        # contained files assigned simultaneously
+        # @todo the metainformation could be included into fileIndex into special files named '.'
         self.dirIndex = {}
         self.mountRecursively = recursive
 
@@ -94,6 +102,7 @@ class IndexedTar:
         if not listDir and path in self.dirIndex:
             return self.dirIndex[path]
 
+        # go down file hierarchy tree along the given path
         p = self.fileIndex
         for name in path.split( '/' ):
             if not name:
@@ -109,11 +118,35 @@ class IndexedTar:
         path = os.path.normpath( path )
         return self.isDir( path ) or isinstance( self.getFileInfo( path ), FileInfo )
 
-    @staticmethod
-    def setFileInfo( fileIndex, path, fileInfo ):
+    def setFileInfo( self, path, fileInfo ):
         path = os.path.normpath( path )
-        p = fileIndex
-        for name in path.split( '/' )[:-1]:
+        pathHierarchy = path.split( '/' )
+        if len( pathHierarchy ) == 0:
+            return
+
+        # check whether all parent directories exist in dirIndex and add default metainformation for them if not
+        for level in range( 2, len( pathHierarchy ) ):
+            dirPath = '/'.join( pathHierarchy[:level] )
+
+            if not dirPath in self.dirIndex:
+                if printDebug >= 3:
+                    print( "Adding implicitly defined parent directory with default metainformation at:", dirPath )
+
+                self.dirIndex[dirPath] = FileInfo(
+                    offset   = 0                   , # not necessary for directory anyways
+                    size     = 1                   , # might be misleading / non-conform
+                    mtime    = fileInfo.mtime      ,
+                    mode     = 0o555 | stat.S_IFDIR,
+                    type     = tarfile.DIRTYPE     ,
+                    linkname = ""                  ,
+                    uid      = fileInfo.uid        ,
+                    gid      = fileInfo.gid        ,
+                    istar    = False
+                )
+
+        # go down file hierarchy tree along the given path
+        p = self.fileIndex
+        for name in pathHierarchy[:-1]:
             if not name:
                 continue
 
@@ -122,9 +155,9 @@ class IndexedTar:
             else:
                 p = p[name]
 
-        fileName = path.split( '/' )[-1]
+        # create a new key in the dictionary of the parent folder
+        fileName = pathHierarchy[-1]
         p.update( { fileName : fileInfo } )
-
 
     def createIndex( self, fileObject ):
         if printDebug >= 1:
@@ -171,6 +204,7 @@ class IndexedTar:
             # Partly, done because fusepy specifies paths in a mounted directory like this
             path = os.path.normpath( "/" + tarInfo.name )
 
+            # test whether the TAR file could be loaded and if so "mount" it recursively
             if indexedTar is not None and ( indexedTar.dirIndex or indexedTar.fileIndex ):
                 # actually apply the recursive tar mounting
                 extractedName = re.sub( r"\.tar$", "", path )
@@ -186,25 +220,28 @@ class IndexedTar:
                 if self.exists( path ):
                     print( "[Warning]", path, "already exists in database and will be overwritten!" )
 
+                # merge dirIndex and fileIndex from recursively loaded TAR into our Indexes
                 for dir, info in indexedTar.dirIndex.items():
                     self.dirIndex[os.path.normpath( path + dir )] = info
                 self.dirIndex[path] = fileInfo
-                self.setFileInfo( self.fileIndex, path, indexedTar.fileIndex )
+                self.setFileInfo( path, indexedTar.fileIndex )
+
             elif path != '/':
                 if self.exists( path ):
                     fileInfo = self.getFileInfo( path )
                     if fileInfo.istar:
-                        self.setFileInfo( self.fileIndex, path + ".tar", fileInfo )
+                        self.setFileInfo( path + ".tar", fileInfo )
                         # no need to delete old entry. Will be overwritten anyway
                         self.dirIndex[path + ".tar"] = self.dirIndex.pop( path )
                     else:
                         print( "[Warning]", path, "already exists in database and will be overwritten!" )
 
+                # simply store the file or directory information from current TAR item
                 if tarInfo.isdir():
                     self.dirIndex[path] = fileInfo
-                    self.setFileInfo( self.fileIndex, path, {} )
+                    self.setFileInfo( path, {} )
                 else:
-                    self.setFileInfo( self.fileIndex, path, fileInfo )
+                    self.setFileInfo( path, fileInfo )
 
         # add parent folders if they were left out in the tar info
         dirsToAdd = {}
@@ -281,7 +318,7 @@ class TarMount( fuse.Operations ):
         if mountMode & stat.S_IRUSR != 0: mountMode |= stat.S_IXUSR
         if mountMode & stat.S_IRGRP != 0: mountMode |= stat.S_IXGRP
         if mountMode & stat.S_IROTH != 0: mountMode |= stat.S_IXOTH
-        self.indexedTar.dirIndex[ "/" ] = fileInfo = FileInfo(
+        self.indexedTar.dirIndex[ "/" ] = FileInfo(
             offset   = 0                ,
             size     = tarStats.st_size ,
             mtime    = tarStats.st_mtime,
