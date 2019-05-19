@@ -1,5 +1,7 @@
 #!/bin/bash
 
+echoerr() { echo "$@" 1>&2; }
+
 error=0
 checkFileInTAR()
 {
@@ -13,7 +15,8 @@ checkFileInTAR()
     python3 ratarmount.py -c "$archive" "$mountFolder" &>/dev/null
     checksum="$( md5sum "$mountFolder/$fileInTar" 2>/dev/null | sed 's| .*||' )"
     if test "$checksum" != "$correctChecksum"; then
-        echo "File sum of '$fileInTar' in mounted TAR '$archive'"' does not match! It seems there was a mounting error!'
+        echoerr 'TEST FAILED!'
+        echoerr "File sum of '$fileInTar' in mounted TAR '$archive' does not match"'!'
         return 1
     fi
     fusermount -u "$mountFolder" &>/dev/null
@@ -22,12 +25,13 @@ checkFileInTAR()
     python3 ratarmount.py "$archive" "$mountFolder" &>/dev/null
     checksum="$( md5sum "$mountFolder/$fileInTar" 2>/dev/null | sed 's| .*||' )"
     if test "$checksum" != "$correctChecksum"; then
-        echo "File sum of '$fileInTar' in mounted TAR '$archive'"' does not match! It seems there was a mounting error!'
+        echoerr 'TEST FAILED!'
+        echoerr "File sum of '$fileInTar' in mounted TAR '$archive' does not match"'!'
         return 1
     fi
     fusermount -u "$mountFolder" &>/dev/null
 
-    echo "Tested succesfully '$fileInTar' in '$archive' for checksum $correctChecksum"
+    echoerr "Tested succesfully '$fileInTar' in '$archive' for checksum $correctChecksum"
 
     return 0
 }
@@ -37,5 +41,6 @@ checkFileInTAR tests/single-file-with-leading-dot-slash.tar bar d3b07384d113edec
 checkFileInTAR tests/folder-with-leading-dot-slash.tar foo/bar 2b87e29fca6ee7f1df6c1a76cb58e101
 checkFileInTAR tests/folder-with-leading-dot-slash.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
 checkFileInTAR tests/single-nested-file.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
+checkFileInTAR tests/single-nested-folder.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
 
 exit $error

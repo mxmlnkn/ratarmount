@@ -118,7 +118,12 @@ class IndexedTar:
         path = os.path.normpath( path )
         return self.isDir( path ) or isinstance( self.getFileInfo( path ), FileInfo )
 
-    def setFileInfo( self, path, fileInfo ):
+    def setFileInfo( self, path, fileOrFolderInfo ):
+        """
+        path: the full path to the file with leading slash (/) for which to set the file or folder info
+        fileOrFolderInfo: can be a named tuple or a dictionary representing a folder
+        """
+
         path = os.path.normpath( path )
         pathHierarchy = path.split( '/' )
         if len( pathHierarchy ) == 0:
@@ -135,12 +140,12 @@ class IndexedTar:
                 self.dirIndex[dirPath] = FileInfo(
                     offset   = 0                   , # not necessary for directory anyways
                     size     = 1                   , # might be misleading / non-conform
-                    mtime    = fileInfo.mtime      ,
+                    mtime    = fileOrFolderInfo.mtime if isinstance( fileOrFolderInfo, FileInfo ) else 0,
                     mode     = 0o555 | stat.S_IFDIR,
                     type     = tarfile.DIRTYPE     ,
                     linkname = ""                  ,
-                    uid      = fileInfo.uid        ,
-                    gid      = fileInfo.gid        ,
+                    uid      = fileOrFolderInfo.uid if isinstance( fileOrFolderInfo, FileInfo ) else 0,
+                    gid      = fileOrFolderInfo.gid if isinstance( fileOrFolderInfo, FileInfo ) else 0,
                     istar    = False
                 )
 
@@ -157,7 +162,7 @@ class IndexedTar:
 
         # create a new key in the dictionary of the parent folder
         fileName = pathHierarchy[-1]
-        p.update( { fileName : fileInfo } )
+        p.update( { fileName : fileOrFolderInfo } )
 
     def createIndex( self, fileObject ):
         if printDebug >= 1:
