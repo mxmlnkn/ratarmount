@@ -1,0 +1,8 @@
+fusepy
+lz4
+msgpack
+simplejson
+pyyaml
+ujson
+cbor
+python-rapidjson
