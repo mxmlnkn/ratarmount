@@ -13,7 +13,7 @@ E.g. on Debian-like systems these can be installed with:
 ```bash
 sudo apt-get update
 sudo apt-get install python3
-pip3 --user -r requirements.txt
+pip3 install --user -r requirements.txt
 ```
 
 # Usage
@@ -102,7 +102,7 @@ The test for the ImageNet data set is promising:
   - Files in TAR (including recursively in contained TARs): 14.2 million
   - Index creation (first mounting): 4 hours
   - Index size: 1GB
-  - Index loading (subsequent mounting): 40s
+  - Index loading (subsequent mounting): 80s
   - Reading a 40kB file: 100ms (first time) and 4ms (subsequent times)
 
 The reading time for a small file simply verifies the random access by using file seek to be working. The difference between the first read and subsequent reads is not because of ratarmount but because of operating system and file system caches.
