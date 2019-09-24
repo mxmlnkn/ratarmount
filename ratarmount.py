@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
 
-import os, re, sys, stat, tarfile, fuse, argparse
+import argparse
 import itertools
+import io
+import os
+import re
+import stat
+import tarfile
+import traceback
 from collections import namedtuple
 from timeit import default_timer as timer
+
+import fuse
 
 
 printDebug = 1
 
 def overrides( parentClass ):
     def overrider( method ):
-        assert( method.__name__ in dir( parentClass ) )
+        assert method.__name__ in dir( parentClass )
         return method
     return overrider
 
@@ -18,10 +26,10 @@ def overrides( parentClass ):
 FileInfo = namedtuple( "FileInfo", "offset size mtime mode type linkname uid gid istar" )
 
 
-class IndexedTar( object ):
+class IndexedTar:
     """
-    This class reads once through a whole TAR archive and stores TAR file offsets for all packed files
-    in an index to support fast seeking to a given file.
+    This class reads once through the whole TAR archive and stores TAR file offsets
+    for all contained files in an index to support fast seeking to a given file.
     """
 
     __slots__ = (
@@ -51,15 +59,23 @@ class IndexedTar( object ):
         'gz',
     ]
 
-    def __init__( self, pathToTar = None, fileObject = None, writeIndex = False, clearIndexCache = False,
-                  recursive = False, serializationBackend = None ):
+    def __init__( self,
+                  pathToTar = None,
+                  fileObject = None,
+                  writeIndex = False,
+                  clearIndexCache = False,
+                  recursive = False,
+                  serializationBackend = None ):
         self.tarFileName = os.path.normpath( pathToTar )
-        # Stores the file hierarchy in a dictionary with keys being either the file and containing file metainformation
-        # or keys being a folder name and containing recursively defined dictionary.
+
+        # Stores the file hierarchy in a dictionary with keys being either
+        #  - the file and containing file metainformation
+        #  - or keys being a folder name and containing a recursively defined dictionary.
         self.fileIndex = {}
         self.mountRecursively = recursive
 
-        self.cacheFolder = os.path.expanduser( "~/.ratarmount" ) # will be used for storing if current path is read-only
+        # will be used for storing indexes if current path is read-only
+        self.cacheFolder = os.path.expanduser( "~/.ratarmount" )
         self.possibleIndexFilePaths = [
             self.tarFileName + ".index",
             self.cacheFolder + "/" + self.tarFileName.replace( "/", "_" ) + ".index"
@@ -138,7 +154,8 @@ class IndexedTar( object ):
                     try:
                         self.writeIndex( self.indexFileName )
                     except IOError:
-                        print( "[Info] Could not write TAR index to file. Subsequent mounts might be slow!" )
+                        print( "[Info] Could not write TAR index to file.",
+                               "Subsequent mounts might be slow!" )
 
     @staticmethod
     def supportedIndexExtensions():
@@ -231,24 +248,28 @@ class IndexedTar( object ):
             if not name:
                 continue
             if not name in p:
-                return
+                return None
             p = p[name]
 
         def repackDeserializedNamedTuple( p ):
             if isinstance( p, list ) and len( p ) == len( FileInfo._fields ):
                 return FileInfo( *p )
-            elif isinstance( p, dict ) and len( p ) == len( FileInfo._fields ) and \
+
+            if isinstance( p, dict ) and len( p ) == len( FileInfo._fields ) and \
                  'uid' in p and isinstance( p['uid'], int ):
-                # a normal directory dict must only have dict or FileInfo values, so if the value to the 'uid'
-                # key is an actual int, then it is sure it is a deserialized FileInfo object and not a file named 'uid'
+                # a normal directory dict must only have dict or FileInfo values,
+                # so if the value to the 'uid' key is an actual int,
+                # then it is sure it is a deserialized FileInfo object and not a file named 'uid'
                 print( "P ===", p )
                 print( "FileInfo ===", FileInfo( **p ) )
                 return FileInfo( **p )
+
             return p
 
         p = repackDeserializedNamedTuple( p )
 
-        # if the directory contents are not to be printed and it is a directory, return the "file" info of "."
+        # if the directory contents are not to be printed and it is a directory,
+        # return the "file" info of ".", which holds the directory metainformation
         if not listDir and isinstance( p, dict ):
             if '.' in p:
                 p = p['.']
@@ -268,7 +289,7 @@ class IndexedTar( object ):
         return repackDeserializedNamedTuple( p )
 
     def isDir( self, path ):
-        return True if isinstance( self.getFileInfo( path, listDir = True ), dict ) else False
+        return isinstance( self.getFileInfo( path, listDir = True ), dict )
 
     def exists( self, path ):
         path = os.path.normpath( path )
@@ -278,10 +299,10 @@ class IndexedTar( object ):
         """
         path: the full path to the file with leading slash (/) for which to set the file info
         """
-        assert( isinstance( fileInfo, FileInfo ) )
+        assert isinstance( fileInfo, FileInfo )
 
         pathHierarchy = os.path.normpath( path ).split( os.sep )
-        if len( pathHierarchy ) == 0:
+        if not pathHierarchy:
             return
 
         # go down file hierarchy tree along the given path
@@ -289,7 +310,7 @@ class IndexedTar( object ):
         for name in pathHierarchy[:-1]:
             if not name:
                 continue
-            assert( isinstance( p, dict ) )
+            assert isinstance( p, dict )
             p = p.setdefault( name, {} )
 
         # create a new key in the dictionary of the parent folder
@@ -299,11 +320,11 @@ class IndexedTar( object ):
         """
         path: the full path to the file with leading slash (/) for which to set the folder info
         """
-        assert( isinstance( dirInfo, FileInfo ) )
-        assert( isinstance( dirContents, dict ) )
+        assert isinstance( dirInfo, FileInfo )
+        assert isinstance( dirContents, dict )
 
         pathHierarchy = os.path.normpath( path ).strip( os.sep ).split( os.sep )
-        if len( pathHierarchy ) == 0:
+        if not pathHierarchy:
             return
 
         # go down file hierarchy tree along the given path
@@ -311,7 +332,7 @@ class IndexedTar( object ):
         for name in pathHierarchy[:-1]:
             if not name:
                 continue
-            assert( isinstance( p, dict ) )
+            assert isinstance( p, dict )
             p = p.setdefault( name, {} )
 
         # create a new key in the dictionary of the parent folder
@@ -320,14 +341,16 @@ class IndexedTar( object ):
 
     def createIndex( self, fileObject ):
         if printDebug >= 1:
-            print( "Creating offset dictionary for", "<file object>" if self.tarFileName is None else self.tarFileName, "..." )
+            print( "Creating offset dictionary for",
+                   "<file object>" if self.tarFileName is None else self.tarFileName, "..." )
         t0 = timer()
 
         self.fileIndex = {}
         try:
             loadedTarFile = tarfile.open( fileobj = fileObject, mode = 'r:' )
         except tarfile.ReadError as exception:
-            print( "Archive can't be opened! This might happen for compressed TAR archives, which currently is not supported." )
+            print( "Archive can't be opened! This might happen for compressed TAR archives, "
+                   "which currently is not supported." )
             raise exception
 
         for tarInfo in loadedTarFile:
@@ -356,7 +379,8 @@ class IndexedTar( object ):
                 if oldPos != tarInfo.offset_data:
                     fileObject.seek( tarInfo.offset_data )
                 indexedTar = IndexedTar( tarInfo.name, fileObject = fileObject, writeIndex = False )
-                fileObject.seek( fileObject.tell() ) # might be especially necessary if the .tar is not actually a tar!
+                # might be especially necessary if the .tar is not actually a tar!
+                fileObject.seek( fileObject.tell() )
 
             # Add a leading '/' as a convention where '/' represents the TAR root folder
             # Partly, done because fusepy specifies paths in a mounted directory like this
@@ -401,23 +425,28 @@ class IndexedTar( object ):
 
         t1 = timer()
         if printDebug >= 1:
-            print( "Creating offset dictionary for", "<file object>" if self.tarFileName is None else self.tarFileName, "took {:.2f}s".format( t1 - t0 ) )
+            print( "Creating offset dictionary for",
+                   "<file object>" if self.tarFileName is None else self.tarFileName,
+                   "took {:.2f}s".format( t1 - t0 ) )
 
     def serializationBackendFromFileName( self, fileName ):
         splitName = fileName.split( '.' )
 
         if len( splitName ) > 2 and '.'.join( splitName[-2:] ) in self.supportedIndexExtensions():
             return '.'.join( splitName[-2:] )
-        elif splitName[-1] in self.supportedIndexExtensions():
+
+        if splitName[-1] in self.supportedIndexExtensions():
             return splitName[-1]
+
         return None
 
     def indexIsLoaded( self ):
-        return True if self.fileIndex else False
+        return bool( self.fileIndex )
 
     def writeIndex( self, outFileName ):
         """
-        outFileName: full file name with backend extension. Depending on the extension the serialization is chosen.
+        outFileName: Full file name with backend extension.
+                     Depending on the extension the serialization is chosen.
         """
 
         serializationBackend = self.serializationBackendFromFileName( outFileName )
@@ -440,7 +469,7 @@ class IndexedTar( object ):
 
         # libraries tested but not working:
         #  - marshal: can't serialize namedtuples
-        #  - hickle: for some reason, creates files almost 64x larger as pickle!? And also takes similarly longer
+        #  - hickle: for some reason, creates files almost 64x larger and slower than pickle!?
         #  - yaml: almost a 10 times slower and more memory usage and deserializes everything including ints to string
 
         with wrapperOpen( outFileName ) as outFile:
@@ -497,9 +526,7 @@ class IndexedTar( object ):
         serializationBackend = serializationBackend.split( '.' )[0]
 
         with wrapperOpen( indexFileName ) as indexFile:
-            if serializationBackend == 'pickle2' or \
-               serializationBackend == 'pickle3' or \
-               serializationBackend == 'pickle':
+            if serializationBackend in ( 'pickle2', 'pickle3', 'pickle' ):
                 import pickle
                 self.fileIndex = pickle.load( indexFile )
 
@@ -526,8 +553,8 @@ class IndexedTar( object ):
         if printDebug >= 2:
             def countDictEntries( d ):
                 n = 0
-                for key, value in d.items():
-                    n += countDictEntries( value ) if type( value ) is dict else 1
+                for value in d.values():
+                    n += countDictEntries( value ) if isinstance( value, dict ) else 1
                 return n
             print( "Files:", countDictEntries( self.fileIndex ) )
 
@@ -550,9 +577,12 @@ class TarMount( fuse.Operations ):
     def __init__( self, pathToMount, clearIndexCache = False, recursive = False, serializationBackend = None ):
         self.tarFileName = pathToMount
         self.tarFile = open( self.tarFileName, 'rb' )
-        self.indexedTar = IndexedTar( self.tarFileName, writeIndex = True,
-                                      clearIndexCache = clearIndexCache, recursive = recursive,
-                                      serializationBackend = serializationBackend )
+        self.indexedTar = IndexedTar(
+            self.tarFileName,
+            writeIndex = True,
+            clearIndexCache = clearIndexCache,
+            recursive = recursive,
+            serializationBackend = serializationBackend )
 
         # make the mount point read only and executable if readable, i.e., allow directory listing
         tarStats = os.stat( self.tarFileName )
@@ -651,28 +681,37 @@ if __name__ == '__main__':
         In order to reduce the mounting time, the created index for random access to files inside the tar will be saved to <path to tar>.index.<backend>[.<compression]. If it can't be saved there, it will be saved in ~/.ratarmount/<path to tar: '/' -> '_'>.index.<backend>[.<compression].
         ''' )
 
-    parser.add_argument( '-f', '--foreground', action='store_true', default = False,
-                         help = 'keeps the python program in foreground so it can print debug output when the mounted path is accessed.' )
+    parser.add_argument(
+        '-f', '--foreground', action='store_true', default = False,
+        help = 'keeps the python program in foreground so it can print debug'
+               'output when the mounted path is accessed.' )
 
-    parser.add_argument( '-d', '--debug', type = int, default = 1,
-                         help = 'sets the debugging level. Higher means more output. Currently 3 is the highest' )
+    parser.add_argument(
+        '-d', '--debug', type = int, default = 1,
+        help = 'sets the debugging level. Higher means more output. Currently 3 is the highest' )
 
-    parser.add_argument( '-c', '--recreate-index', action='store_true', default = False,
-                         help = 'if specified, pre-existing .index files will be deleted and newly created' )
+    parser.add_argument(
+        '-c', '--recreate-index', action='store_true', default = False,
+        help = 'if specified, pre-existing .index files will be deleted and newly created' )
 
-    parser.add_argument( '-r', '--recursive', action='store_true', default = False,
-                         help = 'mount TAR archives inside the mounted TAR recursively. Note that this only has an effect when creating an index. If an index already exists, then this option will be effectively ignored. Recreate the index if you want change the recursive mounting policy anyways.' )
+    parser.add_argument(
+        '-r', '--recursive', action='store_true', default = False,
+        help = 'mount TAR archives inside the mounted TAR recursively. Note that this only has an effect when creating an index. If an index already exists, then this option will be effectively ignored. Recreate the index if you want change the recursive mounting policy anyways.' )
 
-    parser.add_argument( '-s', '--serialization-backend', type = str, default = 'custom',
-                         help = 'specify which library to use for writing out the TAR index. Supported keywords: (' +
-                                ','.join( IndexedTar.availableSerializationBackends ) + ')[.(' +
-                                ','.join( IndexedTar.availableCompressions ).strip( ',' ) + ')]' )
+    parser.add_argument(
+        '-s', '--serialization-backend', type = str, default = 'custom',
+        help =
+        'specify which library to use for writing out the TAR index. Supported keywords: (' +
+        ','.join( IndexedTar.availableSerializationBackends ) + ')[.(' +
+        ','.join( IndexedTar.availableCompressions ).strip( ',' ) + ')]' )
 
-    parser.add_argument( 'tarfilepath', metavar = 'tar-file-path',
-                         type = argparse.FileType( 'r' ), nargs = 1,
-                         help = 'the path to the TAR archive to be mounted' )
-    parser.add_argument( 'mountpath', metavar = 'mount-path', nargs = '?',
-                         help = 'the path to a folder to mount the TAR contents into' )
+    parser.add_argument(
+        'tarfilepath', metavar = 'tar-file-path',
+        type = argparse.FileType( 'r' ), nargs = 1,
+        help = 'the path to the TAR archive to be mounted' )
+    parser.add_argument(
+        'mountpath', metavar = 'mount-path', nargs = '?',
+        help = 'the path to a folder to mount the TAR contents into' )
 
     args = parser.parse_args()
 
@@ -694,11 +733,13 @@ if __name__ == '__main__':
 
     printDebug = args.debug
 
-    fuse.FUSE( operations = TarMount(
-                   pathToMount = tarToMount,
-                   clearIndexCache = args.recreate_index,
-                   recursive = args.recursive,
-                   serializationBackend = args.serialization_backend  ),
+    fuseOperationsObject = TarMount(
+        pathToMount = tarToMount,
+        clearIndexCache = args.recreate_index,
+        recursive = args.recursive,
+        serializationBackend = args.serialization_backend  )
+
+    fuse.FUSE( operations = fuseOperationsObject,
                mountpoint = mountPath,
                foreground = args.foreground )
 
