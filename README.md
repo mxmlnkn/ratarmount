@@ -49,9 +49,17 @@ optional arguments:
                         (default: False)
   -s SERIALIZATION_BACKEND, --serialization-backend SERIALIZATION_BACKEND
                         specify which library to use for writing out the TAR
-                        index. Supported keywords: (pickle,pickle2,pickle3,cus
-                        tom,cbor,msgpack,rapidjson,ujson,simplejson)[.(lz4,gz)
-                        ] (default: custom)
+                        index. Supported keywords: (none,pickle,pickle2,pickle
+                        3,custom,cbor,msgpack,rapidjson,ujson,simplejson)[.(lz
+                        4,gz)] (default: custom)
+  -p PREFIX, --prefix PREFIX
+                        The specified path to the folder inside the TAR will
+                        be mounted to root. This can be useful when the
+                        archive as created with absolute paths. E.g., for an
+                        archive created with `tar -P cf
+                        /var/log/apt/history.log`, -p /var/log/apt/ can be
+                        specified so that the mount target directory
+                        >directly< contains history.log. (default: )
 ```
 
 Index files are if possible created to / if existing loaded from these file locations in order:

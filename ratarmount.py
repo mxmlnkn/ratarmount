@@ -659,7 +659,12 @@ class TarMount( fuse.Operations ):
     is planned.
     """
 
-    def __init__( self, pathToMount, clearIndexCache = False, recursive = False, serializationBackend = None ):
+    def __init__( self,
+                  pathToMount,
+                  clearIndexCache = False,
+                  recursive = False,
+                  serializationBackend = None,
+                  prefix = '' ):
         self.tarFileName = pathToMount
         self.tarFile = open( self.tarFileName, 'rb' )
         self.indexedTar = IndexedTar(
@@ -669,14 +674,22 @@ class TarMount( fuse.Operations ):
             recursive = recursive,
             serializationBackend = serializationBackend )
 
+        if prefix and not self.indexedTar.isDir( prefix ):
+            prefix = ''
+        if prefix and not prefix.endswith( '/' ):
+            prefix += '/'
+        self.prefix = prefix
+
         # make the mount point read only and executable if readable, i.e., allow directory listing
+        # @todo In some cases, I even 2(!) '.' directories listed with ls -la!
+        #       But without this, the mount directory is owned by root
         tarStats = os.stat( self.tarFileName )
         # clear higher bits like S_IFREG and set the directory bit instead
         mountMode = ( tarStats.st_mode & 0o777 ) | stat.S_IFDIR
         if mountMode & stat.S_IRUSR != 0: mountMode |= stat.S_IXUSR
         if mountMode & stat.S_IRGRP != 0: mountMode |= stat.S_IXGRP
         if mountMode & stat.S_IROTH != 0: mountMode |= stat.S_IXOTH
-        self.indexedTar.fileIndex[ '.' ] = FileInfo(
+        self.indexedTar.fileIndex[ self.prefix + '.' ] = FileInfo(
             offset   = 0                ,
             size     = tarStats.st_size ,
             mtime    = tarStats.st_mtime,
@@ -696,7 +709,7 @@ class TarMount( fuse.Operations ):
         if printDebug >= 2:
             print( "[getattr( path =", path, ", fh =", fh, ")] Enter" )
 
-        fileInfo = self.indexedTar.getFileInfo( path, listDir = False )
+        fileInfo = self.indexedTar.getFileInfo( self.prefix + path, listDir = False )
         if not isinstance( fileInfo, FileInfo ):
             if printDebug >= 2:
                 print( "Could not find path:", path )
@@ -718,14 +731,14 @@ class TarMount( fuse.Operations ):
     def readdir( self, path, fh ):
         if printDebug >= 2:
             print( "[readdir( path =", path, ", fh =", fh, ")] return:",
-                   self.indexedTar.getFileInfo( path, listDir = True ).keys() )
+                   self.indexedTar.getFileInfo( self.prefix + path, listDir = True ).keys() )
 
         # we only need to return these special directories. FUSE automatically expands these and will not ask
         # for paths like /../foo/./../bar, so we don't need to worry about cleaning such paths
         yield '.'
         yield '..'
 
-        for key in self.indexedTar.getFileInfo( path, listDir = True ).keys():
+        for key in self.indexedTar.getFileInfo( self.prefix + path, listDir = True ).keys():
             yield key
 
     @overrides( fuse.Operations )
@@ -733,7 +746,7 @@ class TarMount( fuse.Operations ):
         if printDebug >= 2:
             print( "[readlink( path =", path, ")]" )
 
-        fileInfo = self.indexedTar.getFileInfo( path )
+        fileInfo = self.indexedTar.getFileInfo( self.prefix + path )
         if not isinstance( fileInfo, FileInfo ):
             raise fuse.FuseOSError( fuse.errno.EROFS )
 
@@ -748,7 +761,7 @@ class TarMount( fuse.Operations ):
         if printDebug >= 2:
             print( "[read( path =", path, ", length =", length, ", offset =", offset, ",fh =", fh, ")] path:", path )
 
-        fileInfo = self.indexedTar.getFileInfo( path )
+        fileInfo = self.indexedTar.getFileInfo( self.prefix + path )
         if not isinstance( fileInfo, FileInfo ):
             raise fuse.FuseOSError( fuse.errno.EROFS )
 
@@ -791,6 +804,14 @@ if __name__ == '__main__':
         ','.join( IndexedTar.availableCompressions ).strip( ',' ) + ')]' )
 
     parser.add_argument(
+        '-p', '--prefix', type = str, default = '',
+        help = 'The specified path to the folder inside the TAR will be mounted to root. '
+               'This can be useful when the archive as created with absolute paths. '
+               'E.g., for an archive created with `tar -P cf /var/log/apt/history.log`, '
+               '-p /var/log/apt/ can be specified so that the mount target directory '
+               '>directly< contains history.log.' )
+
+    parser.add_argument(
         'tarfilepath', metavar = 'tar-file-path',
         type = argparse.FileType( 'r' ), nargs = 1,
         help = 'the path to the TAR archive to be mounted' )
@@ -822,7 +843,8 @@ if __name__ == '__main__':
         pathToMount = tarToMount,
         clearIndexCache = args.recreate_index,
         recursive = args.recursive,
-        serializationBackend = args.serialization_backend  )
+        serializationBackend = args.serialization_backend,
+        prefix = args.prefix )
 
     fuse.FUSE( operations = fuseOperationsObject,
                mountpoint = mountPath,
