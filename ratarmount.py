@@ -7,6 +7,7 @@ import os
 import re
 import stat
 import tarfile
+import time
 import traceback
 from collections import namedtuple
 from timeit import default_timer as timer
@@ -26,6 +27,34 @@ def overrides( parentClass ):
 FileInfo = namedtuple( "FileInfo", "offset size mtime mode type linkname uid gid istar" )
 
 
+class ProgressBar:
+    def __init__( self, maxValue ):
+        self.maxValue = maxValue
+        self.lastUpdateTime = time.time()
+        self.lastUpdateValue = 0
+        self.updateInterval = 2 # seconds
+        self.creationTime = time.time()
+
+    def update( self, value ):
+        if self.lastUpdateTime is not None and ( time.time() - self.lastUpdateTime ) < self.updateInterval:
+            return
+
+        # Use whole interval since start to estimate time
+        eta1 = int( ( time.time() - self.creationTime ) / value * ( self.maxValue - value ) )
+        # Use only a shorter window interval to estimate time.
+        # Accounts better for higher speeds in beginning, e.g., caused by caching effects.
+        # However, this estimate might vary a lot while the other one stabilizes after some time!
+        eta2 = int( ( time.time() - self.lastUpdateTime ) / ( value - self.lastUpdateValue ) * ( self.maxValue - value ) )
+        print( "Currently at position {} of {} ({:.2f}%). "
+               "Estimated time remaining with current rate: {} min {} s, with average rate: {} min {} s."
+               .format( value, self.maxValue, value / self.maxValue * 100.,
+                        eta2 // 60, eta2 % 60,
+                        eta1 // 60, eta1 % 60 ),
+               flush = True )
+
+        self.lastUpdateTime = time.time()
+        self.lastUpdateValue = value
+
 class IndexedTar:
     """
     This class reads once through the whole TAR archive and stores TAR file offsets
@@ -39,6 +68,7 @@ class IndexedTar:
         'cacheFolder',
         'possibleIndexFilePaths',
         'indexFileName',
+        'progressBar',
     )
 
     # these allowed backends also double as extensions for the index file to look for
@@ -66,7 +96,9 @@ class IndexedTar:
                   writeIndex = False,
                   clearIndexCache = False,
                   recursive = False,
-                  serializationBackend = None ):
+                  serializationBackend = None,
+                  progressBar = None ):
+        self.progressBar = progressBar
         self.tarFileName = os.path.normpath( pathToTar )
 
         # Stores the file hierarchy in a dictionary with keys being either
@@ -345,7 +377,13 @@ class IndexedTar:
                    "which currently is not supported." )
             raise exception
 
+        if self.progressBar is None and os.path.isfile( self.tarFileName ):
+            self.progressBar = ProgressBar( os.stat( self.tarFileName ).st_size )
+
         for tarInfo in loadedTarFile:
+            if self.progressBar is not None:
+                self.progressBar.update( tarInfo.offset_data )
+
             mode = tarInfo.mode
             if tarInfo.isdir() : mode |= stat.S_IFDIR
             if tarInfo.isfile(): mode |= stat.S_IFREG
@@ -370,7 +408,10 @@ class IndexedTar:
                 oldPos = fileObject.tell()
                 if oldPos != tarInfo.offset_data:
                     fileObject.seek( tarInfo.offset_data )
-                indexedTar = IndexedTar( tarInfo.name, fileObject = fileObject, writeIndex = False )
+                indexedTar = IndexedTar( tarInfo.name,
+                                         fileObject = fileObject,
+                                         writeIndex = False,
+                                         progressBar = self.progressBar )
                 # might be especially necessary if the .tar is not actually a tar!
                 fileObject.seek( fileObject.tell() )
 
