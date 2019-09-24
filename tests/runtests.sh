@@ -1,6 +1,7 @@
 #!/bin/bash
 
 cd -- "$( dirname -- "${BASH_SOURCE[0]}" )"
+cd ..
 
 echoerr() { echo "$@" 1>&2; }
 
@@ -69,6 +70,32 @@ checkFileInTAR()
 
     # retry without forcing index recreation
     local cmd=( python3 ratarmount.py --recursive --serialization-backend "$type" "$archive" "$mountFolder" )
+    "${cmd[@]}" &>/dev/null
+    checkStat "$mountFolder" || returnError "${cmd[*]}"
+    checkStat "$mountFolder/$fileInTar" || returnError "${cmd[*]}"
+    verifyCheckSum "$mountFolder" "$fileInTar" "$archive" || returnError "${cmd[*]}"
+    funmount "$mountFolder"
+
+    rmdir "$mountFolder"
+
+    echoerr "Tested succesfully '$fileInTar' in '$archive' for checksum $correctChecksum"
+
+    return 0
+}
+
+checkFileInTARPrefix()
+{
+    local prefix="$1"; shift
+    local archive="$1"; shift
+    local fileInTar="$1"; shift
+    local correctChecksum="$1"
+
+    local mountFolder="$( mktemp -d )"
+
+    funmount "$mountFolder"
+
+    # try with index recreation
+    local cmd=( python3 ratarmount.py -c --recursive --prefix "$prefix" "$archive" "$mountFolder" )
     "${cmd[@]}" &>/dev/null
     checkStat "$mountFolder" || returnError "${cmd[*]}"
     checkStat "$mountFolder/$fileInTar" || returnError "${cmd[*]}"
@@ -226,7 +253,7 @@ data = np.genfromtxt( sys.argv[1], skip_footer = 1 ).transpose()
 print( int( np.max( data[1] ) ), int( np.max( data[2] ) ) )" "$1"
 }
 
-testSerialization()
+benchmarkSerialization()
 {
     local logFile='serializationBenchmark.dat'
     touch "$logFile"
@@ -264,8 +291,13 @@ testSerialization()
     done
 }
 
+pylint --disable=C0326,C0103 ratarmount.py > pylint.log
 
 rm -f tests/*.index.*
+
+checkFileInTARPrefix '' tests/single-nested-file.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
+checkFileInTARPrefix foo tests/single-nested-file.tar fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
+checkFileInTARPrefix foo/fighter tests/single-nested-file.tar ufo 2709a3348eb2c52302a7606ecf5860bc
 
 for type in custom pickle2 pickle3 cbor msgpack rapidjson ujson simplejson; do
   for compression in '' '.gz' '.lz4'; do
@@ -286,8 +318,10 @@ for type in custom pickle2 pickle3 cbor msgpack rapidjson ujson simplejson; do
   done
 done
 
-testSerialization
+#benchmarkSerialization # takes quite long
 
 rm -f tests/*.index.*
+
+echo -e '\e[32mAll tests ran succesfully.\e[0m'
 
 exit $error

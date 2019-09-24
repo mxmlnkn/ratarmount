@@ -6,13 +6,14 @@ Combines the random access indexing idea from [tarindexer](https://github.com/de
 
  - Python3
  - fusepy
- - the serialization backend library (by default: `msgpack` but with the built-in `pickle` backend no additional library is required)
+ - msgpack (This is the default serialization for the cached file index. However, there also is a pickle backend which does not require an additional install but has more memory overhead)
+ - [optional] any of the other serialization backends. (Most of these are for benchmark purposes and can be ignored.)
  
 E.g. on Debian-like systems these can be installed with:
 
 ```bash
 sudo apt-get update
-sudo apt-get install python3
+sudo apt-get install python3 python3-pip
 pip3 install --user -r requirements.txt
 ```
 
@@ -48,9 +49,17 @@ optional arguments:
                         (default: False)
   -s SERIALIZATION_BACKEND, --serialization-backend SERIALIZATION_BACKEND
                         specify which library to use for writing out the TAR
-                        index. Supported keywords: (pickle,pickle2,pickle3,cus
-                        tom,cbor,msgpack,rapidjson,ujson,simplejson)[.(lz4,gz)
-                        ] (default: custom)
+                        index. Supported keywords: (none,pickle,pickle2,pickle
+                        3,custom,cbor,msgpack,rapidjson,ujson,simplejson)[.(lz
+                        4,gz)] (default: custom)
+  -p PREFIX, --prefix PREFIX
+                        The specified path to the folder inside the TAR will
+                        be mounted to root. This can be useful when the
+                        archive as created with absolute paths. E.g., for an
+                        archive created with `tar -P cf
+                        /var/log/apt/history.log`, -p /var/log/apt/ can be
+                        specified so that the mount target directory
+                        >directly< contains history.log. (default: )
 ```
 
 Index files are if possible created to / if existing loaded from these file locations in order:
@@ -84,7 +93,7 @@ Archivemount[https://github.com/cybernoid/archivemount/] does not seem to suppor
 I didn't find out about [TAR Browser](https://github.com/tomorrow-nf/tar-as-filesystem/) before I finished the ratarmount script. That's also one of it's cons:
 
   - Hard to find. I don't seem to be the only one who has trouble finding it as it has zero stars on Github after 4 years compared to 29 stars for tarindexer after roughly the same amount of time.
-  - Hassle to set up. Needs compilation and I gave up when I was instructed to set up a MySQL database for it to use. Btw, the setup instructions are not on its Github but [here](https://web.wpi.edu/Pubs/E-project/Available/E-project-030615-133259/unrestricted/TARBrowserFinal.pdf).
+  - Hassle to set up. Needs compilation and I gave up when I was instructed to set up a MySQL database for it to use. Confusingly, the setup instructions are not on its Github but [here](https://web.wpi.edu/Pubs/E-project/Available/E-project-030615-133259/unrestricted/TARBrowserFinal.pdf).
   - Doesn't seem to support recursive TAR mounting. I didn't test it because of the MysQL dependency but the code does not seem to have logic for recursive mounting.
 
 Pros:
@@ -106,3 +115,33 @@ The test for the ImageNet data set is promising:
   - Reading a 40kB file: 100ms (first time) and 4ms (subsequent times)
 
 The reading time for a small file simply verifies the random access by using file seek to be working. The difference between the first read and subsequent reads is not because of ratarmount but because of operating system and file system caches.
+
+## Choice of the Serialization for the Index File
+
+For most conventional TAR files, which have less than than 10k files, the choice of the serialization backend does not matter.
+However, for larger TARs, both the runtime and the memory footprint can become limiting factors.
+For that reason, I tried different methods for serialization (or marshalling) the database of file stats and offsets inside the TAR file.
+
+To compare the backends, index creation and index loading was benchmarked.
+The test TAR for the benchmark contains 64 TARs containing each roughly 11k files with file names each of length 96 characters.
+This amounts to roughly 64 MiB of metadata in 700 000 files.
+The size of the files inside the TAR do not matter for the benchmark.
+Therefore, they are zero.
+
+![resident-memory-over-time-saving-64-MiB-metadata](benchmarks/plots/resident-memory-over-time-saving-64-MiB-metadata.png)
+
+Above is a memory footprint timeline for index creation.
+The first 45s is the same for all as the index is created in memory.
+Then, there is a peak, which doubles the memory footprint for most serialization backends except for 'custom' and 'simplejson'.
+This is presumably because most of the backends are not streaming, i.e, the store a full copy of the data in memory before writing it to file!
+
+The timeline for index loading is similar.
+Some do need twice the amount of memory, some do not.
+Some are faster, some are slower.
+Below is a comparison of the extracted performance metrics like maximum memory footprint over the whole timeline or the serialization time required.
+
+![performance-comparison-64-MiB-metadata](benchmarks/plots/performance-comparison-64-MiB-metadata.png)
+
+### Conclusion
+
+When low on memory, use the **uncompressed custom** serializer else use **lz4 compressed msgpack** for a <10% time boost when storing the index, and 3-5x faster index loading.
