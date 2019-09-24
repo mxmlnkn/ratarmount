@@ -81,9 +81,15 @@ class IndexedTar:
             self.cacheFolder + "/" + self.tarFileName.replace( "/", "_" ) + ".index"
         ]
 
-        if serializationBackend not in self.supportedIndexExtensions():
+        if not serializationBackend:
             serializationBackend = 'custom'
-            print( "[Warning] Serialization backend not supported. Defaulting to '" + serializationBackend + "'!" )
+
+        if serializationBackend not in self.supportedIndexExtensions():
+            print( "[Warning] Serialization backend '" + str( serializationBackend ) + "' not supported.",
+                   "Defaulting to '" + serializationBackend + "'!" )
+            print( "List of supported extensions / backends:", self.supportedIndexExtensions() )
+
+            serializationBackend = 'custom'
 
         # this is the actual index file, which will be used in the end, and by default
         self.indexFileName = self.possibleIndexFilePaths[0] + "." + serializationBackend
@@ -103,30 +109,14 @@ class IndexedTar:
             # first try loading the index for the given serialization backend
             if serializationBackend is not None:
                 for indexPath in self.possibleIndexFilePaths:
-                    indexPathWitExt = indexPath + "." + serializationBackend
-
-                    if self.indexIsLoaded():
+                    if self.tryLoadIndex( indexPath + "." + serializationBackend ):
                         break
-
-                    if os.path.isfile( indexPathWitExt ):
-                        if os.path.getsize( indexPathWitExt ) == 0:
-                            os.remove( indexPathWitExt )
-                        else:
-                            self.loadIndex( indexPathWitExt )
 
             # try loading the index from one of the pre-configured paths
             for indexPath in self.possibleIndexFilePaths:
                 for extension in self.supportedIndexExtensions():
-                    indexPathWitExt = indexPath + "." + extension
-
-                    if self.indexIsLoaded():
+                    if self.tryLoadIndex( indexPath + "." + extension ):
                         break
-
-                    if os.path.isfile( indexPathWitExt ):
-                        if os.path.getsize( indexPathWitExt ) == 0:
-                            os.remove( indexPathWitExt )
-                        else:
-                            self.loadIndex( indexPathWitExt )
 
             if not self.indexIsLoaded():
                 with open( self.tarFileName, 'rb' ) as file:
@@ -164,6 +154,8 @@ class IndexedTar:
                                                        IndexedTar.availableCompressions ) ]
     @staticmethod
     def dump( toDump, file ):
+        import msgpack
+
         if isinstance( toDump, dict ):
             file.write( b'\x01' ) # magic code meaning "start dictionary object"
 
@@ -175,7 +167,6 @@ class IndexedTar:
             file.write( b'\x02' ) # magic code meaning "close dictionary object"
 
         elif isinstance( toDump, FileInfo ):
-            import msgpack
             serialized = msgpack.dumps( toDump )
             file.write( b'\x05' ) # magic code meaning "msgpack object"
             file.write( len( serialized ).to_bytes( 4, byteorder = 'little' ) )
@@ -192,54 +183,54 @@ class IndexedTar:
 
     @staticmethod
     def load( file ):
+        import msgpack
+
         elementType = file.read( 1 )
 
-        if elementType == b'\x01': # start of dictionary
-            result = {}
+        if elementType != b'\x01': # start of dictionary
+            raise Exception( 'Custom TAR index loader: invalid file format' )
 
-            dictElementType = file.read( 1 )
-            while len( dictElementType ) != 0:
-                if dictElementType == b'\x02':
-                    break
+        result = {}
 
-                elif dictElementType == b'\x03':
-                    import msgpack
+        dictElementType = file.read( 1 )
+        while dictElementType:
+            if dictElementType == b'\x02':
+                break
 
-                    keyType = file.read( 1 )
-                    if keyType != b'\x04': # key must be string object
-                        raise Exception( 'Custom TAR index loader: invalid file format' )
+            elif dictElementType == b'\x03':
+                keyType = file.read( 1 )
+                if keyType != b'\x04': # key must be string object
+                    raise Exception( 'Custom TAR index loader: invalid file format' )
+                size = int.from_bytes( file.read( 4 ), byteorder = 'little' )
+                key = file.read( size ).decode()
+
+                valueType = file.read( 1 )
+                if valueType == b'\x05': # msgpack object
                     size = int.from_bytes( file.read( 4 ), byteorder = 'little' )
-                    key = file.read( size ).decode()
+                    serialized = file.read( size )
+                    value = FileInfo( *msgpack.loads( serialized ) )
 
-                    valueType = file.read( 1 )
-                    if valueType == b'\x05': # msgpack object
-                        size = int.from_bytes( file.read( 4 ), byteorder = 'little' )
-                        serialized = file.read( size )
-                        value = FileInfo( *msgpack.loads( serialized ) )
-
-                    elif valueType == b'\x01': # dict object
-                        import io
-                        file.seek( -1, io.SEEK_CUR )
-                        value = IndexedTar.load( file )
-
-                    else:
-                        raise Exception( 'Custom TAR index loader: invalid file format ' +
-                            '(expected msgpack or dict but got' +
-                            str( int.from_bytes( valueType, byteorder = 'little' ) ) + ')' )
-
-                    result[key] = value
+                elif valueType == b'\x01': # dict object
+                    file.seek( -1, io.SEEK_CUR )
+                    value = IndexedTar.load( file )
 
                 else:
-                    raise Exception( 'Custom TAR index loader: invalid file format ' +
-                        '(expected end-of-dict or key-value pair but got' +
-                        str( int.from_bytes( dictElementType, byteorder = 'little' ) ) + ')' )
+                    raise Exception(
+                        'Custom TAR index loader: invalid file format ' +
+                        '(expected msgpack or dict but got' +
+                        str( int.from_bytes( valueType, byteorder = 'little' ) ) + ')' )
 
-                dictElementType = file.read( 1 )
+                result[key] = value
 
-            return result
+            else:
+                raise Exception(
+                    'Custom TAR index loader: invalid file format ' +
+                    '(expected end-of-dict or key-value pair but got' +
+                    str( int.from_bytes( dictElementType, byteorder = 'little' ) ) + ')' )
 
-        else:
-            raise Exception( 'Custom TAR index loader: invalid file format' )
+            dictElementType = file.read( 1 )
+
+        return result
 
     def getFileInfo( self, path, listDir = False ):
         # go down file hierarchy tree along the given path
@@ -562,6 +553,53 @@ class IndexedTar:
         if printDebug >= 1:
             print( "Loading offset dictionary from", indexFileName, "took {:.2f}s".format( t1 - t0 ) )
 
+    def tryLoadIndex( self, indexFileName ):
+        """calls loadIndex if index is not loaded already and provides extensive error handling"""
+
+        if self.indexIsLoaded():
+            return True
+
+        if not os.path.isfile( indexFileName ):
+            return False
+
+        if os.path.getsize( indexFileName ) == 0:
+            try:
+                os.remove( indexFileName )
+            except OSError:
+                print( "[Warning] Failed to remove empty old cached index file:", indexFileName )
+
+            return False
+
+        try:
+            self.loadIndex( indexFileName )
+        except Exception:
+            self.fileIndex = None
+
+            traceback.print_exc()
+            print( "[Warning] Could not load file '" + indexFileName  )
+
+            print( "[Info] Some likely reasons for not being able to load the index file:" )
+            print( "[Info]   - Some dependencies are missing. Please isntall them with:" )
+            print( "[Info]       pip3 --user -r requirements.txt" )
+            print( "[Info]   - The file has incorrect read permissions" )
+            print( "[Info]   - The file got corrupted because of:" )
+            print( "[Info]     - The program exited while it was still writing the index because of:" )
+            print( "[Info]       - the user sent SIGINT to force the program to quit" )
+            print( "[Info]       - an internal error occured while writing the index" )
+            print( "[Info]       - the disk filled up while writing the index" )
+            print( "[Info]     - Rare lowlevel corruptions caused by hardware failure" )
+
+            print( "[Info] This might force a time-costly index recreation, so if it happens often and "
+                   "mounting is slow, try to find out why loading fails repeatedly, "
+                   "e.g., by opening an issue on the public github page." )
+
+            try:
+                os.remove( indexFileName )
+            except OSError:
+                print( "[Warning] Failed to remove corrupted old cached index file:", indexFileName )
+
+        return self.indexIsLoaded()
+
 
 class TarMount( fuse.Operations ):
     """
@@ -654,9 +692,9 @@ class TarMount( fuse.Operations ):
 
         pathname = fileInfo.linkname
         if pathname.startswith( "/" ):
-            return os.path.relpath( pathname, self.root )
-        else:
-            return pathname
+            return os.path.relpath( pathname, "/" ) # @todo Not exactly sure what to return here
+
+        return pathname
 
     @overrides( fuse.Operations )
     def read( self, path, length, offset, fh ):
