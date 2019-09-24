@@ -1,6 +1,7 @@
 #!/bin/bash
 
 cd -- "$( dirname -- "${BASH_SOURCE[0]}" )"
+cd ..
 
 echoerr() { echo "$@" 1>&2; }
 
@@ -226,7 +227,7 @@ data = np.genfromtxt( sys.argv[1], skip_footer = 1 ).transpose()
 print( int( np.max( data[1] ) ), int( np.max( data[2] ) ) )" "$1"
 }
 
-testSerialization()
+benchmarkSerialization()
 {
     local logFile='serializationBenchmark.dat'
     touch "$logFile"
@@ -264,6 +265,7 @@ testSerialization()
     done
 }
 
+pylint --disable=C0326,C0103 ratarmount.py > pylint.log
 
 rm -f tests/*.index.*
 
@@ -286,7 +288,7 @@ for type in custom pickle2 pickle3 cbor msgpack rapidjson ujson simplejson; do
   done
 done
 
-testSerialization
+#benchmarkSerialization # takes quite long
 
 rm -f tests/*.index.*
 
