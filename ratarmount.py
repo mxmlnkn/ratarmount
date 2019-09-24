@@ -43,6 +43,7 @@ class IndexedTar:
 
     # these allowed backends also double as extensions for the index file to look for
     availableSerializationBackends = [
+        'none',
         'pickle',
         'pickle2',
         'pickle3',
@@ -144,7 +145,7 @@ class IndexedTar:
                     try:
                         self.writeIndex( self.indexFileName )
                     except IOError:
-                        print( "[Info] Could not write TAR index to file.",
+                        print( "[Info] Could not write TAR index to file. ",
                                "Subsequent mounts might be slow!" )
 
     @staticmethod
@@ -462,6 +463,11 @@ class IndexedTar:
         #  - marshal: can't serialize namedtuples
         #  - hickle: for some reason, creates files almost 64x larger and slower than pickle!?
         #  - yaml: almost a 10 times slower and more memory usage and deserializes everything including ints to string
+
+        if serializationBackend == 'none':
+            print( "Won't write out index file because backend 'none' was chosen. "
+                   "Subsequent mounts might be slow!" )
+            return
 
         with wrapperOpen( outFileName ) as outFile:
             if serializationBackend == 'pickle2':
