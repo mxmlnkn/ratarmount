@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import argparse
-import itertools
 import io
+import itertools
 import os
 import re
 import stat
@@ -271,7 +272,7 @@ class IndexedTar:
         for name in os.path.normpath( path ).split( os.sep ):
             if not name:
                 continue
-            if not name in p:
+            if name not in p:
                 return None
             p = p[name]
 
@@ -769,7 +770,7 @@ class TarMount( fuse.Operations ):
         return self.tarFile.read( length )
 
 
-if __name__ == '__main__':
+def cli():
     parser = argparse.ArgumentParser(
         formatter_class = argparse.ArgumentDefaultsHelpFormatter,
         description = '''\
@@ -837,6 +838,7 @@ if __name__ == '__main__':
     if not os.path.exists( mountPath ):
         os.mkdir( mountPath )
 
+    global printDebug
     printDebug = args.debug
 
     fuseOperationsObject = TarMount(
@@ -852,3 +854,6 @@ if __name__ == '__main__':
 
     if mountPathWasCreated and args.foreground:
         os.rmdir( mountPath )
+
+if __name__ == '__main__':
+    cli()

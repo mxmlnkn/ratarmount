@@ -2,19 +2,20 @@
 
 Combines the random access indexing idea from [tarindexer](https://github.com/devsnd/tarindexer) and then mounts the tar using [fusepy](https://github.com/fusepy/fusepy) for easy read-only access just like [archivemount](https://github.com/cybernoid/archivemount/). It also will mount TARs inside TARs inside TARs, ... recursively into folders of the same name, which is useful for the ImageNet data set.
 
-# Requirements
+# Installation
 
- - Python3
- - fusepy
- - msgpack (This is the default serialization for the cached file index. However, there also is a pickle backend which does not require an additional install but has more memory overhead)
- - [optional] any of the other serialization backends. (Most of these are for benchmark purposes and can be ignored.)
- 
-E.g. on Debian-like systems these can be installed with:
+You can simply install it from PyPI:
+```
+pip install ratarmount
+```
 
+Or, if you want to test the latest devlopment version on a Debian-like system:
 ```bash
 sudo apt-get update
-sudo apt-get install python3 python3-pip
-pip3 install --user -r requirements.txt
+sudo apt-get install python3 python3-pip git
+git clone https://github.com/mxmlnkn/ratarmount.git
+python3 -m pip install --user .
+ratarmount --help
 ```
 
 # Usage
