@@ -769,8 +769,7 @@ class TarMount( fuse.Operations ):
         self.tarFile.seek( fileInfo.offset + offset, os.SEEK_SET )
         return self.tarFile.read( length )
 
-
-def cli():
+def parseArgs( args = None ):
     parser = argparse.ArgumentParser(
         formatter_class = argparse.ArgumentDefaultsHelpFormatter,
         description = '''\
@@ -782,25 +781,28 @@ def cli():
 
     parser.add_argument(
         '-f', '--foreground', action='store_true', default = False,
-        help = 'keeps the python program in foreground so it can print debug'
+        help = 'Keeps the python program in foreground so it can print debug '
                'output when the mounted path is accessed.' )
 
     parser.add_argument(
         '-d', '--debug', type = int, default = 1,
-        help = 'sets the debugging level. Higher means more output. Currently 3 is the highest' )
+        help = 'Sets the debugging level. Higher means more output. Currently, 3 is the highest.' )
 
     parser.add_argument(
         '-c', '--recreate-index', action='store_true', default = False,
-        help = 'if specified, pre-existing .index files will be deleted and newly created' )
+        help = 'If specified, pre-existing .index files will be deleted and newly created.' )
 
     parser.add_argument(
         '-r', '--recursive', action='store_true', default = False,
-        help = 'mount TAR archives inside the mounted TAR recursively. Note that this only has an effect when creating an index. If an index already exists, then this option will be effectively ignored. Recreate the index if you want change the recursive mounting policy anyways.' )
+        help = 'Mount TAR archives inside the mounted TAR recursively. '
+               'Note that this only has an effect when creating an index. '
+               'If an index already exists, then this option will be effectively ignored. '
+               'Recreate the index if you want change the recursive mounting policy anyways.' )
 
     parser.add_argument(
         '-s', '--serialization-backend', type = str, default = 'custom',
         help =
-        'specify which library to use for writing out the TAR index. Supported keywords: (' +
+        'Specify which library to use for writing out the TAR index. Supported keywords: (' +
         ','.join( IndexedTar.availableSerializationBackends ) + ')[.(' +
         ','.join( IndexedTar.availableCompressions ).strip( ',' ) + ')]' )
 
@@ -813,14 +815,22 @@ def cli():
                '>directly< contains history.log.' )
 
     parser.add_argument(
+        '--fuse', type = str, default = '',
+        help = 'Comma separated FUSE options. See "man mount.fuse" for help. '
+               'Example: --fuse "allow_other,entry_timeout=2.8,gid=0". ' )
+
+    parser.add_argument(
         'tarfilepath', metavar = 'tar-file-path',
         type = argparse.FileType( 'r' ), nargs = 1,
-        help = 'the path to the TAR archive to be mounted' )
+        help = 'The path to the TAR archive to be mounted.' )
     parser.add_argument(
         'mountpath', metavar = 'mount-path', nargs = '?',
-        help = 'the path to a folder to mount the TAR contents into' )
+        help = 'The path to a folder to mount the TAR contents into.' )
 
-    args = parser.parse_args()
+    return parser.parse_args( args )
+
+def cli( args = None ):
+    args = parseArgs( args )
 
     tarToMount = os.path.abspath( args.tarfilepath[0].name )
     try:
@@ -829,6 +839,9 @@ def cli():
         print( "Archive", tarToMount, "can't be opened!",
                "This might happen for compressed TAR archives, which currently is not supported." )
         exit( 1 )
+
+    fusekwargs = dict( [ option.split( '=', 1 ) if '=' in option else ( option, True )
+                       for option in args.fuse.split( ',' ) ] ) if args.fuse else {}
 
     mountPath = args.mountpath
     if mountPath is None:
@@ -850,7 +863,8 @@ def cli():
 
     fuse.FUSE( operations = fuseOperationsObject,
                mountpoint = mountPath,
-               foreground = args.foreground )
+               foreground = args.foreground,
+               **fusekwargs )
 
     if mountPathWasCreated and args.foreground:
         os.rmdir( mountPath )

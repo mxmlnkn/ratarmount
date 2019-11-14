@@ -22,34 +22,41 @@ ratarmount --help
 
 ```
 usage: ratarmount.py [-h] [-f] [-d DEBUG] [-c] [-r] [-s SERIALIZATION_BACKEND]
+                     [-p PREFIX] [--fuse FUSE]
                      tar-file-path [mount-path]
 
 If no mount path is specified, then the tar will be mounted to a folder of the
-same name but without a file extension.
+same name but without a file extension. TAR files contained inside the tar and
+even TARs in TARs in TARs will be mounted recursively at folders of the same
+name barred the file extension '.tar'. In order to reduce the mounting time,
+the created index for random access to files inside the tar will be saved to
+<path to tar>.index.<backend>[.<compression]. If it can't be saved there, it
+will be saved in ~/.ratarmount/<path to tar: '/' ->
+'_'>.index.<backend>[.<compression].
 
 positional arguments:
-  tar-file-path         the path to the TAR archive to be mounted
-  mount-path            the path to a folder to mount the TAR contents into
+  tar-file-path         The path to the TAR archive to be mounted.
+  mount-path            The path to a folder to mount the TAR contents into.
                         (default: None)
 
 optional arguments:
   -h, --help            show this help message and exit
-  -f, --foreground      keeps the python program in foreground so it can print
+  -f, --foreground      Keeps the python program in foreground so it can print
                         debug output when the mounted path is accessed.
                         (default: False)
   -d DEBUG, --debug DEBUG
-                        sets the debugging level. Higher means more output.
-                        Currently 3 is the highest (default: 1)
-  -c, --recreate-index  if specified, pre-existing .index files will be
-                        deleted and newly created (default: False)
-  -r, --recursive       mount TAR archives inside the mounted TAR recursively.
+                        Sets the debugging level. Higher means more output.
+                        Currently, 3 is the highest. (default: 1)
+  -c, --recreate-index  If specified, pre-existing .index files will be
+                        deleted and newly created. (default: False)
+  -r, --recursive       Mount TAR archives inside the mounted TAR recursively.
                         Note that this only has an effect when creating an
                         index. If an index already exists, then this option
                         will be effectively ignored. Recreate the index if you
                         want change the recursive mounting policy anyways.
                         (default: False)
   -s SERIALIZATION_BACKEND, --serialization-backend SERIALIZATION_BACKEND
-                        specify which library to use for writing out the TAR
+                        Specify which library to use for writing out the TAR
                         index. Supported keywords: (none,pickle,pickle2,pickle
                         3,custom,cbor,msgpack,rapidjson,ujson,simplejson)[.(lz
                         4,gz)] (default: custom)
@@ -61,6 +68,9 @@ optional arguments:
                         /var/log/apt/history.log`, -p /var/log/apt/ can be
                         specified so that the mount target directory
                         >directly< contains history.log. (default: )
+  --fuse FUSE           Comma separated FUSE options. See "man mount.fuse" for
+                        help. Example: --fuse
+                        "allow_other,entry_timeout=2.8,gid=0". (default: )
 ```
 
 Index files are if possible created to / if existing loaded from these file locations in order:
