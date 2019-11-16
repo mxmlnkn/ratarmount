@@ -5,7 +5,7 @@ from setuptools import setup
 
 setup(
     name             = 'ratarmount',
-    version          = '0.1.0',
+    version          = '0.2.0',
 
     description      = 'Random Access Read-Only Tar Mount',
     url              = 'https://github.com/mxmlnkn',

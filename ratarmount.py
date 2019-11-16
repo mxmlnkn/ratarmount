@@ -2,15 +2,17 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import collections
 import io
 import itertools
 import os
+import pprint
 import re
+import sqlite3
 import stat
 import tarfile
 import time
 import traceback
-from collections import namedtuple
 from timeit import default_timer as timer
 
 import fuse
@@ -25,7 +27,7 @@ def overrides( parentClass ):
     return overrider
 
 
-FileInfo = namedtuple( "FileInfo", "offset size mtime mode type linkname uid gid istar" )
+FileInfo = collections.namedtuple( "FileInfo", "offset size mtime mode type linkname uid gid istar" )
 
 
 class ProgressBar:
@@ -55,6 +57,355 @@ class ProgressBar:
 
         self.lastUpdateTime = time.time()
         self.lastUpdateValue = value
+
+class SQLiteIndexedTar:
+    """
+    This class reads once through the whole TAR archive and stores TAR file offsets
+    for all contained files in an index to support fast seeking to a given file.
+    """
+
+    __slots__ = (
+        'tarFileName',
+        'mountRecursively',
+        'indexFileName',
+        'sqlConnection',
+        'parentFolderCache', # stores which parent folders were last tried to add to database and therefore do exist
+    )
+
+    def __init__(
+        self,
+        tarFile         = None, # either string path or file object
+        writeIndex      = False,
+        clearIndexCache = False,
+        recursive       = False,
+    ):
+        self.parentFolderCache = []
+        self.mountRecursively = recursive
+        self.sqlConnection = None
+        if not isinstance( tarFile, str ):
+            self.tarFileName = '<file object>'
+            self.createIndex( tarFile )
+            return
+
+        self.tarFileName = os.path.normpath( tarFile )
+
+        # will be used for storing indexes if current path is read-only
+        possibleIndexFilePaths = [
+            self.tarFileName + ".index.sqlite",
+            os.path.expanduser( os.path.join( "~", ".ratarmount",
+                                              self.tarFileName.replace( "/", "_" ) + ".index.sqlite" ) )
+        ]
+
+        self.indexFileName = None
+        if clearIndexCache:
+            for indexPath in possibleIndexFilePaths:
+                if os.path.isfile( indexPath ):
+                    os.remove( indexPath )
+
+        # Try to find an already existing index
+        for indexPath in possibleIndexFilePaths:
+            if self._tryLoadIndex( indexPath ):
+                break
+        if self.indexIsLoaded():
+            return
+
+        # Find a suitable (writable) location for the index database
+        if writeIndex:
+            for indexPath in possibleIndexFilePaths:
+                try:
+                    folder = os.path.dirname( indexPath )
+                    os.makedirs( folder, exist_ok = True )
+
+                    f = open( indexPath, 'wb' )
+                    f.write( b'\0' * 1024 * 1024 )
+                    f.close()
+                    os.remove( indexPath )
+
+                    self.indexFileName = indexPath
+                    break
+                except IOError:
+                    if printDebug >= 2:
+                        print( "Could not create file:", indexPath )
+
+        with open( self.tarFileName, 'rb' ) as file:
+            self.createIndex( file )
+
+        if printDebug >= 1 and writeIndex:
+            # The 0-time is legacy for the automated tests
+            print( "Writing out TAR index to", self.tarFileName, "took 0s",
+                   "and is sized", os.stat( self.tarFileName ).st_size, "B" )
+
+    def _openSqlDb( self, filePath ):
+        self.sqlConnection = sqlite3.connect( filePath )
+        self.sqlConnection.row_factory = sqlite3.Row
+        self.sqlConnection.executescript( """
+            PRAGMA LOCKING_MODE = EXCLUSIVE;
+            PRAGMA TEMP_STORE = MEMORY;
+            PRAGMA JOURNAL_MODE = OFF;
+            PRAGMA SYNCHRONOUS = OFF;
+            PRAGMA CACHE_SIZE = -512000;
+        """ )
+
+    def createIndex( self, fileObject, progressBar = None, pathPrefix = '' ):
+        if printDebug >= 1:
+            print( "Creating offset dictionary for",
+                   "<file object>" if self.tarFileName is None else self.tarFileName, "..." )
+        t0 = timer()
+
+        schema = """
+            CREATE TABLE "files" (
+                "path"     VARCHAR(65535) NOT NULL,
+                "name"     VARCHAR(65535) NOT NULL,
+                "offset"   INTEGER,  /* seek offset from TAR file where these file's contents resides */
+                "size"     INTEGER,
+                "mtime"    INTEGER,
+                "mode"     INTEGER,
+                "type"     INTEGER,
+                "linkname" VARCHAR(65535),
+                "uid"      INTEGER,
+                "gid"      INTEGER,
+                /* True for valid TAR files. Internally used to determine where to mount recursive TAR files. */
+                "istar"    BOOL,
+                PRIMARY KEY ( path, name ) /* see SQL benchmarks for decision on this */
+            );
+        """
+
+        # 1. If no SQL connection was given (by recursive call), open a new database file
+        if not self.sqlConnection:
+            if printDebug >= 1:
+                print( "Creating new SQLite index database at", self.indexFileName )
+            self._openSqlDb( self.indexFileName if self.indexFileName else ':memory:' )
+
+            try:
+                self.sqlConnection.execute( schema )
+            except OperationalError:
+                print( "[Warning] The index file {} already seems to contain a table. "
+                       "Will try to drop and recreate it!".format( indexFileName ) )
+                self.sqlConnection.execute( 'DROP TABLE "files"' )
+                self.sqlConnection.execute( schema )
+
+        # 2. Open TAR file reader
+        try:
+            loadedTarFile = tarfile.open( fileobj = fileObject, mode = 'r:' )
+        except tarfile.ReadError as exception:
+            print( "Archive can't be opened! This might happen for compressed TAR archives, "
+                   "which currently is not supported." )
+            raise exception
+
+        if progressBar is None:
+            progressBar = ProgressBar( os.fstat( fileObject.fileno() ).st_size )
+
+        # 3. Iterate over files inside TAR and add them to the database
+        for tarInfo in loadedTarFile:
+            loadedTarFile.members = []
+            progressBar.update( tarInfo.offset_data )
+
+            mode = tarInfo.mode
+            if tarInfo.isdir() : mode |= stat.S_IFDIR
+            if tarInfo.isfile(): mode |= stat.S_IFREG
+            if tarInfo.issym() : mode |= stat.S_IFLNK
+            if tarInfo.ischr() : mode |= stat.S_IFCHR
+            if tarInfo.isfifo(): mode |= stat.S_IFIFO
+
+            # Add a leading '/' as a convention where '/' represents the TAR root folder
+            # Partly, done because fusepy specifies paths in a mounted directory like this
+            # os.normpath does not delete duplicate '/' at beginning of string!
+            fullPath = pathPrefix + "/" + os.path.normpath( tarInfo.name ).lstrip( '/' )
+
+            # 4. Open contained TARs for recursive mounting
+            isTar = False
+            if self.mountRecursively and tarInfo.isfile() and tarInfo.name.endswith( ".tar" ):
+                oldPos = fileObject.tell()
+                fileObject.seek( tarInfo.offset_data )
+
+                oldPrintName = self.tarFileName
+                try:
+                    self.tarFileName = tarInfo.name.lstrip( '/' ) # This is for output of the recursive call
+                    self.createIndex( fileObject, progressBar, fullPath )
+
+                    # if the TAR file contents could be read, we need to adjust the actual
+                    # TAR file's metadata to be a directory instead of a file
+                    mode = ( mode & 0o777 ) | stat.S_IFDIR
+                    if mode & stat.S_IRUSR != 0: mode |= stat.S_IXUSR
+                    if mode & stat.S_IRGRP != 0: mode |= stat.S_IXGRP
+                    if mode & stat.S_IROTH != 0: mode |= stat.S_IXOTH
+                    isTar = True
+
+                except tarfile.ReadError:
+                    None
+                self.tarFileName = oldPrintName
+
+                fileObject.seek( oldPos )
+
+            path, name = fullPath.rsplit( "/", 1 )
+            fileInfo = (
+                path               , # 0
+                name               , # 1
+                tarInfo.offset_data, # 2
+                tarInfo.size       , # 3
+                tarInfo.mtime      , # 4
+                mode               , # 5
+                tarInfo.type       , # 6
+                tarInfo.linkname   , # 7
+                tarInfo.uid        , # 8
+                tarInfo.gid        , # 9
+                isTar              , # 10
+            )
+            self.setFileInfo( fullPath, fileInfo )
+
+        self.sqlConnection.commit()
+
+        t1 = timer()
+        if printDebug >= 1:
+            print( "Creating offset dictionary for",
+                   "<file object>" if self.tarFileName is None else self.tarFileName,
+                   "took {:.2f}s".format( t1 - t0 ) )
+
+    def getFileInfo( self, fullPath, listDir = False ):
+        """
+        This is the heart of this class' public interface!
+
+        path    : full path to file where '/' denotes TAR's root, e.g., '/', or '/foo'
+        listDir : if True, return a dictionary for the given directory path: { fileName : FileInfo, ... }
+                  if False, return simple FileInfo to given path (directory or file)
+        if path does not exist, always return None
+        """
+        # @todo cache last listDir as most ofthen a stat over all entries will soon follow
+
+        # also strips trailing '/' except for a single '/' and leading '/'
+        fullPath = '/' + os.path.normpath( fullPath ).lstrip( '/' )
+        if listDir:
+            rows = self.sqlConnection.execute( 'SELECT * FROM "files" WHERE "path" == (?)',
+                                               ( fullPath.rstrip( '/' ), ) )
+            dir = {}
+            gotResults = False
+            for row in rows:
+                gotResults = True
+                if row['name']:
+                    dir[row['name']] = FileInfo( **dict( [ ( key, row[key] ) for key in FileInfo._fields ] ) )
+
+            return dir if gotResults else None
+
+        path, name = fullPath.rsplit( '/', 1 )
+        row = self.sqlConnection.execute( 'SELECT * FROM "files" WHERE "path" == (?) AND "name" == (?)',
+                                          ( path, name ) ).fetchone()
+        return FileInfo( **dict( [ ( key, row[key] ) for key in FileInfo._fields ] ) ) if row else None
+
+    def isDir( self, path ):
+        return isinstance( self.getFileInfo( path, listDir = True ), dict )
+
+    def setFileInfo( self, fullPath, fileInfo ):
+        """
+        fullPath : the full path to the file with leading slash (/) for which to set the file info
+        """
+        assert self.sqlConnection
+        assert fullPath[0] == "/"
+
+        if isinstance( fileInfo, FileInfo ):
+            # os.normpath does not delete duplicate '/' at beginning of string!
+            path, name = fullPath.rsplit( "/", 1 )
+            row = (
+                path,
+                name,
+                fileInfo.offset,
+                fileInfo.size,
+                fileInfo.mtime,
+                fileInfo.mode,
+                fileInfo.type,
+                fileInfo.linkname,
+                fileInfo.uid,
+                fileInfo.gid,
+                fileInfo.istar,
+            )
+        elif isinstance( fileInfo, tuple ) or isinstance( fileInfo, list ):
+            row = fileInfo
+            path = row[0]
+
+        self.sqlConnection.execute( 'INSERT OR REPLACE INTO "files" VALUES (?,?,?,?,?,?,?,?,?,?,?)', row )
+
+        # Add parent folders if they do not exist.
+        # E.g.: path = '/a/b/c' -> paths = [('', 'a'), ('/a', 'b'), ('/a/b', 'c')]
+        # Without the parentFolderCache, the additional INSERT statements increase the creation time
+        # from 8.5s to 12s, so almost 50% slowdown for the 8MiB test TAR!
+        paths = path.split( "/" )
+        paths = [ p for p in ( ( "/".join( paths[:i] ), paths[i] ) for i in range( 1, len( paths ) ) )
+                 if p not in self.parentFolderCache ]
+        if paths:
+            self.parentFolderCache += paths
+            # Assuming files in the TAR are sorted by hierarchy, the maximum parent folder cache size
+            # gives the maximum cacheable file nesting depth. High numbers lead to higher memory usage and lookup times.
+            if len( self.parentFolderCache ) > 16:
+                self.parentFolderCache = self.parentFolderCache[-8:]
+            rows = [ ( p[0], p[1], 0, 1, 0, 0o555 | stat.S_IFDIR, tarfile.DIRTYPE, "", 0, 0, False ) for p in paths ]
+            self.sqlConnection.executemany( 'INSERT OR IGNORE INTO "files" VALUES (?,?,?,?,?,?,?,?,?,?,?)', rows )
+
+    def indexIsLoaded( self ):
+        if not self.sqlConnection:
+            return False
+
+        try:
+            self.sqlConnection.execute( 'SELECT * FROM "files" WHERE 0 == 1;' )
+        except Exception:
+            return False
+
+        return True
+
+    def loadIndex( self, indexFileName ):
+        if self.indexIsLoaded():
+            return
+
+        t0 = time.time()
+        self._openSqlDb( indexFileName )
+
+        if printDebug >= 1:
+            # Legacy output for automated tests
+            print( "Loading offset dictionary from", indexFileName, "took {:.2f}s".format( time.time() - t0 ) )
+
+    def _tryLoadIndex( self, indexFileName ):
+        """calls loadIndex if index is not loaded already and provides extensive error handling"""
+
+        if self.indexIsLoaded():
+            return True
+
+        if not os.path.isfile( indexFileName ):
+            return False
+
+        if os.path.getsize( indexFileName ) == 0:
+            try:
+                os.remove( indexFileName )
+            except OSError:
+                print( "[Warning] Failed to remove empty old cached index file:", indexFileName )
+
+            return False
+
+        try:
+            self.loadIndex( indexFileName )
+        except Exception:
+            traceback.print_exc()
+            print( "[Warning] Could not load file '" + indexFileName  )
+
+            print( "[Info] Some likely reasons for not being able to load the index file:" )
+            print( "[Info]   - The file has incorrect read permissions" )
+            print( "[Info]   - The file got corrupted because of:" )
+            print( "[Info]     - The program exited while it was still writing the index because of:" )
+            print( "[Info]       - the user sent SIGINT to force the program to quit" )
+            print( "[Info]       - an internal error occured while writing the index" )
+            print( "[Info]       - the disk filled up while writing the index" )
+            print( "[Info]     - Rare lowlevel corruptions caused by hardware failure" )
+
+            print( "[Info] This might force a time-costly index recreation, so if it happens often and "
+                   "mounting is slow, try to find out why loading fails repeatedly, "
+                   "e.g., by opening an issue on the public github page." )
+
+            try:
+                os.remove( indexFileName )
+            except OSError:
+                print( "[Warning] Failed to remove corrupted old cached index file:", indexFileName )
+
+        if printDebug >= 3 and self.indexIsLoaded():
+            print( "Loaded index", indexFileName )
+        return self.indexIsLoaded()
+
 
 class IndexedTar:
     """
@@ -336,7 +687,7 @@ class IndexedTar:
             if not name:
                 continue
             assert isinstance( p, dict )
-            p = p.setdefault( name, {} )
+            p = p.setdefault( name, {} ) # if parent folders of the file to add do not exist, add them
 
         # create a new key in the dictionary of the parent folder
         p.update( { pathHierarchy[-1] : fileInfo } )
@@ -424,10 +775,6 @@ class IndexedTar:
             # test whether the TAR file could be loaded and if so "mount" it recursively
             if indexedTar is not None and indexedTar.indexIsLoaded():
                 # actually apply the recursive tar mounting
-                extractedName = re.sub( r"\.tar$", "", path )
-                if not self.exists( extractedName ):
-                    path = extractedName
-
                 mountMode = ( fileInfo.mode & 0o777 ) | stat.S_IFDIR
                 if mountMode & stat.S_IRUSR != 0: mountMode |= stat.S_IXUSR
                 if mountMode & stat.S_IRGRP != 0: mountMode |= stat.S_IXGRP
@@ -444,13 +791,7 @@ class IndexedTar:
                 # just a warning and check for the path already existing
                 if self.exists( path ):
                     fileInfo = self.getFileInfo( path, listDir = False )
-                    if fileInfo.istar:
-                        # move recursively mounted TAR directory to original .tar name if there is a name-clash,
-                        # e.g., when foo/ also exists in the TAR but foo.tar would be mounted to foo/.
-                        # In this case, move that mount to foo.tar/
-                        self.setFileInfo( path + ".tar", fileInfo, self.getFileInfo( path, listDir = True ) )
-                    else:
-                        print( "[Warning]", path, "already exists in database and will be overwritten!" )
+                    print( "[Warning]", path, "already exists in database and will be overwritten!" )
 
                 # simply store the file or directory information from current TAR item
                 if tarInfo.isdir():
@@ -667,19 +1008,32 @@ class TarMount( fuse.Operations ):
                   recursive = False,
                   serializationBackend = None,
                   prefix = '' ):
+        """
+        prefix : Instead of mounting the TAR's root and showing all files a prefix can be specified.
+                 For example '/bar' will only show all TAR files which are inside the '/bar' folder inside the TAR.
+        """
         self.tarFileName = pathToMount
         self.tarFile = open( self.tarFileName, 'rb' )
-        self.indexedTar = IndexedTar(
-            self.tarFileName,
-            writeIndex = True,
-            clearIndexCache = clearIndexCache,
-            recursive = recursive,
-            serializationBackend = serializationBackend )
 
-        if prefix and not self.indexedTar.isDir( prefix ):
-            prefix = ''
-        if prefix and not prefix.endswith( '/' ):
-            prefix += '/'
+        if serializationBackend == 'sqlite':
+            self.indexedTar = SQLiteIndexedTar(
+                self.tarFileName,
+                writeIndex      = True,
+                clearIndexCache = clearIndexCache,
+                recursive       = recursive )
+        else:
+            self.indexedTar = IndexedTar(
+                self.tarFileName,
+                writeIndex           = True,
+                clearIndexCache      = clearIndexCache,
+                recursive            = recursive,
+                serializationBackend = serializationBackend )
+
+        if prefix:
+            if not prefix.startswith( '/' ):
+                prefix = '/' + prefix
+            if not self.indexedTar.isDir( prefix ):
+                prefix = ''
         self.prefix = prefix
 
         # make the mount point read only and executable if readable, i.e., allow directory listing
@@ -691,7 +1045,7 @@ class TarMount( fuse.Operations ):
         if mountMode & stat.S_IRUSR != 0: mountMode |= stat.S_IXUSR
         if mountMode & stat.S_IRGRP != 0: mountMode |= stat.S_IXGRP
         if mountMode & stat.S_IROTH != 0: mountMode |= stat.S_IXOTH
-        self.indexedTar.fileIndex[ self.prefix + '.' ] = FileInfo(
+        rootFileInfo = FileInfo(
             offset   = 0                ,
             size     = tarStats.st_size ,
             mtime    = tarStats.st_mtime,
@@ -703,8 +1057,14 @@ class TarMount( fuse.Operations ):
             istar    = True
         )
 
-        if printDebug >= 3:
-            print( "Loaded File Index:", self.indexedTar.fileIndex )
+        if serializationBackend == 'sqlite':
+            self.indexedTar.setFileInfo( '/' if not self.prefix else self.prefix, rootFileInfo )
+        else:
+            self.indexedTar.fileIndex[ self.prefix + '.' ] = rootFileInfo
+
+            if printDebug >= 3:
+                print( "Loaded File Index:" )
+                pprint.pprint( self.indexedTar.fileIndex )
 
     @overrides( fuse.Operations )
     def getattr( self, path, fh = None ):
@@ -714,7 +1074,7 @@ class TarMount( fuse.Operations ):
         fileInfo = self.indexedTar.getFileInfo( self.prefix + path, listDir = False )
         if not isinstance( fileInfo, FileInfo ):
             if printDebug >= 2:
-                print( "Could not find path:", path )
+                print( "Could not find path:", self.prefix + path )
             raise fuse.FuseOSError( fuse.errno.EROFS )
 
         # dictionary keys: https://pubs.opengroup.org/onlinepubs/007904875/basedefs/sys/stat.h.html
@@ -725,23 +1085,27 @@ class TarMount( fuse.Operations ):
         statDict['st_nlink'] = 2
 
         if printDebug >= 2:
-            print( "[getattr( path =", path, ", fh =", fh, ")] return:", statDict )
+            print( "[getattr( path =", self.prefix + path, ", fh =", fh, ")] return:", statDict )
 
         return statDict
 
     @overrides( fuse.Operations )
     def readdir( self, path, fh ):
-        if printDebug >= 2:
-            print( "[readdir( path =", path, ", fh =", fh, ")] return:",
-                   self.indexedTar.getFileInfo( self.prefix + path, listDir = True ).keys() )
-
         # we only need to return these special directories. FUSE automatically expands these and will not ask
         # for paths like /../foo/./../bar, so we don't need to worry about cleaning such paths
         yield '.'
         yield '..'
 
-        for key in self.indexedTar.getFileInfo( self.prefix + path, listDir = True ).keys():
-            yield key
+        dirInfo = self.indexedTar.getFileInfo( self.prefix + path, listDir = True )
+        if printDebug >= 2:
+            print( "[readdir( path =", self.prefix + path, ", fh =", fh, ")] return:",
+                   dirInfo.keys() if dirInfo else None )
+
+        if isinstance( dirInfo, dict ):
+            for key in dirInfo.keys():
+                yield key
+        elif printDebug >= 2:
+            print( "[readdir] Could not find path:", self.prefix + path )
 
     @overrides( fuse.Operations )
     def readlink( self, path ):
@@ -801,10 +1165,10 @@ def parseArgs( args = None ):
                'Recreate the index if you want change the recursive mounting policy anyways.' )
 
     parser.add_argument(
-        '-s', '--serialization-backend', type = str, default = 'custom',
+        '-s', '--serialization-backend', type = str, default = 'sqlite',
         help =
         'Specify which library to use for writing out the TAR index. Supported keywords: (' +
-        ','.join( IndexedTar.availableSerializationBackends ) + ')[.(' +
+        ','.join( IndexedTar.availableSerializationBackends + [ 'sqlite' ] ) + ')[.(' +
         ','.join( IndexedTar.availableCompressions ).strip( ',' ) + ')]' )
 
     parser.add_argument(
@@ -856,15 +1220,16 @@ def cli( args = None ):
     printDebug = args.debug
 
     fuseOperationsObject = TarMount(
-        pathToMount = tarToMount,
-        clearIndexCache = args.recreate_index,
-        recursive = args.recursive,
+        pathToMount          = tarToMount,
+        clearIndexCache      = args.recreate_index,
+        recursive            = args.recursive,
         serializationBackend = args.serialization_backend,
-        prefix = args.prefix )
+        prefix               = args.prefix )
 
     fuse.FUSE( operations = fuseOperationsObject,
                mountpoint = mountPath,
                foreground = args.foreground,
+               nothreads  = args.serialization_backend == 'sqlite',
                **fusekwargs )
 
     if mountPathWasCreated and args.foreground:

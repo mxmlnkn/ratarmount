@@ -58,8 +58,8 @@ optional arguments:
   -s SERIALIZATION_BACKEND, --serialization-backend SERIALIZATION_BACKEND
                         Specify which library to use for writing out the TAR
                         index. Supported keywords: (none,pickle,pickle2,pickle
-                        3,custom,cbor,msgpack,rapidjson,ujson,simplejson)[.(lz
-                        4,gz)] (default: custom)
+                        3,custom,cbor,msgpack,rapidjson,ujson,simplejson,sqlit
+                        e)[.(lz4,gz)] (default: sqlite)
   -p PREFIX, --prefix PREFIX
                         The specified path to the folder inside the TAR will
                         be mounted to root. This can be useful when the
@@ -114,7 +114,7 @@ Pros:
 
 Ratarmount creates an index file with file names, ownership, permission flags, and offset information to be stored at the TAR file's location or inside `~/.ratarmount/` and then offers a FUSE mount integration for easy access to the files.
 
-The test for the ImageNet data set is promising:
+The test on 50e8dbb, which used pickle serialization, for the ImageNet data set is promising:
 
   - TAR size: 1.31TB
   - Contains TARs: yes
@@ -126,6 +126,8 @@ The test for the ImageNet data set is promising:
   - Reading a 40kB file: 100ms (first time) and 4ms (subsequent times)
 
 The reading time for a small file simply verifies the random access by using file seek to be working. The difference between the first read and subsequent reads is not because of ratarmount but because of operating system and file system caches.
+
+
 
 ## Choice of the Serialization for the Index File
 
