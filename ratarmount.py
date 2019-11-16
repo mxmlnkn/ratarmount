@@ -382,6 +382,7 @@ class IndexedTar:
             self.progressBar = ProgressBar( os.stat( self.tarFileName ).st_size )
 
         for tarInfo in loadedTarFile:
+            loadedTarFile.members = []
             if self.progressBar is not None:
                 self.progressBar.update( tarInfo.offset_data )
 
