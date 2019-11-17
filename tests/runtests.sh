@@ -85,6 +85,7 @@ checkFileInTAR()
 
 checkFileInTARPrefix()
 {
+    local type="$1"; shift
     local prefix="$1"; shift
     local archive="$1"; shift
     local fileInTar="$1"; shift
@@ -255,22 +256,24 @@ print( int( np.max( data[1] ) ), int( np.max( data[2] ) ) )" "$1"
 
 benchmarkSerialization()
 {
-    local logFile='serializationBenchmark.dat'
+    local benchmarksFolder=benchmarks/data
+    local logFile="$benchmarksFolder/serializationBenchmark.dat"
     touch "$logFile"
     echo '# tarMiB indexCreationTime serializationTime serializedSize deserializationTime peakVmSizeCreation peakRssSizeCreation peakVmSizeLoading peakRssSizeLoading' >> "$logFile"
-    local benchmarksFolder=benchmarks/data
     mkdir -p -- "$benchmarksFolder"
 
-    local type mib
-    for mib in 256; do #1 8 64; do
-        for type in pickle2 pickle3 custom cbor msgpack rapidjson ujson simplejson; do
-            for compression in '' '.gz' '.lz4'; do
+    local type mib compression compressions
+    for mib in 1 8 64 256; do
+        for type in sqlite custom pickle2 pickle3 cbor msgpack rapidjson ujson simplejson; do
+            compressions=( '' '.gz' '.lz4' )
+            if [[ "$type" == 'sqlite' ]]; then compressions=( '' ); fi
+            for compression in "${compressions[@]}"; do
                 echoerr "Benchmarking ${type}.${compression} ..."
 
                 printf '%i ' "$mib" >> "$logFile"
 
                 testLargeTar "$mib" "${type}${compression}" | sed -n -r '
-                    s|Creating offset dictionary for /.* took ([0-9.]+)s|\1|p;
+                    s|Creating offset dictionary for /[^:]*.tar took ([0-9.]+)s|\1|p;
                     s|Writing out TAR.* took ([0-9.]+)s and is sized ([0-9]+) B|\1 \2|p;
                     s|Loading offset dictionary.* took ([0-9.]+)s|\1|p;
                 ' | sed -z 's|\n| |g' >> "$logFile"
@@ -295,13 +298,16 @@ pylint --disable=C0326,C0103 ratarmount.py > pylint.log
 
 rm -f tests/*.index.*
 
-checkFileInTARPrefix '' tests/single-nested-file.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
-checkFileInTARPrefix foo tests/single-nested-file.tar fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
-checkFileInTARPrefix foo/fighter tests/single-nested-file.tar ufo 2709a3348eb2c52302a7606ecf5860bc
 
-for type in custom pickle2 pickle3 cbor msgpack rapidjson ujson simplejson; do
-  for compression in '' '.gz' '.lz4'; do
+for type in sqlite custom pickle2 pickle3 cbor msgpack rapidjson ujson simplejson; do
+  compressions=( '' '.gz' '.lz4' )
+  if [[ "$type" == 'sqlite' ]]; then compressions=( '' ); fi
+  for compression in "${compressions[@]}"; do
     echoerr "=== Testing Serialization Backend: ${type}${compression} ==="
+
+    checkFileInTARPrefix "${type}${compression}" '' tests/single-nested-file.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
+    checkFileInTARPrefix "${type}${compression}" foo tests/single-nested-file.tar fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
+    checkFileInTARPrefix "${type}${compression}" foo/fighter tests/single-nested-file.tar ufo 2709a3348eb2c52302a7606ecf5860bc
 
     checkFileInTAR "${type}${compression}" tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
     checkFileInTAR "${type}${compression}" tests/single-file-with-leading-dot-slash.tar bar d3b07384d113edec49eaa6238ad5ff00
@@ -311,16 +317,17 @@ for type in custom pickle2 pickle3 cbor msgpack rapidjson ujson simplejson; do
     checkFileInTAR "${type}${compression}" tests/single-nested-folder.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
 
     checkFileInTAR "${type}${compression}" tests/nested-tar.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
-    checkFileInTAR "${type}${compression}" tests/nested-tar.tar foo/lighter/fighter/bar 2b87e29fca6ee7f1df6c1a76cb58e101
+    checkFileInTAR "${type}${compression}" tests/nested-tar.tar foo/lighter.tar/fighter/bar 2b87e29fca6ee7f1df6c1a76cb58e101
 
     checkFileInTAR "${type}${compression}" tests/nested-tar-with-overlapping-name.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
     checkFileInTAR "${type}${compression}" tests/nested-tar-with-overlapping-name.tar foo/fighter.tar/fighter/bar 2b87e29fca6ee7f1df6c1a76cb58e101
   done
 done
 
-#benchmarkSerialization # takes quite long
+benchmarkSerialization # takes quite long
 
 rm -f tests/*.index.*
+rmdir tests/*/
 
 echo -e '\e[32mAll tests ran succesfully.\e[0m'
 

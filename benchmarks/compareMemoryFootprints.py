@@ -83,38 +83,35 @@ def plotPerformanceComparison( fileName, fileNameSizeMiB = 64 ):
     pageSize = 4096
 
     # load column labels from file
-    labels = None
-    groupLabels = []
+    labels        = None  # [ 'tarMiB', 'indexCreationTime', ... ]
+    backendLabels = []    # [ 'sqlite', 'custom', 'custom.gz', 'custom.lz2', ... ]
+    rawData       = []
     with open( fileName ) as file:
         for line in file:
             line = line.strip()
             if line[0] == '#':
                 labels = line[1:].strip().split( ' ' )
             elif '#' in line:
-                backend = line.split( '#' )[-1].strip()
-                if backend in groupLabels:
-                    break
-                else:
-                    groupLabels.append( backend )
+                values, backend = line.split( '#', 1 )
+                rawData += [ np.array( [ float( x ) for x in values.split( ' ' ) if x ] ) ]
+                backendLabels.append( backend.strip() )
+    rawData = np.array( rawData ).transpose()
+    iToCompare, = np.where( rawData[labels.index( 'tarMiB' )] == fileNameSizeMiB )
+    rawData = rawData[:,iToCompare]
+    backendLabels = [ b for i,b in enumerate( backendLabels ) if i in iToCompare ]
 
-    compressionGroups = []
-    compressions = []
-    for groupLabel in groupLabels:
+    compressionGroups = []  # ['', 'gz', 'lz4']
+    compressions      = []  # ['', '', 'gz', 'lz4', '', 'gz', ... ]
+    for groupLabel in backendLabels:
         compression = groupLabel.split( '.' )[-1] if len( groupLabel.split( '.' ) ) >= 2 else ''
         compressions.append( compression )
         if compression not in compressionGroups:
             compressionGroups.append( compression )
+    compressionBackgrounds = { '' : '', 'gz' : '//', 'lz4' : 'o' }
 
-    assert( len( groupLabels ) % len( compressionGroups ) == 0 )
-    for i in range( len( compressions ) // len( compressionGroups ) ):
-        assert( compressions[ len( compressionGroups ) * i : len( compressionGroups ) * ( i + 1 )] == compressionGroups )
-
-    backends = [ x.split( '.' )[0] for x in groupLabels ]
     from collections import OrderedDict
-    backends = list( OrderedDict.fromkeys( backends ) )
-
-    rawData = np.genfromtxt( fileName ).transpose()
-    rawData = rawData[:,rawData[0] == fileNameSizeMiB]
+    # get unique backend "list" with same ordering as read [ 'custom', 'json', 'sqlite', ... ]
+    backends = list( OrderedDict.fromkeys( [ x.split( '.' )[0] for x in backendLabels ] ) )
 
     data = {}
     for iLabel in range( len( labels ) ):
@@ -140,27 +137,26 @@ def plotPerformanceComparison( fileName, fileNameSizeMiB = 64 ):
                 yData *= pageSize
 
         iBest = np.argmin( yData )
-        print( "Best for", title, ":", groupLabels[iBest], 'with', yData[iBest] )
+        print( "Best for", title, ":", backendLabels[iBest], 'with', yData[iBest] )
 
-        for i in np.arange( len( yData ) // len( compressionGroups ) ):
-            bar, = \
-            ax.bar( len( compressionGroups ) * ( i + widthBetweenBars ) + 0,
-                    yData[len( compressionGroups ) * i + 0], hatch = ''   )
-            ax.bar( len( compressionGroups ) * ( i + widthBetweenBars ) + 1,
-                    yData[len( compressionGroups ) * i + 1], hatch = '//', color = bar.get_facecolor() )
-            ax.bar( len( compressionGroups ) * ( i + widthBetweenBars ) + 2,
-                    yData[len( compressionGroups ) * i + 2], hatch = 'o' , color = bar.get_facecolor() )
-            ax.bar( [ len( compressionGroups ) * widthBetweenBars ], [ 0 ],
-                    color = bar.get_facecolor(), label = backends[i] )
-
+        for j,backend in enumerate( backends ):
+            bar = None
+            for k,compression in enumerate( compressionGroups ):
+                ys = [ y for i,y in enumerate( yData )
+                       if backendLabels[i].startswith( backend ) and
+                          backendLabels[i].endswith( compression if compression else backend ) ]
+                if not ys:
+                    continue
+                assert( len( ys ) == 1 )
+                bar, = ax.bar( len( compressionGroups ) * ( j + widthBetweenBars ) + k, ys[0],
+                               hatch = compressionBackgrounds[compression],
+                               color = bar.get_facecolor() if bar else None, label = backend if k == 0 else None )
     print()
 
-    ax.bar( [ len( compressionGroups ) * widthBetweenBars ], [ 0 ], hatch = ''  , color = '0.9',
-            label = compressionGroups[0] if compressionGroups[0] else 'uncompressed' )
-    ax.bar( [ len( compressionGroups ) * widthBetweenBars ], [ 0 ], hatch = '//', color = '0.9',
-            label = compressionGroups[1] if compressionGroups[1] else 'uncompressed' )
-    ax.bar( [ len( compressionGroups ) * widthBetweenBars ], [ 0 ], hatch = 'o' , color = '0.9',
-            label = compressionGroups[2] if compressionGroups[2] else 'uncompressed' )
+    for compression in compressionGroups:
+        ax.bar( [ len( compressionGroups ) * widthBetweenBars ], [ 0 ],
+                hatch = compressionBackgrounds[compression], color = '0.9',
+                label = compression if compression else 'uncompressed' )
 
     ax.legend( loc = 'center left',  bbox_to_anchor = ( 1, 0.5 ) )
     fig.tight_layout()
@@ -173,10 +169,13 @@ if len( sys.argv ) != 2 or not os.path.isdir( sys.argv[1] ):
 dataFolder = sys.argv[1]
 os.chdir( dataFolder )
 
-for sizeMiB in [ 64, 256 ]:
+for sizeMiB in [ 1, 8, 64, 256 ]:
     for type in [ 'saving', 'loading' ]:
         files = [ f for f in os.listdir( '.' ) if fnmatch.fnmatch( f, '*-' + str( sizeMiB ) + '-MiB-' + type + '.dat' ) ]
         plotMemoryOverTime( files, 'resident-memory-over-time-' + type, sizeMiB )
-    plotPerformanceComparison( '../../serializationBenchmark.dat', sizeMiB )
+    try:
+        plotPerformanceComparison( 'serializationBenchmark.dat', sizeMiB )
+    except Exception as e:
+        print( "Could not plot performance comparison because:", e )
 
 plt.show()
