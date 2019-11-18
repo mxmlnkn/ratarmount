@@ -2,6 +2,13 @@
 # -*- coding: utf-8 -*-
 
 from setuptools import setup
+from setuptools.extension import Extension
+from Cython.Build import cythonize
+
+
+extensions = [
+    Extension( 'bzip2', [ 'bzip2.pyx' ], include_dirs = [ '.' ], language = 'c++', ),
+]
 
 setup(
     name             = 'ratarmount',
@@ -20,6 +27,7 @@ setup(
                          'Topic :: System :: Archiving' ],
 
     py_modules       = [ 'ratarmount' ],
+    ext_modules      = cythonize( extensions ),
     install_requires = [ 'fusepy',
                          'lz4',
                          'msgpack',
