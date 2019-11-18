@@ -86,7 +86,7 @@ struct bwdata {
 struct bunzip_data {
   // Input stream, input buffer, input bit buffer
   int in_fd, inbufCount, inbufPos;
-  char *inbuf;
+  unsigned char *inbuf;
   unsigned int inbufBitCount, inbufBits;
 
   // Output buffer
@@ -605,7 +605,7 @@ dataus_interruptus:
 
 // Allocate the structure, read file header. If !len, src_fd contains
 // filehandle to read from. Else inbuf contains data.
-int start_bunzip(struct bunzip_data **bdp, int src_fd, char *inbuf, int len)
+int start_bunzip(struct bunzip_data **bdp, int src_fd, unsigned char *inbuf, int len)
 {
   struct bunzip_data *bd;
   unsigned int i;
@@ -615,14 +615,14 @@ int start_bunzip(struct bunzip_data **bdp, int src_fd, char *inbuf, int len)
   if (!len) i += IOBUF_SIZE;
 
   // Allocate bunzip_data. Most fields initialize to zero.
-  bd = *bdp = malloc(i);
+  bd = *bdp = (struct bunzip_data *)malloc(i);
   memset( bd, 0, i );
   if (len) {
     bd->inbuf = inbuf;
     bd->inbufCount = len;
     bd->in_fd = -1;
   } else {
-    bd->inbuf = (char *)(bd+1);
+    bd->inbuf = (unsigned char *)(bd+1);
     bd->in_fd = src_fd;
   }
 
@@ -637,7 +637,7 @@ int start_bunzip(struct bunzip_data **bdp, int src_fd, char *inbuf, int len)
   if (i<'1' || i>'9') return RETVAL_NOT_BZIP_DATA;
   bd->dbufSize = 100000*(i-'0')*THREADS;
   for (i=0; i<THREADS; i++)
-    bd->bwdata[i].dbuf = malloc(bd->dbufSize * sizeof(int));
+    bd->bwdata[i].dbuf = (unsigned int *)malloc(bd->dbufSize * sizeof(int));
 
   return 0;
 }
