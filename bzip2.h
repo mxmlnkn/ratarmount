@@ -28,6 +28,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <sstream>
+#include <stdexcept>
+
 #define THREADS 1
 
 // Constants for huffman coding
@@ -43,9 +46,6 @@
 
 // Status return values
 #define RETVAL_LAST_BLOCK        ( -100 )
-#define RETVAL_NOT_BZIP_DATA     ( -1 )
-#define RETVAL_DATA_ERROR        ( -2 )
-#define RETVAL_OBSOLETE_INPUT    ( -3 )
 
 
 // Create a 256 entry CRC32 lookup table.
@@ -132,7 +132,7 @@ get_bits( struct bunzip_data* bd,
         // If we need to read more data from file into byte buffer, do so
         if ( bd->inbufPos == bd->inbufCount ) {
             if ( 0 >= ( bd->inbufCount = read( bd->in_fd, bd->inbuf, IOBUF_SIZE ) ) ) {
-                exit( 1 );
+                throw std::domain_error( "Not enough data to read!" );
             }
             bd->inbufPos = 0;
         }
@@ -193,15 +193,19 @@ read_block_header( struct bunzip_data* bd,
 
     // Is this a valid data block?  (Constant is "pi".)
     if ( ( ii != 0x314159 ) || ( jj != 0x265359 ) ) {
-        return RETVAL_NOT_BZIP_DATA;
+        std::stringstream msg;
+        msg << "[BZip2 block header] invalid compressed magic 0x" << std::hex << ii << jj;
+        throw std::domain_error( msg.str() );
     }
 
-    // We can add support for blockRandomised if anybody complains.
     if ( get_bits( bd, 1 ) ) {
-        return RETVAL_OBSOLETE_INPUT;
+        throw std::domain_error( "[BZip2 block header] deprecated randomised bit is not supported" );
     }
+
     if ( ( bw->origPtr = get_bits( bd, 24 ) ) > bd->dbufSize ) {
-        return RETVAL_DATA_ERROR;
+        std::stringstream msg;
+        msg << "[BZip2 block header] origPtr " << bw->origPtr << " is larger than buffer size: " << bd->dbufSize;
+        throw std::logic_error( msg.str() );
     }
 
     // mapping table: if some byte values are never used (encoding things
@@ -225,7 +229,9 @@ read_block_header( struct bunzip_data* bd,
     // How many different huffman coding groups does this block use?
     bd->groupCount = get_bits( bd, 3 );
     if ( ( bd->groupCount < 2 ) || ( bd->groupCount > MAX_GROUPS ) ) {
-        return RETVAL_DATA_ERROR;
+        std::stringstream msg;
+        msg << "[BZip2 block header] Invalid Huffman coding group count " << bd->groupCount;
+        throw std::logic_error( msg.str() );
     }
 
     // nSelectors: Every GROUP_SIZE many symbols we switch huffman coding
@@ -236,7 +242,9 @@ read_block_header( struct bunzip_data* bd,
     // bit runs.  (MTF = Move To Front.  Every time a symbol occurs it's moved
     // to the front of the table, so it has a shorter encoding next time.)
     if ( !( bd->nSelectors = get_bits( bd, 15 ) ) ) {
-        return RETVAL_DATA_ERROR;
+        std::stringstream msg;
+        msg << "[BZip2 block header] selectors_used " << bd->nSelectors << " is invalid";
+        throw std::logic_error( msg.str() );
     }
     for ( ii = 0; ii < bd->groupCount; ii++ ) {
         bd->mtfSymbol[ii] = ii;
@@ -245,7 +253,9 @@ read_block_header( struct bunzip_data* bd,
         // Get next value
         for ( jj = 0; get_bits( bd, 1 ); jj++ ) {
             if ( jj >= bd->groupCount ) {
-                return RETVAL_DATA_ERROR;
+                std::stringstream msg;
+                msg << "[BZip2 block header] Could not find zero termination after " << bd->groupCount << " bits";
+                throw std::domain_error( msg.str() );
             }
         }
 
@@ -269,7 +279,10 @@ read_block_header( struct bunzip_data* bd,
             for ( ; ; ) {
                 // !hh || hh > MAX_HUFCODE_BITS in one test.
                 if ( MAX_HUFCODE_BITS - 1 < (unsigned)hh - 1 ) {
-                    return RETVAL_DATA_ERROR;
+                    std::stringstream msg;
+                    msg << "[BZip2 block header]  start_huffman_length " << hh
+                    << " is larger than " << MAX_HUFCODE_BITS << " or zero\n";
+                    throw std::logic_error( msg.str() );
                 }
                 // Grab 2 bits instead of 1 (slightly smaller/faster).  Stop if
                 // first bit is 0, otherwise second bit says whether to
@@ -398,7 +411,9 @@ read_huffman_data( struct bunzip_data* bd,
             // Determine which huffman coding group to use.
             symCount = GROUP_SIZE - 1;
             if ( selector >= bd->nSelectors ) {
-                return RETVAL_DATA_ERROR;
+                std::stringstream msg;
+                msg << "[BZip2 block data] selector " << selector << " out of maximum range " << bd->nSelectors;
+                throw std::domain_error( msg.str() );
             }
             hufGroup = bd->groups + bd->selectors[selector++];
             base = hufGroup->base - 1;
@@ -421,9 +436,18 @@ read_huffman_data( struct bunzip_data* bd,
         // Huffman decode jj into nextSym (with bounds checking)
         jj -= base[ii];
 
-        if ( ( ii > hufGroup->maxLen ) || ( (unsigned)jj >= MAX_SYMBOLS ) ) {
-            return RETVAL_DATA_ERROR;
+        if ( ii > hufGroup->maxLen ) {
+            std::stringstream msg;
+            msg << "[BZip2 block data] " << ii << " bigger than max length " << hufGroup->maxLen;
+            throw std::domain_error( msg.str() );
         }
+
+        if ( (unsigned)jj >= MAX_SYMBOLS ) {
+            std::stringstream msg;
+            msg << "[BZip2 block data] " << jj << " larger than max symbols " << MAX_SYMBOLS;
+            throw std::domain_error( msg.str() );
+        }
+
         nextSym = hufGroup->permute[jj];
 
         // If this is a repeated run, loop collecting data
@@ -453,7 +477,9 @@ read_huffman_data( struct bunzip_data* bd,
         if ( runPos ) {
             runPos = 0;
             if ( dbufCount + hh > bd->dbufSize ) {
-                return RETVAL_DATA_ERROR;
+                std::stringstream msg;
+                msg << "[BZip2 block data] dbufCount " << dbufCount << " > " << bd->dbufSize << " dbufSize";
+                throw std::domain_error( msg.str() );
             }
 
             uc = bd->symToByte[bd->mtfSymbol[0]];
@@ -475,7 +501,9 @@ read_huffman_data( struct bunzip_data* bd,
          * Another instance of the first symbol in the mtf array, position 0,
          * would have been handled as part of a run.) */
         if ( dbufCount >= bd->dbufSize ) {
-            return RETVAL_DATA_ERROR;
+            std::stringstream msg;
+            msg << "[BZip2 block data] dbufCount " << dbufCount << " > " << bd->dbufSize << " dbufSize";
+            throw std::domain_error( msg.str() );
         }
         ii = nextSym - 1;
         uc = bd->mtfSymbol[ii];
@@ -494,7 +522,9 @@ read_huffman_data( struct bunzip_data* bd,
 
     // Now we know what dbufCount is, do a better sanity check on origPtr.
     if ( bw->origPtr >= ( bw->writeCount = dbufCount ) ) {
-        return RETVAL_DATA_ERROR;
+        std::stringstream msg;
+        msg << "[BZip2 block data] origPtr error " << bw->origPtr;
+        throw std::domain_error( msg.str() );
     }
 
     return 0;
@@ -508,7 +538,7 @@ flush_bunzip_outbuf( struct bunzip_data* bd,
 {
     if ( bd->outbufPos ) {
         if ( write( out_fd, bd->outbuf, bd->outbufPos ) != bd->outbufPos ) {
-            exit( 2 );
+            throw std::logic_error( "Could not flush complete output buffer" );
         }
         bd->outbufPos = 0;
     }
@@ -688,59 +718,6 @@ dataus_interruptus:
             }
         }
     }
-}
-
-
-// Allocate the structure, read file header. If !len, src_fd contains
-// filehandle to read from. Else inbuf contains data.
-int
-start_bunzip( struct bunzip_data** bdp,
-              int                  src_fd,
-              unsigned char*       inbuf,
-              int                  len )
-{
-    struct bunzip_data* bd;
-    unsigned int i;
-
-    // Figure out how much data to allocate.
-    i = sizeof( struct bunzip_data );
-    if ( !len ) {
-        i += IOBUF_SIZE;
-    }
-
-    // Allocate bunzip_data. Most fields initialize to zero.
-    bd = *bdp = (struct bunzip_data*)malloc( i );
-    memset( bd, 0, i );
-    if ( len ) {
-        bd->inbuf = inbuf;
-        bd->inbufCount = len;
-        bd->in_fd = -1;
-    } else {
-        bd->inbuf = (unsigned char*)( bd + 1 );
-        bd->in_fd = src_fd;
-    }
-
-    crc_init( bd->crc32Table, 0 );
-
-    // Ensure that file starts with "BZh".
-    for ( i = 0; i < 3; i++ ) {
-        if ( get_bits( bd, 8 ) != "BZh"[i] ) {
-            return RETVAL_NOT_BZIP_DATA;
-        }
-    }
-
-    // Next byte ascii '1'-'9', indicates block size in units of 100k of
-    // uncompressed data. Allocate intermediate buffer for block.
-    i = get_bits( bd, 8 );
-    if ( ( i < '1' ) || ( i > '9' ) ) {
-        return RETVAL_NOT_BZIP_DATA;
-    }
-    bd->dbufSize = 100000 * ( i - '0' ) * THREADS;
-    for ( i = 0; i < THREADS; i++ ) {
-        bd->bwdata[i].dbuf = (unsigned int*)malloc( bd->dbufSize * sizeof( int ) );
-    }
-
-    return 0;
 }
 
 
@@ -994,7 +971,7 @@ BZ2Reader::startBunzip( const int    fileDescriptor,
     // Ensure that file starts with "BZh".
     for ( auto i = 0; i < 3; i++ ) {
         if ( getBits( 8 ) != "BZh"[i] ) {
-            throw std::domain_error( "Input is not BZip2 data" );
+            throw std::domain_error( "Input header is not BZip2 magic 'BZh'" );
         }
     }
 
@@ -1002,7 +979,10 @@ BZ2Reader::startBunzip( const int    fileDescriptor,
     // uncompressed data. Allocate intermediate buffer for block.
     const auto i = getBits( 8 );
     if ( ( i < '1' ) || ( i > '9' ) ) {
-        throw std::domain_error( "Input is not BZip2 data" );
+        std::stringstream msg;
+        msg << "[Open BZip2] Blocksize must be one of '0' (" << std::hex << (int)'0' << ") ... '9' (" << (int)'9'
+        << ") but is " << i << " (" << (int)i << ")" << std::dec;
+        throw std::domain_error( msg.str() );
     }
     bd.dbufSize = 100000 * ( i - '0' ) * THREADS;
     for ( int i = 0; i < THREADS; i++ ) {
