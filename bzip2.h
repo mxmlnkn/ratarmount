@@ -17,12 +17,117 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstring>
-#include <array>
+#include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
+
+
+class BitReader
+{
+public:
+    static constexpr size_t IOBUF_SIZE = 4096;
+    static constexpr int NO_FILE = -1;
+
+public:
+    BitReader( std::string filePath )
+    {
+        m_file = fopen( filePath.c_str(), "r" );
+        initializeFileBuffer( fileno( m_file ) );
+    }
+
+    BitReader( int fileDescriptor )
+    {
+        initializeFileBuffer( fileDescriptor );
+    }
+
+    BitReader( const uint8_t* buffer,
+               size_t         size )
+    {
+        initializeFileBuffer( buffer, size );
+    }
+
+    ~BitReader()
+    {
+        if ( m_file != nullptr ) {
+            fclose( m_file );
+        }
+    }
+
+    uint32_t
+        read( uint8_t );
+
+private:
+    void
+    initializeFileBuffer( int fileDescriptor )
+    {
+        m_fileDescriptor = fileDescriptor;
+    }
+
+    void
+    initializeFileBuffer( const uint8_t* buffer,
+                          size_t         size )
+    {
+        m_inbuf.resize( size );
+        std::memcpy( m_inbuf.data(), buffer, size );
+    }
+
+private:
+    FILE* m_file = nullptr;
+    int m_fileDescriptor = NO_FILE;
+    std::vector<uint8_t> m_inbuf;
+    uint32_t m_inbufPos = 0;     // stores current position in buffer in bytes
+
+public:
+    uint32_t m_inbufBits = 0;    // bitbuffer stores the last read bits from m_inbuf
+    uint8_t m_inbufBitCount = 0; // size of bitbuffer in bits
+};
+
+
+inline uint32_t
+BitReader::read( const uint8_t bits_wanted )
+{
+    uint32_t bits = 0;
+    assert( bits_wanted <= sizeof( bits ) * 8 );
+
+    // If we need to get more data from the byte buffer, do so.  (Loop getting
+    // one byte at a time to enforce endianness and avoid unaligned access.)
+    auto bitsNeeded = bits_wanted;
+    while ( m_inbufBitCount < bitsNeeded ) {
+        // If we need to read more data from file into byte buffer, do so
+        if ( m_inbufPos == m_inbuf.size() ) {
+            m_inbuf.resize( IOBUF_SIZE );
+            const auto nBytesRead = ::read( m_fileDescriptor, m_inbuf.data(), m_inbuf.size() );
+            if ( nBytesRead <= 0 ) {
+                // this will also happen for invalid file descriptor -1
+                throw std::domain_error( "[BitReader] Not enough data to read!" );
+            }
+            m_inbuf.resize( nBytesRead );
+            m_inbufPos = 0;
+        }
+
+        // Avoid 32-bit overflow (dump bit buffer to top of output)
+        if ( m_inbufBitCount >= 24 ) {
+            bits = m_inbufBits & ( ( 1 << m_inbufBitCount ) - 1 );
+            bitsNeeded -= m_inbufBitCount;
+            bits <<= bitsNeeded;
+            m_inbufBitCount = 0;
+        }
+
+        // Grab next 8 bits of input from buffer.
+        m_inbufBits = ( m_inbufBits << 8 ) | m_inbuf[m_inbufPos++];
+        m_inbufBitCount += 8;
+    }
+
+    // Calculate result
+    m_inbufBitCount -= bitsNeeded;
+    bits |= ( m_inbufBits >> m_inbufBitCount ) & ( ( 1 << bitsNeeded ) - 1 );
+    assert( bits == ( bits & ( 0xffffffffL >> ( 32 - bits_wanted ) ) ) );
+    return bits;
+}
 
 
 class BZ2Reader
@@ -73,14 +178,6 @@ private:
     // memory that persists between calls to bunzip
     struct bunzip_data
     {
-        // Input stream, input buffer, input bit buffer
-        int in_fd = -1;
-        int inbufCount = 0;
-        int inbufPos = 0;
-        std::vector<uint8_t> inbuf;
-        unsigned int inbufBitCount = 0;
-        unsigned int inbufBits = 0;
-
         // Output buffer
         std::array<char, IOBUF_SIZE> outbuf;
         int outbufPos = 0;
@@ -155,28 +252,23 @@ private:
     };
 
 public:
-    BZ2Reader( const std::string& filePath )
+    BZ2Reader( const std::string& filePath ) :
+        m_bitReader( filePath )
     {
-        m_file = fopen( filePath.c_str(), "r" );
-        startBunzip( fileno( m_file ), nullptr, 0 );
+        startBunzip();
     }
 
-    BZ2Reader( const int fileDescriptor )
+    BZ2Reader( const int fileDescriptor ) :
+        m_bitReader( fileDescriptor )
     {
-        startBunzip( fileDescriptor, nullptr, 0 );
+        startBunzip();
     }
 
     BZ2Reader( const char*  bz2Data,
-               const size_t size )
+               const size_t size ) :
+        m_bitReader( reinterpret_cast<const uint8_t*>( bz2Data ), size )
     {
-        startBunzip( 0, bz2Data, size );
-    }
-
-    ~BZ2Reader()
-    {
-        if ( m_file != nullptr ) {
-            fclose( m_file );
-        }
+        startBunzip();
     }
 
     uint32_t
@@ -190,11 +282,9 @@ public:
     {
         return bd.totalCRC;
     }
-
     // Decompress a block of text to intermediate buffer
     int
     readNextBlock();
-
     int
     decodeBuffer( BurrowsWheelerTransformData* bw,
                   int                          out_fd,
@@ -215,33 +305,28 @@ public:
     }
 
 private:
+    uint32_t
+    getBits( uint8_t nBits )
+    {
+        return m_bitReader.read( nBits );
+    }
     void
     flushOutputBuffer( int outputFileDescriptor );
-
     void
     prepareBurrowsWheeler( BurrowsWheelerTransformData* bw );
-
     int
     readBlockHeader( BurrowsWheelerTransformData* bw );
-
     int
     readBlockData( BurrowsWheelerTransformData* bw );
-
-    uint32_t
-    getBits( const unsigned char bits_wanted );
-
     static std::array<uint32_t, CRC32_LOOKUP_TABLE_SIZE>
     createCRC32LookupTable( bool littleEndian = false );
-
     void
-    startBunzip( const int    fileDescriptor,
-                 const char*  bz2Data,
-                 const size_t size );
+    startBunzip();
 
 private:
+    BitReader m_bitReader;
     BlockHeader header;
     bunzip_data bd;
-    FILE* m_file;
 };
 
 
@@ -371,7 +456,7 @@ BZ2Reader::readBlockHeader( BurrowsWheelerTransformData* bw )
                 if ( kk & 2 ) {
                     hh += 1 - ( ( kk & 1 ) << 1 );
                 } else {
-                    bd.inbufBitCount++;
+                    m_bitReader.m_inbufBitCount++;
                     break;
                 }
             }
@@ -491,7 +576,9 @@ BZ2Reader::readBlockData( BurrowsWheelerTransformData* bw )
 
             // Unroll getBits() to avoid a function call when the data's in
             // the buffer already.
-            const auto kk = bd.inbufBitCount ? ( bd.inbufBits >> --( bd.inbufBitCount ) ) & 1 : getBits( 1 );
+            const auto kk =
+                m_bitReader.m_inbufBitCount ? ( m_bitReader.m_inbufBits >> --( m_bitReader.m_inbufBitCount ) ) &
+                1 : getBits( 1 );
             jj = ( jj << 1 ) | kk;
         }
         // Huffman decode jj into nextSym (with bounds checking)
@@ -768,20 +855,8 @@ dataus_interruptus:
 
 
 inline void
-BZ2Reader::startBunzip( const int    fileDescriptor,
-                        const char*  bz2Data,
-                        const size_t size )
+BZ2Reader::startBunzip()
 {
-    if ( size ) {
-        bd.inbuf.resize( size );
-        std::memcpy( bd.inbuf.data(), bz2Data, size );
-        bd.inbufCount = size;
-        bd.in_fd = -1;
-    } else {
-        bd.inbuf.resize( IOBUF_SIZE, 0 );
-        bd.in_fd = fileDescriptor;
-    }
-
     // Ensure that file starts with "BZh".
     for ( auto i = 0; i < 3; i++ ) {
         if ( getBits( 8 ) != (uint32_t)"BZh"[i] ) {
@@ -819,43 +894,4 @@ BZ2Reader::createCRC32LookupTable( bool littleEndian )
         table[i] = c;
     }
     return table;
-}
-
-
-inline uint32_t
-BZ2Reader::getBits( const unsigned char bits_wanted )
-{
-    uint32_t bits = 0;
-    assert( bits_wanted <= sizeof( bits ) * 8 );
-
-    // If we need to get more data from the byte buffer, do so.  (Loop getting
-    // one byte at a time to enforce endianness and avoid unaligned access.)
-    auto bitsNeeded = bits_wanted;
-    while ( bd.inbufBitCount < bitsNeeded ) {
-        // If we need to read more data from file into byte buffer, do so
-        if ( bd.inbufPos == bd.inbufCount ) {
-            if ( 0 >= ( bd.inbufCount = read( bd.in_fd, bd.inbuf.data(), IOBUF_SIZE ) ) ) {
-                throw std::domain_error( "Not enough data to read!" );
-            }
-            bd.inbufPos = 0;
-        }
-
-        // Avoid 32-bit overflow (dump bit buffer to top of output)
-        if ( bd.inbufBitCount >= 24 ) {
-            bits = bd.inbufBits & ( ( 1 << bd.inbufBitCount ) - 1 );
-            bitsNeeded -= bd.inbufBitCount;
-            bits <<= bitsNeeded;
-            bd.inbufBitCount = 0;
-        }
-
-        // Grab next 8 bits of input from buffer.
-        bd.inbufBits = ( bd.inbufBits << 8 ) | bd.inbuf[bd.inbufPos++];
-        bd.inbufBitCount += 8;
-    }
-
-    // Calculate result
-    bd.inbufBitCount -= bitsNeeded;
-    bits |= ( bd.inbufBits >> bd.inbufBitCount ) & ( ( 1 << bitsNeeded ) - 1 );
-    assert( bits == ( bits & ( 0xffffffffL >> ( 32 - bits_wanted ) ) ) );
-    return bits;
 }
