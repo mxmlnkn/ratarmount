@@ -18,11 +18,14 @@
 
 #include <algorithm>
 #include <array>
+#include <bitset>
 #include <cassert>
 #include <cstring>
 #include <iostream>
+#include <map>
 #include <sstream>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 
@@ -33,22 +36,18 @@ public:
     static constexpr int NO_FILE = -1;
 
 public:
-    BitReader( std::string filePath )
-    {
-        m_file = fopen( filePath.c_str(), "r" );
-        initializeFileBuffer( fileno( m_file ) );
-    }
+    BitReader( std::string filePath ) :
+        m_file( fopen( filePath.c_str(), "rb" ) )
+    {}
 
-    BitReader( int fileDescriptor )
-    {
-        initializeFileBuffer( fileDescriptor );
-    }
+    BitReader( int fileDescriptor ) :
+        m_file( fdopen( fileDescriptor, "rb" ) )
+    {}
 
     BitReader( const uint8_t* buffer,
-               size_t         size )
-    {
-        initializeFileBuffer( buffer, size );
-    }
+               size_t         size ) :
+        m_inbuf( buffer, buffer + size )
+    {}
 
     ~BitReader()
     {
@@ -58,31 +57,67 @@ public:
     }
 
     uint32_t
-    read( uint8_t );
+        read( uint8_t );
 
-private:
-    void
-    initializeFileBuffer( int fileDescriptor )
+    size_t
+    tell() const
     {
-        m_fileDescriptor = fileDescriptor;
+        return ( ftell( m_file ) - m_inbuf.size() + m_inbufPos ) * 8ULL - m_inbufBitCount;
     }
 
     void
-    initializeFileBuffer( const uint8_t* buffer,
-                          size_t         size )
+    seek( const size_t offsetBits )
     {
-        m_inbuf.resize( size );
-        std::memcpy( m_inbuf.data(), buffer, size );
+        const auto bytesToSeek = offsetBits >> 3;
+        const auto subbitsToSeek = offsetBits & 7;
+
+        m_inbuf.clear();
+        m_inbufPos = 0;
+        m_inbufBits = 0;
+        m_inbufBitCount = 0;
+
+        if ( m_file == nullptr ) {
+            if ( bytesToSeek >= m_inbuf.size() ) {
+                std::stringstream msg;
+                msg << "[BitReader] Could not seek to specified byte " << bytesToSeek;
+                std::invalid_argument( msg.str() );
+            }
+
+            m_inbufPos = bytesToSeek;
+            if ( subbitsToSeek > 0 ) {
+                m_inbufBitCount = 8 - subbitsToSeek;
+                m_inbufBits = m_inbuf[m_inbufPos++];
+            }
+        } else {
+            const auto returnCodeSeek = fseek( m_file, bytesToSeek, SEEK_SET );
+            if ( subbitsToSeek > 0 ) {
+                m_inbufBitCount = 8 - subbitsToSeek;
+                m_inbufBits = fgetc( m_file );
+            }
+
+            if ( ( returnCodeSeek != 0 ) || feof( m_file ) || ferror( m_file ) ) {
+                std::stringstream msg;
+                msg << "[BitReader] Could not seek to specified byte " << bytesToSeek
+                << " subbit " << subbitsToSeek << ", feof: " << feof( m_file ) << ", ferror: " << ferror( m_file )
+                << ", returnCodeSeek: " << returnCodeSeek;
+                throw std::invalid_argument( msg.str() );
+            }
+        }
     }
 
 private:
     FILE* m_file = nullptr;
-    int m_fileDescriptor = NO_FILE;
     std::vector<uint8_t> m_inbuf;
     uint32_t m_inbufPos = 0;     // stores current position in buffer in bytes
 
 public:
-    uint32_t m_inbufBits = 0;    // bitbuffer stores the last read bits from m_inbuf
+    /**
+     * Bit buffer stores the last read bits from m_inbuf.
+     * The bits are to be read from left to right. This means that not the least significant n bits
+     * are to be returned on read but the most significant.
+     * E.g. return 3 bits of 1011 1001 should return 101 not 001
+     */
+    uint32_t m_inbufBits = 0;
     uint8_t m_inbufBitCount = 0; // size of bitbuffer in bits
 };
 
@@ -100,7 +135,7 @@ BitReader::read( const uint8_t bits_wanted )
         // If we need to read more data from file into byte buffer, do so
         if ( m_inbufPos == m_inbuf.size() ) {
             m_inbuf.resize( IOBUF_SIZE );
-            const auto nBytesRead = ::read( m_fileDescriptor, m_inbuf.data(), m_inbuf.size() );
+            const auto nBytesRead = fread( m_inbuf.data(), 1, m_inbuf.size(), m_file );
             if ( nBytesRead <= 0 ) {
                 // this will also happen for invalid file descriptor -1
                 throw std::domain_error( "[BitReader] Not enough data to read!" );
@@ -125,7 +160,7 @@ BitReader::read( const uint8_t bits_wanted )
     // Calculate result
     m_inbufBitCount -= bitsNeeded;
     bits |= ( m_inbufBits >> m_inbufBitCount ) & ( ( 1 << bitsNeeded ) - 1 );
-    assert( bits == ( bits & ( 0xffffffffL >> ( 32 - bits_wanted ) ) ) );
+    assert( bits == ( bits & ( ~0L >> ( 32 - bits_wanted ) ) ) );
     return bits;
 }
 
@@ -142,7 +177,6 @@ public:
     static constexpr int SYMBOL_RUNB = 1;
 
     static constexpr int IOBUF_SIZE = 4096;
-    static constexpr int RETVAL_LAST_BLOCK = -100;
     static constexpr int THREADS = 1;
     static constexpr int CRC32_LOOKUP_TABLE_SIZE = 256;
     /* a small lookup table: raw data -> CRC32 value to speed up CRC calculation */
@@ -263,7 +297,10 @@ public:
     uint32_t
     streamCRC() const
     {
-        return header.bwdata.headerCRC; // only true when called after last block read
+        if ( !m_readLastBlock ) {
+            throw std::invalid_argument( "Stream CRC is in last BZip2 block, which was not read yet." );
+        }
+        return m_streamCRC; // only true when called after last block read
     }
 
     uint32_t
@@ -272,27 +309,70 @@ public:
         return m_totalCRC;
     }
 
+    bool
+    finished() const
+    {
+        return m_readLastBlock;
+    }
+
+    uint8_t
+    blockSize100k() const
+    {
+        return m_blockSize100k;
+    }
+
+    /**
+     * @return vectors of block data: offset in file, offset in decoded data
+     *         (cumulative size of all prior decoded blocks).
+     */
+    std::map<size_t, size_t>
+    blockOffsets()
+    {
+        if ( !finished() ) {
+            decodeStream( -1, nullptr, 0 );
+            if ( !finished() ) {
+                throw std::runtime_error( "Did not encounter last bzip block." );
+            }
+        }
+
+        for ( auto it = m_blockToDataOffsets.begin(); it != m_blockToDataOffsets.end(); ++it ) {
+            m_bitReader.seek( it->first );
+            const auto magicBytes = ( (uint64_t)m_bitReader.read( 24 ) << 24 ) | m_bitReader.read( 24 );
+            std::cerr << "Magic byte at offset " << ( it->first >> 3 ) << " B " << ( it->first & 7 ) << " b is 0x"
+            << std::hex << magicBytes << std::dec << "\n";
+        }
+
+        return m_blockToDataOffsets;
+    }
+
     /* Decompress a block of text to intermediate buffer */
-    int
+    size_t
     readNextBlock();
 
     int
-    decodeBuffer( BurrowsWheelerTransformData* bw,
-                  int                          out_fd,
-                  char*                        outbuf,
-                  int                          len );
+    decodeStream( int    outputFileDescriptor,
+                  char*  outputBuffer,
+                  size_t nBytesToWrite );
 
+    /**
+     * @return number of bytes written
+     */
     int
-    writeData( const int   outputFileDescriptor,
-               char* const outputBuffer = nullptr,
-               const int   outputBufferSize = 0 )
+    writeData( const int    outputFileDescriptor,
+               char* const  outputBuffer = nullptr,
+               const size_t outputBufferSize = 0 )
     {
-        const auto rc = decodeBuffer( &header.bwdata, outputFileDescriptor, outputBuffer, outputBufferSize );
+        const auto nBytes = decodeStream( outputFileDescriptor, outputBuffer, outputBufferSize );
         flushOutputBuffer( outputFileDescriptor );
-        if ( ( rc == RETVAL_LAST_BLOCK ) && ( header.bwdata.headerCRC == m_totalCRC ) ) {
-            return 0;
+        if ( finished() ) {
+            if ( m_streamCRC == m_totalCRC ) {
+                return nBytes;
+            }
+            std::stringstream msg;
+            msg << "Stream CRC 0x" << std::hex << m_streamCRC << " does not match calculated CRC 0x" << m_totalCRC;
+            throw std::runtime_error( msg.str() );
         }
-        return rc;
+        return nBytes;
     }
 
 private:
@@ -305,14 +385,21 @@ private:
     void
     flushOutputBuffer( int outputFileDescriptor );
 
-    void
+    static void
     prepareBurrowsWheeler( BurrowsWheelerTransformData* bw );
 
-    int
-    readBlockHeader( BurrowsWheelerTransformData* bw );
+    BlockHeader
+    readBlockHeader();
 
+    /**
+     * First pass, read block's symbols into dbuf[dbufCount].
+     *
+     * This undoes three types of compression: huffman coding, run length encoding,
+     * and move to front encoding.  We have to undo all those to know when we've
+     * read enough input.
+     */
     int
-    readBlockData( BurrowsWheelerTransformData* bw );
+    readBlockData( BlockHeader* header );
 
     static std::array<uint32_t, CRC32_LOOKUP_TABLE_SIZE>
     createCRC32LookupTable( bool littleEndian = false );
@@ -322,12 +409,18 @@ private:
 
 private:
     BitReader m_bitReader;
-    BlockHeader header;
+    BlockHeader m_lastHeader;
 
     std::array<char, IOBUF_SIZE> m_outbuf;
-    int m_outbufPos = 0;
+    size_t m_outbufPos = 0;
 
-    uint32_t m_totalCRC = 0;
+    uint8_t m_blockSize100k = 0;
+    uint32_t m_streamCRC = 0; /* CRC of stream as last block says */
+    uint32_t m_totalCRC = 0; /* CRC calculated by us for the stream up to the point to which we read */
+    bool m_readLastBlock = false;
+    size_t m_bytesDecoded = 0;
+
+    std::map<size_t, size_t> m_blockToDataOffsets;
 };
 
 
@@ -349,14 +442,21 @@ const std::array<uint32_t, BZ2Reader::CRC32_LOOKUP_TABLE_SIZE> BZ2Reader::CRC32_
  *           from 2 to MAX_GROUPS)
  * variable: hufGroup[groupCount] (MTF encoded huffman table data.)
  */
-inline int
-BZ2Reader::readBlockHeader( BurrowsWheelerTransformData* bw )
+inline BZ2Reader::BlockHeader
+BZ2Reader::readBlockHeader()
 {
+    BlockHeader header;
+
+    /* note that blocks are NOT byte-aligned! Only the end of the stream has a necessary padding. */
+    m_blockToDataOffsets.insert( { m_bitReader.tell(), m_bytesDecoded } );
+
     header.magicBytes = ( (uint64_t)getBits( 24 ) << 24 ) | (uint64_t)getBits( 24 );
-    bw->headerCRC = getBits( 32 );
+    header.bwdata.headerCRC = getBits( 32 );
     if ( header.magicBytes == 0x177245385090 /* bcd(sqrt(pi)) */ ) {
         /* EOF block contains CRC for whole stream? */
-        return RETVAL_LAST_BLOCK;
+        m_readLastBlock = true;
+        m_streamCRC = header.bwdata.headerCRC;
+        return header;
     }
 
     if ( header.magicBytes != 0x314159265359 /* bcd(pi) */ ) {
@@ -365,14 +465,16 @@ BZ2Reader::readBlockHeader( BurrowsWheelerTransformData* bw )
         throw std::domain_error( msg.str() );
     }
 
+    header.bwdata.dbuf.resize( 100000 * m_blockSize100k, 0 );
     header.isRandomized = getBits( 1 );
     if ( header.isRandomized ) {
         throw std::domain_error( "[BZip2 block header] deprecated isRandomized bit is not supported" );
     }
 
-    if ( ( bw->origPtr = getBits( 24 ) ) > bw->dbuf.size() ) {
+    if ( ( header.bwdata.origPtr = getBits( 24 ) ) > header.bwdata.dbuf.size() ) {
         std::stringstream msg;
-        msg << "[BZip2 block header] origPtr " << bw->origPtr << " is larger than buffer size: " << bw->dbuf.size();
+        msg << "[BZip2 block header] origPtr " << header.bwdata.origPtr << " is larger than buffer size: " <<
+        header.bwdata.dbuf.size();
         throw std::logic_error( msg.str() );
     }
 
@@ -522,48 +624,42 @@ BZ2Reader::readBlockHeader( BurrowsWheelerTransformData* bw )
         base[hufGroup->minLen] = 0;
     }
 
-    return 0;
+    return header;
 }
 
 
-/* First pass, read block's symbols into dbuf[dbufCount].
- *
- * This undoes three types of compression: huffman coding, run length encoding,
- * and move to front encoding.  We have to undo all those to know when we've
- * read enough input.
- */
 inline int
-BZ2Reader::readBlockData( BurrowsWheelerTransformData* bw )
+BZ2Reader::readBlockData( BlockHeader* const header )
 {
-    GroupData* hufGroup = nullptr;
+    const GroupData* hufGroup = nullptr;
 
     // We've finished reading and digesting the block header.  Now read this
     // block's huffman coded symbols from the file and undo the huffman coding
     // and run length encoding, saving the result into dbuf[dbufCount++] = uc
 
     // Initialize symbol occurrence counters and symbol mtf table
-    bw->byteCount.fill( 0 );
-    for ( size_t i = 0; i < header.mtfSymbol.size(); i++ ) {
-        header.mtfSymbol[i] = i;
+    header->bwdata.byteCount.fill( 0 );
+    for ( size_t i = 0; i < header->mtfSymbol.size(); i++ ) {
+        header->mtfSymbol[i] = i;
     }
 
     // Loop through compressed symbols.  This is the first "tight inner loop"
     // that needs to be micro-optimized for speed.  (This one fills out dbuf[]
     // linearly, staying in cache more, so isn't as limited by DRAM access.)
-    int* base = nullptr;
-    int* limit = nullptr;
+    const int* base = nullptr;
+    const int* limit = nullptr;
     int dbufCount = 0;
     for ( int ii, jj, hh = 0, runPos = 0, symCount = 0, selector = 0; ; ) {
         // Have we reached the end of this huffman group?
         if ( !( symCount-- ) ) {
             // Determine which huffman coding group to use.
             symCount = GROUP_SIZE - 1;
-            if ( selector >= header.selectors_used ) {
+            if ( selector >= header->selectors_used ) {
                 std::stringstream msg;
-                msg << "[BZip2 block data] selector " << selector << " out of maximum range " << header.selectors_used;
+                msg << "[BZip2 block data] selector " << selector << " out of maximum range " << header->selectors_used;
                 throw std::domain_error( msg.str() );
             }
-            hufGroup = &header.groups[header.selectors[selector++]];
+            hufGroup = &header->groups[header->selectors[selector++]];
             base = hufGroup->base.data() - 1;
             limit = hufGroup->limit.data() - 1;
         }
@@ -625,21 +721,22 @@ BZ2Reader::readBlockData( BurrowsWheelerTransformData* bw )
          * literal used is the one at the head of the mtfSymbol array.) */
         if ( runPos ) {
             runPos = 0;
-            if ( dbufCount + hh > (int)bw->dbuf.size() ) {
+            if ( dbufCount + hh > (int)header->bwdata.dbuf.size() ) {
                 std::stringstream msg;
-                msg << "[BZip2 block data] dbufCount " << dbufCount << " > " << bw->dbuf.size() << " dbufSize";
+                msg << "[BZip2 block data] dbufCount " << dbufCount << " > " << header->bwdata.dbuf.size() <<
+                " dbufSize";
                 throw std::domain_error( msg.str() );
             }
 
-            const auto uc = header.symbolToByte[header.mtfSymbol[0]];
-            bw->byteCount[uc] += hh;
+            const auto uc = header->symbolToByte[header->mtfSymbol[0]];
+            header->bwdata.byteCount[uc] += hh;
             while ( hh-- ) {
-                bw->dbuf[dbufCount++] = uc;
+                header->bwdata.dbuf[dbufCount++] = uc;
             }
         }
 
         // Is this the terminating symbol?
-        if ( nextSym > header.symbolCount ) {
+        if ( nextSym > header->symbolCount ) {
             break;
         }
 
@@ -649,30 +746,30 @@ BZ2Reader::readBlockData( BurrowsWheelerTransformData* bw )
          * result can't be -1 or 0, because 0 and 1 are RUNA and RUNB.
          * Another instance of the first symbol in the mtf array, position 0,
          * would have been handled as part of a run.) */
-        if ( dbufCount >= (int)bw->dbuf.size() ) {
+        if ( dbufCount >= (int)header->bwdata.dbuf.size() ) {
             std::stringstream msg;
-            msg << "[BZip2 block data] dbufCount " << dbufCount << " > " << bw->dbuf.size() << " dbufSize";
+            msg << "[BZip2 block data] dbufCount " << dbufCount << " > " << header->bwdata.dbuf.size() << " dbufSize";
             throw std::domain_error( msg.str() );
         }
         ii = nextSym - 1;
-        auto uc = header.mtfSymbol[ii];
+        auto uc = header->mtfSymbol[ii];
         // On my laptop, unrolling this memmove() into a loop shaves 3.5% off
         // the total running time.
         while ( ii-- ) {
-            header.mtfSymbol[ii + 1] = header.mtfSymbol[ii];
+            header->mtfSymbol[ii + 1] = header->mtfSymbol[ii];
         }
-        header.mtfSymbol[0] = uc;
-        uc = header.symbolToByte[uc];
+        header->mtfSymbol[0] = uc;
+        uc = header->symbolToByte[uc];
 
         // We have our literal byte.  Save it into dbuf.
-        bw->byteCount[uc]++;
-        bw->dbuf[dbufCount++] = uc;
+        header->bwdata.byteCount[uc]++;
+        header->bwdata.dbuf[dbufCount++] = uc;
     }
 
     // Now we know what dbufCount is, do a better sanity check on origPtr.
-    if ( bw->origPtr >= (unsigned int)( bw->writeCount = dbufCount ) ) {
+    if ( header->bwdata.origPtr >= (unsigned int)( header->bwdata.writeCount = dbufCount ) ) {
         std::stringstream msg;
-        msg << "[BZip2 block data] origPtr error " << bw->origPtr;
+        msg << "[BZip2 block data] origPtr error " << header->bwdata.origPtr;
         throw std::domain_error( msg.str() );
     }
 
@@ -683,12 +780,13 @@ BZ2Reader::readBlockData( BurrowsWheelerTransformData* bw )
 inline void
 BZ2Reader::flushOutputBuffer( int outputFileDescriptor )
 {
-    if ( m_outbufPos ) {
-        if ( write( outputFileDescriptor, m_outbuf.data(), m_outbufPos ) != m_outbufPos ) {
+    if ( ( m_outbufPos > 0 ) && ( outputFileDescriptor >= 0 ) ) {
+        if ( write( outputFileDescriptor, m_outbuf.data(), m_outbufPos ) != (long int)m_outbufPos ) {
             throw std::logic_error( "Could not flush complete output buffer" );
         }
-        m_outbufPos = 0;
     }
+    m_bytesDecoded += m_outbufPos;
+    m_outbufPos = 0;
 }
 
 
@@ -729,18 +827,19 @@ BZ2Reader::prepareBurrowsWheeler( BurrowsWheelerTransformData* bw )
 }
 
 
-inline int
+inline size_t
 BZ2Reader::readNextBlock()
 {
-    int rc = readBlockHeader( &header.bwdata );
-    if ( !rc ) {
-        rc = readBlockData( &header.bwdata );
+    m_lastHeader = readBlockHeader();
+    if ( finished() ) {
+        return 0;
     }
+    const auto dataBlockSize = readBlockData( &m_lastHeader );
 
     // First thing that can be done by a background thread.
-    prepareBurrowsWheeler( &header.bwdata );
+    prepareBurrowsWheeler( &m_lastHeader.bwdata );
 
-    return rc;
+    return dataBlockSize;
 }
 
 
@@ -752,29 +851,26 @@ BZ2Reader::readNextBlock()
 // http://dogma.net/markn/articles/bwt/bwt.htm
 // http://marknelson.us/1996/09/01/bwt/
 inline int
-BZ2Reader::decodeBuffer( BurrowsWheelerTransformData* bw,
-                         int                          out_fd,
-                         char*                        outbuf,
-                         int                          len )
+BZ2Reader::decodeStream( int    outputFileDescriptor,
+                         char*  outputBuffer,
+                         size_t nBytesToWrite )
 {
     int count, pos, current, run, copies, outbyte, previous, gotcount = 0;
+    const auto bw = &m_lastHeader.bwdata;
 
-    for ( ; ; ) {
+    while ( true ) {
         // If last read was short due to end of file, return last block now
         if ( bw->writeCount < 0 ) {
             return bw->writeCount;
         }
 
         // If we need to refill dbuf, do it.
-        if ( !bw->writeCount ) {
-            int i = readNextBlock();
-            if ( i ) {
-                if ( i == RETVAL_LAST_BLOCK ) {
-                    bw->writeCount = i;
-                    return gotcount;
-                } else {
-                    return i;
-                }
+        if ( bw->writeCount == 0 ) {
+            const auto dataBlockCount = readNextBlock();
+            const auto bw = &m_lastHeader.bwdata;
+            if ( finished() ) {
+                bw->writeCount = dataBlockCount;
+                return gotcount;
             }
         }
 
@@ -786,7 +882,7 @@ BZ2Reader::decodeBuffer( BurrowsWheelerTransformData* bw,
         while ( count ) {
             // If somebody (like tar) wants a certain number of bytes of
             // data from memory instead of written to a file, humor them.
-            if ( len && ( m_outbufPos >= len ) ) {
+            if ( nBytesToWrite && ( m_outbufPos >= nBytesToWrite ) ) {
                 goto dataus_interruptus;
             }
             count--;
@@ -811,11 +907,10 @@ BZ2Reader::decodeBuffer( BurrowsWheelerTransformData* bw,
             // Output bytes to buffer, flushing to file if necessary
             while ( copies-- ) {
                 if ( m_outbufPos == IOBUF_SIZE ) {
-                    flushOutputBuffer( out_fd );
+                    flushOutputBuffer( outputFileDescriptor );
                 }
                 m_outbuf[m_outbufPos++] = outbyte;
-                bw->dataCRC = ( bw->dataCRC << 8 )
-                              ^ CRC32_TABLE[( bw->dataCRC >> 24 ) ^ outbyte];
+                bw->dataCRC = ( bw->dataCRC << 8 ) ^ CRC32_TABLE[( bw->dataCRC >> 24 ) ^ outbyte];
             }
             if ( current != previous ) {
                 run = 0;
@@ -826,23 +921,24 @@ BZ2Reader::decodeBuffer( BurrowsWheelerTransformData* bw,
         bw->dataCRC = ~( bw->dataCRC );
         m_totalCRC = ( ( m_totalCRC << 1 ) | ( m_totalCRC >> 31 ) ) ^ bw->dataCRC;
 
-        // if this block had a crc error, force file level crc error.
         if ( bw->dataCRC != bw->headerCRC ) {
-            m_totalCRC = bw->headerCRC + 1;
-
-            return RETVAL_LAST_BLOCK;
+            std::stringstream msg;
+            msg << "Calculated CRC " << std::hex << bw->dataCRC << " for block mismatches " << bw->headerCRC;
+            throw std::runtime_error( msg.str() );
         }
 dataus_interruptus:
         bw->writeCount = count;
-        if ( len ) {
+        if ( nBytesToWrite ) {
             gotcount += m_outbufPos;
-            memcpy( outbuf, m_outbuf.data(), len );
+            if ( outputBuffer != nullptr ) {
+                memcpy( outputBuffer, m_outbuf.data(), nBytesToWrite );
+            }
 
             // If we got enough data, checkpoint loop state and return
-            if ( ( len -= m_outbufPos ) < 1 ) {
-                m_outbufPos -= len;
+            if ( ( nBytesToWrite -= m_outbufPos ) < 1 ) {
+                m_outbufPos -= nBytesToWrite;
                 if ( m_outbufPos ) {
-                    memmove( m_outbuf.data(), m_outbuf.data() + len, m_outbufPos );
+                    memmove( m_outbuf.data(), m_outbuf.data() + nBytesToWrite, m_outbufPos );
                 }
                 bw->writePos = pos;
                 bw->writeCurrent = current;
@@ -874,7 +970,7 @@ BZ2Reader::startBunzip()
         << ") but is " << i << " (" << (int)i << ")" << std::dec;
         throw std::domain_error( msg.str() );
     }
-    header.bwdata.dbuf.resize( 100000 * ( i - '0' ), 0 );
+    m_blockSize100k = i - '0';
 }
 
 
