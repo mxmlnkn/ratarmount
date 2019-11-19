@@ -7,7 +7,13 @@ from Cython.Build import cythonize
 
 
 extensions = [
-    Extension( 'bzip2', [ 'bzip2.pyx' ], include_dirs = [ '.' ], language = 'c++', ),
+    Extension(
+        'bzip2',
+        [ 'bzip2.pyx' ],
+        include_dirs       = [ '.' ],
+        language           = 'c++',
+        extra_compile_args = [ '-std=c++11', '-O3', '-DNDEBUG' ],
+    ),
 ]
 
 setup(
