@@ -33,7 +33,7 @@ setup(
                          'Topic :: System :: Archiving' ],
 
     py_modules       = [ 'ratarmount' ],
-    ext_modules      = cythonize( extensions ),
+    ext_modules      = cythonize( extensions, compiler_directives = { 'language_level' : '3' } ),
     install_requires = [ 'fusepy',
                          'lz4',
                          'msgpack',
