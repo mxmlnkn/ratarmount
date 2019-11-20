@@ -395,6 +395,9 @@ public:
     void
     setBlockOffsets( std::map<size_t, size_t> offsets )
     {
+        if ( offsets.size() < 2 ) {
+            throw std::invalid_argument( "Block offset map must contain at least one valid block and one EOS block!" );
+        }
         m_blockToDataOffsetsComplete = true;
         m_blockToDataOffsets = std::move( offsets );
     }

@@ -109,6 +109,7 @@ class SQLiteIndexedTar:
         # Try to find an already existing index
         for indexPath in possibleIndexFilePaths:
             if self._tryLoadIndex( indexPath ):
+                self.indexFileName = indexPath
                 break
         if self.indexIsLoaded():
             return
@@ -139,8 +140,8 @@ class SQLiteIndexedTar:
 
         if printDebug >= 1 and writeIndex:
             # The 0-time is legacy for the automated tests
-            print( "Writing out TAR index to", self.tarFileName, "took 0s",
-                   "and is sized", os.stat( self.tarFileName ).st_size, "B" )
+            print( "Writing out TAR index to", self.indexFileName, "took 0s",
+                   "and is sized", os.stat( self.indexFileName ).st_size, "B" )
 
     def _openSqlDb( self, filePath ):
         self.sqlConnection = sqlite3.connect( filePath )
@@ -1043,6 +1044,22 @@ class TarMount( fuse.Operations ):
                 writeIndex      = True,
                 clearIndexCache = clearIndexCache,
                 recursive       = recursive )
+
+            # The index creation iterates over the whole file, so now we can query the block offsets gathered during
+            if isinstance( self.tarFile, SeekableBzip2 ):
+                db = self.indexedTar.sqlConnection
+                try:
+                    offsets = dict( db.execute( 'SELECT blockoffset,dataoffset FROM bzip2blocks' ) )
+                    self.tarFile.setBlockOffsets( offsets )
+                except Exception as e:
+                    print( "[Warning] Could not load BZip2 Block offset data. Will create it from scratch." )
+
+                    tables = [ x[0] for x in db.execute( 'SELECT name FROM sqlite_master WHERE type="table"' ) ]
+                    if 'bzip2blocks' not in tables:
+                        db.execute( 'CREATE TABLE bzip2blocks ( blockoffset INTEGER PRIMARY KEY, dataoffset INTEGER )' )
+                    db.executemany( 'INSERT INTO bzip2blocks VALUES (?,?)',
+                                    self.tarFile.blockOffsets().items() )
+                    db.commit()
         else:
             self.indexedTar = IndexedTar(
                 pathToMount,

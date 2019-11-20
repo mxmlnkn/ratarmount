@@ -1,6 +1,8 @@
 # Random Access Read-Only Tar Mount (Ratarmount)
 
-Combines the random access indexing idea from [tarindexer](https://github.com/devsnd/tarindexer) and then mounts the tar using [fusepy](https://github.com/fusepy/fusepy) for easy read-only access just like [archivemount](https://github.com/cybernoid/archivemount/). It also will mount TARs inside TARs inside TARs, ... recursively into folders of the same name, which is useful for the ImageNet data set.
+Combines the random access indexing idea from [tarindexer](https://github.com/devsnd/tarindexer) and then **mounts** the tar using [fusepy](https://github.com/fusepy/fusepy) for easy read-only access just like [archivemount](https://github.com/cybernoid/archivemount/). 
+It also will mount TARs inside TARs inside TARs, ... **recursively** into folders of the same name, which is useful for the ImageNet data set.
+Furthermore, it now has support for **BZip2** compressed TAR archives!
 
 
 # Installation

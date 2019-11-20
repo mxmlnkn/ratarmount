@@ -33,6 +33,7 @@ cdef extern from "bzip2.h":
         size_t tell() except +
         int read( int, char*, size_t ) except +
         map[size_t,size_t] blockOffsets() except +
+        void setBlockOffsets( map[size_t,size_t] ) except +
 
 cdef class BZ2ReaderWrapper():
     cdef BZ2Reader* bz2reader
@@ -83,6 +84,10 @@ cdef class BZ2ReaderWrapper():
 
     def blockOffsets( self ):
         return <dict> self.bz2reader.blockOffsets()
+
+    def setBlockOffsets( self, offsets ):
+        return self.bz2reader.setBlockOffsets( offsets )
+
 
 # Extra class because cdefs are not visible from otuside but cdef class can't inherit from io.BufferedIOBase
 class SeekableBzip2( io.BufferedIOBase ):
@@ -141,3 +146,6 @@ class SeekableBzip2( io.BufferedIOBase ):
 
     def blockOffsets( self ):
         return self.bz2reader.blockOffsets()
+
+    def setBlockOffsets( self, offsets ):
+        return self.bz2reader.setBlockOffsets( offsets )
