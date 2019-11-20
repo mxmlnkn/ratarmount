@@ -1,3 +1,9 @@
+tests/*.tar*
+benchmarks/data/**/*.png
+benchmarks/**/*.tar
+notes.txt
+knowledge
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
