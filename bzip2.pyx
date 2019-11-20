@@ -4,12 +4,17 @@ functions in `micro-bunzip.c`).
 """
 
 from libc.stdlib cimport malloc, free
+from libc.stdio cimport SEEK_SET
 from libcpp.string cimport string
+from libcpp.map cimport map
 from libcpp cimport bool
 
 import io
 import os
 import sys
+
+ctypedef (unsigned long long int) size_t
+ctypedef (long long int) lli
 
 
 cdef extern from "Python.h":
@@ -17,23 +22,26 @@ cdef extern from "Python.h":
     object PyString_FromStringAndSize( char *, int )
 
 cdef extern from "bzip2.h":
-    ctypedef (unsigned long long int) size_t
     cppclass BZ2Reader:
-        BZ2Reader( const string& ) except +
-        bool finished() except +
+        BZ2Reader( string ) except +
+        BZ2Reader( int ) except +
+        bool eof() except +
         int fileno() except +
         void close() except +
         bool closed() except +
-        void seek( size_t ) except +
+        size_t seek( lli, int ) except +
         size_t tell() except +
         int read( int, char*, size_t ) except +
-
+        map[size_t,size_t] blockOffsets() except +
 
 cdef class BZ2ReaderWrapper():
     cdef BZ2Reader* bz2reader
 
-    def __init__( self, filename ):
-        self.bz2reader = new BZ2Reader( filename.encode() )
+    def __init__( self, fileNameOrDescriptor ):
+        if isinstance( fileNameOrDescriptor, basestring ):
+            self.bz2reader = new BZ2Reader( <string>fileNameOrDescriptor.encode() )
+        else:
+            self.bz2reader = new BZ2Reader( <int> fileNameOrDescriptor )
 
     def close( self ):
         self.bz2reader.close()
@@ -45,7 +53,7 @@ cdef class BZ2ReaderWrapper():
         return self.bz2reader.fileno()
 
     def read( self, size = -1 ):
-        if size == 0 or self.bz2reader.finished():
+        if size == 0 or self.bz2reader.eof():
             return b''
 
         cdef char* buffer
@@ -67,11 +75,14 @@ cdef class BZ2ReaderWrapper():
 
         raise Exception( "Invalid size argument" )
 
-    def seek( self, offset ):
-        self.bz2reader.seek( offset )
+    def seek( self, offset, whence ):
+        return self.bz2reader.seek( offset, whence )
 
     def tell( self ):
         return self.bz2reader.tell()
+
+    def blockOffsets( self ):
+        return <dict> self.bz2reader.blockOffsets()
 
 # Extra class because cdefs are not visible from otuside but cdef class can't inherit from io.BufferedIOBase
 class SeekableBzip2( io.BufferedIOBase ):
@@ -102,10 +113,7 @@ class SeekableBzip2( io.BufferedIOBase ):
         return self.bz2reader.read( size )
 
     def seek( self, offset, whence = io.SEEK_SET ):
-        if ( whence != io.SEEK_SET ):
-            raise Exception( "not supported" )
-        self.bz2reader.seek( offset )
-        return offset
+        return self.bz2reader.seek( offset, whence )
 
     def tell( self ):
         return self.bz2reader.tell()
@@ -130,3 +138,6 @@ class SeekableBzip2( io.BufferedIOBase ):
 
     def writelines( self, seq ):
         raise Exception( "not supported" )
+
+    def blockOffsets( self ):
+        return self.bz2reader.blockOffsets()

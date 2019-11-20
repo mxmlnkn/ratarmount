@@ -15,6 +15,7 @@ import time
 import traceback
 from timeit import default_timer as timer
 
+from bzip2 import SeekableBzip2
 import fuse
 
 
@@ -74,7 +75,8 @@ class SQLiteIndexedTar:
 
     def __init__(
         self,
-        tarFile         = None, # either string path or file object
+        tarFileName     = None, # either string path or file object
+        fileObject      = None, # if not specified, tarFileName will be opened
         writeIndex      = False,
         clearIndexCache = False,
         recursive       = False,
@@ -82,12 +84,14 @@ class SQLiteIndexedTar:
         self.parentFolderCache = []
         self.mountRecursively = recursive
         self.sqlConnection = None
-        if not isinstance( tarFile, str ):
-            self.tarFileName = '<file object>'
-            self.createIndex( tarFile )
-            return
 
-        self.tarFileName = os.path.normpath( tarFile )
+        assert tarFileName or fileObject
+        if not tarFileName:
+            self.tarFileName = '<file object>'
+            self.createIndex( fileObject )
+            # return here because we can't find a save location without any identifying name
+            return
+        self.tarFileName = os.path.normpath( tarFileName )
 
         # will be used for storing indexes if current path is read-only
         possibleIndexFilePaths = [
@@ -127,8 +131,11 @@ class SQLiteIndexedTar:
                     if printDebug >= 2:
                         print( "Could not create file:", indexPath )
 
-        with open( self.tarFileName, 'rb' ) as file:
-            self.createIndex( file )
+        if fileObject:
+            self.createIndex( fileObject )
+        else:
+            with open( self.tarFileName, 'rb' ) as file:
+                self.createIndex( file )
 
         if printDebug >= 1 and writeIndex:
             # The 0-time is legacy for the automated tests
@@ -186,7 +193,7 @@ class SQLiteIndexedTar:
 
         # 2. Open TAR file reader
         try:
-            loadedTarFile = tarfile.open( fileobj = fileObject, mode = 'r:' )
+            loadedTarFile = tarfile.open( fileobj = fileObject, mode = 'r|' )
         except tarfile.ReadError as exception:
             print( "Archive can't be opened! This might happen for compressed TAR archives, "
                    "which currently is not supported." )
@@ -1002,28 +1009,42 @@ class TarMount( fuse.Operations ):
     is planned.
     """
 
-    def __init__( self,
-                  pathToMount,
-                  clearIndexCache = False,
-                  recursive = False,
-                  serializationBackend = None,
-                  prefix = '' ):
+    def __init__(
+        self,
+        pathToMount,
+        clearIndexCache = False,
+        recursive = False,
+        serializationBackend = None,
+        prefix = ''
+    ):
         """
         prefix : Instead of mounting the TAR's root and showing all files a prefix can be specified.
                  For example '/bar' will only show all TAR files which are inside the '/bar' folder inside the TAR.
         """
-        self.tarFileName = pathToMount
-        self.tarFile = open( self.tarFileName, 'rb' )
+
+        self.tarFile = open( pathToMount, 'rb' )
+
+        # check for bzip2 compressed tar archive and add bz2 reader if so
+        magicBytes = self.tarFile.read( 10 )
+        self.tarFile.seek( 0 ) # For some reason does not get propagated to underlying file descriptor and BZ2Reader?!
+        self.tarFile.flush()
+        if magicBytes[0:3] == b"BZh" and magicBytes[4:10] == b"1AY&SY":
+            self.rawFile = self.tarFile # save so that garbage collector won't close it!
+            self.tarFile = SeekableBzip2( self.rawFile.fileno() )
+            if serializationBackend != 'sqlite':
+                print( "[Warning] Currently, only the SQLite backend has .tar.bz2 support, therefore will use that!" )
+                serializationBackend
 
         if serializationBackend == 'sqlite':
             self.indexedTar = SQLiteIndexedTar(
-                self.tarFileName,
+                pathToMount,
+                self.tarFile,
                 writeIndex      = True,
                 clearIndexCache = clearIndexCache,
                 recursive       = recursive )
         else:
             self.indexedTar = IndexedTar(
-                self.tarFileName,
+                pathToMount,
                 writeIndex           = True,
                 clearIndexCache      = clearIndexCache,
                 recursive            = recursive,
@@ -1039,7 +1060,7 @@ class TarMount( fuse.Operations ):
         # make the mount point read only and executable if readable, i.e., allow directory listing
         # @todo In some cases, I even 2(!) '.' directories listed with ls -la!
         #       But without this, the mount directory is owned by root
-        tarStats = os.stat( self.tarFileName )
+        tarStats = os.stat( pathToMount )
         # clear higher bits like S_IFREG and set the directory bit instead
         mountMode = ( tarStats.st_mode & 0o777 ) | stat.S_IFDIR
         if mountMode & stat.S_IRUSR != 0: mountMode |= stat.S_IXUSR
@@ -1198,9 +1219,21 @@ def cli( args = None ):
     args = parseArgs( args )
 
     tarToMount = os.path.abspath( args.tarfilepath[0].name )
+
+    type = None
+
     try:
         tarfile.open( tarToMount, mode = 'r:' )
+        type = 'TAR'
     except tarfile.ReadError:
+        None
+
+    with open( tarToMount, 'rb' ) as file:
+        magicBytes = file.peek( 10 )
+        if magicBytes[0:3] == b"BZh" and magicBytes[4:10] == b"1AY&SY":
+            type = 'BZ2'
+
+    if not type:
         print( "Archive", tarToMount, "can't be opened!",
                "This might happen for compressed TAR archives, which currently is not supported." )
         exit( 1 )
@@ -1210,7 +1243,12 @@ def cli( args = None ):
 
     mountPath = args.mountpath
     if mountPath is None:
-        mountPath = os.path.splitext( tarToMount )[0]
+        for ext in [ '.tar', '.tar.bz2', '.tbz2' ]:
+            if tarToMount[-len( ext ):].lower() == ext.lower():
+                mountPath = tarToMount[:-len( ext )]
+                break
+        if not mountPath:
+            mountPath = os.path.splitext( tarToMount )[0]
 
     mountPathWasCreated = False
     if not os.path.exists( mountPath ):

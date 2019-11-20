@@ -294,39 +294,13 @@ benchmarkSerialization()
     done
 }
 
-checkUnbzip2()
-(
-    tmpFolder="$( mktemp -d )"
-
-    g++ extern/toybox/main.cpp -o "$tmpFolder/bzip2"
-    for size in 0 1 2 3 4 5 10 20 30 100 1000 10000 100000 1000000; do
-        head -c "$size" /dev/urandom > "$tmpFolder/$size"
-        for (( blockSize = 1; blockSize <= 9; ++blockSize )); do
-            for compressor in bzip2 pbzip2; do
-                echo -e "\e[37mTesting random file with $size B and compressed by $compressor with blocksize $blockSize\e[0m"
-                bz2File="$tmpFolder/$size.$blockSize.$compressor.bz2"
-                $compressor -$blockSize --keep --stdout "$tmpFolder/$size" > "$bz2File"
-                sha1Org=$( sha1sum "$tmpFolder/$size" | sed 's| .*||' )
-                sha1New=$( "$tmpFolder/bzip2" "$bz2File" | sha1sum | sed 's| .*||' )
-                if [[ $sha1Org != $sha1New ]]; then
-                    count=$( "$tmpFolder/bzip2" "$bz2File" | wc -c )
-                    echoerr -e "\e[31mExtracted sha1sum $sha1New differs from original $sha1Org."
-                    echoerr -e "Extracted bytes: $count original size: $( wc -c "$tmpFolder/$size" )\e[0m"
-                    return 1
-                fi
-            done
-        done
-    done
-
-    rm -r "$tmpFolder"
-)
 
 
 
 
 pylint --disable=C0326,C0103 ratarmount.py > pylint.log
 
-checkUnbzip2
+python3 testBz2.py
 
 rm -f tests/*.index.*
 
