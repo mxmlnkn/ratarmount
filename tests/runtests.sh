@@ -329,7 +329,7 @@ for type in sqlite custom pickle2 pickle3 cbor msgpack rapidjson ujson simplejso
   done
 done
 
-benchmarkSerialization # takes quite long
+#benchmarkSerialization # takes quite long, and a benchmark is not a test ...
 
 rm -f tests/*.index.*
 rmdir tests/*/

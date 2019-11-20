@@ -151,7 +151,6 @@ class SQLiteIndexedTar:
             PRAGMA TEMP_STORE = MEMORY;
             PRAGMA JOURNAL_MODE = OFF;
             PRAGMA SYNCHRONOUS = OFF;
-            PRAGMA CACHE_SIZE = -512000;
         """ )
 
     def createIndex( self, fileObject, progressBar = None, pathPrefix = '', streamOffset = 0 ):
@@ -160,37 +159,45 @@ class SQLiteIndexedTar:
                    "<file object>" if self.tarFileName is None else self.tarFileName, "..." )
         t0 = timer()
 
-        schema = """
-            CREATE TABLE "files" (
-                "path"     VARCHAR(65535) NOT NULL,
-                "name"     VARCHAR(65535) NOT NULL,
-                "offset"   INTEGER,  /* seek offset from TAR file where these file's contents resides */
-                "size"     INTEGER,
-                "mtime"    INTEGER,
-                "mode"     INTEGER,
-                "type"     INTEGER,
-                "linkname" VARCHAR(65535),
-                "uid"      INTEGER,
-                "gid"      INTEGER,
-                /* True for valid TAR files. Internally used to determine where to mount recursive TAR files. */
-                "istar"    BOOL,
-                PRIMARY KEY ( path, name ) /* see SQL benchmarks for decision on this */
-            );
-        """
-
         # 1. If no SQL connection was given (by recursive call), open a new database file
+        openedConnection = False
         if not self.sqlConnection:
             if printDebug >= 1:
                 print( "Creating new SQLite index database at", self.indexFileName )
-            self._openSqlDb( self.indexFileName if self.indexFileName else ':memory:' )
 
-            try:
-                self.sqlConnection.execute( schema )
-            except OperationalError:
-                print( "[Warning] The index file {} already seems to contain a table. "
-                       "Will try to drop and recreate it!".format( indexFileName ) )
-                self.sqlConnection.execute( 'DROP TABLE "files"' )
-                self.sqlConnection.execute( schema )
+            createTables = """
+                CREATE TABLE "files" (
+                    "path"     VARCHAR(65535) NOT NULL,
+                    "name"     VARCHAR(65535) NOT NULL,
+                    "offset"   INTEGER,  /* seek offset from TAR file where these file's contents resides */
+                    "size"     INTEGER,
+                    "mtime"    INTEGER,
+                    "mode"     INTEGER,
+                    "type"     INTEGER,
+                    "linkname" VARCHAR(65535),
+                    "uid"      INTEGER,
+                    "gid"      INTEGER,
+                    /* True for valid TAR files. Internally used to determine where to mount recursive TAR files. */
+                    "istar"    BOOL,
+                    PRIMARY KEY (path,name) /* see SQL benchmarks for decision on this */
+                );
+                /* "A table created using CREATE TABLE AS has no PRIMARY KEY and no constraints of any kind"
+                 * Therefore, it will not be sorted and inserting will be faster! */
+                CREATE TABLE "filestmp" AS SELECT * FROM "files" WHERE 0;
+                CREATE TABLE "parentfolders" (
+                    "path"     VARCHAR(65535) NOT NULL,
+                    "name"     VARCHAR(65535) NOT NULL,
+                    PRIMARY KEY (path,name)
+                );
+            """
+
+            openedConnection = True
+            self._openSqlDb( self.indexFileName if self.indexFileName else ':memory:' )
+            tables = self.sqlConnection.execute( 'SELECT name FROM sqlite_master WHERE type = "table";' )
+            if set( [ "files", "filestmp", "parentfolders" ] ).intersection( set( [ t[0] for t in tables ] ) ):
+                raise Exception( "[Error] The index file {} already seems to contain a table. "
+                                 "Please specify --recreate-index." )
+            self.sqlConnection.executescript( createTables )
 
         # 2. Open TAR file reader
         try:
@@ -260,7 +267,23 @@ class SQLiteIndexedTar:
                 tarInfo.gid        , # 9
                 isTar              , # 10
             )
-            self.setFileInfo( fullPath, fileInfo )
+            self._setFileInfo( fullPath, fileInfo )
+
+        # 5. Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
+        if openedConnection:
+            if printDebug >= 2:
+                print( "Resorting files by path ..." )
+
+            cleanupDatabase = """
+                INSERT OR REPLACE INTO "files" SELECT * FROM "filestmp" ORDER BY "path","name",rowid;
+                DROP TABLE "filestmp";
+                INSERT OR IGNORE INTO "files"
+                    SELECT path,name,0,1,0,{},{},"",0,0,0
+                    FROM "parentfolders" ORDER BY "path","name";
+                DROP TABLE "parentfolders";
+            """.format( int( 0o555 | stat.S_IFDIR ), int( tarfile.DIRTYPE ) )
+            self.sqlConnection.executescript( cleanupDatabase )
+
 
         self.sqlConnection.commit()
 
@@ -303,35 +326,7 @@ class SQLiteIndexedTar:
     def isDir( self, path ):
         return isinstance( self.getFileInfo( path, listDir = True ), dict )
 
-    def setFileInfo( self, fullPath, fileInfo ):
-        """
-        fullPath : the full path to the file with leading slash (/) for which to set the file info
-        """
-        assert self.sqlConnection
-        assert fullPath[0] == "/"
-
-        if isinstance( fileInfo, FileInfo ):
-            # os.normpath does not delete duplicate '/' at beginning of string!
-            path, name = fullPath.rsplit( "/", 1 )
-            row = (
-                path,
-                name,
-                fileInfo.offset,
-                fileInfo.size,
-                fileInfo.mtime,
-                fileInfo.mode,
-                fileInfo.type,
-                fileInfo.linkname,
-                fileInfo.uid,
-                fileInfo.gid,
-                fileInfo.istar,
-            )
-        elif isinstance( fileInfo, tuple ) or isinstance( fileInfo, list ):
-            row = fileInfo
-            path = row[0]
-
-        self.sqlConnection.execute( 'INSERT OR REPLACE INTO "files" VALUES (?,?,?,?,?,?,?,?,?,?,?)', row )
-
+    def _tryAddParentFolders( self, path ):
         # Add parent folders if they do not exist.
         # E.g.: path = '/a/b/c' -> paths = [('', 'a'), ('/a', 'b'), ('/a/b', 'c')]
         # Without the parentFolderCache, the additional INSERT statements increase the creation time
@@ -339,14 +334,46 @@ class SQLiteIndexedTar:
         paths = path.split( "/" )
         paths = [ p for p in ( ( "/".join( paths[:i] ), paths[i] ) for i in range( 1, len( paths ) ) )
                  if p not in self.parentFolderCache ]
-        if paths:
-            self.parentFolderCache += paths
-            # Assuming files in the TAR are sorted by hierarchy, the maximum parent folder cache size
-            # gives the maximum cacheable file nesting depth. High numbers lead to higher memory usage and lookup times.
-            if len( self.parentFolderCache ) > 16:
-                self.parentFolderCache = self.parentFolderCache[-8:]
-            rows = [ ( p[0], p[1], 0, 1, 0, 0o555 | stat.S_IFDIR, tarfile.DIRTYPE, "", 0, 0, False ) for p in paths ]
-            self.sqlConnection.executemany( 'INSERT OR IGNORE INTO "files" VALUES (?,?,?,?,?,?,?,?,?,?,?)', rows )
+        if not paths:
+            return
+
+        self.parentFolderCache += paths
+        # Assuming files in the TAR are sorted by hierarchy, the maximum parent folder cache size
+        # gives the maximum cacheable file nesting depth. High numbers lead to higher memory usage and lookup times.
+        if len( self.parentFolderCache ) > 16:
+            self.parentFolderCache = self.parentFolderCache[-8:]
+        self.sqlConnection.executemany( 'INSERT OR IGNORE INTO "parentfolders" VALUES (?,?)',
+                                        [ ( p[0], p[1] ) for p in paths ] )
+
+    def _setFileInfo( self, fullPath, row ):
+        assert isinstance( row, tuple )
+        self.sqlConnection.execute( 'INSERT OR REPLACE INTO "files" VALUES (?,?,?,?,?,?,?,?,?,?,?)', row )
+        self._tryAddParentFolders( row[0] )
+
+    def setFileInfo( self, fullPath, fileInfo ):
+        """
+        fullPath : the full path to the file with leading slash (/) for which to set the file info
+        """
+        assert self.sqlConnection
+        assert fullPath[0] == "/"
+        assert isinstance( fileInfo, FileInfo )
+
+        # os.normpath does not delete duplicate '/' at beginning of string!
+        path, name = fullPath.rsplit( "/", 1 )
+        row = (
+            path,
+            name,
+            fileInfo.offset,
+            fileInfo.size,
+            fileInfo.mtime,
+            fileInfo.mode,
+            fileInfo.type,
+            fileInfo.linkname,
+            fileInfo.uid,
+            fileInfo.gid,
+            fileInfo.istar,
+        )
+        self.sqlConnection.execute( 'INSERT OR REPLACE INTO "files" VALUES (?,?,?,?,?,?,?,?,?,?,?)', row )
 
     def indexIsLoaded( self ):
         if not self.sqlConnection:
