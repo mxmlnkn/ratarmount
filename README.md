@@ -21,6 +21,8 @@ python3 -m pip install --user .
 ratarmount --help
 ```
 
+You can also simply download [ratarmount.py](https://github.com/mxmlnkn/ratarmount/raw/master/ratarmount.py) and call it directly but then BZip2 support will not work and you will have to install the dependencies manually, so at least `pip3 install --user fusepy`.
+
 # Usage
 
 ```

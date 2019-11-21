@@ -15,7 +15,6 @@ import time
 import traceback
 from timeit import default_timer as timer
 
-from bzip2 import SeekableBzip2
 import fuse
 
 
@@ -1057,7 +1056,10 @@ class TarMount( fuse.Operations ):
         magicBytes = self.tarFile.read( 10 )
         self.tarFile.seek( 0 ) # For some reason does not get propagated to underlying file descriptor and BZ2Reader?!
         self.tarFile.flush()
+        isBz2 = False
         if magicBytes[0:3] == b"BZh" and magicBytes[4:10] == b"1AY&SY":
+            from bzip2 import SeekableBzip2
+            isBz2 = True
             self.rawFile = self.tarFile # save so that garbage collector won't close it!
             self.tarFile = SeekableBzip2( self.rawFile.fileno() )
             if serializationBackend != 'sqlite':
@@ -1073,7 +1075,7 @@ class TarMount( fuse.Operations ):
                 recursive       = recursive )
 
             # The index creation iterates over the whole file, so now we can query the block offsets gathered during
-            if isinstance( self.tarFile, SeekableBzip2 ):
+            if isBz2:
                 db = self.indexedTar.sqlConnection
                 try:
                     offsets = dict( db.execute( 'SELECT blockoffset,dataoffset FROM bzip2blocks' ) )
