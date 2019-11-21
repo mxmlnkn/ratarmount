@@ -153,7 +153,7 @@ class SQLiteIndexedTar:
             PRAGMA CACHE_SIZE = -512000;
         """ )
 
-    def createIndex( self, fileObject, progressBar = None, pathPrefix = '' ):
+    def createIndex( self, fileObject, progressBar = None, pathPrefix = '', streamOffset = 0 ):
         if printDebug >= 1:
             print( "Creating offset dictionary for",
                    "<file object>" if self.tarFileName is None else self.tarFileName, "..." )
@@ -205,7 +205,8 @@ class SQLiteIndexedTar:
         # 3. Iterate over files inside TAR and add them to the database
         for tarInfo in loadedTarFile:
             loadedTarFile.members = []
-            progressBar.update( tarInfo.offset_data )
+            globalOffset = streamOffset + tarInfo.offset_data
+            progressBar.update( globalOffset )
 
             mode = tarInfo.mode
             if tarInfo.isdir() : mode |= stat.S_IFDIR
@@ -223,12 +224,12 @@ class SQLiteIndexedTar:
             isTar = False
             if self.mountRecursively and tarInfo.isfile() and tarInfo.name.endswith( ".tar" ):
                 oldPos = fileObject.tell()
-                fileObject.seek( tarInfo.offset_data )
+                fileObject.seek( globalOffset )
 
                 oldPrintName = self.tarFileName
                 try:
                     self.tarFileName = tarInfo.name.lstrip( '/' ) # This is for output of the recursive call
-                    self.createIndex( fileObject, progressBar, fullPath )
+                    self.createIndex( fileObject, progressBar, fullPath, globalOffset )
 
                     # if the TAR file contents could be read, we need to adjust the actual
                     # TAR file's metadata to be a directory instead of a file
@@ -248,7 +249,7 @@ class SQLiteIndexedTar:
             fileInfo = (
                 path               , # 0
                 name               , # 1
-                tarInfo.offset_data, # 2
+                globalOffset       , # 2
                 tarInfo.size       , # 3
                 tarInfo.mtime      , # 4
                 mode               , # 5
