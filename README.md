@@ -93,7 +93,7 @@ You downloaded a large TAR file from the internet, for example the [1.31TB](http
 
 ### Archivemount
 
-Archivemount[https://github.com/cybernoid/archivemount/] does not seem to support random access in version 0.8.7 and also mounting seems to have performance issues:
+[Archivemount](https://github.com/cybernoid/archivemount/) does not seem to support random access in version 0.8.7 and also mounting seems to have performance issues:
 
   - Mounting the 6.5GB ImageNet Large-Scale Visual Recognition Challenge 2012 validation data set, and then testing the speed with: `time cat mounted/ILSVRC2012_val_00049975.JPEG | wc -c` takes 250ms for archivemount and 2ms for ratarmount.
   - Trying to mount the 150GB [ILSVRC object localization data set](https://www.kaggle.com/c/imagenet-object-localization-challenge) containing 2 million images was given up upon after 2 hours. Ratarmount takes ~15min to create a ~150MB index and <1ms for opening an already created index (SQLite database) and mounting the TAR. In contrast, archivemount will take the same amount of time even for subsequent mounts.
