@@ -305,28 +305,39 @@ python3 testBz2.py
 rm -f tests/*.index.*
 
 for type in sqlite custom pickle2 pickle3 cbor msgpack rapidjson ujson simplejson; do
-  compressions=( '' '.gz' '.lz4' )
-  if [[ "$type" == 'sqlite' ]]; then compressions=( '' ); fi
-  for compression in "${compressions[@]}"; do
-    echoerr "=== Testing Serialization Backend: ${type}${compression} ==="
+    compressions=( '' '.gz' '.lz4' )
+    if [[ "$type" == 'sqlite' ]]; then compressions=( '' ); fi
+    for compression in "${compressions[@]}"; do
+        echoerr "=== Testing Serialization Backend: ${type}${compression} ==="
 
-    checkFileInTARPrefix "${type}${compression}" '' tests/single-nested-file.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
-    checkFileInTARPrefix "${type}${compression}" foo tests/single-nested-file.tar fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
-    checkFileInTARPrefix "${type}${compression}" foo/fighter tests/single-nested-file.tar ufo 2709a3348eb2c52302a7606ecf5860bc
+        checkFileInTARPrefix "${type}${compression}" '' tests/single-nested-file.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
+        checkFileInTARPrefix "${type}${compression}" foo tests/single-nested-file.tar fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
+        checkFileInTARPrefix "${type}${compression}" foo/fighter tests/single-nested-file.tar ufo 2709a3348eb2c52302a7606ecf5860bc
 
-    checkFileInTAR "${type}${compression}" tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
-    checkFileInTAR "${type}${compression}" tests/single-file-with-leading-dot-slash.tar bar d3b07384d113edec49eaa6238ad5ff00
-    checkFileInTAR "${type}${compression}" tests/folder-with-leading-dot-slash.tar foo/bar 2b87e29fca6ee7f1df6c1a76cb58e101
-    checkFileInTAR "${type}${compression}" tests/folder-with-leading-dot-slash.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
-    checkFileInTAR "${type}${compression}" tests/single-nested-file.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
-    checkFileInTAR "${type}${compression}" tests/single-nested-folder.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
+        tests=(
+            d3b07384d113edec49eaa6238ad5ff00 tests/single-file.tar                        bar
+            d3b07384d113edec49eaa6238ad5ff00 tests/single-file-with-leading-dot-slash.tar bar
+            2b87e29fca6ee7f1df6c1a76cb58e101 tests/folder-with-leading-dot-slash.tar      foo/bar
+            2709a3348eb2c52302a7606ecf5860bc tests/folder-with-leading-dot-slash.tar      foo/fighter/ufo
+            2709a3348eb2c52302a7606ecf5860bc tests/single-nested-file.tar                 foo/fighter/ufo
+            2709a3348eb2c52302a7606ecf5860bc tests/single-nested-folder.tar               foo/fighter/ufo
+            2709a3348eb2c52302a7606ecf5860bc tests/nested-tar.tar                         foo/fighter/ufo
+            2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar.tar                         foo/lighter.tar/fighter/bar
+            2709a3348eb2c52302a7606ecf5860bc tests/nested-tar-with-overlapping-name.tar   foo/fighter/ufo
+            2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar-with-overlapping-name.tar   foo/fighter.tar/fighter/bar
+        )
 
-    checkFileInTAR "${type}${compression}" tests/nested-tar.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
-    checkFileInTAR "${type}${compression}" tests/nested-tar.tar foo/lighter.tar/fighter/bar 2b87e29fca6ee7f1df6c1a76cb58e101
-
-    checkFileInTAR "${type}${compression}" tests/nested-tar-with-overlapping-name.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
-    checkFileInTAR "${type}${compression}" tests/nested-tar-with-overlapping-name.tar foo/fighter.tar/fighter/bar 2b87e29fca6ee7f1df6c1a76cb58e101
-  done
+        for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
+            checkFileInTAR "${type}${compression}" "${tests[iTest+1]}" "${tests[iTest+2]}" "${tests[iTest]}"
+            # For SQLite backend, check with BZip2 compression
+            if [[ $type == 'sqlite' ]]; then
+                tmpBz2=$( mktemp --suffix='.tar.bz2' )
+                bzip2 --keep --stdout "${tests[iTest+1]}" > "$tmpBz2"
+                checkFileInTAR "${type}${compression}" "$tmpBz2" "${tests[iTest+2]}" "${tests[iTest]}"
+                'rm' -- "$tmpBz2"
+            fi
+        done
+    done
 done
 
 #benchmarkSerialization # takes quite long, and a benchmark is not a test ...
