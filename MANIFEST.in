@@ -1,0 +1,5 @@
+include LICENSE
+include README.md
+include ratarmount.py
+include bzip2.cpp
+include bzip2.h
