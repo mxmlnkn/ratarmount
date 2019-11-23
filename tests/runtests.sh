@@ -335,6 +335,11 @@ for type in sqlite custom pickle2 pickle3 cbor msgpack rapidjson ujson simplejso
                 bzip2 --keep --stdout "${tests[iTest+1]}" > "$tmpBz2"
                 checkFileInTAR "${type}${compression}" "$tmpBz2" "${tests[iTest+2]}" "${tests[iTest]}"
                 'rm' -- "$tmpBz2"
+
+                tmpGz=$( mktemp --suffix='.tar.gz' )
+                gzip --keep --stdout "${tests[iTest+1]}" > "$tmpGz"
+                checkFileInTAR "${type}${compression}" "$tmpGz" "${tests[iTest+2]}" "${tests[iTest]}"
+                'rm' -- "$tmpGz"
             fi
         done
     done

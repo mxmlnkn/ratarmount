@@ -11,6 +11,7 @@ import re
 import sqlite3
 import stat
 import tarfile
+import tempfile
 import time
 import traceback
 from timeit import default_timer as timer
@@ -1052,19 +1053,26 @@ class TarMount( fuse.Operations ):
 
         self.tarFile = open( pathToMount, 'rb' )
 
-        # check for bzip2 compressed tar archive and add bz2 reader if so
+        # check for bzip2 compressed tar archive and add BZip2 reader if so
         magicBytes = self.tarFile.read( 10 )
         self.tarFile.seek( 0 ) # For some reason does not get propagated to underlying file descriptor and BZ2Reader?!
         self.tarFile.flush()
-        isBz2 = False
+        type = None
         if magicBytes[0:3] == b"BZh" and magicBytes[4:10] == b"1AY&SY":
             from bzip2 import SeekableBzip2
-            isBz2 = True
+            type = 'BZ2'
             self.rawFile = self.tarFile # save so that garbage collector won't close it!
             self.tarFile = SeekableBzip2( self.rawFile.fileno() )
-            if serializationBackend != 'sqlite':
-                print( "[Warning] Currently, only the SQLite backend has .tar.bz2 support, therefore will use that!" )
-                serializationBackend
+
+        elif magicBytes[0:2] == b"\x1f\x8b":
+            from indexed_gzip import IndexedGzipFile
+            type = 'GZ'
+            self.rawFile = self.tarFile # save so that garbage collector won't close it!
+            self.tarFile = IndexedGzipFile( fileobj = self.rawFile )
+
+        if type and serializationBackend != 'sqlite':
+            print( "[Warning] Only the SQLite backend has .tar.bz2 and .tar.gz support, therefore will use that!" )
+            serializationBackend = 'sqlite'
 
         if serializationBackend == 'sqlite':
             self.indexedTar = SQLiteIndexedTar(
@@ -1075,20 +1083,51 @@ class TarMount( fuse.Operations ):
                 recursive       = recursive )
 
             # The index creation iterates over the whole file, so now we can query the block offsets gathered during
-            if isBz2:
+            if type == 'BZ2':
                 db = self.indexedTar.sqlConnection
                 try:
                     offsets = dict( db.execute( 'SELECT blockoffset,dataoffset FROM bzip2blocks' ) )
                     self.tarFile.setBlockOffsets( offsets )
                 except Exception as e:
-                    print( "[Warning] Could not load BZip2 Block offset data. Will create it from scratch." )
+                    if printDebug >= 2:
+                        print( "Could not load BZip2 Block offset data. Will create it from scratch." )
 
                     tables = [ x[0] for x in db.execute( 'SELECT name FROM sqlite_master WHERE type="table"' ) ]
-                    if 'bzip2blocks' not in tables:
-                        db.execute( 'CREATE TABLE bzip2blocks ( blockoffset INTEGER PRIMARY KEY, dataoffset INTEGER )' )
+                    if 'bzip2blocks' in tables:
+                        db.execute( 'DROP TABLE bzip2blocks' )
+                    db.execute( 'CREATE TABLE bzip2blocks ( blockoffset INTEGER PRIMARY KEY, dataoffset INTEGER )' )
                     db.executemany( 'INSERT INTO bzip2blocks VALUES (?,?)',
                                     self.tarFile.blockOffsets().items() )
                     db.commit()
+
+            elif type == 'GZ':
+                db = self.indexedTar.sqlConnection
+                gzindex = tempfile.mkstemp()[1]
+                try:
+                    with open( gzindex, 'wb' ) as file:
+                        file.write( db.execute( 'SELECT data FROM gzipindex' ).fetchone()[0] )
+                    self.tarFile.import_index( filename = gzindex )
+                except Exception as e:
+                    if printDebug >= 2:
+                        print( "Could not load GZip Block offset data. Will create it from scratch." )
+
+                    # Transparently force index to be built if not already done so. build_full_index was buggy for me.
+                    # Seeking from end not supported, so we have to read the whole data in in a loop
+                    while self.tarFile.read( 1024*1024 ):
+                        pass
+                    self.tarFile.export_index( filename = gzindex )
+                    if printDebug >= 2:
+                        print( "Exported GZip index size:", os.stat( gzindex ).st_size )
+
+                    tables = [ x[0] for x in db.execute( 'SELECT name FROM sqlite_master WHERE type="table"' ) ]
+                    if 'gzipindex' in tables:
+                        db.execute( 'DROP TABLE gzipindex' )
+                    db.execute( 'CREATE TABLE gzipindex ( data BLOB )' )
+                    with open( gzindex, 'rb' ) as file:
+                        db.execute( 'INSERT INTO gzipindex VALUES (?)', ( file.read(), ) )
+                    db.commit()
+                os.remove( gzindex )
+
         else:
             self.indexedTar = IndexedTar(
                 pathToMount,
@@ -1279,6 +1318,8 @@ def cli( args = None ):
         magicBytes = file.peek( 10 )
         if magicBytes[0:3] == b"BZh" and magicBytes[4:10] == b"1AY&SY":
             type = 'BZ2'
+        elif magicBytes[:2] == b'\x1f\x8b':
+            type = 'GZ'
 
     if not type:
         print( "Archive", tarToMount, "can't be opened!",
@@ -1290,7 +1331,7 @@ def cli( args = None ):
 
     mountPath = args.mountpath
     if mountPath is None:
-        for ext in [ '.tar', '.tar.bz2', '.tbz2' ]:
+        for ext in [ '.tar', '.tar.bz2', '.tbz2', '.tar.gz', '.tgz' ]:
             if tarToMount[-len( ext ):].lower() == ext.lower():
                 mountPath = tarToMount[:-len( ext )]
                 break

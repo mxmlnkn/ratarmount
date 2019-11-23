@@ -1,8 +1,8 @@
 # Random Access Read-Only Tar Mount (Ratarmount)
 
-Combines the random access indexing idea from [tarindexer](https://github.com/devsnd/tarindexer) and then **mounts** the tar using [fusepy](https://github.com/fusepy/fusepy) for easy read-only access just like [archivemount](https://github.com/cybernoid/archivemount/). 
+Combines the random access indexing idea from [tarindexer](https://github.com/devsnd/tarindexer) and then **mounts** the **TAR** using [fusepy](https://github.com/fusepy/fusepy) for easy read-only access just like [archivemount](https://github.com/cybernoid/archivemount/).
 It also will mount TARs inside TARs inside TARs, ... **recursively** into folders of the same name, which is useful for the ImageNet data set.
-Furthermore, it now has support for **BZip2** compressed TAR archives!
+Furthermore, it now has support for **BZip2** compressed TAR archives provided by a refactored and improved version of [bzcat](https://github.com/landley/toybox/blob/c77b66455762f42bb824c1aa8cc60e7f4d44bdab/toys/other/bzcat.c) from [toybox](https://landley.net/code/toybox/) and support for **GZip** compressed TAR archives provided by the [indexed_gzip](https://github.com/pauldmccarthy/indexed_gzip) dependency.
 
 
 # Installation
@@ -12,7 +12,7 @@ You can simply install it from PyPI:
 pip install ratarmount
 ```
 
-Or, if you want to test the latest devlopment version on a Debian-like system:
+Or, if you want to test the latest development version on a Debian-like system:
 ```bash
 sudo apt-get update
 sudo apt-get install python3 python3-pip git
@@ -80,8 +80,8 @@ optional arguments:
 
 Index files are if possible created to / if existing loaded from these file locations in order:
 
-  - `<path to tar>.index.pickle`
-  - `~/.tarmount/<path to tar: '/' -> '_'>.index.pickle`
+  - `<path to tar>.index.<serialization backend>`
+  - `~/.tarmount/<path to tar: '/' -> '_'>.index.<serialization backend>`
 
 
 # The Problem
@@ -93,10 +93,11 @@ You downloaded a large TAR file from the internet, for example the [1.31TB](http
 
 ### Archivemount
 
-[Archivemount](https://github.com/cybernoid/archivemount/) does not seem to support random access in version 0.8.7 and also mounting seems to have performance issues:
+[Archivemount](https://github.com/cybernoid/archivemount/) seems to have large performance issues for too many files for both mounting and file access in version 0.8.7.
 
   - Mounting the 6.5GB ImageNet Large-Scale Visual Recognition Challenge 2012 validation data set, and then testing the speed with: `time cat mounted/ILSVRC2012_val_00049975.JPEG | wc -c` takes 250ms for archivemount and 2ms for ratarmount.
   - Trying to mount the 150GB [ILSVRC object localization data set](https://www.kaggle.com/c/imagenet-object-localization-challenge) containing 2 million images was given up upon after 2 hours. Ratarmount takes ~15min to create a ~150MB index and <1ms for opening an already created index (SQLite database) and mounting the TAR. In contrast, archivemount will take the same amount of time even for subsequent mounts.
+  - Does not support recursive mounting. Although, you could write a script to stack archivemount on top of archivemount for all contained TAR files.
 
 ### Tarindexer
 

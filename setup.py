@@ -41,6 +41,7 @@ setup(
     py_modules       = [ 'ratarmount' ],
     ext_modules      = extensions,
     install_requires = [ 'fusepy',
+                         'indexed_gzip',
                          'lz4',
                          'msgpack',
                          'simplejson',
