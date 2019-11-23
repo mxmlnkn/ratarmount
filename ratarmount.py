@@ -10,6 +10,7 @@ import pprint
 import re
 import sqlite3
 import stat
+import sys
 import tarfile
 import tempfile
 import time
@@ -1292,6 +1293,9 @@ def parseArgs( args = None ):
                'Example: --fuse "allow_other,entry_timeout=2.8,gid=0". ' )
 
     parser.add_argument(
+        '-v', '--version', action='store_true', help = 'Print version string.' )
+
+    parser.add_argument(
         'tarfilepath', metavar = 'tar-file-path',
         type = argparse.FileType( 'r' ), nargs = 1,
         help = 'The path to the TAR archive to be mounted.' )
@@ -1302,6 +1306,11 @@ def parseArgs( args = None ):
     return parser.parse_args( args )
 
 def cli( args = None ):
+    tmpArgs = sys.argv if args is None else args
+    if '--version' in tmpArgs or '-v' in tmpArgs:
+        print( "ratarmount 0.3.0" )
+        return
+
     args = parseArgs( args )
 
     tarToMount = os.path.abspath( args.tarfilepath[0].name )
@@ -1324,7 +1333,7 @@ def cli( args = None ):
     if not type:
         print( "Archive", tarToMount, "can't be opened!",
                "This might happen for compressed TAR archives, which currently is not supported." )
-        exit( 1 )
+        return 1
 
     fusekwargs = dict( [ option.split( '=', 1 ) if '=' in option else ( option, True )
                        for option in args.fuse.split( ',' ) ] ) if args.fuse else {}
@@ -1361,5 +1370,7 @@ def cli( args = None ):
     if mountPathWasCreated and args.foreground:
         os.rmdir( mountPath )
 
+    return 0
+
 if __name__ == '__main__':
-    cli()
+    cli( sys.argv )
