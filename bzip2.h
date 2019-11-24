@@ -307,7 +307,8 @@ private:
         std::array<uint8_t, 256> symbolToByte;
         std::array<uint8_t, 256> mtfSymbol;
         unsigned int symbolCount;
-        static_assert( std::numeric_limits<decltype( symbolCount )>::max() >= MAX_SYMBOLS );
+        static_assert( std::numeric_limits<decltype( symbolCount )>::max() >= MAX_SYMBOLS,
+                       "Datatype for symbolCount is not sufficient!" );
         uint16_t huffman_groups; // only actually 15 bit
         /**
          * Every GROUP_SIZE many symbols we switch huffman coding tables.

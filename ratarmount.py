@@ -1308,7 +1308,7 @@ def parseArgs( args = None ):
 def cli( args = None ):
     tmpArgs = sys.argv if args is None else args
     if '--version' in tmpArgs or '-v' in tmpArgs:
-        print( "ratarmount 0.3.1" )
+        print( "ratarmount 0.3.2" )
         return
 
     args = parseArgs( args )
