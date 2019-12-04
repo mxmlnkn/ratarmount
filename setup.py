@@ -27,7 +27,7 @@ setup(
     version          = '0.3.2',
 
     description      = 'Random Access Read-Only Tar Mount',
-    url              = 'https://github.com/mxmlnkn',
+    url              = 'https://github.com/mxmlnkn/ratarmount',
     author           = 'Maximilian Knespel',
     author_email     = 'mxmlnkn@github.de',
     license          = 'MIT',
