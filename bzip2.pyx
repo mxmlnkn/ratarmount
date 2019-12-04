@@ -31,6 +31,7 @@ cdef extern from "bzip2.h":
         bool closed() except +
         size_t seek( lli, int ) except +
         size_t tell() except +
+        size_t tellCompressed() except +
         int read( int, char*, size_t ) except +
         map[size_t,size_t] blockOffsets() except +
         void setBlockOffsets( map[size_t,size_t] ) except +
@@ -82,6 +83,9 @@ cdef class BZ2ReaderWrapper():
     def tell( self ):
         return self.bz2reader.tell()
 
+    def tellCompressed( self ):
+        return self.bz2reader.tellCompressed()
+
     def blockOffsets( self ):
         return <dict> self.bz2reader.blockOffsets()
 
@@ -122,6 +126,9 @@ class SeekableBzip2( io.BufferedIOBase ):
 
     def tell( self ):
         return self.bz2reader.tell()
+
+    def tellCompressed( self ):
+        return self.bz2reader.tellCompressed()
 
     def peek( self, n = 0 ):
         raise Exception( "not supported" )

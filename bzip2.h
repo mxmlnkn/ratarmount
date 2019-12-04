@@ -405,7 +405,18 @@ public:
     size_t
     tell() const
     {
-        return m_decodedBytesCount; /* @todo only works for first go through! */
+        return m_decodedBytesCount;
+    }
+
+    /**
+     * @return number of processed bits of compressed bzip2 input file stream
+     * @note Bzip2 is block based and blocks are currently read fully, meaning that the granularity
+     *       of the returned position is ~100-900kB. It's only useful for a rough estimate.
+     */
+    size_t
+    tellCompressed() const
+    {
+        return m_bitReader.tell();
     }
 
     size_t
@@ -589,6 +600,7 @@ BZ2Reader::seek( long long int offset,
     const auto nBytesSeekInBlock = offset - blockOffset->second;
 
     m_bitReader.seek( blockOffset->first );
+    m_decodedBytesCount = blockOffset->second;
     readNextBlock(); /* also resets checkpoint data */
     /* no decodeBzip2 necessary because we only seek inside one block! */
     const auto nBytesDecoded = decodeStream( nBytesSeekInBlock );

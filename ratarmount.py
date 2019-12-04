@@ -17,6 +17,18 @@ import time
 import traceback
 from timeit import default_timer as timer
 
+try:
+    from bzip2 import SeekableBzip2
+    hasBzip2Support = True
+except ImportError:
+    hasBzip2Support = False
+
+try:
+    from indexed_gzip import IndexedGzipFile
+    hasGzipSupport = True
+except ImportError:
+    hasGzipSupport = False
+
 import fuse
 
 
@@ -215,7 +227,18 @@ class SQLiteIndexedTar:
         for tarInfo in loadedTarFile:
             loadedTarFile.members = []
             globalOffset = streamOffset + tarInfo.offset_data
-            progressBar.update( globalOffset )
+            if hasBzip2Support and isinstance( fileObject, SeekableBzip2 ):
+                # We will have to adjust the global offset to a rough estimate of the real compressed size.
+                # Note that tellCompressed is always one bzip2 block further, which leads to underestimated
+                # file compression ratio especially in the beginning.
+                progressBar.update( int( globalOffset * fileObject.tellCompressed() / 8 / fileObject.tell() ) )
+            elif hasGzipSupport and isinstance( fileObject, IndexedGzipFile ):
+                try:
+                    progressBar.update( int( globalOffset * fileObject.fileobj().tell() / fileObject.tell() ) )
+                except:
+                    progressBar.update( globalOffset )
+            else:
+                progressBar.update( globalOffset )
 
             mode = tarInfo.mode
             if tarInfo.isdir() : mode |= stat.S_IFDIR
@@ -1060,16 +1083,19 @@ class TarMount( fuse.Operations ):
         self.tarFile.flush()
         type = None
         if magicBytes[0:3] == b"BZh" and magicBytes[4:10] == b"1AY&SY":
-            from bzip2 import SeekableBzip2
+            if not hasBzip2Support:
+                raise Exception( "You are trying open a bzip2 compressed TAR file but no bzip2 support was detected!" )
             type = 'BZ2'
             self.rawFile = self.tarFile # save so that garbage collector won't close it!
             self.tarFile = SeekableBzip2( self.rawFile.fileno() )
 
         elif magicBytes[0:2] == b"\x1f\x8b":
-            from indexed_gzip import IndexedGzipFile
+            if not hasBzip2Support:
+                raise Exception( "You are trying open a gzip compressed TAR file but no gzip support was detected!" )
             type = 'GZ'
             self.rawFile = self.tarFile # save so that garbage collector won't close it!
-            self.tarFile = IndexedGzipFile( fileobj = self.rawFile )
+            # drop_handles keeps a file handle opening as is required to call tell() during decoding
+            self.tarFile = IndexedGzipFile( fileobj = self.rawFile, drop_handles = False )
 
         if type and serializationBackend != 'sqlite':
             print( "[Warning] Only the SQLite backend has .tar.bz2 and .tar.gz support, therefore will use that!" )
