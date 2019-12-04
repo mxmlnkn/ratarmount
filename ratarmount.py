@@ -32,6 +32,8 @@ except ImportError:
 import fuse
 
 
+__version__ = '0.3.3'
+
 printDebug = 1
 
 def overrides( parentClass ):
@@ -79,6 +81,7 @@ class SQLiteIndexedTar:
     """
 
     __slots__ = (
+        '__version__',
         'tarFileName',
         'mountRecursively',
         'indexFileName',
@@ -94,6 +97,7 @@ class SQLiteIndexedTar:
         clearIndexCache = False,
         recursive       = False,
     ):
+        self.__version__ = '0.1.0'
         self.parentFolderCache = []
         self.mountRecursively = recursive
         self.sqlConnection = None
@@ -308,6 +312,44 @@ class SQLiteIndexedTar:
             """.format( int( 0o555 | stat.S_IFDIR ), int( tarfile.DIRTYPE ) )
             self.sqlConnection.executescript( cleanupDatabase )
 
+        # 6. Add Metadata
+        metadataTables = """
+            /* empty table whose sole existence specifies that we finished iterating the tar */
+            CREATE TABLE "versions" (
+                "name"     VARCHAR(65535) NOT NULL, /* which component the version belongs to */
+                "version"  VARCHAR(65535) NOT NULL, /* free form version string */
+                /* Semantic Versioning 2.0.0 (semver.org) parts if they can be specified:
+                 *   MAJOR version when you make incompatible API changes,
+                 *   MINOR version when you add functionality in a backwards compatible manner, and
+                 *   PATCH version when you make backwards compatible bug fixes. */
+                "major"    INTEGER,
+                "minor"    INTEGER,
+                "path"     INTEGER
+            );
+        """
+        try:
+            self.sqlConnection.executescript( metadataTables )
+        except Exception as exception:
+            if printDebug >= 2:
+                print( exception )
+            print( "[Warning] There was an error when adding metadata information. Index loading might not work." )
+
+        try:
+            ratarmountVersion = [ re.sub( '[^0-9]', '', x ) for x in __version__.split( '.' ) ]
+            indexVersion = [ re.sub( '[^0-9]', '', x ) for x in self.__version__.split( '.' ) ]
+            self.sqlConnection.executemany( 'INSERT OR REPLACE INTO "versions" VALUES (?,?,?,?,?)',
+                [ ( 'ratarmount', __version__,
+                     ratarmountVersion[0] if len( ratarmountVersion ) > 0 else None,
+                     ratarmountVersion[1] if len( ratarmountVersion ) > 1 else None,
+                     ratarmountVersion[2] if len( ratarmountVersion ) > 2 else None, ),
+                   ( 'index', self.__version__,
+                     indexVersion[0] if len( indexVersion ) > 0 else None,
+                     indexVersion[1] if len( indexVersion ) > 1 else None,
+                     indexVersion[2] if len( indexVersion ) > 2 else None, )
+                 ]
+             )
+        except Exception as exception:
+            print( "[Warning] There was an error when adding version information." )
 
         self.sqlConnection.commit()
 
@@ -1334,7 +1376,7 @@ def parseArgs( args = None ):
 def cli( args = None ):
     tmpArgs = sys.argv if args is None else args
     if '--version' in tmpArgs or '-v' in tmpArgs:
-        print( "ratarmount 0.3.2" )
+        print( "ratarmount", __version__ )
         return
 
     args = parseArgs( args )
