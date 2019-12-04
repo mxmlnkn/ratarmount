@@ -1081,9 +1081,10 @@ BZ2Reader::decodeStream( const size_t nMaxBytesToDecode )
 
     int count, pos, current, run, copies, outbyte, previous;
     const auto bw = &m_lastHeader.bwdata;
-    size_t nBytesDecoded = 0;
+    // try to flush remnants in output buffer from interrupted last call
+    size_t nBytesDecoded = flushOutputBuffer( nMaxBytesToDecode );
 
-    while ( true ) {
+    while ( nBytesDecoded < nMaxBytesToDecode ) {
         // If we need to refill dbuf, do it. Only won't be required for resuming interrupted decodations
         if ( bw->writeCount == 0 ) {
             const auto dataBlockCount = readNextBlock();
