@@ -1373,4 +1373,4 @@ def cli( args = None ):
     return 0
 
 if __name__ == '__main__':
-    cli( sys.argv )
+    cli( sys.argv[1:] )
