@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# exit when any command fails
+set -e
+
 rm -rf build dist *.egg-info __pycache__
 
 # generate bzip2.cpp from bzip2.pyx
