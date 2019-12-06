@@ -9,4 +9,7 @@ rm -rf build dist *.egg-info __pycache__
 python3 setup.py build_ext --inplace --cython
 python3 setup.py sdist bdist_wheel
 
-#twine upload dist/*
+tests/runtests.sh
+
+srcPackage=$( find dist -name '*.tar.gz' -printf "%T@ %p\n" | sort -n | sed -n -r '1{ s|[0-9.]+ ||p; }' )
+twine upload "$srcPackage"

@@ -32,7 +32,7 @@ except ImportError:
 import fuse
 
 
-__version__ = '0.3.3'
+__version__ = '0.3.4'
 
 printDebug = 1
 
@@ -218,7 +218,12 @@ class SQLiteIndexedTar:
 
         # 2. Open TAR file reader
         try:
-            loadedTarFile = tarfile.open( fileobj = fileObject, mode = 'r|' )
+            streamed = ( hasBzip2Support and isinstance( fileObject, SeekableBzip2 ) ) or \
+                       ( hasGzipSupport and isinstance( fileObject, IndexedGzipFile ) )
+            # r: uses seeks to skip to the next file inside the TAR while r| doesn't do any seeks.
+            # r| might be slower but for compressed files we have to go over all the data once anyways
+            # and I had problems with seeks at this stage. Maybe they are gone now after the bz2 bugfix though.
+            loadedTarFile = tarfile.open( fileobj = fileObject, mode = 'r|' if streamed else 'r:' )
         except tarfile.ReadError as exception:
             print( "Archive can't be opened! This might happen for compressed TAR archives, "
                    "which currently is not supported." )
@@ -265,7 +270,7 @@ class SQLiteIndexedTar:
                 oldPrintName = self.tarFileName
                 try:
                     self.tarFileName = tarInfo.name.lstrip( '/' ) # This is for output of the recursive call
-                    self.createIndex( fileObject, progressBar, fullPath, globalOffset )
+                    self.createIndex( fileObject, progressBar, fullPath, globalOffset if streamed else 0 )
 
                     # if the TAR file contents could be read, we need to adjust the actual
                     # TAR file's metadata to be a directory instead of a file

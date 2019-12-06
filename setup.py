@@ -24,7 +24,7 @@ if buildCython:
 
 setup(
     name             = 'ratarmount',
-    version          = '0.3.3',
+    version          = '0.3.4',
 
     description      = 'Random Access Read-Only Tar Mount',
     url              = 'https://github.com/mxmlnkn/ratarmount',
