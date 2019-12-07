@@ -178,7 +178,7 @@ class SQLiteIndexedTar:
 
         # 1. If no SQL connection was given (by recursive call), open a new database file
         openedConnection = False
-        if not self.sqlConnection:
+        if not self.indexIsLoaded():
             if printDebug >= 1:
                 print( "Creating new SQLite index database at", self.indexFileName )
 
@@ -453,6 +453,7 @@ class SQLiteIndexedTar:
         try:
             self.sqlConnection.execute( 'SELECT * FROM "files" WHERE 0 == 1;' )
         except Exception:
+            self.sqlConnection = None
             return False
 
         return True
