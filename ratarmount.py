@@ -1148,7 +1148,7 @@ class TarMount( fuse.Operations ):
             self.tarFile = SeekableBzip2( self.rawFile.fileno() )
 
         elif magicBytes[0:2] == b"\x1f\x8b":
-            if not hasBzip2Support:
+            if not hasGzipSupport:
                 raise Exception( "You are trying open a gzip compressed TAR file but no gzip support was detected!" )
             type = 'GZ'
             self.rawFile = self.tarFile # save so that garbage collector won't close it!
