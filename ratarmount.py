@@ -1237,7 +1237,7 @@ class TarMount( fuse.Operations ):
         if mountMode & stat.S_IRUSR != 0: mountMode |= stat.S_IXUSR
         if mountMode & stat.S_IRGRP != 0: mountMode |= stat.S_IXGRP
         if mountMode & stat.S_IROTH != 0: mountMode |= stat.S_IXOTH
-        rootFileInfo = FileInfo(
+        self.rootFileInfo = FileInfo(
             offset   = 0                ,
             size     = tarStats.st_size ,
             mtime    = tarStats.st_mtime,
@@ -1249,21 +1249,16 @@ class TarMount( fuse.Operations ):
             istar    = True
         )
 
-        if serializationBackend == 'sqlite':
-            self.indexedTar.setFileInfo( '/' if not self.prefix else self.prefix, rootFileInfo )
-        else:
-            self.indexedTar.fileIndex[ self.prefix + '.' ] = rootFileInfo
-
-            if printDebug >= 3:
-                print( "Loaded File Index:" )
-                pprint.pprint( self.indexedTar.fileIndex )
-
     @overrides( fuse.Operations )
     def getattr( self, path, fh = None ):
         if printDebug >= 2:
             print( "[getattr( path =", path, ", fh =", fh, ")] Enter" )
 
-        fileInfo = self.indexedTar.getFileInfo( self.prefix + path, listDir = False )
+        if path == '/':
+            fileInfo = self.rootFileInfo
+        else:
+            fileInfo = self.indexedTar.getFileInfo( self.prefix + path, listDir = False )
+
         if not isinstance( fileInfo, FileInfo ):
             if printDebug >= 2:
                 print( "Could not find path:", self.prefix + path )
