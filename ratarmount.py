@@ -464,6 +464,20 @@ class SQLiteIndexedTar:
 
         t0 = time.time()
         self._openSqlDb( indexFileName )
+        tables = [ x[0] for x in self.sqlConnection.execute( 'SELECT name FROM sqlite_master WHERE type="table"' ) ]
+
+        # Check indexes created with bugged bz2 decoder (bug existed when I did not store versions yet)
+        if 'bzip2blocks' in tables and 'versions' not in tables:
+            raise Exception( "The indexes created with version 0.3.0 through 0.3.3 for bzip2 compressed archives "
+                             "are very likely to be wrong because of a bzip2 decoder bug.\n"
+                             "Please delete the index or call ratarmount with the --recreate-index option!" )
+
+        # Check for empty or incomplete indexes
+        if 'files' not in tables:
+            raise Exception( "SQLite index is empty" )
+
+        if 'filestmp' in tables or 'parentfolders' in tables:
+            raise Exception( "SQLite index is incomplete" )
 
         if printDebug >= 1:
             # Legacy output for automated tests
@@ -478,32 +492,28 @@ class SQLiteIndexedTar:
         if not os.path.isfile( indexFileName ):
             return False
 
-        if os.path.getsize( indexFileName ) == 0:
-            try:
-                os.remove( indexFileName )
-            except OSError:
-                print( "[Warning] Failed to remove empty old cached index file:", indexFileName )
-
-            return False
-
         try:
             self.loadIndex( indexFileName )
-        except Exception:
-            traceback.print_exc()
-            print( "[Warning] Could not load file '" + indexFileName  )
+        except Exception as exception:
+            if printDebug >= 3:
+                traceback.print_exc();
 
+            print( "[Warning] Could not load file '" + indexFileName  )
+            print( "[Info] Exception:", exception )
             print( "[Info] Some likely reasons for not being able to load the index file:" )
-            print( "[Info]   - The file has incorrect read permissions" )
-            print( "[Info]   - The file got corrupted because of:" )
+            print( "[Info]   - The index file has incorrect read permissions" )
+            print( "[Info]   - The index file is incomplete because ratarmount was killed during index creation" )
+            print( "[Info]   - The index file was detected to contain errors because of known bugs of older versions" )
+            print( "[Info]   - The index file got corrupted because of:" )
             print( "[Info]     - The program exited while it was still writing the index because of:" )
             print( "[Info]       - the user sent SIGINT to force the program to quit" )
             print( "[Info]       - an internal error occured while writing the index" )
             print( "[Info]       - the disk filled up while writing the index" )
             print( "[Info]     - Rare lowlevel corruptions caused by hardware failure" )
 
-            print( "[Info] This might force a time-costly index recreation, so if it happens often and "
-                   "mounting is slow, try to find out why loading fails repeatedly, "
-                   "e.g., by opening an issue on the public github page." )
+            print( "[Info] This might force a time-costly index recreation, so if it happens often\n"
+                   "       and mounting is slow, try to find out why loading fails repeatedly,\n"
+                   "       e.g., by opening an issue on the public github page." )
 
             try:
                 os.remove( indexFileName )
