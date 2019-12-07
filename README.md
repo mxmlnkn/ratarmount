@@ -1,8 +1,13 @@
 # Random Access Read-Only Tar Mount (Ratarmount)
 
+[![PyPI version](https://badge.fury.io/py/ratarmount.svg)](https://badge.fury.io/py/ratarmount)
+[![Downloads](https://pepy.tech/badge/ratarmount/month)](https://pepy.tech/project/ratarmount/month)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](http://opensource.org/licenses/MIT)
+[![Build Status](https://travis-ci.org/mxmlnkn/ratarmount.svg?branch=master)](https://travis-ci.com/mxmlnkn/ratarmount)
+
 Combines the random access indexing idea from [tarindexer](https://github.com/devsnd/tarindexer) and then **mounts** the **TAR** using [fusepy](https://github.com/fusepy/fusepy) for easy read-only access just like [archivemount](https://github.com/cybernoid/archivemount/).
 It also will mount TARs inside TARs inside TARs, ... **recursively** into folders of the same name, which is useful for the ImageNet data set.
-Furthermore, it now has support for **BZip2** compressed TAR archives provided by a refactored and improved version of [bzcat](https://github.com/landley/toybox/blob/c77b66455762f42bb824c1aa8cc60e7f4d44bdab/toys/other/bzcat.c) from [toybox](https://landley.net/code/toybox/) and support for **GZip** compressed TAR archives provided by the [indexed_gzip](https://github.com/pauldmccarthy/indexed_gzip) dependency.
+Furthermore, it now has support for **BZip2** compressed TAR archives provided by a refactored and improved version of [bzcat](https://github.com/landley/toybox/blob/c77b66455762f42bb824c1aa8cc60e7f4d44bdab/toys/other/bzcat.c) from [toybox](https://landley.net/code/toybox/) and support for **Gzip** compressed TAR archives provided by the [indexed_gzip](https://github.com/pauldmccarthy/indexed_gzip) dependency.
 
 
 # Installation
