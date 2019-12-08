@@ -1354,7 +1354,7 @@ def parseArgs( args = None ):
     parser.add_argument(
         '-s', '--serialization-backend', type = str, default = 'sqlite',
         help =
-        'Specify which library to use for writing out the TAR index. Supported keywords: (' +
+        '(deprecated) Specify which library to use for writing out the TAR index. Supported keywords: (' +
         ','.join( IndexedTar.availableSerializationBackends + [ 'sqlite' ] ) + ')[.(' +
         ','.join( IndexedTar.availableCompressions ).strip( ',' ) + ')]' )
 

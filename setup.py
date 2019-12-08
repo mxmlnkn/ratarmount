@@ -40,14 +40,17 @@ setup(
 
     py_modules       = [ 'ratarmount' ],
     ext_modules      = extensions,
-    install_requires = [ 'fusepy',
-                         'indexed_gzip',
-                         'lz4',
-                         'msgpack',
-                         'simplejson',
-                         'pyyaml',
-                         'ujson',
-                         'cbor',
-                         'python-rapidjson' ],
+    install_requires = [ 'fusepy', 'indexed_gzip' ],
+    extras_require   = {
+                            'legacy-serializers' : [
+                                'lz4',
+                                'msgpack',
+                                'simplejson',
+                                'pyyaml',
+                                'ujson',
+                                'cbor',
+                                'python-rapidjson'
+                            ]
+                       },
     entry_points = { 'console_scripts': [ 'ratarmount=ratarmount:cli' ] }
 )
