@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import os
 import sys
 from setuptools import setup
+
+scriptPath = os.path.abspath( os.path.dirname( __file__ ) )
+with open( os.path.join( scriptPath, 'README.md' ), encoding = 'utf-8' ) as file:
+    readmeContents = file.read()
 
 setup(
     name             = 'ratarmount',
@@ -19,6 +24,9 @@ setup(
                          'Operating System :: Unix',
                          'Programming Language :: Python :: 3',
                          'Topic :: System :: Archiving' ],
+
+    long_description = readmeContents,
+    long_description_content_type = 'text/markdown',
 
     py_modules       = [ 'ratarmount' ],
     install_requires = [ 'fusepy', 'indexed_gzip', 'indexed_bzip2' ],
