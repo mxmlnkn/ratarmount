@@ -1,4 +1,13 @@
 
+# Version 0.4.0 built on 2019-12-15
+
+ - Make bzip2 seek support standalone module.
+ - Fix memory leak because BZ2Reader destructor was never called.
+ - Fix SQLite backend loading not working when index is read-only.
+ - Improve faulty index detection.
+ - Fix typo causing bug with gzip support detection.
+ - Deprecate legacy serializers.
+
 # Version 0.3.4 built on 2019-12-06
 
  - Fix performance bug for index creation of uncompressed TARs by not
