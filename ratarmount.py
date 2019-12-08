@@ -18,12 +18,14 @@ import traceback
 from timeit import default_timer as timer
 
 try:
-    from bzip2 import SeekableBzip2
+    import indexed_bzip2
+    from indexed_bzip2 import IndexedBzip2File
     hasBzip2Support = True
 except ImportError:
     hasBzip2Support = False
 
 try:
+    import indexed_gzip
     from indexed_gzip import IndexedGzipFile
     hasGzipSupport = True
 except ImportError:
@@ -218,7 +220,7 @@ class SQLiteIndexedTar:
 
         # 2. Open TAR file reader
         try:
-            streamed = ( hasBzip2Support and isinstance( fileObject, SeekableBzip2 ) ) or \
+            streamed = ( hasBzip2Support and isinstance( fileObject, IndexedBzip2File ) ) or \
                        ( hasGzipSupport and isinstance( fileObject, IndexedGzipFile ) )
             # r: uses seeks to skip to the next file inside the TAR while r| doesn't do any seeks.
             # r| might be slower but for compressed files we have to go over all the data once anyways
@@ -236,11 +238,11 @@ class SQLiteIndexedTar:
         for tarInfo in loadedTarFile:
             loadedTarFile.members = []
             globalOffset = streamOffset + tarInfo.offset_data
-            if hasBzip2Support and isinstance( fileObject, SeekableBzip2 ):
+            if hasBzip2Support and isinstance( fileObject, IndexedBzip2File ):
                 # We will have to adjust the global offset to a rough estimate of the real compressed size.
-                # Note that tellCompressed is always one bzip2 block further, which leads to underestimated
+                # Note that tell_compressed is always one bzip2 block further, which leads to underestimated
                 # file compression ratio especially in the beginning.
-                progressBar.update( int( globalOffset * fileObject.tellCompressed() / 8 / fileObject.tell() ) )
+                progressBar.update( int( globalOffset * fileObject.tell_compressed() / 8 / fileObject.tell() ) )
             elif hasGzipSupport and isinstance( fileObject, IndexedGzipFile ):
                 try:
                     progressBar.update( int( globalOffset * fileObject.fileobj().tell() / fileObject.tell() ) )
@@ -340,21 +342,28 @@ class SQLiteIndexedTar:
             print( "[Warning] There was an error when adding metadata information. Index loading might not work." )
 
         try:
-            ratarmountVersion = [ re.sub( '[^0-9]', '', x ) for x in __version__.split( '.' ) ]
-            indexVersion = [ re.sub( '[^0-9]', '', x ) for x in self.__version__.split( '.' ) ]
-            self.sqlConnection.executemany( 'INSERT OR REPLACE INTO "versions" VALUES (?,?,?,?,?)',
-                [ ( 'ratarmount', __version__,
-                     ratarmountVersion[0] if len( ratarmountVersion ) > 0 else None,
-                     ratarmountVersion[1] if len( ratarmountVersion ) > 1 else None,
-                     ratarmountVersion[2] if len( ratarmountVersion ) > 2 else None, ),
-                   ( 'index', self.__version__,
-                     indexVersion[0] if len( indexVersion ) > 0 else None,
-                     indexVersion[1] if len( indexVersion ) > 1 else None,
-                     indexVersion[2] if len( indexVersion ) > 2 else None, )
-                 ]
-             )
+            def makeVersionRow( versionName, version ):
+                versionNumbers = [ re.sub( '[^0-9]', '', x ) for x in version.split( '.' ) ]
+                return ( versionName,
+                         version,
+                         versionNumbers[0] if len( versionNumbers ) > 0 else None,
+                         versionNumbers[1] if len( versionNumbers ) > 1 else None,
+                         versionNumbers[2] if len( versionNumbers ) > 2 else None, )
+
+            versions = [ makeVersionRow( 'ratarmount', __version__ ),
+                         makeVersionRow( 'index', self.__version__ ) ]
+
+            if hasBzip2Support and isinstance( fileObject, IndexedBzip2File ):
+                versions += [ makeVersionRow( 'indexed_bzip2', indexed_bzip2.__version__ ) ]
+
+            if hasGzipSupport and isinstance( fileObject, IndexedGzipFile ):
+                versions += [ makeVersionRow( 'indexed_gzip', indexed_gzip.__version__ ) ]
+
+            self.sqlConnection.executemany( 'INSERT OR REPLACE INTO "versions" VALUES (?,?,?,?,?)', versions )
         except Exception as exception:
             print( "[Warning] There was an error when adding version information." )
+            if printDebug >= 3:
+                print( exception )
 
         self.sqlConnection.commit()
 
@@ -1145,7 +1154,7 @@ class TarMount( fuse.Operations ):
                 raise Exception( "You are trying open a bzip2 compressed TAR file but no bzip2 support was detected!" )
             type = 'BZ2'
             self.rawFile = self.tarFile # save so that garbage collector won't close it!
-            self.tarFile = SeekableBzip2( self.rawFile.fileno() )
+            self.tarFile = IndexedBzip2File( self.rawFile.fileno() )
 
         elif magicBytes[0:2] == b"\x1f\x8b":
             if not hasGzipSupport:
@@ -1172,7 +1181,7 @@ class TarMount( fuse.Operations ):
                 db = self.indexedTar.sqlConnection
                 try:
                     offsets = dict( db.execute( 'SELECT blockoffset,dataoffset FROM bzip2blocks' ) )
-                    self.tarFile.setBlockOffsets( offsets )
+                    self.tarFile.set_block_offsets( offsets )
                 except Exception as e:
                     if printDebug >= 2:
                         print( "Could not load BZip2 Block offset data. Will create it from scratch." )
@@ -1182,7 +1191,7 @@ class TarMount( fuse.Operations ):
                         db.execute( 'DROP TABLE bzip2blocks' )
                     db.execute( 'CREATE TABLE bzip2blocks ( blockoffset INTEGER PRIMARY KEY, dataoffset INTEGER )' )
                     db.executemany( 'INSERT INTO bzip2blocks VALUES (?,?)',
-                                    self.tarFile.blockOffsets().items() )
+                                    self.tarFile.block_offsets().items() )
                     db.commit()
 
             elif type == 'GZ':
