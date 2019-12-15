@@ -1,8 +1,13 @@
 # Random Access Read-Only Tar Mount (Ratarmount)
 
+[![PyPI version](https://badge.fury.io/py/ratarmount.svg)](https://badge.fury.io/py/ratarmount)
+[![Downloads](https://pepy.tech/badge/ratarmount/month)](https://pepy.tech/project/ratarmount/month)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](http://opensource.org/licenses/MIT)
+[![Build Status](https://travis-ci.org/mxmlnkn/ratarmount.svg?branch=master)](https://travis-ci.com/mxmlnkn/ratarmount)
+
 Combines the random access indexing idea from [tarindexer](https://github.com/devsnd/tarindexer) and then **mounts** the **TAR** using [fusepy](https://github.com/fusepy/fusepy) for easy read-only access just like [archivemount](https://github.com/cybernoid/archivemount/).
 It also will mount TARs inside TARs inside TARs, ... **recursively** into folders of the same name, which is useful for the ImageNet data set.
-Furthermore, it now has support for **BZip2** compressed TAR archives provided by a refactored and improved version of [bzcat](https://github.com/landley/toybox/blob/c77b66455762f42bb824c1aa8cc60e7f4d44bdab/toys/other/bzcat.c) from [toybox](https://landley.net/code/toybox/) and support for **GZip** compressed TAR archives provided by the [indexed_gzip](https://github.com/pauldmccarthy/indexed_gzip) dependency.
+Furthermore, it now has support for **BZip2** compressed TAR archives provided by a refactored and improved version of [bzcat](https://github.com/landley/toybox/blob/c77b66455762f42bb824c1aa8cc60e7f4d44bdab/toys/other/bzcat.c) from [toybox](https://landley.net/code/toybox/) and support for **Gzip** compressed TAR archives provided by the [indexed_gzip](https://github.com/pauldmccarthy/indexed_gzip) dependency.
 
 
 # Installation
@@ -22,6 +27,12 @@ ratarmount --help
 ```
 
 You can also simply download [ratarmount.py](https://github.com/mxmlnkn/ratarmount/raw/master/ratarmount.py) and call it directly but then BZip2 support will not work and you will have to install the dependencies manually, so at least `pip3 install --user fusepy`.
+
+If you want to use other serialization backends instead of the default SQLite one, then either install those packages manually or install ratarmount by specifying the `legacy-serializers` feature:
+
+```
+pip install ratarmount[legacy-serializers]
+```
 
 # Usage
 
@@ -61,10 +72,10 @@ optional arguments:
                         want change the recursive mounting policy anyways.
                         (default: False)
   -s SERIALIZATION_BACKEND, --serialization-backend SERIALIZATION_BACKEND
-                        Specify which library to use for writing out the TAR
-                        index. Supported keywords: (none,pickle,pickle2,pickle
-                        3,custom,cbor,msgpack,rapidjson,ujson,simplejson,sqlit
-                        e)[.(lz4,gz)] (default: sqlite)
+                        (deprecated) Specify which library to use for writing
+                        out the TAR index. Supported keywords: (none,pickle,pi
+                        ckle2,pickle3,custom,cbor,msgpack,rapidjson,ujson,simp
+                        lejson,sqlite)[.(lz4,gz)] (default: sqlite)
   -p PREFIX, --prefix PREFIX
                         The specified path to the folder inside the TAR will
                         be mounted to root. This can be useful when the
@@ -184,3 +195,4 @@ Below is a comparison of the extracted performance metrics like maximum memory f
 Use the **SQLite** backend.
 
 When low on disk memory, which shouldn't be the case as you already have a huge TAR file and the index is most often only ~0.1% of the original TAR file's size, use the **lz4 compressed msgpack** backend.
+For this reason all other serialization backends are currently deprecated as they would required a completely separate code branch to be kept up to date.

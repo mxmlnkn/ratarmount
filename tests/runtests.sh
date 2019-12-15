@@ -300,8 +300,6 @@ benchmarkSerialization()
 
 pylint --disable=C0326,C0103 ratarmount.py > pylint.log
 
-python3 testBz2.py
-
 rm -f tests/*.index.*
 
 for type in sqlite custom pickle2 pickle3 cbor msgpack rapidjson ujson simplejson; do

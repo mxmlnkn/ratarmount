@@ -1,30 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import os
 import sys
 from setuptools import setup
-from setuptools.extension import Extension
 
-buildCython = '--cython' in sys.argv
-
-extensions = [
-    Extension(
-        'bzip2',
-        [ 'bzip2.pyx' if buildCython else 'bzip2.cpp' ],
-        include_dirs       = [ '.' ],
-        language           = 'c++',
-        extra_compile_args = [ '-std=c++11', '-O3', '-DNDEBUG' ],
-    ),
-]
-
-if buildCython:
-    from Cython.Build import cythonize
-    extensions = cythonize( extensions, compiler_directives = { 'language_level' : '3' } )
-    del sys.argv[sys.argv.index( '--cython' )]
+scriptPath = os.path.abspath( os.path.dirname( __file__ ) )
+with open( os.path.join( scriptPath, 'README.md' ), encoding = 'utf-8' ) as file:
+    readmeContents = file.read()
 
 setup(
     name             = 'ratarmount',
-    version          = '0.3.4',
+    version          = '0.4.0',
 
     description      = 'Random Access Read-Only Tar Mount',
     url              = 'https://github.com/mxmlnkn/ratarmount',
@@ -38,16 +25,21 @@ setup(
                          'Programming Language :: Python :: 3',
                          'Topic :: System :: Archiving' ],
 
+    long_description = readmeContents,
+    long_description_content_type = 'text/markdown',
+
     py_modules       = [ 'ratarmount' ],
-    ext_modules      = extensions,
-    install_requires = [ 'fusepy',
-                         'indexed_gzip',
-                         'lz4',
-                         'msgpack',
-                         'simplejson',
-                         'pyyaml',
-                         'ujson',
-                         'cbor',
-                         'python-rapidjson' ],
+    install_requires = [ 'fusepy', 'indexed_gzip', 'indexed_bzip2' ],
+    extras_require   = {
+                            'legacy-serializers' : [
+                                'lz4',
+                                'msgpack',
+                                'simplejson',
+                                'pyyaml',
+                                'ujson',
+                                'cbor',
+                                'python-rapidjson'
+                            ]
+                       },
     entry_points = { 'console_scripts': [ 'ratarmount=ratarmount:cli' ] }
 )

@@ -18,12 +18,14 @@ import traceback
 from timeit import default_timer as timer
 
 try:
-    from bzip2 import SeekableBzip2
+    import indexed_bzip2
+    from indexed_bzip2 import IndexedBzip2File
     hasBzip2Support = True
 except ImportError:
     hasBzip2Support = False
 
 try:
+    import indexed_gzip
     from indexed_gzip import IndexedGzipFile
     hasGzipSupport = True
 except ImportError:
@@ -32,7 +34,7 @@ except ImportError:
 import fuse
 
 
-__version__ = '0.3.4'
+__version__ = '0.4.0'
 
 printDebug = 1
 
@@ -178,7 +180,7 @@ class SQLiteIndexedTar:
 
         # 1. If no SQL connection was given (by recursive call), open a new database file
         openedConnection = False
-        if not self.sqlConnection:
+        if not self.indexIsLoaded():
             if printDebug >= 1:
                 print( "Creating new SQLite index database at", self.indexFileName )
 
@@ -218,7 +220,7 @@ class SQLiteIndexedTar:
 
         # 2. Open TAR file reader
         try:
-            streamed = ( hasBzip2Support and isinstance( fileObject, SeekableBzip2 ) ) or \
+            streamed = ( hasBzip2Support and isinstance( fileObject, IndexedBzip2File ) ) or \
                        ( hasGzipSupport and isinstance( fileObject, IndexedGzipFile ) )
             # r: uses seeks to skip to the next file inside the TAR while r| doesn't do any seeks.
             # r| might be slower but for compressed files we have to go over all the data once anyways
@@ -236,11 +238,11 @@ class SQLiteIndexedTar:
         for tarInfo in loadedTarFile:
             loadedTarFile.members = []
             globalOffset = streamOffset + tarInfo.offset_data
-            if hasBzip2Support and isinstance( fileObject, SeekableBzip2 ):
+            if hasBzip2Support and isinstance( fileObject, IndexedBzip2File ):
                 # We will have to adjust the global offset to a rough estimate of the real compressed size.
-                # Note that tellCompressed is always one bzip2 block further, which leads to underestimated
+                # Note that tell_compressed is always one bzip2 block further, which leads to underestimated
                 # file compression ratio especially in the beginning.
-                progressBar.update( int( globalOffset * fileObject.tellCompressed() / 8 / fileObject.tell() ) )
+                progressBar.update( int( globalOffset * fileObject.tell_compressed() / 8 / fileObject.tell() ) )
             elif hasGzipSupport and isinstance( fileObject, IndexedGzipFile ):
                 try:
                     progressBar.update( int( globalOffset * fileObject.fileobj().tell() / fileObject.tell() ) )
@@ -340,21 +342,28 @@ class SQLiteIndexedTar:
             print( "[Warning] There was an error when adding metadata information. Index loading might not work." )
 
         try:
-            ratarmountVersion = [ re.sub( '[^0-9]', '', x ) for x in __version__.split( '.' ) ]
-            indexVersion = [ re.sub( '[^0-9]', '', x ) for x in self.__version__.split( '.' ) ]
-            self.sqlConnection.executemany( 'INSERT OR REPLACE INTO "versions" VALUES (?,?,?,?,?)',
-                [ ( 'ratarmount', __version__,
-                     ratarmountVersion[0] if len( ratarmountVersion ) > 0 else None,
-                     ratarmountVersion[1] if len( ratarmountVersion ) > 1 else None,
-                     ratarmountVersion[2] if len( ratarmountVersion ) > 2 else None, ),
-                   ( 'index', self.__version__,
-                     indexVersion[0] if len( indexVersion ) > 0 else None,
-                     indexVersion[1] if len( indexVersion ) > 1 else None,
-                     indexVersion[2] if len( indexVersion ) > 2 else None, )
-                 ]
-             )
+            def makeVersionRow( versionName, version ):
+                versionNumbers = [ re.sub( '[^0-9]', '', x ) for x in version.split( '.' ) ]
+                return ( versionName,
+                         version,
+                         versionNumbers[0] if len( versionNumbers ) > 0 else None,
+                         versionNumbers[1] if len( versionNumbers ) > 1 else None,
+                         versionNumbers[2] if len( versionNumbers ) > 2 else None, )
+
+            versions = [ makeVersionRow( 'ratarmount', __version__ ),
+                         makeVersionRow( 'index', self.__version__ ) ]
+
+            if hasBzip2Support and isinstance( fileObject, IndexedBzip2File ):
+                versions += [ makeVersionRow( 'indexed_bzip2', indexed_bzip2.__version__ ) ]
+
+            if hasGzipSupport and isinstance( fileObject, IndexedGzipFile ):
+                versions += [ makeVersionRow( 'indexed_gzip', indexed_gzip.__version__ ) ]
+
+            self.sqlConnection.executemany( 'INSERT OR REPLACE INTO "versions" VALUES (?,?,?,?,?)', versions )
         except Exception as exception:
             print( "[Warning] There was an error when adding version information." )
+            if printDebug >= 3:
+                print( exception )
 
         self.sqlConnection.commit()
 
@@ -453,6 +462,7 @@ class SQLiteIndexedTar:
         try:
             self.sqlConnection.execute( 'SELECT * FROM "files" WHERE 0 == 1;' )
         except Exception:
+            self.sqlConnection = None
             return False
 
         return True
@@ -463,6 +473,20 @@ class SQLiteIndexedTar:
 
         t0 = time.time()
         self._openSqlDb( indexFileName )
+        tables = [ x[0] for x in self.sqlConnection.execute( 'SELECT name FROM sqlite_master WHERE type="table"' ) ]
+
+        # Check indexes created with bugged bz2 decoder (bug existed when I did not store versions yet)
+        if 'bzip2blocks' in tables and 'versions' not in tables:
+            raise Exception( "The indexes created with version 0.3.0 through 0.3.3 for bzip2 compressed archives "
+                             "are very likely to be wrong because of a bzip2 decoder bug.\n"
+                             "Please delete the index or call ratarmount with the --recreate-index option!" )
+
+        # Check for empty or incomplete indexes
+        if 'files' not in tables:
+            raise Exception( "SQLite index is empty" )
+
+        if 'filestmp' in tables or 'parentfolders' in tables:
+            raise Exception( "SQLite index is incomplete" )
 
         if printDebug >= 1:
             # Legacy output for automated tests
@@ -477,32 +501,28 @@ class SQLiteIndexedTar:
         if not os.path.isfile( indexFileName ):
             return False
 
-        if os.path.getsize( indexFileName ) == 0:
-            try:
-                os.remove( indexFileName )
-            except OSError:
-                print( "[Warning] Failed to remove empty old cached index file:", indexFileName )
-
-            return False
-
         try:
             self.loadIndex( indexFileName )
-        except Exception:
-            traceback.print_exc()
-            print( "[Warning] Could not load file '" + indexFileName  )
+        except Exception as exception:
+            if printDebug >= 3:
+                traceback.print_exc();
 
+            print( "[Warning] Could not load file '" + indexFileName  )
+            print( "[Info] Exception:", exception )
             print( "[Info] Some likely reasons for not being able to load the index file:" )
-            print( "[Info]   - The file has incorrect read permissions" )
-            print( "[Info]   - The file got corrupted because of:" )
+            print( "[Info]   - The index file has incorrect read permissions" )
+            print( "[Info]   - The index file is incomplete because ratarmount was killed during index creation" )
+            print( "[Info]   - The index file was detected to contain errors because of known bugs of older versions" )
+            print( "[Info]   - The index file got corrupted because of:" )
             print( "[Info]     - The program exited while it was still writing the index because of:" )
             print( "[Info]       - the user sent SIGINT to force the program to quit" )
             print( "[Info]       - an internal error occured while writing the index" )
             print( "[Info]       - the disk filled up while writing the index" )
             print( "[Info]     - Rare lowlevel corruptions caused by hardware failure" )
 
-            print( "[Info] This might force a time-costly index recreation, so if it happens often and "
-                   "mounting is slow, try to find out why loading fails repeatedly, "
-                   "e.g., by opening an issue on the public github page." )
+            print( "[Info] This might force a time-costly index recreation, so if it happens often\n"
+                   "       and mounting is slow, try to find out why loading fails repeatedly,\n"
+                   "       e.g., by opening an issue on the public github page." )
 
             try:
                 os.remove( indexFileName )
@@ -1134,10 +1154,10 @@ class TarMount( fuse.Operations ):
                 raise Exception( "You are trying open a bzip2 compressed TAR file but no bzip2 support was detected!" )
             type = 'BZ2'
             self.rawFile = self.tarFile # save so that garbage collector won't close it!
-            self.tarFile = SeekableBzip2( self.rawFile.fileno() )
+            self.tarFile = IndexedBzip2File( self.rawFile.fileno() )
 
         elif magicBytes[0:2] == b"\x1f\x8b":
-            if not hasBzip2Support:
+            if not hasGzipSupport:
                 raise Exception( "You are trying open a gzip compressed TAR file but no gzip support was detected!" )
             type = 'GZ'
             self.rawFile = self.tarFile # save so that garbage collector won't close it!
@@ -1161,7 +1181,7 @@ class TarMount( fuse.Operations ):
                 db = self.indexedTar.sqlConnection
                 try:
                     offsets = dict( db.execute( 'SELECT blockoffset,dataoffset FROM bzip2blocks' ) )
-                    self.tarFile.setBlockOffsets( offsets )
+                    self.tarFile.set_block_offsets( offsets )
                 except Exception as e:
                     if printDebug >= 2:
                         print( "Could not load BZip2 Block offset data. Will create it from scratch." )
@@ -1171,7 +1191,7 @@ class TarMount( fuse.Operations ):
                         db.execute( 'DROP TABLE bzip2blocks' )
                     db.execute( 'CREATE TABLE bzip2blocks ( blockoffset INTEGER PRIMARY KEY, dataoffset INTEGER )' )
                     db.executemany( 'INSERT INTO bzip2blocks VALUES (?,?)',
-                                    self.tarFile.blockOffsets().items() )
+                                    self.tarFile.block_offsets().items() )
                     db.commit()
 
             elif type == 'GZ':
@@ -1226,7 +1246,7 @@ class TarMount( fuse.Operations ):
         if mountMode & stat.S_IRUSR != 0: mountMode |= stat.S_IXUSR
         if mountMode & stat.S_IRGRP != 0: mountMode |= stat.S_IXGRP
         if mountMode & stat.S_IROTH != 0: mountMode |= stat.S_IXOTH
-        rootFileInfo = FileInfo(
+        self.rootFileInfo = FileInfo(
             offset   = 0                ,
             size     = tarStats.st_size ,
             mtime    = tarStats.st_mtime,
@@ -1238,21 +1258,16 @@ class TarMount( fuse.Operations ):
             istar    = True
         )
 
-        if serializationBackend == 'sqlite':
-            self.indexedTar.setFileInfo( '/' if not self.prefix else self.prefix, rootFileInfo )
-        else:
-            self.indexedTar.fileIndex[ self.prefix + '.' ] = rootFileInfo
-
-            if printDebug >= 3:
-                print( "Loaded File Index:" )
-                pprint.pprint( self.indexedTar.fileIndex )
-
     @overrides( fuse.Operations )
     def getattr( self, path, fh = None ):
         if printDebug >= 2:
             print( "[getattr( path =", path, ", fh =", fh, ")] Enter" )
 
-        fileInfo = self.indexedTar.getFileInfo( self.prefix + path, listDir = False )
+        if path == '/':
+            fileInfo = self.rootFileInfo
+        else:
+            fileInfo = self.indexedTar.getFileInfo( self.prefix + path, listDir = False )
+
         if not isinstance( fileInfo, FileInfo ):
             if printDebug >= 2:
                 print( "Could not find path:", self.prefix + path )
@@ -1348,7 +1363,7 @@ def parseArgs( args = None ):
     parser.add_argument(
         '-s', '--serialization-backend', type = str, default = 'sqlite',
         help =
-        'Specify which library to use for writing out the TAR index. Supported keywords: (' +
+        '(deprecated) Specify which library to use for writing out the TAR index. Supported keywords: (' +
         ','.join( IndexedTar.availableSerializationBackends + [ 'sqlite' ] ) + ')[.(' +
         ','.join( IndexedTar.availableCompressions ).strip( ',' ) + ')]' )
 
