@@ -10,6 +10,13 @@ It also will mount TARs inside TARs inside TARs, ... **recursively** into folder
 Furthermore, it now has support for **BZip2** compressed TAR archives provided by a refactored and improved version of [bzcat](https://github.com/landley/toybox/blob/c77b66455762f42bb824c1aa8cc60e7f4d44bdab/toys/other/bzcat.c) from [toybox](https://landley.net/code/toybox/) and support for **Gzip** compressed TAR archives provided by the [indexed_gzip](https://github.com/pauldmccarthy/indexed_gzip) dependency.
 
 
+# Table of Contents
+1. [Installation](#installation)
+2. [Usage](#usage)
+3. [The Problem](#the-problem)
+4. [The Solution](#the-solution)
+5. [Benchmarks](benchmarks/BENCHMARKS.md)
+
 # Installation
 
 You can simply install it from PyPI:
@@ -104,7 +111,7 @@ You downloaded a large TAR file from the internet, for example the [1.31TB](http
 
 ### Archivemount
 
-[Archivemount](https://github.com/cybernoid/archivemount/) seems to have large performance issues for too many files for both mounting and file access in version 0.8.7.
+[Archivemount](https://github.com/cybernoid/archivemount/) seems to have large performance issues for too many files for both mounting and file access in version 0.8.7. A more in-depth comparison benchmark can be found [here](benchmarks/BENCHMARKS.md).
 
   - Mounting the 6.5GB ImageNet Large-Scale Visual Recognition Challenge 2012 validation data set, and then testing the speed with: `time cat mounted/ILSVRC2012_val_00049975.JPEG | wc -c` takes 250ms for archivemount and 2ms for ratarmount.
   - Trying to mount the 150GB [ILSVRC object localization data set](https://www.kaggle.com/c/imagenet-object-localization-challenge) containing 2 million images was given up upon after 2 hours. Ratarmount takes ~15min to create a ~150MB index and <1ms for opening an already created index (SQLite database) and mounting the TAR. In contrast, archivemount will take the same amount of time even for subsequent mounts.
@@ -160,39 +167,11 @@ Here is a more recent test for version 0.2.0 with the new default SQLite backend
   - Reading a 64kB file: ~4ms
   - Running 'find mountPoint -type f | wc -l' (1.26M stat calls): 1m 50s
 
+## Benchmarks
 
-## Choice of the Serialization for the Index File
-
-For most conventional TAR files, which have less than than 10k files, the choice of the serialization backend does not matter.
-However, for larger TARs, both the runtime and the memory footprint can become limiting factors.
-For that reason, I tried different methods for serialization (or marshalling) the database of file stats and offsets inside the TAR file.
-
-To compare the backends, index creation and index loading was benchmarked.
-The test TAR for the benchmark contains 256 TARs containing each roughly 11k files with file names each of length 96 characters.
-This amounts to roughly 256 MiB of metadata in 700 000 files.
-The size of the files inside the TAR do not matter for the benchmark.
-Therefore, they are zero.
-
-![resident-memory-over-time-saving-256-MiB-metadata](benchmarks/plots/resident-memory-over-time-saving-256-MiB-metadata.png)
-
-Above is a memory footprint timeline for index creation.
-The first 3min is the same for all except sqlite as the index is created in memory.
-The SQLite version differs as the index is not a nested dictionary but is directly created in the SQL table.
-Then, there is a peak, which doubles the memory footprint for most serialization backends except for 'custom' and 'simplejson'.
-This is presumably because most of the backends are not streaming, i.e, the store a full copy of the data in memory before writing it to file!
-The SQLite version is configured with a 512MiB cache, therefore as can be seen in the plot after that cache size is reached, the data is written to disk periodically meaning the memory footprint does not scale with the number of files inside the TAR!
-
-The timeline for index loading is similar.
-Some do need twice the amount of memory, some do not.
-Some are slower, some are faster, SQLite is the fastest with practically zero loading time.
-Below is a comparison of the extracted performance metrics like maximum memory footprint over the whole timeline or the serialization time required.
-
-![performance-comparison-256-MiB-metadata](benchmarks/plots/performance-comparison-256-MiB-metadata.png)
-
-
-### Conclusion
-
-Use the **SQLite** backend.
-
-When low on disk memory, which shouldn't be the case as you already have a huge TAR file and the index is most often only ~0.1% of the original TAR file's size, use the **lz4 compressed msgpack** backend.
-For this reason all other serialization backends are currently deprecated as they would required a completely separate code branch to be kept up to date.
+During the making of this project several benchmarks were created. These can be viewed [here](benchmarks/BENCHMARKS.md).
+These are some of the things benchmarked and compared there:
+ 
+  - Memory and runtime comparisons of backends for saving the index with offsets
+  - Comparison of SQLite table designs
+  - Mounting and file access time comparison between archivemount and ratarmount
