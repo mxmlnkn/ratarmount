@@ -1195,13 +1195,35 @@ class TarMount( fuse.Operations ):
                     db.commit()
 
             elif type == 'GZ':
+                # indexed_gzip index only has a file based API, so we need to write all the index data from the SQL
+                # database out into a temporary file. For that, let's first try to use the same location as the SQLite
+                # database because it should have sufficient writing rights and free disk space.
                 db = self.indexedTar.sqlConnection
-                gzindex = tempfile.mkstemp()[1]
-                try:
-                    with open( gzindex, 'wb' ) as file:
-                        file.write( db.execute( 'SELECT data FROM gzipindex' ).fetchone()[0] )
-                    self.tarFile.import_index( filename = gzindex )
-                except Exception as e:
+
+                # Try to export data from SQLite database. Note that no error checking against the existence of
+                # gzipindex table is done because the exported data itself might also be wrong and we can't check
+                # against this. Therefore, collate all error checking by catching exceptions.
+                gzindex = None
+                for tmpDir in [ os.path.dirname( self.indexedTar.indexFileName ), None ]:
+                    try:
+                        gzindex = tempfile.mkstemp( dir = tmpDir )[1]
+                        with open( gzindex, 'wb' ) as file:
+                            file.write( db.execute( 'SELECT data FROM gzipindex' ).fetchone()[0] )
+                    except:
+                        try:
+                            os.remove( gzindex )
+                        except:
+                            pass
+                        gzindex = None
+
+                needToCreateIndex = gzindex is None
+                if not needToCreateIndex:
+                    try:
+                        self.tarFile.import_index( filename = gzindex )
+                    except indexed_gzip.ZranError:
+                        needToCreateIndex = True
+
+                if needToCreateIndex:
                     if printDebug >= 2:
                         print( "Could not load GZip Block offset data. Will create it from scratch." )
 
@@ -1209,7 +1231,28 @@ class TarMount( fuse.Operations ):
                     # Seeking from end not supported, so we have to read the whole data in in a loop
                     while self.tarFile.read( 1024*1024 ):
                         pass
-                    self.tarFile.export_index( filename = gzindex )
+
+                    # The created index can unfortunately be pretty large and tmp might actually run out of memory!
+                    # Therefore, try different paths, starting with the location where the index resides.
+                    gzindex = None
+                    for tmpDir in [ os.path.dirname( self.indexedTar.indexFileName ), None ]:
+                        gzindex = tempfile.mkstemp( dir = tmpDir )[1]
+                        try:
+                            self.tarFile.export_index( filename = gzindex )
+                        except indexed_gzip.ZranError:
+                            try:
+                                os.remove( gzindex )
+                            except:
+                                pass
+                            gzindex = None
+
+                    if not gzindex or not os.path.isfile( gzindex ):
+                        print( "[Warning] The GZip index required for seeking could not be loaded!" )
+                        print( "[Info] This might happen when you are out of space in your temporary file and at the" )
+                        print( "[Info] the index file location. The gzipindex size takes roughly 32kiB per 4MiB of" )
+                        print( "[Info] uncompressed(!) bytes (0.8% of the uncompressed data) by default." )
+                        raise Exception( "[Error] Could not initialize the GZip seek cache." )
+
                     if printDebug >= 2:
                         print( "Exported GZip index size:", os.stat( gzindex ).st_size )
 
