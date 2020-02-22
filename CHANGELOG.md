@@ -1,5 +1,18 @@
 
+# Version 0.5.0 built on 2019-05-09
+
+ - Add support for sparse files inside the TAR.
+ - Automatically detect if the TAR file has grown since the last index creation.
+ - Add support for truncated TAR files, e.g., during downloading.
+ - Add support for concatenated TAR files.
+ - Add support for hardlinks in the TAR file.
+ - Add support for union mounting.
+ - Add support for accessing older versions of a file if the TAR containts multiple versions.
+ - Detect changes in TAR files and recreate the index if so.
+ - Remove support for old non-SQLite index backends.
+
 # Version 0.4.1 built on 2019-04-10
+
  - Add option for gzip index seek point spacing to CLI.
  - Fix absolute symbolic links being stripped of their leading '/'.
  - Fix returned error codes.
