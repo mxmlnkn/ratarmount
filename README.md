@@ -171,7 +171,9 @@ Here is a more recent test for version 0.2.0 with the new default SQLite backend
 
 During the making of this project several benchmarks were created. These can be viewed [here](benchmarks/BENCHMARKS.md).
 These are some of the things benchmarked and compared there:
- 
+
   - Memory and runtime comparisons of backends for saving the index with offsets
   - Comparison of SQLite table designs
   - Mounting and file access time comparison between archivemount and ratarmount
+
+![Benchmark comparison between ratarmount and archivemount](benchmarks/plots/archivemount-comparison.png)
