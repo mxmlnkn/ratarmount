@@ -1,5 +1,11 @@
 
+# Version 0.5.0 built on 2019-04-??
+
+ - Add support for sparse files inside the TAR.
+ - Automatically detect if the TAR file has grown since the last index creation.
+
 # Version 0.4.1 built on 2019-04-10
+
  - Add option for gzip index seek point spacing to CLI.
  - Fix absolute symbolic links being stripped of their leading '/'.
  - Fix returned error codes.
