@@ -353,6 +353,15 @@ for type in sqlite custom pickle2 pickle3 cbor msgpack rapidjson ujson simplejso
             2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar-with-overlapping-name.tar   foo/fighter.tar/fighter/bar
         )
 
+        # Sparse file support is not backported to the old serializers
+        if [[ $type == 'sqlite' ]]; then
+            tests+=(
+                832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   01.sparse1.bin
+                832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   02.normal1.bin
+                832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   03.sparse1.bin
+            )
+        fi
+
         for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
             checkFileInTAR "${type}${compression}" "${tests[iTest+1]}" "${tests[iTest+2]}" "${tests[iTest]}"
             # For SQLite backend, check with BZip2 compression
