@@ -1426,8 +1426,18 @@ def parseArgs( args = None ):
         ','.join( IndexedTar.availableSerializationBackends + [ 'sqlite' ] ) + ')[.(' +
         ','.join( IndexedTar.availableCompressions ).strip( ',' ) + ')]' )
 
+    # Considerations for the default value:
+    #   - seek times for the bz2 backend are between 0.01s and 0.1s
+    #   - seek times for the gzip backend are roughly 1/10th compared to bz2 at a default spacing of 4MiB
+    #     -> we could do a spacing of 40MiB (however the comparison are for another test archive, so it might not apply)
+    #   - ungziping firefox 66 inflates the compressed size of 66MiB to 184MiB (~3 times more) and takes 1.4s on my PC
+    #     -> to have a response time of 0.1s, it would require a spacing < 13MiB
+    #   - the gzip index takes roughly 32kiB per seek point
+    #   - the bzip2 index takes roughly 16B per 100-900kiB of compressed data
+    #     -> for the gzip index to have the same space efficiency assuming a compression ratio of only 1,
+    #        the spacing would have to be 1800MiB at which point it would become almost useless
     parser.add_argument(
-        '-gs', '--gzip-seek-point-spacing', type = float, default = 4,
+        '-gs', '--gzip-seek-point-spacing', type = float, default = 16,
         help =
         'This only is applied when the index is first created or recreated with the -c option. '
         'The spacing given in MiB specifies the seek point distance in the uncompressed data. '
