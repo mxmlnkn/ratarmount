@@ -205,7 +205,7 @@ class SQLiteIndexedTar:
     )
 
     # Names must be identical to the SQLite column headers!
-    FileInfo = collections.namedtuple( "FileInfo", "offset size mtime mode type linkname uid gid istar" )
+    FileInfo = collections.namedtuple( "FileInfo", "offsetheader offset size mtime mode type linkname uid gid istar issparse" )
 
     def __init__(
         self,
@@ -215,7 +215,9 @@ class SQLiteIndexedTar:
         clearIndexCache = False,
         recursive       = False,
     ):
-        self.__version__ = '0.1.0'
+        # Version 0.1.0: Initial version
+        # Version 0.2.0: Added sparse support and 'offsetheader' and 'issparse' columns to the SQLite database
+        self.__version__ = '0.2.0'
         self.parentFolderCache = []
         self.mountRecursively = recursive
         self.sqlConnection = None
@@ -302,18 +304,20 @@ class SQLiteIndexedTar:
 
             createTables = """
                 CREATE TABLE "files" (
-                    "path"     VARCHAR(65535) NOT NULL,
-                    "name"     VARCHAR(65535) NOT NULL,
-                    "offset"   INTEGER,  /* seek offset from TAR file where these file's contents resides */
-                    "size"     INTEGER,
-                    "mtime"    INTEGER,
-                    "mode"     INTEGER,
-                    "type"     INTEGER,
-                    "linkname" VARCHAR(65535),
-                    "uid"      INTEGER,
-                    "gid"      INTEGER,
+                    "path"          VARCHAR(65535) NOT NULL,
+                    "name"          VARCHAR(65535) NOT NULL,
+                    "offsetheader"  INTEGER,  /* seek offset from TAR file where these file's contents resides */
+                    "offset"        INTEGER,  /* seek offset from TAR file where these file's contents resides */
+                    "size"          INTEGER,
+                    "mtime"         INTEGER,
+                    "mode"          INTEGER,
+                    "type"          INTEGER,
+                    "linkname"      VARCHAR(65535),
+                    "uid"           INTEGER,
+                    "gid"           INTEGER,
                     /* True for valid TAR files. Internally used to determine where to mount recursive TAR files. */
-                    "istar"    BOOL,
+                    "istar"         BOOL   ,
+                    "issparse"      BOOL   ,  /* for sparse files the file size refers to the expanded size! */
                     PRIMARY KEY (path,name) /* see SQL benchmarks for decision on this */
                 );
                 /* "A table created using CREATE TABLE AS has no PRIMARY KEY and no constraints of any kind"
@@ -354,6 +358,7 @@ class SQLiteIndexedTar:
         for tarInfo in loadedTarFile:
             loadedTarFile.members = []
             globalOffset = streamOffset + tarInfo.offset_data
+            globalOffsetHeader = streamOffset + tarInfo.offset
             if hasBzip2Support and isinstance( fileObject, IndexedBzip2File ):
                 # We will have to adjust the global offset to a rough estimate of the real compressed size.
                 # Note that tell_compressed is always one bzip2 block further, which leads to underestimated
@@ -408,17 +413,19 @@ class SQLiteIndexedTar:
             fileInfo = (
                 path               , # 0
                 name               , # 1
-                globalOffset       , # 2
-                tarInfo.size       , # 3
-                tarInfo.mtime      , # 4
-                mode               , # 5
-                tarInfo.type       , # 6
-                tarInfo.linkname   , # 7
-                tarInfo.uid        , # 8
-                tarInfo.gid        , # 9
-                isTar              , # 10
+                globalOffsetHeader , # 2
+                globalOffset       , # 3
+                tarInfo.size       , # 4
+                tarInfo.mtime      , # 5
+                mode               , # 6
+                tarInfo.type       , # 7
+                tarInfo.linkname   , # 8
+                tarInfo.uid        , # 9
+                tarInfo.gid        , # 10
+                isTar              , # 11
+                tarInfo.issparse() , # 12
             )
-            self._setFileInfo( fullPath, fileInfo )
+            self._setFileInfo( fileInfo )
 
         # 5. Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
         if openedConnection:
@@ -429,7 +436,8 @@ class SQLiteIndexedTar:
                 INSERT OR REPLACE INTO "files" SELECT * FROM "filestmp" ORDER BY "path","name",rowid;
                 DROP TABLE "filestmp";
                 INSERT OR IGNORE INTO "files"
-                    SELECT path,name,0,1,0,{},{},"",0,0,0
+                    /* path name offsetheader offset size mtime mode type linkname uid gid istar issparse */
+                    SELECT path,name,0,0,1,0,{},{},"",0,0,0,0
                     FROM "parentfolders" ORDER BY "path","name";
                 DROP TABLE "parentfolders";
             """.format( int( 0o555 | stat.S_IFDIR ), int( tarfile.DIRTYPE ) )
@@ -510,7 +518,19 @@ class SQLiteIndexedTar:
             for row in rows:
                 gotResults = True
                 if row['name']:
-                    dir[row['name']] = self.FileInfo( **dict( [ ( key, row[key] ) for key in self.FileInfo._fields ] ) )
+                    dir[row['name']] = self.FileInfo(
+                        offset       = row['offset'],
+                        offsetheader = row['offsetheader'] if 'offsetheader' in row.keys() else 0,
+                        size         = row['size'],
+                        mtime        = row['mtime'],
+                        mode         = row['mode'],
+                        type         = row['type'],
+                        linkname     = row['linkname'],
+                        uid          = row['uid'],
+                        gid          = row['gid'],
+                        istar        = row['istar'],
+                        issparse     = row['issparse'] if 'issparse' in row.keys() else False
+                    )
 
             return dir if gotResults else None
 
@@ -521,7 +541,19 @@ class SQLiteIndexedTar:
         if row is None:
             return None
 
-        return self.FileInfo( **dict( [ ( key, row[key] ) for key in self.FileInfo._fields ] ) ) if row else None
+        return self.FileInfo(
+            offset       = row['offset'],
+            offsetheader = row['offsetheader'] if 'offsetheader' in row.keys() else 0,
+            size         = row['size'],
+            mtime        = row['mtime'],
+            mode         = row['mode'],
+            type         = row['type'],
+            linkname     = row['linkname'],
+            uid          = row['uid'],
+            gid          = row['gid'],
+            istar        = row['istar'],
+            issparse     = row['issparse'] if 'issparse' in row.keys() else False
+        )
 
     def isDir( self, path ):
         return isinstance( self.getFileInfo( path, listDir = True ), dict )
@@ -545,9 +577,10 @@ class SQLiteIndexedTar:
         self.sqlConnection.executemany( 'INSERT OR IGNORE INTO "parentfolders" VALUES (?,?)',
                                         [ ( p[0], p[1] ) for p in paths ] )
 
-    def _setFileInfo( self, fullPath, row ):
+    def _setFileInfo( self, row ):
         assert isinstance( row, tuple )
-        self.sqlConnection.execute( 'INSERT OR REPLACE INTO "files" VALUES (?,?,?,?,?,?,?,?,?,?,?)', row )
+        self.sqlConnection.execute( 'INSERT OR REPLACE INTO "files" VALUES (' +
+                                    ','.join( '?' * len( row ) ) + ');', row )
         self._tryAddParentFolders( row[0] )
 
     def setFileInfo( self, fullPath, fileInfo ):
@@ -563,6 +596,7 @@ class SQLiteIndexedTar:
         row = (
             path,
             name,
+            fileInfo.offsetheader,
             fileInfo.offset,
             fileInfo.size,
             fileInfo.mtime,
@@ -572,8 +606,9 @@ class SQLiteIndexedTar:
             fileInfo.uid,
             fileInfo.gid,
             fileInfo.istar,
+            fileInfo.issparse,
         )
-        self.sqlConnection.execute( 'INSERT OR REPLACE INTO "files" VALUES (?,?,?,?,?,?,?,?,?,?,?)', row )
+        self._setFileInfo( row )
 
     def indexIsLoaded( self ):
         if not self.sqlConnection:
@@ -595,6 +630,14 @@ class SQLiteIndexedTar:
         t0 = time.time()
         self._openSqlDb( indexFileName )
         tables = [ x[0] for x in self.sqlConnection.execute( 'SELECT name FROM sqlite_master WHERE type="table"' ) ]
+        versions = None
+        try:
+            rows = self.sqlConnection.execute( 'SELECT * FROM versions;' )
+            versions = {}
+            for row in rows:
+                versions[row[0]] = ( row[2], row[3], row[4] )
+        except:
+            pass
 
         try:
             # Check indexes created with bugged bz2 decoder (bug existed when I did not store versions yet)
@@ -609,6 +652,11 @@ class SQLiteIndexedTar:
 
             if 'filestmp' in tables or 'parentfolders' in tables:
                 raise Exception( "SQLite index is incomplete" )
+
+            # Check for pre-sparse support indexes
+            if 'versions' not in tables or 'index' not in versions or versions['index'][1] < 2:
+                print( "[Warning] The found outdated index does not contain any sparse file information." )
+                print( "[Warning] Please recreate the index if you have problems with those." )
 
         except Exception as e:
             # indexIsLoaded checks self.sqlConnection, so close it before returning because it was found to be faulty
@@ -1417,15 +1465,17 @@ class TarMount( fuse.Operations ):
         if mountMode & stat.S_IRGRP != 0: mountMode |= stat.S_IXGRP
         if mountMode & stat.S_IROTH != 0: mountMode |= stat.S_IXOTH
         self.rootFileInfo = SQLiteIndexedTar.FileInfo(
-            offset   = 0                ,
-            size     = tarStats.st_size ,
-            mtime    = tarStats.st_mtime,
-            mode     = mountMode        ,
-            type     = tarfile.DIRTYPE  ,
-            linkname = ""               ,
-            uid      = tarStats.st_uid  ,
-            gid      = tarStats.st_gid  ,
-            istar    = True
+            offset       = 0                ,
+            offsetheader = 0                ,
+            size         = tarStats.st_size ,
+            mtime        = tarStats.st_mtime,
+            mode         = mountMode        ,
+            type         = tarfile.DIRTYPE  ,
+            linkname     = ""               ,
+            uid          = tarStats.st_uid  ,
+            gid          = tarStats.st_gid  ,
+            istar        = True             ,
+            issparse     = False
         )
 
     @overrides( fuse.Operations )
@@ -1498,6 +1548,19 @@ class TarMount( fuse.Operations ):
            not isinstance( fileInfo, IndexedTar.FileInfo ) and
            not isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) ):
             raise fuse.FuseOSError( fuse.errno.ENOENT )
+
+        if isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) and fileInfo.issparse:
+            # The TAR file format is very simple. It's just a concatenation of TAR blocks. There is not even a
+            # global header, only the TAR block headers. That's why we can simpley cut out the TAR block for
+            # the sparse file using StenciledFile and then use tarfile on it to expand the sparse file correctly.
+            tarBlockSize = fileInfo.offset - fileInfo.offsetheader + fileInfo.size
+            tarSubFile = StenciledFile( self.tarFile, [ ( fileInfo.offsetheader, tarBlockSize ) ] )
+            tmpTarFile = tarfile.open( fileobj = tarSubFile, mode = 'r:' )
+            tmpFileObject = tmpTarFile.extractfile( next( iter( tmpTarFile ) ) )
+            tmpFileObject.seek( offset, os.SEEK_SET )
+            result = tmpFileObject.read( length )
+            tmpTarFile.close()
+            return result
 
         self.tarFile.seek( fileInfo.offset + offset, os.SEEK_SET )
         return self.tarFile.read( length )
