@@ -997,7 +997,6 @@ class IndexedTar:
         with wrapperOpen( outFileName ) as outFile:
             if serializationBackend == 'pickle2':
                 import pickle
-                pickle.dump( self.fileIndex, outFile )
                 pickle.dump( self.fileIndex, outFile, protocol = 2 )
 
             # default serialization because it has the fewest dependencies and because it was legacy default
@@ -1005,7 +1004,6 @@ class IndexedTar:
                  serializationBackend == 'pickle' or \
                  serializationBackend is None:
                 import pickle
-                pickle.dump( self.fileIndex, outFile )
                 pickle.dump( self.fileIndex, outFile, protocol = 3 ) # 3 is default protocol
 
             elif serializationBackend == 'simplejson':
