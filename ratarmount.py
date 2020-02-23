@@ -44,10 +44,6 @@ def overrides( parentClass ):
         return method
     return overrider
 
-
-FileInfo = collections.namedtuple( "FileInfo", "offset size mtime mode type linkname uid gid istar" )
-
-
 class ProgressBar:
     def __init__( self, maxValue ):
         self.maxValue = maxValue
@@ -90,6 +86,9 @@ class SQLiteIndexedTar:
         'sqlConnection',
         'parentFolderCache', # stores which parent folders were last tried to add to database and therefore do exist
     )
+
+    # Names must be identical to the SQLite column headers!
+    FileInfo = collections.namedtuple( "FileInfo", "offset size mtime mode type linkname uid gid istar" )
 
     def __init__(
         self,
@@ -394,14 +393,14 @@ class SQLiteIndexedTar:
             for row in rows:
                 gotResults = True
                 if row['name']:
-                    dir[row['name']] = FileInfo( **dict( [ ( key, row[key] ) for key in FileInfo._fields ] ) )
+                    dir[row['name']] = self.FileInfo( **dict( [ ( key, row[key] ) for key in self.FileInfo._fields ] ) )
 
             return dir if gotResults else None
 
         path, name = fullPath.rsplit( '/', 1 )
         row = self.sqlConnection.execute( 'SELECT * FROM "files" WHERE "path" == (?) AND "name" == (?)',
                                           ( path, name ) ).fetchone()
-        return FileInfo( **dict( [ ( key, row[key] ) for key in FileInfo._fields ] ) ) if row else None
+        return self.FileInfo( **dict( [ ( key, row[key] ) for key in self.FileInfo._fields ] ) ) if row else None
 
     def isDir( self, path ):
         return isinstance( self.getFileInfo( path, listDir = True ), dict )
@@ -436,7 +435,7 @@ class SQLiteIndexedTar:
         """
         assert self.sqlConnection
         assert fullPath[0] == "/"
-        assert isinstance( fileInfo, FileInfo )
+        assert isinstance( fileInfo, self.FileInfo )
 
         # os.normpath does not delete duplicate '/' at beginning of string!
         path, name = fullPath.rsplit( "/", 1 )
@@ -562,6 +561,8 @@ class IndexedTar:
         'indexFileName',
         'progressBar',
     )
+
+    FileInfo = collections.namedtuple( "FileInfo", "offset size mtime mode type linkname uid gid istar" )
 
     # these allowed backends also double as extensions for the index file to look for
     availableSerializationBackends = [
@@ -691,7 +692,7 @@ class IndexedTar:
 
             file.write( b'\x02' ) # magic code meaning "close dictionary object"
 
-        elif isinstance( toDump, FileInfo ):
+        elif isinstance( toDump, IndexedTar.FileInfo ):
             serialized = msgpack.dumps( toDump )
             file.write( b'\x05' ) # magic code meaning "msgpack object"
             file.write( len( serialized ).to_bytes( 4, byteorder = 'little' ) )
@@ -733,7 +734,7 @@ class IndexedTar:
                 if valueType == b'\x05': # msgpack object
                     size = int.from_bytes( file.read( 4 ), byteorder = 'little' )
                     serialized = file.read( size )
-                    value = FileInfo( *msgpack.loads( serialized ) )
+                    value = IndexedTar.FileInfo( *msgpack.loads( serialized ) )
 
                 elif valueType == b'\x01': # dict object
                     file.seek( -1, io.SEEK_CUR )
@@ -768,17 +769,17 @@ class IndexedTar:
             p = p[name]
 
         def repackDeserializedNamedTuple( p ):
-            if isinstance( p, list ) and len( p ) == len( FileInfo._fields ):
-                return FileInfo( *p )
+            if isinstance( p, list ) and len( p ) == len( self.FileInfo._fields ):
+                return self.FileInfo( *p )
 
-            if isinstance( p, dict ) and len( p ) == len( FileInfo._fields ) and \
+            if isinstance( p, dict ) and len( p ) == len( self.FileInfo._fields ) and \
                  'uid' in p and isinstance( p['uid'], int ):
                 # a normal directory dict must only have dict or FileInfo values,
                 # so if the value to the 'uid' key is an actual int,
                 # then it is sure it is a deserialized FileInfo object and not a file named 'uid'
                 print( "P ===", p )
-                print( "FileInfo ===", FileInfo( **p ) )
-                return FileInfo( **p )
+                print( "FileInfo ===", self.FileInfo( **p ) )
+                return self.FileInfo( **p )
 
             return p
 
@@ -790,7 +791,7 @@ class IndexedTar:
             if '.' in p:
                 p = p['.']
             else:
-                return FileInfo(
+                return self.FileInfo(
                     offset   = 0, # not necessary for directory anyways
                     size     = 1, # might be misleading / non-conform
                     mtime    = 0,
@@ -809,13 +810,13 @@ class IndexedTar:
 
     def exists( self, path ):
         path = os.path.normpath( path )
-        return self.isDir( path ) or isinstance( self.getFileInfo( path ), FileInfo )
+        return self.isDir( path ) or isinstance( self.getFileInfo( path ), self.FileInfo )
 
     def setFileInfo( self, path, fileInfo ):
         """
         path: the full path to the file with leading slash (/) for which to set the file info
         """
-        assert isinstance( fileInfo, FileInfo )
+        assert isinstance( fileInfo, self.FileInfo )
 
         pathHierarchy = os.path.normpath( path ).split( os.sep )
         if not pathHierarchy:
@@ -836,7 +837,7 @@ class IndexedTar:
         """
         path: the full path to the file with leading slash (/) for which to set the folder info
         """
-        assert isinstance( dirInfo, FileInfo )
+        assert isinstance( dirInfo, self.FileInfo )
         assert isinstance( dirContents, dict )
 
         pathHierarchy = os.path.normpath( path ).strip( os.sep ).split( os.sep )
@@ -883,7 +884,7 @@ class IndexedTar:
             if tarInfo.issym() : mode |= stat.S_IFLNK
             if tarInfo.ischr() : mode |= stat.S_IFCHR
             if tarInfo.isfifo(): mode |= stat.S_IFIFO
-            fileInfo = FileInfo(
+            fileInfo = self.FileInfo(
                 offset   = tarInfo.offset_data,
                 size     = tarInfo.size       ,
                 mtime    = tarInfo.mtime      ,
@@ -1131,6 +1132,10 @@ class IndexedTar:
         return self.indexIsLoaded()
 
 
+# Must be global so pickle can find out!
+FileInfo = IndexedTar.FileInfo
+
+
 class TarMount( fuse.Operations ):
     """
     This class implements the fusepy interface in order to create a mounted file system view
@@ -1305,7 +1310,7 @@ class TarMount( fuse.Operations ):
         if mountMode & stat.S_IRUSR != 0: mountMode |= stat.S_IXUSR
         if mountMode & stat.S_IRGRP != 0: mountMode |= stat.S_IXGRP
         if mountMode & stat.S_IROTH != 0: mountMode |= stat.S_IXOTH
-        self.rootFileInfo = FileInfo(
+        self.rootFileInfo = SQLiteIndexedTar.FileInfo(
             offset   = 0                ,
             size     = tarStats.st_size ,
             mtime    = tarStats.st_mtime,
@@ -1327,7 +1332,9 @@ class TarMount( fuse.Operations ):
         else:
             fileInfo = self.indexedTar.getFileInfo( self.prefix + path, listDir = False )
 
-        if not isinstance( fileInfo, FileInfo ):
+        if fileInfo is None or (
+           not isinstance( fileInfo, IndexedTar.FileInfo ) and
+           not isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) ):
             if printDebug >= 2:
                 print( "Could not find path:", self.prefix + path )
             raise fuse.FuseOSError( fuse.errno.EROFS )
@@ -1368,7 +1375,9 @@ class TarMount( fuse.Operations ):
             print( "[readlink( path =", path, ")]" )
 
         fileInfo = self.indexedTar.getFileInfo( self.prefix + path )
-        if not isinstance( fileInfo, FileInfo ):
+        if fileInfo is None or (
+           not isinstance( fileInfo, IndexedTar.FileInfo ) and
+           not isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) ):
             raise fuse.FuseOSError( fuse.errno.EROFS )
 
         pathname = fileInfo.linkname
@@ -1383,7 +1392,9 @@ class TarMount( fuse.Operations ):
             print( "[read( path =", path, ", length =", length, ", offset =", offset, ",fh =", fh, ")] path:", path )
 
         fileInfo = self.indexedTar.getFileInfo( self.prefix + path )
-        if not isinstance( fileInfo, FileInfo ):
+        if fileInfo is None or (
+           not isinstance( fileInfo, IndexedTar.FileInfo ) and
+           not isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) ):
             raise fuse.FuseOSError( fuse.errno.EROFS )
 
         self.tarFile.seek( fileInfo.offset + offset, os.SEEK_SET )
