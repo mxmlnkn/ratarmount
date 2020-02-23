@@ -330,7 +330,7 @@ class SQLiteIndexedTar:
                  *   PATCH version when you make backwards compatible bug fixes. */
                 "major"    INTEGER,
                 "minor"    INTEGER,
-                "path"     INTEGER
+                "patch"    INTEGER
             );
         """
         try:
