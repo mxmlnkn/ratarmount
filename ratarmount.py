@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import bisect
 import collections
 import io
 import itertools
@@ -71,6 +72,122 @@ class ProgressBar:
 
         self.lastUpdateTime = time.time()
         self.lastUpdateValue = value
+
+class StenciledFile(io.BufferedIOBase):
+    """A file abstraction layer giving a stenciled view to an underlying file."""
+
+    def __init__(self, fileobj, stencils):
+        """
+        stencils: A list tuples specifying the offset and length of the underlying file to use.
+                  The order of these tuples will be kept.
+                  The offset must be non-negative and the size must be positive.
+
+        Examples:
+            stencil = [(5,7)]
+                Makes a new 7B sized virtual file starting at offset 5 of fileobj.
+            stencil = [(0,3),(5,3)]
+                Make a new 6B sized virtual file containing bytes [0,1,2,5,6,7] of fileobj.
+            stencil = [(0,3),(0,3)]
+                Make a 6B size file containing the first 3B of fileobj twice concatenated together.
+        """
+
+        self.fileobj = fileobj
+        self.offsets = [ x[0] for x in stencils ]
+        self.sizes   = [ x[1] for x in stencils ]
+
+        # Calculate cumulative sizes
+        self.cumsizes = [ 0 ]
+        for offset, size in stencils:
+            assert offset >= 0
+            assert size > 0
+            self.cumsizes.append( self.cumsizes[-1] + size )
+
+        # Seek to the first stencil offset in the underlying file so that "read" will work out-of-the-box
+        self.seek( 0 )
+
+    def _findStencil( self, offset ):
+        """
+        Return index to stencil where offset belongs to. E.g., for stencils [(3,5),(8,2)], offsets 0 to
+        and including 4 will still be inside stencil (3,5), i.e., index 0 will be returned. For offset 6,
+        index 1 would be returned because it now is in the second contiguous region / stencil.
+        """
+        # bisect_left( value ) gives an index for a lower range: value < x for all x in list[0:i]
+        # Because value >= 0 and list starts with 0 we can therefore be sure that the returned i>0
+        # Consider the stencils [(11,2),(22,2),(33,2)] -> cumsizes [0,2,4,6]. Seek to offset 2 should seek to 22.
+        assert offset >= 0
+        i = bisect.bisect_left( self.cumsizes, offset + 1 ) - 1
+        assert i >= 0
+        return i
+
+    def close(self):
+        self.fileobj.close()
+
+    def closed(self):
+        return self.fileobj.closed()
+
+    def fileno(self):
+        return self.fileobj.fileno()
+
+    def seekable(self):
+        return self.fileobj.seekable()
+
+    def readable(self):
+        return self.fileobj.readable()
+
+    def writable(self):
+        return False
+
+    def read(self, size=-1):
+        if size == -1:
+            size = self.cumsizes[-1] - self.offset
+
+        # This loop works in a kind of leapfrog fashion. On each even loop iteration it seeks to the next stencil
+        # and on each odd iteration it reads the data and increments the offset inside the stencil!
+        result = b''
+        i = self._findStencil( self.offset )
+        while size > 0 and i < len( self.sizes ):
+            # Read as much as requested or as much as the current contiguous region / stencil still contains
+            readableSize = min( size, self.sizes[i] - ( self.offset - self.cumsizes[i] ) )
+            if readableSize == 0:
+                # Go to next stencil
+                i += 1
+                if i >= len( self.offsets ):
+                    break
+                self.fileobj.seek( self.offsets[i] )
+            else:
+                # Actually read data
+                tmp = self.fileobj.read( readableSize )
+                self.offset += len( tmp )
+                result += tmp
+                size -= readableSize
+                # Now, either size is 0 or readableSize will be 0 in the next iteration
+
+        return result
+
+    def seek(self, offset, whence=io.SEEK_SET):
+        if whence == io.SEEK_CUR:
+            self.offset += offset
+        elif whence == io.SEEK_END:
+            self.offset = self.cumsizes[-1] + offset
+        elif whence == io.SEEK_SET:
+            self.offset = offset
+
+        if self.offset < 0:
+            raise Exception("Trying to seek before the start of the file!")
+        if self.offset >= self.cumsizes[-1]:
+            return self.offset
+
+        i = self._findStencil( self.offset )
+        offsetInsideStencil = self.offset - self.cumsizes[i]
+        assert offsetInsideStencil >= 0
+        assert offsetInsideStencil < self.sizes[i]
+        self.fileobj.seek( self.offsets[i] + offsetInsideStencil, io.SEEK_SET )
+
+        return self.offset
+
+    def tell(self):
+        return self.offset
+
 
 class SQLiteIndexedTar:
     """
