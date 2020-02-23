@@ -1148,7 +1148,8 @@ class TarMount( fuse.Operations ):
         clearIndexCache = False,
         recursive = False,
         serializationBackend = None,
-        prefix = ''
+        prefix = '',
+        gzipSeekPointSpacing = 4*1024*1024
     ):
         """
         prefix : Instead of mounting the TAR's root and showing all files a prefix can be specified.
@@ -1175,7 +1176,9 @@ class TarMount( fuse.Operations ):
             type = 'GZ'
             self.rawFile = self.tarFile # save so that garbage collector won't close it!
             # drop_handles keeps a file handle opening as is required to call tell() during decoding
-            self.tarFile = IndexedGzipFile( fileobj = self.rawFile, drop_handles = False )
+            self.tarFile = IndexedGzipFile( fileobj = self.rawFile,
+                                            drop_handles = False,
+                                            spacing = gzipSeekPointSpacing )
 
         if type and serializationBackend != 'sqlite':
             print( "[Warning] Only the SQLite backend has .tar.bz2 and .tar.gz support, therefore will use that!" )
@@ -1424,6 +1427,15 @@ def parseArgs( args = None ):
         ','.join( IndexedTar.availableCompressions ).strip( ',' ) + ')]' )
 
     parser.add_argument(
+        '-gs', '--gzip-seek-point-spacing', type = float, default = 4,
+        help =
+        'This only is applied when the index is first created or recreated with the -c option. '
+        'The spacing given in MiB specifies the seek point distance in the uncompressed data. '
+        'A distance of 16MiB means that archives smaller than 16MiB in uncompressed size will '
+        'not benefit from faster seek times. A seek point takes roughly 32kiB. '
+        'So, smaller distances lead to more responsive seeking but may explode the index size!' )
+
+    parser.add_argument(
         '-p', '--prefix', type = str, default = '',
         help = 'The specified path to the folder inside the TAR will be mounted to root. '
                'This can be useful when the archive as created with absolute paths. '
@@ -1447,7 +1459,11 @@ def parseArgs( args = None ):
         'mountpath', metavar = 'mount-path', nargs = '?',
         help = 'The path to a folder to mount the TAR contents into.' )
 
-    return parser.parse_args( args )
+    args = parser.parse_args( args )
+
+    args.gzip_seek_point_spacing = args.gzip_seek_point_spacing * 1024 * 1024
+
+    return args
 
 def cli( args = None ):
     tmpArgs = sys.argv if args is None else args
@@ -1503,7 +1519,8 @@ def cli( args = None ):
         clearIndexCache      = args.recreate_index,
         recursive            = args.recursive,
         serializationBackend = args.serialization_backend,
-        prefix               = args.prefix )
+        prefix               = args.prefix,
+        gzipSeekPointSpacing = args.gzip_seek_point_spacing )
 
     fuse.FUSE( operations = fuseOperationsObject,
                mountpoint = mountPath,
