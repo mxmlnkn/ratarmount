@@ -461,13 +461,14 @@ class SQLiteIndexedTar:
 
         try:
             self.sqlConnection.execute( 'SELECT * FROM "files" WHERE 0 == 1;' )
-        except Exception:
+        except sqlite3.OperationalError:
             self.sqlConnection = None
             return False
 
         return True
 
     def loadIndex( self, indexFileName ):
+        """Loads the given index SQLite database and checks it for validity."""
         if self.indexIsLoaded():
             return
 
@@ -475,18 +476,29 @@ class SQLiteIndexedTar:
         self._openSqlDb( indexFileName )
         tables = [ x[0] for x in self.sqlConnection.execute( 'SELECT name FROM sqlite_master WHERE type="table"' ) ]
 
-        # Check indexes created with bugged bz2 decoder (bug existed when I did not store versions yet)
-        if 'bzip2blocks' in tables and 'versions' not in tables:
-            raise Exception( "The indexes created with version 0.3.0 through 0.3.3 for bzip2 compressed archives "
-                             "are very likely to be wrong because of a bzip2 decoder bug.\n"
-                             "Please delete the index or call ratarmount with the --recreate-index option!" )
+        try:
+            # Check indexes created with bugged bz2 decoder (bug existed when I did not store versions yet)
+            if 'bzip2blocks' in tables and 'versions' not in tables:
+                raise Exception( "The indexes created with version 0.3.0 through 0.3.3 for bzip2 compressed archives "
+                                 "are very likely to be wrong because of a bzip2 decoder bug.\n"
+                                 "Please delete the index or call ratarmount with the --recreate-index option!" )
 
-        # Check for empty or incomplete indexes
-        if 'files' not in tables:
-            raise Exception( "SQLite index is empty" )
+            # Check for empty or incomplete indexes
+            if 'files' not in tables:
+                raise Exception( "SQLite index is empty" )
 
-        if 'filestmp' in tables or 'parentfolders' in tables:
-            raise Exception( "SQLite index is incomplete" )
+            if 'filestmp' in tables or 'parentfolders' in tables:
+                raise Exception( "SQLite index is incomplete" )
+
+        except Exception as e:
+            # indexIsLoaded checks self.sqlConnection, so close it before returning because it was found to be faulty
+            try:
+                self.sqlConnection.close()
+            except:
+                pass
+            self.sqlConnection = None
+
+            raise e
 
         if printDebug >= 1:
             # Legacy output for automated tests
@@ -505,7 +517,7 @@ class SQLiteIndexedTar:
             self.loadIndex( indexFileName )
         except Exception as exception:
             if printDebug >= 3:
-                traceback.print_exc();
+                traceback.print_exc()
 
             print( "[Warning] Could not load file '" + indexFileName  )
             print( "[Info] Exception:", exception )
@@ -531,6 +543,7 @@ class SQLiteIndexedTar:
 
         if printDebug >= 3 and self.indexIsLoaded():
             print( "Loaded index", indexFileName )
+
         return self.indexIsLoaded()
 
 
