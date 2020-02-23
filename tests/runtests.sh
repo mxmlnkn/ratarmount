@@ -326,6 +326,7 @@ benchmarkSerialization()
 
 
 
+python3 tests/tests.py || returnError "tests/tests.py"
 
 pylint --disable=C0326,C0103 ratarmount.py > pylint.log
 

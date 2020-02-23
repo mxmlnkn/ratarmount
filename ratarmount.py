@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import bisect
 import collections
 import io
 import itertools
@@ -71,6 +72,113 @@ class ProgressBar:
 
         self.lastUpdateTime = time.time()
         self.lastUpdateValue = value
+
+class StenciledFile(io.BufferedIOBase):
+    """A file abstraction layer giving a stenciled view to an underlying file."""
+
+    def __init__(self, fileobj, stencils):
+        """
+        stencils: A list tuples specifying the offset and length of the underlying file to use.
+                  The order of these tuples will be kept.
+                  E.g. [(0,3),(5,3)] will make a new file 6B long virtual file containing bytes [0,1,2,5,6,7]
+                  of the original. Or [(0,3),(0.3)] will have 6B, which are the first 3B of the original twice
+                  and concatenated together.
+        """
+        self.fileobj = fileobj
+
+        # Calculate accumulated sizes
+        self.stencils = stencils
+        self.sizes = [ 0 ]
+        sum = 0
+        for offsetAndSize in stencils:
+            sum += offsetAndSize[1]
+            self.sizes += [ sum ]
+        self.seek( 0 )
+
+    def close(self):
+        self.fileobj.close()
+
+    def closed(self):
+        return self.fileobj.closed()
+
+    def fileno(self):
+        return self.fileobj.fileno()
+
+    def seekable(self):
+        return self.fileobj.seekable()
+
+    def readable(self):
+        return self.fileobj.readable()
+
+    def writable(self):
+        return False
+
+    def read(self, size=-1):
+        if size == -1:
+            size = self.sizes[-1] - self.offset
+
+        i = bisect.bisect_left( self.sizes, self.offset + 1 ) - 1
+        result = b''
+        while size > 0 and i < len( self.sizes ):
+            readableSize = min( size, self.stencils[i][1] - ( self.offset - self.sizes[i] ) )
+            if readableSize == 0:
+                i += 1
+                self.fileobj.seek( self.stencils[i][0] )
+            else:
+                tmp = self.fileobj.read( readableSize )
+                self.offset += len( tmp )
+                result += tmp
+                size -= readableSize
+
+        return result
+
+    def seek(self, offset, whence=io.SEEK_SET):
+        if whence == io.SEEK_CUR:
+            return self.fileobj.seek( offset, whence )
+        if whence == io.SEEK_END:
+            return self.fileobj.seek( offset, whence )
+        self.offset = offset
+
+        if self.offset < 0:
+            raise Exception("Trying to seek before the start of the file!")
+        if self.offset >= self.sizes[-1]:
+            raise Exception("Trying to seek after the end of the file!")
+
+        # bisect_left gives a lower range: value < x for all x in a[0:i]
+        # Because value >= 0 and a starts with 0 we can therefore be sure that the returned i>0
+        # Consider [(11,2),(22,2),(33,2)] -> sizes [0,2,4,6], seek to offset 2 should seek to 22.
+        i = bisect.bisect_left( self.sizes, self.offset + 1 ) - 1
+        assert( self.sizes[i] < self.offset + 1 )
+        assert( i >= 0 )
+
+        offsetAndSize = self.stencils[i]
+        assert( self.offset - self.sizes[i] >= 0 )
+        assert( self.offset - self.sizes[i] < offsetAndSize[1] )
+        return self.fileobj.seek( offsetAndSize[0] + self.offset - self.sizes[i], whence )
+
+    def tell(self):
+        return self.offset
+
+    def peek(self, n=0):
+        raise Exception("not supported")
+
+    def read1(self, size=-1):
+        raise Exception("not supported")
+
+    def readinto(self, b):
+        raise Exception("not supported")
+
+    def readline(self, size=-1):
+        raise Exception("not supported")
+
+    def readlines(self, size=-1):
+        raise Exception("not supported")
+
+    def write(self, data):
+        raise Exception("not supported")
+
+    def writelines(self, seq):
+        raise Exception("not supported")
 
 class SQLiteIndexedTar:
     """
