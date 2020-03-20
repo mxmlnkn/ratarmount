@@ -6,6 +6,7 @@ import bisect
 import collections
 import io
 import itertools
+import json
 import os
 import pprint
 import re
@@ -215,8 +216,11 @@ class SQLiteIndexedTar:
         clearIndexCache = False,
         recursive       = False,
     ):
-        # Version 0.1.0: Initial version
-        # Version 0.2.0: Added sparse support and 'offsetheader' and 'issparse' columns to the SQLite database
+        # Version 0.1.0:
+        #   - Initial version
+        # Version 0.2.0:
+        #   - Add sparse support and 'offsetheader' and 'issparse' columns to the SQLite database
+        #   - Add TAR file size metadata in order to quickly check whether the TAR changed
         self.__version__ = '0.2.0'
         self.parentFolderCache = []
         self.mountRecursively = recursive
@@ -275,10 +279,36 @@ class SQLiteIndexedTar:
             with open( self.tarFileName, 'rb' ) as file:
                 self.createIndex( file )
 
+        self._storeTarMetadata()
+
         if printDebug >= 1 and writeIndex:
             # The 0-time is legacy for the automated tests
             print( "Writing out TAR index to", self.indexFileName, "took 0s",
                    "and is sized", os.stat( self.indexFileName ).st_size, "B" )
+
+    def _storeTarMetadata( self ):
+        """Adds some consistency meta information to recognize the need to update the cached TAR index"""
+
+        metadataTable = """
+            /* empty table whose sole existence specifies that we finished iterating the tar */
+            CREATE TABLE "metadata" (
+                "key"      VARCHAR(65535) NOT NULL, /* e.g. "tarsize" */
+                "value"    VARCHAR(65535) NOT NULL  /* e.g. size in bytes as integer */
+            );
+        """
+
+        try:
+            tarStats = os.stat( self.tarFileName )
+            self.sqlConnection.executescript( metadataTable )
+            serializedTarStats = json.dumps( { attr : getattr( tarStats, attr )
+                                               for attr in dir( tarStats ) if attr.startswith( 'st_' ) } )
+            self.sqlConnection.execute( 'INSERT INTO "metadata" VALUES (?,?)', ( "tarstats", serializedTarStats ) )
+            self.sqlConnection.commit()
+        except Exception as exception:
+            if printDebug >= 2:
+                print( exception )
+            print( "[Warning] There was an error when adding file metadata information." )
+            print( "[Warning] Automatic detection of changed TAR files during index loading might not work." )
 
     def _openSqlDb( self, filePath ):
         self.sqlConnection = sqlite3.connect( filePath )
@@ -355,7 +385,8 @@ class SQLiteIndexedTar:
             progressBar = ProgressBar( os.fstat( fileObject.fileno() ).st_size )
 
         # 3. Iterate over files inside TAR and add them to the database
-        for tarInfo in loadedTarFile:
+        try:
+          for tarInfo in loadedTarFile:
             loadedTarFile.members = []
             globalOffset = streamOffset + tarInfo.offset_data
             globalOffsetHeader = streamOffset + tarInfo.offset
@@ -426,6 +457,10 @@ class SQLiteIndexedTar:
                 tarInfo.issparse() , # 12
             )
             self._setFileInfo( fileInfo )
+        except tarfile.ReadError as e:
+            if 'unexpected end of data' in str( e ):
+                print( "[Warning] The TAR file is incomplete. Ratarmount will work but some files might be cut off. "
+                       "If the TAR file size changes, ratarmount will recreate the index during the next mounting." )
 
         # 5. Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
         if openedConnection:
@@ -657,6 +692,22 @@ class SQLiteIndexedTar:
             if 'versions' not in tables or 'index' not in versions or versions['index'][1] < 2:
                 print( "[Warning] The found outdated index does not contain any sparse file information." )
                 print( "[Warning] Please recreate the index if you have problems with those." )
+
+            if 'metadata' in tables:
+                values = dict( list( self.sqlConnection.execute( 'SELECT * FROM metadata;' ) ) )
+                if 'tarstats' in values:
+                    values = json.loads( values['tarstats'] )
+                tarStats = os.stat( self.tarFileName )
+
+                if hasattr( tarStats, "st_size" ) and 'st_size' in values \
+                   and tarStats.st_size != values['st_size']:
+                    raise Exception( "TAR file for this SQLite index has changed size from",
+                                     tarStats.st_size, "to", values['st_size'] )
+
+                if hasattr( tarStats, "st_mtime" ) and 'st_mtime' in values \
+                   and tarStats.st_mtime != values['st_mtime']:
+                    raise Exception( "The modification date for the TAR file", values['st_mtime'],
+                                     "to this SQLite index has changed (" + str( tarStats.st_mtime ) + ")" )
 
         except Exception as e:
             # indexIsLoaded checks self.sqlConnection, so close it before returning because it was found to be faulty

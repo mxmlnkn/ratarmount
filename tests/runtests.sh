@@ -323,7 +323,61 @@ benchmarkSerialization()
     done
 }
 
+checkAutomaticIndexRecreation()
+(
+    ratarmountScript=$( realpath -- ratarmount.py )
+    cd -- "$( mktemp -d )"
 
+    archive='momo.tar'
+    mountFolder='momo'
+
+    # 1. Create a simple TAR
+    fileName='meme'
+    echo 'mimi' > "$fileName"
+    tar -cf "$archive" "$fileName"
+
+    # 1. Check and create index
+    python3 "$ratarmountScript" "$archive"
+    diff -- "$fileName" "$mountFolder/$fileName" || returnError 'Files differ!'
+    funmount "$mountFolder"
+
+    # 2. Check that index does not get recreated normally
+    sleep 1 # because we are comparing timestamps with seconds precision ...
+    indexFile='momo.tar.index.sqlite'
+    [[ -f $indexFile ]] || returnError 'Index file not found!'
+    lastModification=$( stat -c %Y -- "$indexFile" )
+    python3 "$ratarmountScript" "$archive"
+    diff -- "$fileName" "$mountFolder/$fileName" || returnError 'Files differ!'
+    funmount "$mountFolder"
+    [[ $lastModification -eq $( stat -c %Y -- "$indexFile" ) ]] || returnError 'Index changed even though TAR did not!'
+
+    # 3. Change contents (and timestamp) without changing the size
+    #    (Luckily TAR is filled to 10240 Bytes anyways for very small files)
+    sleep 1 # because we are comparing timestamps with seconds precision ...
+    fileName="${fileName//e/a}"
+    echo 'momo' > "$fileName"
+    tar -cf "$archive" "$fileName"
+
+    python3 "$ratarmountScript" "$archive"
+    diff -- "$fileName" "$mountFolder/${fileName}" || returnError 'Files differ!'
+    funmount "$mountFolder"
+    [[ $lastModification -ne $( stat -c %Y -- "$indexFile" ) ]] || \
+        returnError 'Index did not change even though TAR did!'
+    lastModification=$( stat -c %Y -- "$indexFile" )
+
+    # 4. Check that index changes if size changes but modification timestamp does not
+    sleep 1 # because we are comparing timestamps with seconds precision ...
+    fileName="heho"
+    head -c $(( 100 * 1024 )) /dev/urandom > "$fileName"
+    tar -cf "$archive" "$fileName"
+    touch -d "@$lastModification" "$archive"
+
+    python3 "$ratarmountScript" "$archive"
+    diff -- "$fileName" "$mountFolder/${fileName}" || returnError 'Files differ!'
+    funmount "$mountFolder"
+    [[ $lastModification -ne $( stat -c %Y -- "$indexFile" ) ]] || \
+        returnError 'Index did not change even though TAR filesize did!'
+)
 
 
 python3 tests/tests.py || returnError "tests/tests.py"
@@ -372,6 +426,8 @@ done
 checkFileInTARPrefix '' tests/single-nested-file.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
 checkFileInTARPrefix foo tests/single-nested-file.tar fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
 checkFileInTARPrefix foo/fighter tests/single-nested-file.tar ufo 2709a3348eb2c52302a7606ecf5860bc
+
+checkAutomaticIndexRecreation || returnError 'Automatic index recreation test failed!'
 
 # Deprecated serialization backend tests
 
