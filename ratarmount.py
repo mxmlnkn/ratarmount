@@ -206,8 +206,11 @@ class SQLiteIndexedTar:
         clearIndexCache = False,
         recursive       = False,
     ):
-        # Version 0.1.0: Initial version
-        # Version 0.2.0: Added sparse support and 'offsetheader' and 'issparse' columns to the SQLite database
+        # Version 0.1.0:
+        #   - Initial version
+        # Version 0.2.0:
+        #   - Add sparse support and 'offsetheader' and 'issparse' columns to the SQLite database
+        #   - Add TAR file size metadata in order to quickly check whether the TAR changed
         self.__version__ = '0.2.0'
         self.parentFolderCache = []
         self.mountRecursively = recursive
@@ -219,7 +222,9 @@ class SQLiteIndexedTar:
             self.createIndex( fileObject )
             # return here because we can't find a save location without any identifying name
             return
+
         self.tarFileName = os.path.normpath( tarFileName )
+        assert os.path.exists( self.tarFileName )
 
         # will be used for storing indexes if current path is read-only
         possibleIndexFilePaths = [
@@ -265,6 +270,28 @@ class SQLiteIndexedTar:
         else:
             with open( self.tarFileName, 'rb' ) as file:
                 self.createIndex( file )
+
+        # Add some consistency meta information
+        statTable = """
+            /* empty table whose sole existence specifies that we finished iterating the tar */
+            CREATE TABLE "metadata" (
+                "key"      VARCHAR(65535) NOT NULL, /* e.g. "tarsize" */
+                "value"    VARCHAR(65535) NOT NULL  /* e.g. size in bytes as integer */
+            );
+        """
+        tarStats = os.stat( self.tarFileName )
+        try:
+            self.sqlConnection.executescript( statTable )
+            self.sqlConnection.execute( 'INSERT INTO "metadata" VALUES (?,?)', ( "tarsize", tarStats.st_size ) )
+            if hasattr( tarStats, "st_blocks" ):
+                self.sqlConnection.execute( 'INSERT INTO "metadata" VALUES (?,?)', ( "tarblocks", tarStats.st_blocks ) )
+            self.sqlConnection.commit()
+        except Exception as exception:
+            if printDebug >= 2:
+                print( exception )
+            print( "[Warning] There was an error when adding file metadata information. "
+                   "Index loading might not work." )
+
 
         if printDebug >= 1 and writeIndex:
             # The 0-time is legacy for the automated tests
@@ -346,7 +373,8 @@ class SQLiteIndexedTar:
             progressBar = ProgressBar( os.fstat( fileObject.fileno() ).st_size )
 
         # 3. Iterate over files inside TAR and add them to the database
-        for tarInfo in loadedTarFile:
+        try:
+          for tarInfo in loadedTarFile:
             loadedTarFile.members = []
             globalOffset = streamOffset + tarInfo.offset_data
             globalOffsetHeader = streamOffset + tarInfo.offset
@@ -417,6 +445,11 @@ class SQLiteIndexedTar:
                 tarInfo.issparse() , # 12
             )
             self._setFileInfo( fullPath, fileInfo )
+        except tarfile.ReadError as e:
+            if 'unexpected end of data' in str( e ):
+                print( "[Warning] The TAR file is incomplete. Ratarmount will work but some files might be cut off. "
+                       "When the TAR file size changes, ratarmount, will recreate the index automatically." )
+
 
         # 5. Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
         if openedConnection:
@@ -647,6 +680,18 @@ class SQLiteIndexedTar:
             if 'versions' not in tables or 'index' not in versions or versions['index'][1] < 2:
                 print( "[Warning] The found outdated index does not contain any sparse file information." )
                 print( "[Warning] Please recreate the index if you have problems with those." )
+
+            if 'metadata' in tables:
+                values = dict( list( self.sqlConnection.execute( 'SELECT * FROM metadata' ) ) )
+                tarStats = os.stat( self.tarFileName )
+
+                if hasattr( tarStats, "st_size" ) and 'tarsize' in values \
+                   and tarStats.st_size != int( values['tarsize'] ):
+                    raise Exception( "TAR file for this SQLite index has changed size" )
+
+                if hasattr( tarStats, "st_blocks" ) and 'tarblocks' in values \
+                   and tarStats.st_blocks != int( values['tarblocks'] ):
+                    raise Exception( "TAR file for this SQLite index has changed size" )
 
         except Exception as e:
             # indexIsLoaded checks self.sqlConnection, so close it before returning because it was found to be faulty
