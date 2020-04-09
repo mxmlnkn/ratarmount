@@ -400,6 +400,10 @@ class SQLiteIndexedTar:
         path, name = fullPath.rsplit( '/', 1 )
         row = self.sqlConnection.execute( 'SELECT * FROM "files" WHERE "path" == (?) AND "name" == (?)',
                                           ( path, name ) ).fetchone()
+
+        if row is None:
+            return None
+
         return self.FileInfo( **dict( [ ( key, row[key] ) for key in self.FileInfo._fields ] ) ) if row else None
 
     def isDir( self, path ):
