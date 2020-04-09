@@ -1382,11 +1382,7 @@ class TarMount( fuse.Operations ):
            not isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) ):
             raise fuse.FuseOSError( fuse.errno.ENOENT )
 
-        pathname = fileInfo.linkname
-        if pathname.startswith( "/" ):
-            return os.path.relpath( pathname, "/" ) # @todo Not exactly sure what to return here
-
-        return pathname
+        return fileInfo.linkname
 
     @overrides( fuse.Operations )
     def read( self, path, length, offset, fh ):
