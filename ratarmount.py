@@ -1339,7 +1339,7 @@ class TarMount( fuse.Operations ):
            not isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) ):
             if printDebug >= 2:
                 print( "Could not find path:", self.prefix + path )
-            raise fuse.FuseOSError( fuse.errno.EROFS )
+            raise fuse.FuseOSError( fuse.errno.ENOENT )
 
         # dictionary keys: https://pubs.opengroup.org/onlinepubs/007904875/basedefs/sys/stat.h.html
         statDict = dict( ( "st_" + key, getattr( fileInfo, key ) ) for key in ( 'size', 'mtime', 'mode', 'uid', 'gid' ) )
@@ -1380,7 +1380,7 @@ class TarMount( fuse.Operations ):
         if fileInfo is None or (
            not isinstance( fileInfo, IndexedTar.FileInfo ) and
            not isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) ):
-            raise fuse.FuseOSError( fuse.errno.EROFS )
+            raise fuse.FuseOSError( fuse.errno.ENOENT )
 
         pathname = fileInfo.linkname
         if pathname.startswith( "/" ):
@@ -1397,7 +1397,7 @@ class TarMount( fuse.Operations ):
         if fileInfo is None or (
            not isinstance( fileInfo, IndexedTar.FileInfo ) and
            not isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) ):
-            raise fuse.FuseOSError( fuse.errno.EROFS )
+            raise fuse.FuseOSError( fuse.errno.ENOENT )
 
         self.tarFile.seek( fileInfo.offset + offset, os.SEEK_SET )
         return self.tarFile.read( length )
