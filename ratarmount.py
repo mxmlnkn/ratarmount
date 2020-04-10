@@ -1155,14 +1155,8 @@ class TarMount( fuse.Operations ):
         clearIndexCache = False,
         recursive = False,
         serializationBackend = None,
-        prefix = '',
         gzipSeekPointSpacing = 4*1024*1024
     ):
-        """
-        prefix : Instead of mounting the TAR's root and showing all files a prefix can be specified.
-                 For example '/bar' will only show all TAR files which are inside the '/bar' folder inside the TAR.
-        """
-
         self.tarFile = open( pathToMount, 'rb' )
 
         # check for bzip2 compressed tar archive and add BZip2 reader if so
@@ -1296,13 +1290,6 @@ class TarMount( fuse.Operations ):
                 recursive            = recursive,
                 serializationBackend = serializationBackend )
 
-        if prefix:
-            if not prefix.startswith( '/' ):
-                prefix = '/' + prefix
-            if not self.indexedTar.isDir( prefix ):
-                prefix = ''
-        self.prefix = prefix
-
         # make the mount point read only and executable if readable, i.e., allow directory listing
         # @todo In some cases, I even 2(!) '.' directories listed with ls -la!
         #       But without this, the mount directory is owned by root
@@ -1332,13 +1319,13 @@ class TarMount( fuse.Operations ):
         if path == '/':
             fileInfo = self.rootFileInfo
         else:
-            fileInfo = self.indexedTar.getFileInfo( self.prefix + path, listDir = False )
+            fileInfo = self.indexedTar.getFileInfo( path, listDir = False )
 
         if fileInfo is None or (
            not isinstance( fileInfo, IndexedTar.FileInfo ) and
            not isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) ):
             if printDebug >= 2:
-                print( "Could not find path:", self.prefix + path )
+                print( "Could not find path:", path )
             raise fuse.FuseOSError( fuse.errno.ENOENT )
 
         # dictionary keys: https://pubs.opengroup.org/onlinepubs/007904875/basedefs/sys/stat.h.html
@@ -1349,7 +1336,7 @@ class TarMount( fuse.Operations ):
         statDict['st_nlink'] = 2
 
         if printDebug >= 2:
-            print( "[getattr( path =", self.prefix + path, ", fh =", fh, ")] return:", statDict )
+            print( "[getattr( path =", path, ", fh =", fh, ")] return:", statDict )
 
         return statDict
 
@@ -1360,23 +1347,23 @@ class TarMount( fuse.Operations ):
         yield '.'
         yield '..'
 
-        dirInfo = self.indexedTar.getFileInfo( self.prefix + path, listDir = True )
+        dirInfo = self.indexedTar.getFileInfo( path, listDir = True )
         if printDebug >= 2:
-            print( "[readdir( path =", self.prefix + path, ", fh =", fh, ")] return:",
+            print( "[readdir( path =", path, ", fh =", fh, ")] return:",
                    dirInfo.keys() if dirInfo else None )
 
         if isinstance( dirInfo, dict ):
             for key in dirInfo.keys():
                 yield key
         elif printDebug >= 2:
-            print( "[readdir] Could not find path:", self.prefix + path )
+            print( "[readdir] Could not find path:", path )
 
     @overrides( fuse.Operations )
     def readlink( self, path ):
         if printDebug >= 2:
             print( "[readlink( path =", path, ")]" )
 
-        fileInfo = self.indexedTar.getFileInfo( self.prefix + path )
+        fileInfo = self.indexedTar.getFileInfo( path )
         if fileInfo is None or (
            not isinstance( fileInfo, IndexedTar.FileInfo ) and
            not isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) ):
@@ -1389,7 +1376,7 @@ class TarMount( fuse.Operations ):
         if printDebug >= 2:
             print( "[read( path =", path, ", length =", length, ", offset =", offset, ",fh =", fh, ")] path:", path )
 
-        fileInfo = self.indexedTar.getFileInfo( self.prefix + path )
+        fileInfo = self.indexedTar.getFileInfo( path )
         if fileInfo is None or (
            not isinstance( fileInfo, IndexedTar.FileInfo ) and
            not isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) ):
@@ -1456,7 +1443,10 @@ def parseArgs( args = None ):
 
     parser.add_argument(
         '-p', '--prefix', type = str, default = '',
-        help = 'The specified path to the folder inside the TAR will be mounted to root. '
+        help = '[deprecated] Use "-o modules=subdir,subdir=<prefix>" instead. '
+               'This standard way utilizes FUSE itself and will also work for other FUSE '
+               'applications. So, it is preferable even if a bit more verbose.'
+               'The specified path to the folder inside the TAR will be mounted to root. '
                'This can be useful when the archive as created with absolute paths. '
                'E.g., for an archive created with `tar -P cf /var/log/apt/history.log`, '
                '-p /var/log/apt/ can be specified so that the mount target directory '
@@ -1514,8 +1504,12 @@ def cli( args = None ):
                "This might happen for compressed TAR archives, which currently is not supported." )
         return 1
 
+    # Convert the comma separated list of key[=value] options into a dictionary for fusepy
     fusekwargs = dict( [ option.split( '=', 1 ) if '=' in option else ( option, True )
                        for option in args.fuse.split( ',' ) ] ) if args.fuse else {}
+    if args.prefix:
+        fusekwargs['modules'] = 'subdir'
+        fusekwargs['subdir'] = args.prefix
 
     mountPath = args.mountpath
     if mountPath is None:
@@ -1538,7 +1532,6 @@ def cli( args = None ):
         clearIndexCache      = args.recreate_index,
         recursive            = args.recursive,
         serializationBackend = args.serialization_backend,
-        prefix               = args.prefix,
         gzipSeekPointSpacing = args.gzip_seek_point_spacing )
 
     fuse.FUSE( operations = fuseOperationsObject,
