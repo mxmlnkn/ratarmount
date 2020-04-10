@@ -1463,7 +1463,7 @@ def parseArgs( args = None ):
                '>directly< contains history.log.' )
 
     parser.add_argument(
-        '--fuse', type = str, default = '',
+        '-o', '--fuse', type = str, default = '',
         help = 'Comma separated FUSE options. See "man mount.fuse" for help. '
                'Example: --fuse "allow_other,entry_timeout=2.8,gid=0". ' )
 
