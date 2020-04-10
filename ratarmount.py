@@ -34,7 +34,7 @@ except ImportError:
 import fuse
 
 
-__version__ = '0.4.0'
+__version__ = '0.4.1'
 
 printDebug = 1
 
@@ -43,10 +43,6 @@ def overrides( parentClass ):
         assert method.__name__ in dir( parentClass )
         return method
     return overrider
-
-
-FileInfo = collections.namedtuple( "FileInfo", "offset size mtime mode type linkname uid gid istar" )
-
 
 class ProgressBar:
     def __init__( self, maxValue ):
@@ -90,6 +86,9 @@ class SQLiteIndexedTar:
         'sqlConnection',
         'parentFolderCache', # stores which parent folders were last tried to add to database and therefore do exist
     )
+
+    # Names must be identical to the SQLite column headers!
+    FileInfo = collections.namedtuple( "FileInfo", "offset size mtime mode type linkname uid gid istar" )
 
     def __init__(
         self,
@@ -331,7 +330,7 @@ class SQLiteIndexedTar:
                  *   PATCH version when you make backwards compatible bug fixes. */
                 "major"    INTEGER,
                 "minor"    INTEGER,
-                "path"     INTEGER
+                "patch"    INTEGER
             );
         """
         try:
@@ -394,14 +393,18 @@ class SQLiteIndexedTar:
             for row in rows:
                 gotResults = True
                 if row['name']:
-                    dir[row['name']] = FileInfo( **dict( [ ( key, row[key] ) for key in FileInfo._fields ] ) )
+                    dir[row['name']] = self.FileInfo( **dict( [ ( key, row[key] ) for key in self.FileInfo._fields ] ) )
 
             return dir if gotResults else None
 
         path, name = fullPath.rsplit( '/', 1 )
         row = self.sqlConnection.execute( 'SELECT * FROM "files" WHERE "path" == (?) AND "name" == (?)',
                                           ( path, name ) ).fetchone()
-        return FileInfo( **dict( [ ( key, row[key] ) for key in FileInfo._fields ] ) ) if row else None
+
+        if row is None:
+            return None
+
+        return self.FileInfo( **dict( [ ( key, row[key] ) for key in self.FileInfo._fields ] ) ) if row else None
 
     def isDir( self, path ):
         return isinstance( self.getFileInfo( path, listDir = True ), dict )
@@ -436,7 +439,7 @@ class SQLiteIndexedTar:
         """
         assert self.sqlConnection
         assert fullPath[0] == "/"
-        assert isinstance( fileInfo, FileInfo )
+        assert isinstance( fileInfo, self.FileInfo )
 
         # os.normpath does not delete duplicate '/' at beginning of string!
         path, name = fullPath.rsplit( "/", 1 )
@@ -461,13 +464,14 @@ class SQLiteIndexedTar:
 
         try:
             self.sqlConnection.execute( 'SELECT * FROM "files" WHERE 0 == 1;' )
-        except Exception:
+        except sqlite3.OperationalError:
             self.sqlConnection = None
             return False
 
         return True
 
     def loadIndex( self, indexFileName ):
+        """Loads the given index SQLite database and checks it for validity."""
         if self.indexIsLoaded():
             return
 
@@ -475,18 +479,29 @@ class SQLiteIndexedTar:
         self._openSqlDb( indexFileName )
         tables = [ x[0] for x in self.sqlConnection.execute( 'SELECT name FROM sqlite_master WHERE type="table"' ) ]
 
-        # Check indexes created with bugged bz2 decoder (bug existed when I did not store versions yet)
-        if 'bzip2blocks' in tables and 'versions' not in tables:
-            raise Exception( "The indexes created with version 0.3.0 through 0.3.3 for bzip2 compressed archives "
-                             "are very likely to be wrong because of a bzip2 decoder bug.\n"
-                             "Please delete the index or call ratarmount with the --recreate-index option!" )
+        try:
+            # Check indexes created with bugged bz2 decoder (bug existed when I did not store versions yet)
+            if 'bzip2blocks' in tables and 'versions' not in tables:
+                raise Exception( "The indexes created with version 0.3.0 through 0.3.3 for bzip2 compressed archives "
+                                 "are very likely to be wrong because of a bzip2 decoder bug.\n"
+                                 "Please delete the index or call ratarmount with the --recreate-index option!" )
 
-        # Check for empty or incomplete indexes
-        if 'files' not in tables:
-            raise Exception( "SQLite index is empty" )
+            # Check for empty or incomplete indexes
+            if 'files' not in tables:
+                raise Exception( "SQLite index is empty" )
 
-        if 'filestmp' in tables or 'parentfolders' in tables:
-            raise Exception( "SQLite index is incomplete" )
+            if 'filestmp' in tables or 'parentfolders' in tables:
+                raise Exception( "SQLite index is incomplete" )
+
+        except Exception as e:
+            # indexIsLoaded checks self.sqlConnection, so close it before returning because it was found to be faulty
+            try:
+                self.sqlConnection.close()
+            except:
+                pass
+            self.sqlConnection = None
+
+            raise e
 
         if printDebug >= 1:
             # Legacy output for automated tests
@@ -505,7 +520,7 @@ class SQLiteIndexedTar:
             self.loadIndex( indexFileName )
         except Exception as exception:
             if printDebug >= 3:
-                traceback.print_exc();
+                traceback.print_exc()
 
             print( "[Warning] Could not load file '" + indexFileName  )
             print( "[Info] Exception:", exception )
@@ -531,6 +546,7 @@ class SQLiteIndexedTar:
 
         if printDebug >= 3 and self.indexIsLoaded():
             print( "Loaded index", indexFileName )
+
         return self.indexIsLoaded()
 
 
@@ -549,6 +565,8 @@ class IndexedTar:
         'indexFileName',
         'progressBar',
     )
+
+    FileInfo = collections.namedtuple( "FileInfo", "offset size mtime mode type linkname uid gid istar" )
 
     # these allowed backends also double as extensions for the index file to look for
     availableSerializationBackends = [
@@ -678,7 +696,7 @@ class IndexedTar:
 
             file.write( b'\x02' ) # magic code meaning "close dictionary object"
 
-        elif isinstance( toDump, FileInfo ):
+        elif isinstance( toDump, IndexedTar.FileInfo ):
             serialized = msgpack.dumps( toDump )
             file.write( b'\x05' ) # magic code meaning "msgpack object"
             file.write( len( serialized ).to_bytes( 4, byteorder = 'little' ) )
@@ -720,7 +738,7 @@ class IndexedTar:
                 if valueType == b'\x05': # msgpack object
                     size = int.from_bytes( file.read( 4 ), byteorder = 'little' )
                     serialized = file.read( size )
-                    value = FileInfo( *msgpack.loads( serialized ) )
+                    value = IndexedTar.FileInfo( *msgpack.loads( serialized ) )
 
                 elif valueType == b'\x01': # dict object
                     file.seek( -1, io.SEEK_CUR )
@@ -755,17 +773,17 @@ class IndexedTar:
             p = p[name]
 
         def repackDeserializedNamedTuple( p ):
-            if isinstance( p, list ) and len( p ) == len( FileInfo._fields ):
-                return FileInfo( *p )
+            if isinstance( p, list ) and len( p ) == len( self.FileInfo._fields ):
+                return self.FileInfo( *p )
 
-            if isinstance( p, dict ) and len( p ) == len( FileInfo._fields ) and \
+            if isinstance( p, dict ) and len( p ) == len( self.FileInfo._fields ) and \
                  'uid' in p and isinstance( p['uid'], int ):
                 # a normal directory dict must only have dict or FileInfo values,
                 # so if the value to the 'uid' key is an actual int,
                 # then it is sure it is a deserialized FileInfo object and not a file named 'uid'
                 print( "P ===", p )
-                print( "FileInfo ===", FileInfo( **p ) )
-                return FileInfo( **p )
+                print( "FileInfo ===", self.FileInfo( **p ) )
+                return self.FileInfo( **p )
 
             return p
 
@@ -777,7 +795,7 @@ class IndexedTar:
             if '.' in p:
                 p = p['.']
             else:
-                return FileInfo(
+                return self.FileInfo(
                     offset   = 0, # not necessary for directory anyways
                     size     = 1, # might be misleading / non-conform
                     mtime    = 0,
@@ -796,13 +814,13 @@ class IndexedTar:
 
     def exists( self, path ):
         path = os.path.normpath( path )
-        return self.isDir( path ) or isinstance( self.getFileInfo( path ), FileInfo )
+        return self.isDir( path ) or isinstance( self.getFileInfo( path ), self.FileInfo )
 
     def setFileInfo( self, path, fileInfo ):
         """
         path: the full path to the file with leading slash (/) for which to set the file info
         """
-        assert isinstance( fileInfo, FileInfo )
+        assert isinstance( fileInfo, self.FileInfo )
 
         pathHierarchy = os.path.normpath( path ).split( os.sep )
         if not pathHierarchy:
@@ -823,7 +841,7 @@ class IndexedTar:
         """
         path: the full path to the file with leading slash (/) for which to set the folder info
         """
-        assert isinstance( dirInfo, FileInfo )
+        assert isinstance( dirInfo, self.FileInfo )
         assert isinstance( dirContents, dict )
 
         pathHierarchy = os.path.normpath( path ).strip( os.sep ).split( os.sep )
@@ -870,7 +888,7 @@ class IndexedTar:
             if tarInfo.issym() : mode |= stat.S_IFLNK
             if tarInfo.ischr() : mode |= stat.S_IFCHR
             if tarInfo.isfifo(): mode |= stat.S_IFIFO
-            fileInfo = FileInfo(
+            fileInfo = self.FileInfo(
                 offset   = tarInfo.offset_data,
                 size     = tarInfo.size       ,
                 mtime    = tarInfo.mtime      ,
@@ -983,7 +1001,6 @@ class IndexedTar:
         with wrapperOpen( outFileName ) as outFile:
             if serializationBackend == 'pickle2':
                 import pickle
-                pickle.dump( self.fileIndex, outFile )
                 pickle.dump( self.fileIndex, outFile, protocol = 2 )
 
             # default serialization because it has the fewest dependencies and because it was legacy default
@@ -991,7 +1008,6 @@ class IndexedTar:
                  serializationBackend == 'pickle' or \
                  serializationBackend is None:
                 import pickle
-                pickle.dump( self.fileIndex, outFile )
                 pickle.dump( self.fileIndex, outFile, protocol = 3 ) # 3 is default protocol
 
             elif serializationBackend == 'simplejson':
@@ -1118,6 +1134,10 @@ class IndexedTar:
         return self.indexIsLoaded()
 
 
+# Must be global so pickle can find out!
+FileInfo = IndexedTar.FileInfo
+
+
 class TarMount( fuse.Operations ):
     """
     This class implements the fusepy interface in order to create a mounted file system view
@@ -1135,13 +1155,8 @@ class TarMount( fuse.Operations ):
         clearIndexCache = False,
         recursive = False,
         serializationBackend = None,
-        prefix = ''
+        gzipSeekPointSpacing = 4*1024*1024
     ):
-        """
-        prefix : Instead of mounting the TAR's root and showing all files a prefix can be specified.
-                 For example '/bar' will only show all TAR files which are inside the '/bar' folder inside the TAR.
-        """
-
         self.tarFile = open( pathToMount, 'rb' )
 
         # check for bzip2 compressed tar archive and add BZip2 reader if so
@@ -1162,7 +1177,9 @@ class TarMount( fuse.Operations ):
             type = 'GZ'
             self.rawFile = self.tarFile # save so that garbage collector won't close it!
             # drop_handles keeps a file handle opening as is required to call tell() during decoding
-            self.tarFile = IndexedGzipFile( fileobj = self.rawFile, drop_handles = False )
+            self.tarFile = IndexedGzipFile( fileobj = self.rawFile,
+                                            drop_handles = False,
+                                            spacing = gzipSeekPointSpacing )
 
         if type and serializationBackend != 'sqlite':
             print( "[Warning] Only the SQLite backend has .tar.bz2 and .tar.gz support, therefore will use that!" )
@@ -1195,13 +1212,35 @@ class TarMount( fuse.Operations ):
                     db.commit()
 
             elif type == 'GZ':
+                # indexed_gzip index only has a file based API, so we need to write all the index data from the SQL
+                # database out into a temporary file. For that, let's first try to use the same location as the SQLite
+                # database because it should have sufficient writing rights and free disk space.
                 db = self.indexedTar.sqlConnection
-                gzindex = tempfile.mkstemp()[1]
-                try:
-                    with open( gzindex, 'wb' ) as file:
-                        file.write( db.execute( 'SELECT data FROM gzipindex' ).fetchone()[0] )
-                    self.tarFile.import_index( filename = gzindex )
-                except Exception as e:
+
+                # Try to export data from SQLite database. Note that no error checking against the existence of
+                # gzipindex table is done because the exported data itself might also be wrong and we can't check
+                # against this. Therefore, collate all error checking by catching exceptions.
+                gzindex = None
+                for tmpDir in [ os.path.dirname( self.indexedTar.indexFileName ), None ]:
+                    try:
+                        gzindex = tempfile.mkstemp( dir = tmpDir )[1]
+                        with open( gzindex, 'wb' ) as file:
+                            file.write( db.execute( 'SELECT data FROM gzipindex' ).fetchone()[0] )
+                    except:
+                        try:
+                            os.remove( gzindex )
+                        except:
+                            pass
+                        gzindex = None
+
+                needToCreateIndex = gzindex is None
+                if not needToCreateIndex:
+                    try:
+                        self.tarFile.import_index( filename = gzindex )
+                    except indexed_gzip.ZranError:
+                        needToCreateIndex = True
+
+                if needToCreateIndex:
                     if printDebug >= 2:
                         print( "Could not load GZip Block offset data. Will create it from scratch." )
 
@@ -1209,7 +1248,28 @@ class TarMount( fuse.Operations ):
                     # Seeking from end not supported, so we have to read the whole data in in a loop
                     while self.tarFile.read( 1024*1024 ):
                         pass
-                    self.tarFile.export_index( filename = gzindex )
+
+                    # The created index can unfortunately be pretty large and tmp might actually run out of memory!
+                    # Therefore, try different paths, starting with the location where the index resides.
+                    gzindex = None
+                    for tmpDir in [ os.path.dirname( self.indexedTar.indexFileName ), None ]:
+                        gzindex = tempfile.mkstemp( dir = tmpDir )[1]
+                        try:
+                            self.tarFile.export_index( filename = gzindex )
+                        except indexed_gzip.ZranError:
+                            try:
+                                os.remove( gzindex )
+                            except:
+                                pass
+                            gzindex = None
+
+                    if not gzindex or not os.path.isfile( gzindex ):
+                        print( "[Warning] The GZip index required for seeking could not be loaded!" )
+                        print( "[Info] This might happen when you are out of space in your temporary file and at the" )
+                        print( "[Info] the index file location. The gzipindex size takes roughly 32kiB per 4MiB of" )
+                        print( "[Info] uncompressed(!) bytes (0.8% of the uncompressed data) by default." )
+                        raise Exception( "[Error] Could not initialize the GZip seek cache." )
+
                     if printDebug >= 2:
                         print( "Exported GZip index size:", os.stat( gzindex ).st_size )
 
@@ -1230,13 +1290,6 @@ class TarMount( fuse.Operations ):
                 recursive            = recursive,
                 serializationBackend = serializationBackend )
 
-        if prefix:
-            if not prefix.startswith( '/' ):
-                prefix = '/' + prefix
-            if not self.indexedTar.isDir( prefix ):
-                prefix = ''
-        self.prefix = prefix
-
         # make the mount point read only and executable if readable, i.e., allow directory listing
         # @todo In some cases, I even 2(!) '.' directories listed with ls -la!
         #       But without this, the mount directory is owned by root
@@ -1246,7 +1299,7 @@ class TarMount( fuse.Operations ):
         if mountMode & stat.S_IRUSR != 0: mountMode |= stat.S_IXUSR
         if mountMode & stat.S_IRGRP != 0: mountMode |= stat.S_IXGRP
         if mountMode & stat.S_IROTH != 0: mountMode |= stat.S_IXOTH
-        self.rootFileInfo = FileInfo(
+        self.rootFileInfo = SQLiteIndexedTar.FileInfo(
             offset   = 0                ,
             size     = tarStats.st_size ,
             mtime    = tarStats.st_mtime,
@@ -1266,12 +1319,14 @@ class TarMount( fuse.Operations ):
         if path == '/':
             fileInfo = self.rootFileInfo
         else:
-            fileInfo = self.indexedTar.getFileInfo( self.prefix + path, listDir = False )
+            fileInfo = self.indexedTar.getFileInfo( path, listDir = False )
 
-        if not isinstance( fileInfo, FileInfo ):
+        if fileInfo is None or (
+           not isinstance( fileInfo, IndexedTar.FileInfo ) and
+           not isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) ):
             if printDebug >= 2:
-                print( "Could not find path:", self.prefix + path )
-            raise fuse.FuseOSError( fuse.errno.EROFS )
+                print( "Could not find path:", path )
+            raise fuse.FuseOSError( fuse.errno.ENOENT )
 
         # dictionary keys: https://pubs.opengroup.org/onlinepubs/007904875/basedefs/sys/stat.h.html
         statDict = dict( ( "st_" + key, getattr( fileInfo, key ) ) for key in ( 'size', 'mtime', 'mode', 'uid', 'gid' ) )
@@ -1281,7 +1336,7 @@ class TarMount( fuse.Operations ):
         statDict['st_nlink'] = 2
 
         if printDebug >= 2:
-            print( "[getattr( path =", self.prefix + path, ", fh =", fh, ")] return:", statDict )
+            print( "[getattr( path =", path, ", fh =", fh, ")] return:", statDict )
 
         return statDict
 
@@ -1292,40 +1347,40 @@ class TarMount( fuse.Operations ):
         yield '.'
         yield '..'
 
-        dirInfo = self.indexedTar.getFileInfo( self.prefix + path, listDir = True )
+        dirInfo = self.indexedTar.getFileInfo( path, listDir = True )
         if printDebug >= 2:
-            print( "[readdir( path =", self.prefix + path, ", fh =", fh, ")] return:",
+            print( "[readdir( path =", path, ", fh =", fh, ")] return:",
                    dirInfo.keys() if dirInfo else None )
 
         if isinstance( dirInfo, dict ):
             for key in dirInfo.keys():
                 yield key
         elif printDebug >= 2:
-            print( "[readdir] Could not find path:", self.prefix + path )
+            print( "[readdir] Could not find path:", path )
 
     @overrides( fuse.Operations )
     def readlink( self, path ):
         if printDebug >= 2:
             print( "[readlink( path =", path, ")]" )
 
-        fileInfo = self.indexedTar.getFileInfo( self.prefix + path )
-        if not isinstance( fileInfo, FileInfo ):
-            raise fuse.FuseOSError( fuse.errno.EROFS )
+        fileInfo = self.indexedTar.getFileInfo( path )
+        if fileInfo is None or (
+           not isinstance( fileInfo, IndexedTar.FileInfo ) and
+           not isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) ):
+            raise fuse.FuseOSError( fuse.errno.ENOENT )
 
-        pathname = fileInfo.linkname
-        if pathname.startswith( "/" ):
-            return os.path.relpath( pathname, "/" ) # @todo Not exactly sure what to return here
-
-        return pathname
+        return fileInfo.linkname
 
     @overrides( fuse.Operations )
     def read( self, path, length, offset, fh ):
         if printDebug >= 2:
             print( "[read( path =", path, ", length =", length, ", offset =", offset, ",fh =", fh, ")] path:", path )
 
-        fileInfo = self.indexedTar.getFileInfo( self.prefix + path )
-        if not isinstance( fileInfo, FileInfo ):
-            raise fuse.FuseOSError( fuse.errno.EROFS )
+        fileInfo = self.indexedTar.getFileInfo( path )
+        if fileInfo is None or (
+           not isinstance( fileInfo, IndexedTar.FileInfo ) and
+           not isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) ):
+            raise fuse.FuseOSError( fuse.errno.ENOENT )
 
         self.tarFile.seek( fileInfo.offset + offset, os.SEEK_SET )
         return self.tarFile.read( length )
@@ -1367,16 +1422,38 @@ def parseArgs( args = None ):
         ','.join( IndexedTar.availableSerializationBackends + [ 'sqlite' ] ) + ')[.(' +
         ','.join( IndexedTar.availableCompressions ).strip( ',' ) + ')]' )
 
+    # Considerations for the default value:
+    #   - seek times for the bz2 backend are between 0.01s and 0.1s
+    #   - seek times for the gzip backend are roughly 1/10th compared to bz2 at a default spacing of 4MiB
+    #     -> we could do a spacing of 40MiB (however the comparison are for another test archive, so it might not apply)
+    #   - ungziping firefox 66 inflates the compressed size of 66MiB to 184MiB (~3 times more) and takes 1.4s on my PC
+    #     -> to have a response time of 0.1s, it would require a spacing < 13MiB
+    #   - the gzip index takes roughly 32kiB per seek point
+    #   - the bzip2 index takes roughly 16B per 100-900kiB of compressed data
+    #     -> for the gzip index to have the same space efficiency assuming a compression ratio of only 1,
+    #        the spacing would have to be 1800MiB at which point it would become almost useless
+    parser.add_argument(
+        '-gs', '--gzip-seek-point-spacing', type = float, default = 16,
+        help =
+        'This only is applied when the index is first created or recreated with the -c option. '
+        'The spacing given in MiB specifies the seek point distance in the uncompressed data. '
+        'A distance of 16MiB means that archives smaller than 16MiB in uncompressed size will '
+        'not benefit from faster seek times. A seek point takes roughly 32kiB. '
+        'So, smaller distances lead to more responsive seeking but may explode the index size!' )
+
     parser.add_argument(
         '-p', '--prefix', type = str, default = '',
-        help = 'The specified path to the folder inside the TAR will be mounted to root. '
+        help = '[deprecated] Use "-o modules=subdir,subdir=<prefix>" instead. '
+               'This standard way utilizes FUSE itself and will also work for other FUSE '
+               'applications. So, it is preferable even if a bit more verbose.'
+               'The specified path to the folder inside the TAR will be mounted to root. '
                'This can be useful when the archive as created with absolute paths. '
                'E.g., for an archive created with `tar -P cf /var/log/apt/history.log`, '
                '-p /var/log/apt/ can be specified so that the mount target directory '
                '>directly< contains history.log.' )
 
     parser.add_argument(
-        '--fuse', type = str, default = '',
+        '-o', '--fuse', type = str, default = '',
         help = 'Comma separated FUSE options. See "man mount.fuse" for help. '
                'Example: --fuse "allow_other,entry_timeout=2.8,gid=0". ' )
 
@@ -1391,7 +1468,11 @@ def parseArgs( args = None ):
         'mountpath', metavar = 'mount-path', nargs = '?',
         help = 'The path to a folder to mount the TAR contents into.' )
 
-    return parser.parse_args( args )
+    args = parser.parse_args( args )
+
+    args.gzip_seek_point_spacing = args.gzip_seek_point_spacing * 1024 * 1024
+
+    return args
 
 def cli( args = None ):
     tmpArgs = sys.argv if args is None else args
@@ -1423,8 +1504,12 @@ def cli( args = None ):
                "This might happen for compressed TAR archives, which currently is not supported." )
         return 1
 
+    # Convert the comma separated list of key[=value] options into a dictionary for fusepy
     fusekwargs = dict( [ option.split( '=', 1 ) if '=' in option else ( option, True )
                        for option in args.fuse.split( ',' ) ] ) if args.fuse else {}
+    if args.prefix:
+        fusekwargs['modules'] = 'subdir'
+        fusekwargs['subdir'] = args.prefix
 
     mountPath = args.mountpath
     if mountPath is None:
@@ -1447,7 +1532,7 @@ def cli( args = None ):
         clearIndexCache      = args.recreate_index,
         recursive            = args.recursive,
         serializationBackend = args.serialization_backend,
-        prefix               = args.prefix )
+        gzipSeekPointSpacing = args.gzip_seek_point_spacing )
 
     fuse.FUSE( operations = fuseOperationsObject,
                mountpoint = mountPath,

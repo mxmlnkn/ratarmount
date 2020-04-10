@@ -23,6 +23,7 @@ verifyCheckSum()
     local mountFolder="$1"
     local fileInTar="$2"
     local archive="$3"
+    local correctChecksum="$4"
 
     checksum="$( md5sum "$mountFolder/$fileInTar" 2>/dev/null | sed 's| .*||' )"
     if test "$checksum" != "$correctChecksum"; then
@@ -65,7 +66,7 @@ checkFileInTAR()
     "${cmd[@]}" &>/dev/null
     checkStat "$mountFolder" || returnError "${cmd[*]}"
     checkStat "$mountFolder/$fileInTar" || returnError "${cmd[*]}"
-    verifyCheckSum "$mountFolder" "$fileInTar" "$archive" || returnError "${cmd[*]}"
+    verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum" || returnError "${cmd[*]}"
     funmount "$mountFolder"
 
     # retry without forcing index recreation
@@ -73,7 +74,7 @@ checkFileInTAR()
     "${cmd[@]}" &>/dev/null
     checkStat "$mountFolder" || returnError "${cmd[*]}"
     checkStat "$mountFolder/$fileInTar" || returnError "${cmd[*]}"
-    verifyCheckSum "$mountFolder" "$fileInTar" "$archive" || returnError "${cmd[*]}"
+    verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum" || returnError "${cmd[*]}"
     funmount "$mountFolder"
 
     rmdir "$mountFolder"
@@ -85,7 +86,7 @@ checkFileInTAR()
 
 checkFileInTARPrefix()
 {
-    local type="$1"; shift
+    # Prefixing support only works for SQLite backend, therefore it does not take a backend/type parameter
     local prefix="$1"; shift
     local archive="$1"; shift
     local fileInTar="$1"; shift
@@ -100,12 +101,40 @@ checkFileInTARPrefix()
     "${cmd[@]}" &>/dev/null
     checkStat "$mountFolder" || returnError "${cmd[*]}"
     checkStat "$mountFolder/$fileInTar" || returnError "${cmd[*]}"
-    verifyCheckSum "$mountFolder" "$fileInTar" "$archive" || returnError "${cmd[*]}"
+    verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum" || returnError "${cmd[*]}"
     funmount "$mountFolder"
 
     rmdir "$mountFolder"
 
     echoerr "Tested succesfully '$fileInTar' in '$archive' for checksum $correctChecksum"
+
+    return 0
+}
+
+checkLinkInTAR()
+{
+    local archive="$1"; shift
+    local fileInTar="$1"; shift
+    local correctLinkTarget="$1"
+
+    local mountFolder="$( mktemp -d )"
+
+    funmount "$mountFolder"
+
+    # try with index recreation
+    local cmd=( python3 ratarmount.py -c --recursive "$archive" "$mountFolder" )
+    "${cmd[@]}" &>/dev/null
+    checkStat "$mountFolder" || returnError "${cmd[*]}"
+    checkStat "$mountFolder/$fileInTar" || returnError "${cmd[*]}"
+    if [[ $( readlink -- "$mountFolder/$fileInTar" ) != $correctLinkTarget ]]; then
+        echoerr -e "\e[37mLink target of '$fileInTar' in mounted TAR '$archive' does not match"'!\e[0m'
+        returnError "${cmd[*]}"
+    fi
+    funmount "$mountFolder"
+
+    rmdir "$mountFolder"
+
+    echoerr "Tested succesfully '$fileInTar' in '$archive' for link target $correctLinkTarget"
 
     return 0
 }
@@ -308,9 +337,8 @@ for type in sqlite custom pickle2 pickle3 cbor msgpack rapidjson ujson simplejso
     for compression in "${compressions[@]}"; do
         echoerr "=== Testing Serialization Backend: ${type}${compression} ==="
 
-        checkFileInTARPrefix "${type}${compression}" '' tests/single-nested-file.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
-        checkFileInTARPrefix "${type}${compression}" foo tests/single-nested-file.tar fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
-        checkFileInTARPrefix "${type}${compression}" foo/fighter tests/single-nested-file.tar ufo 2709a3348eb2c52302a7606ecf5860bc
+        checkLinkInTAR tests/symlinks.tar foo ../foo
+        checkLinkInTAR tests/symlinks.tar python /usr/bin/python
 
         tests=(
             d3b07384d113edec49eaa6238ad5ff00 tests/single-file.tar                        bar
@@ -341,6 +369,12 @@ for type in sqlite custom pickle2 pickle3 cbor msgpack rapidjson ujson simplejso
             fi
         done
     done
+
+    if [[ "$type" == 'sqlite' ]]; then
+        checkFileInTARPrefix '' tests/single-nested-file.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
+        checkFileInTARPrefix foo tests/single-nested-file.tar fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
+        checkFileInTARPrefix foo/fighter tests/single-nested-file.tar ufo 2709a3348eb2c52302a7606ecf5860bc
+    fi
 done
 
 #benchmarkSerialization # takes quite long, and a benchmark is not a test ...

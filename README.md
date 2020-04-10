@@ -7,7 +7,7 @@
 
 Combines the random access indexing idea from [tarindexer](https://github.com/devsnd/tarindexer) and then **mounts** the **TAR** using [fusepy](https://github.com/fusepy/fusepy) for easy read-only access just like [archivemount](https://github.com/cybernoid/archivemount/).
 It also will mount TARs inside TARs inside TARs, ... **recursively** into folders of the same name, which is useful for the ImageNet data set.
-Furthermore, it now has support for **BZip2** compressed TAR archives provided by a refactored and improved version of [bzcat](https://github.com/landley/toybox/blob/c77b66455762f42bb824c1aa8cc60e7f4d44bdab/toys/other/bzcat.c) from [toybox](https://landley.net/code/toybox/) and support for **Gzip** compressed TAR archives provided by the [indexed_gzip](https://github.com/pauldmccarthy/indexed_gzip) dependency.
+Furthermore, it now has support for **BZip2** compressed TAR archives provided by [indexed_bzip2](https://github.com/mxmlnkn/indexed_bzip2), a refactored and extended version of [bzcat](https://github.com/landley/toybox/blob/c77b66455762f42bb824c1aa8cc60e7f4d44bdab/toys/other/bzcat.c) from [toybox](https://landley.net/code/toybox/), and support for **Gzip** compressed TAR archives provided by the [indexed_gzip](https://github.com/pauldmccarthy/indexed_gzip) dependency.
 
 
 # Table of Contents
@@ -171,7 +171,9 @@ Here is a more recent test for version 0.2.0 with the new default SQLite backend
 
 During the making of this project several benchmarks were created. These can be viewed [here](benchmarks/BENCHMARKS.md).
 These are some of the things benchmarked and compared there:
- 
+
   - Memory and runtime comparisons of backends for saving the index with offsets
   - Comparison of SQLite table designs
   - Mounting and file access time comparison between archivemount and ratarmount
+
+![Benchmark comparison between ratarmount and archivemount](benchmarks/plots/archivemount-comparison.png)
