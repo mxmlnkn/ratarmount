@@ -1594,8 +1594,13 @@ class TarMount( fuse.Operations ):
             tmpTarFile.close()
             return result
 
-        self.tarFile.seek( fileInfo.offset + offset, os.SEEK_SET )
-        return self.tarFile.read( length )
+        try:
+            self.tarFile.seek( fileInfo.offset + offset, os.SEEK_SET )
+            return self.tarFile.read( length )
+        except RuntimeError as e:
+            traceback.print_exc()
+            print( "Caught exception when trying to read data from underlying TAR file! Returning errno.EIO." )
+            raise fuse.FuseOSError( fuse.errno.EIO )
 
 def parseArgs( args = None ):
     parser = argparse.ArgumentParser(
