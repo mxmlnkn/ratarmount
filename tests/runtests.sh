@@ -352,6 +352,8 @@ for type in sqlite custom pickle2 pickle3 cbor msgpack rapidjson ujson simplejso
             2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar.tar                         foo/lighter.tar/fighter/bar
             2709a3348eb2c52302a7606ecf5860bc tests/nested-tar-with-overlapping-name.tar   foo/fighter/ufo
             2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar-with-overlapping-name.tar   foo/fighter.tar/fighter/bar
+            2709a3348eb2c52302a7606ecf5860bc tests/hardlink.tar                           hardlink/ufo
+            2709a3348eb2c52302a7606ecf5860bc tests/hardlink.tar                           hardlink/natsu
         )
 
         # Sparse file support is not backported to the old serializers
