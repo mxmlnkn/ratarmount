@@ -397,6 +397,8 @@ tests=(
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar.tar                         foo/lighter.tar/fighter/bar
     2709a3348eb2c52302a7606ecf5860bc tests/nested-tar-with-overlapping-name.tar   foo/fighter/ufo
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar-with-overlapping-name.tar   foo/fighter.tar/fighter/bar
+    2709a3348eb2c52302a7606ecf5860bc tests/hardlink.tar                           hardlink/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/hardlink.tar                           hardlink/natsu
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   01.sparse1.bin
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   02.normal1.bin
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   03.sparse1.bin
@@ -442,6 +444,8 @@ tests=(
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar.tar                         foo/lighter.tar/fighter/bar
     2709a3348eb2c52302a7606ecf5860bc tests/nested-tar-with-overlapping-name.tar   foo/fighter/ufo
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar-with-overlapping-name.tar   foo/fighter.tar/fighter/bar
+    2709a3348eb2c52302a7606ecf5860bc tests/hardlink.tar                           hardlink/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/hardlink.tar                           hardlink/natsu
 )
 
 for type in custom pickle2 pickle3 cbor msgpack rapidjson ujson simplejson; do

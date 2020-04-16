@@ -1546,6 +1546,10 @@ class TarMount( fuse.Operations ):
                 print( "Could not find path:", path )
             raise fuse.FuseOSError( fuse.errno.ENOENT )
 
+        # Dereference hard links
+        if not stat.S_ISREG( fileInfo.mode ) and not stat.S_ISLNK( fileInfo.mode ) and fileInfo.linkname:
+            return self.getattr( '/' + fileInfo.linkname.lstrip( '/' ), fh )
+
         # dictionary keys: https://pubs.opengroup.org/onlinepubs/007904875/basedefs/sys/stat.h.html
         statDict = dict( ( "st_" + key, getattr( fileInfo, key ) ) for key in ( 'size', 'mtime', 'mode', 'uid', 'gid' ) )
         # signal that everything was mounted read-only
@@ -1599,6 +1603,12 @@ class TarMount( fuse.Operations ):
            not isinstance( fileInfo, IndexedTar.FileInfo ) and
            not isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) ):
             raise fuse.FuseOSError( fuse.errno.ENOENT )
+
+        # Dereference hard links
+        if not stat.S_ISREG( fileInfo.mode ) and not stat.S_ISLNK( fileInfo.mode ) and fileInfo.linkname:
+            targetLink = '/' + fileInfo.linkname.lstrip( '/' )
+            if targetLink != path:
+                return self.read( targetLink, length, offset, fh )
 
         if isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) and fileInfo.issparse:
             # The TAR file format is very simple. It's just a concatenation of TAR blocks. There is not even a
