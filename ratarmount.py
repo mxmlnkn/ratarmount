@@ -203,6 +203,7 @@ class SQLiteIndexedTar:
         'indexFileName',
         'sqlConnection',
         'parentFolderCache', # stores which parent folders were last tried to add to database and therefore do exist
+        'tarFileObject', # file object to the uncompressed (or decompressed) TAR file to read actual data out of
     )
 
     # Names must be identical to the SQLite column headers!
@@ -243,6 +244,7 @@ class SQLiteIndexedTar:
         self.tarFileName = os.path.abspath( tarFileName )
         if not fileObject:
             fileObject = open( self.tarFileName, 'rb' )
+        self.tarFileObject = fileObject
 
         # will be used for storing indexes if current path is read-only
         possibleIndexFilePaths = [
@@ -263,7 +265,7 @@ class SQLiteIndexedTar:
                 self.indexFileName = indexPath
                 break
         if self.indexIsLoaded():
-            self._loadOrStoreCompressionOffsets( fileObject )
+            self._loadOrStoreCompressionOffsets()
             return
 
         # Find a suitable (writable) location for the index database
@@ -284,8 +286,8 @@ class SQLiteIndexedTar:
                     if printDebug >= 2:
                         print( "Could not create file:", indexPath )
 
-        self.createIndex( fileObject )
-        self._loadOrStoreCompressionOffsets( fileObject )
+        self.createIndex( self.tarFileObject )
+        self._loadOrStoreCompressionOffsets()
 
         self._storeTarMetadata()
 
@@ -773,11 +775,12 @@ class SQLiteIndexedTar:
 
         return self.indexIsLoaded()
 
-    def _loadOrStoreCompressionOffsets( self, fileObject ):
+    def _loadOrStoreCompressionOffsets( self ):
         # This should be called after the TAR file index is complete (loaded or created).
         # If the TAR file index was created, then tarfile has iterated over the whole file once
         # and therefore completed the implicit compression offset creation.
         db = self.sqlConnection
+        fileObject = self.tarFileObject
 
         if 'IndexedBzip2File' in globals() and isinstance( fileObject, IndexedBzip2File ):
             try:
@@ -883,6 +886,7 @@ class IndexedTar:
         'possibleIndexFilePaths',
         'indexFileName',
         'progressBar',
+        'tarFileObject',
     )
 
     FileInfo = collections.namedtuple( "FileInfo", "offset size mtime mode type linkname uid gid istar" )
@@ -955,6 +959,8 @@ class IndexedTar:
                 print( "Can't write out index for file object input. Ignoring this option." )
             self.createIndex( fileObject )
         else:
+            fileObject = open( self.tarFileName, 'rb' )
+
             # first try loading the index for the given serialization backend
             if serializationBackend is not None:
                 for indexPath in self.possibleIndexFilePaths:
@@ -968,8 +974,7 @@ class IndexedTar:
                         break
 
             if not self.indexIsLoaded():
-                with open( self.tarFileName, 'rb' ) as file:
-                    self.createIndex( file )
+                self.createIndex( fileObject )
 
                 if writeIndex:
                     for indexPath in self.possibleIndexFilePaths:
@@ -995,6 +1000,8 @@ class IndexedTar:
                     except IOError:
                         print( "[Info] Could not write TAR index to file. ",
                                "Subsequent mounts might be slow!" )
+
+        self.tarFileObject = fileObject
 
     @staticmethod
     def supportedIndexExtensions():
