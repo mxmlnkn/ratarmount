@@ -1531,6 +1531,14 @@ class TarMount( fuse.Operations ):
     is planned.
     """
 
+    __slots__ = (
+        'mountSources',
+        'rootFileInfo',
+        'mountPoint',
+        'mountPointFd',
+        'mountPointWasCreated',
+    )
+
     def __init__(
         self,
         pathToMount,
@@ -1540,22 +1548,30 @@ class TarMount( fuse.Operations ):
         gzipSeekPointSpacing = 4*1024*1024,
         mountPoint = None
     ):
-        self.indexedTar = self._openTar( pathToMount, clearIndexCache, recursive,
-                                         serializationBackend, gzipSeekPointSpacing )
-        self.tarFile = self.indexedTar.tarFileObject
+        try:
+            os.fspath( pathToMount )
+            pathToMount = [ pathToMount ]
+        except:
+            pass
+
+        self.mountSources = [ self._openTar( tarFile, clearIndexCache, recursive,
+                                             serializationBackend, gzipSeekPointSpacing )
+                              if not os.path.isdir( tarFile ) else os.path.realpath( tarFile )
+                              for tarFile in pathToMount ]
 
         # make the mount point read only and executable if readable, i.e., allow directory listing
         # @todo In some cases, I even get 2(!) '.' directories listed with ls -la!
         #       But without this, the mount directory is owned by root
-        tarStats = os.stat( pathToMount )
+        tarStats = os.stat( pathToMount[0] )
         # clear higher bits like S_IFREG and set the directory bit instead
         mountMode = ( tarStats.st_mode & 0o777 ) | stat.S_IFDIR
         if mountMode & stat.S_IRUSR != 0: mountMode |= stat.S_IXUSR
         if mountMode & stat.S_IRGRP != 0: mountMode |= stat.S_IXGRP
         if mountMode & stat.S_IROTH != 0: mountMode |= stat.S_IXOTH
+
         self.rootFileInfo = SQLiteIndexedTar.FileInfo(
-            offset       = 0                ,
-            offsetheader = 0                ,
+            offset       = None             ,
+            offsetheader = None             ,
             size         = tarStats.st_size ,
             mtime        = tarStats.st_mtime,
             mode         = mountMode        ,
@@ -1572,7 +1588,8 @@ class TarMount( fuse.Operations ):
         if mountPoint and not os.path.exists( mountPoint ):
             os.mkdir( mountPoint )
             self.mountPointWasCreated = True
-        self.mountPoint = os.path.abspath( mountPoint )
+        self.mountPoint = os.path.realpath( mountPoint )
+        self.mountPointFd = os.open( self.mountPoint, os.O_RDONLY )
 
     def __del__( self ):
         try:
@@ -1580,6 +1597,8 @@ class TarMount( fuse.Operations ):
                 os.rmdir( self.mountPoint )
         except:
             pass
+
+        os.close( self.mountPointFd )
 
     def _openTar( self, tarFilePath, clearIndexCache, recursive, serializationBackend, gzipSeekPointSpacing ):
         if SQLiteIndexedTar._detectCompression( name = tarFilePath ) and serializationBackend != 'sqlite':
@@ -1600,21 +1619,79 @@ class TarMount( fuse.Operations ):
                                  recursive            = recursive,
                                  gzipSeekPointSpacing = gzipSeekPointSpacing  )
 
+    @staticmethod
+    def _getFileInfoFromRealFile( filePath ):
+        stats = os.lstat( filePath )
+        return SQLiteIndexedTar.FileInfo(
+            offset       = None          ,
+            offsetheader = None          ,
+            size         = stats.st_size ,
+            mtime        = stats.st_mtime,
+            mode         = stats.st_mode ,
+            type         = None          , # I think this is completely unused and mostly contained in mode
+            linkname     = os.readlink( filePath ) if os.path.islink( filePath ) else None,
+            uid          = stats.st_uid  ,
+            gid          = stats.st_gid  ,
+            istar        = False         ,
+            issparse     = False
+        )
+
+    def _getFileInfo( self, filePath ):
+        for mountSource in self.mountSources[::-1]:
+            if isinstance( mountSource, str ):
+                realFilePath = os.path.join( mountSource, filePath.lstrip( os.path.sep ) )
+                if os.path.lexists( realFilePath ):
+                    return self._getFileInfoFromRealFile( realFilePath ), mountSource
+
+            else:
+                fileInfo = mountSource.getFileInfo( filePath, listDir = False )
+                if isinstance( fileInfo, IndexedTar.FileInfo ) or \
+                   isinstance( fileInfo, SQLiteIndexedTar.FileInfo ):
+                    return fileInfo, mountSource
+
+        raise fuse.FuseOSError( fuse.errno.ENOENT )
+
+    def _listDir( self, folderPath ):
+        """
+        Returns the set of all folder contents over all mount sources or None if the path was found in none of them.
+        """
+
+        files = set()
+        folderExists = False
+
+        for mountSource in self.mountSources:
+            if isinstance( mountSource, str ):
+                realFolderPath = os.path.join( mountSource, folderPath.lstrip( os.path.sep ) )
+                if os.path.isdir( realFolderPath ):
+                    files = files.union( os.listdir( realFolderPath ) )
+                    folderExists = True
+            else:
+                result = mountSource.getFileInfo( folderPath, listDir = True )
+                if isinstance( result, dict ):
+                    files = files.union( result.keys() )
+                    folderExists = True
+
+        return files if folderExists else None
+
+    @overrides( fuse.Operations )
+    def init( self, connection ):
+        os.fchdir( self.mountPointFd )
+        for i in range( len( self.mountSources ) ):
+            if self.mountSources[i] == self.mountPoint:
+                self.mountSources[i] = '.'
+
     @overrides( fuse.Operations )
     def getattr( self, path, fh = None ):
         if path == '/':
             fileInfo = self.rootFileInfo
         else:
-            fileInfo = self.indexedTar.getFileInfo( path, listDir = False )
-
-        if fileInfo is None or (
-           not isinstance( fileInfo, IndexedTar.FileInfo ) and
-           not isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) ):
-            raise fuse.FuseOSError( fuse.errno.ENOENT )
+            fileInfo, _ = self._getFileInfo( path )
 
         # Dereference hard links
         if not stat.S_ISREG( fileInfo.mode ) and not stat.S_ISLNK( fileInfo.mode ) and fileInfo.linkname:
-            return self.getattr( '/' + fileInfo.linkname.lstrip( '/' ), fh )
+            targetLink = '/' + fileInfo.linkname.lstrip( '/' )
+            if targetLink != path:
+                return self.getattr( targetLink, fh )
 
         # dictionary keys: https://pubs.opengroup.org/onlinepubs/007904875/basedefs/sys/stat.h.html
         statDict = dict( ( "st_" + key, getattr( fileInfo, key ) ) for key in ( 'size', 'mtime', 'mode', 'uid', 'gid' ) )
@@ -1632,29 +1709,19 @@ class TarMount( fuse.Operations ):
         yield '.'
         yield '..'
 
-        dirInfo = self.indexedTar.getFileInfo( path, listDir = True )
-
-        if isinstance( dirInfo, dict ):
-            for key in dirInfo.keys():
+        files = self._listDir( path )
+        if files:
+            for key in files:
                 yield key
 
     @overrides( fuse.Operations )
     def readlink( self, path ):
-        fileInfo = self.indexedTar.getFileInfo( path )
-        if fileInfo is None or (
-           not isinstance( fileInfo, IndexedTar.FileInfo ) and
-           not isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) ):
-            raise fuse.FuseOSError( fuse.errno.ENOENT )
-
+        fileInfo, _ = self._getFileInfo( path )
         return fileInfo.linkname
 
     @overrides( fuse.Operations )
     def read( self, path, length, offset, fh ):
-        fileInfo = self.indexedTar.getFileInfo( path )
-        if fileInfo is None or (
-           not isinstance( fileInfo, IndexedTar.FileInfo ) and
-           not isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) ):
-            raise fuse.FuseOSError( fuse.errno.ENOENT )
+        fileInfo, mountSource = self._getFileInfo( path )
 
         # Dereference hard links
         if not stat.S_ISREG( fileInfo.mode ) and not stat.S_ISLNK( fileInfo.mode ) and fileInfo.linkname:
@@ -1662,12 +1729,18 @@ class TarMount( fuse.Operations ):
             if targetLink != path:
                 return self.read( targetLink, length, offset, fh )
 
+        # Handle access to underlying non-empty folder
+        if isinstance( mountSource, str ):
+            f = open( os.path.join( mountSource, path.lstrip( os.path.sep ) ), 'rb' )
+            f.seek( offset )
+            return f.read( length )
+
         if isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) and fileInfo.issparse:
             # The TAR file format is very simple. It's just a concatenation of TAR blocks. There is not even a
             # global header, only the TAR block headers. That's why we can simpley cut out the TAR block for
             # the sparse file using StenciledFile and then use tarfile on it to expand the sparse file correctly.
             tarBlockSize = fileInfo.offset - fileInfo.offsetheader + fileInfo.size
-            tarSubFile = StenciledFile( self.tarFile, [ ( fileInfo.offsetheader, tarBlockSize ) ] )
+            tarSubFile = StenciledFile( mountSource.tarFileObject, [ ( fileInfo.offsetheader, tarBlockSize ) ] )
             tmpTarFile = tarfile.open( fileobj = tarSubFile, mode = 'r:' )
             tmpFileObject = tmpTarFile.extractfile( next( iter( tmpTarFile ) ) )
             tmpFileObject.seek( offset, os.SEEK_SET )
@@ -1676,8 +1749,8 @@ class TarMount( fuse.Operations ):
             return result
 
         try:
-            self.tarFile.seek( fileInfo.offset + offset, os.SEEK_SET )
-            return self.tarFile.read( length )
+            mountSource.tarFileObject.seek( fileInfo.offset + offset, os.SEEK_SET )
+            return mountSource.tarFileObject.read( length )
         except RuntimeError as e:
             traceback.print_exc()
             print( "Caught exception when trying to read data from underlying TAR file! Returning errno.EIO." )
@@ -1712,6 +1785,15 @@ def parseArgs( args = None ):
         formatter_class = argparse.ArgumentDefaultsHelpFormatter,
         description = '''\
         In order to reduce the mounting time, the created index for random access to files inside the tar will be saved to <path to tar>.index.<backend>[.<compression]. If it can't be saved there, it will be saved in ~/.ratarmount/<path to tar: '/' -> '_'>.index.<backend>[.<compression].
+
+        Note that the things to be (union) mounted can be TARs and/or folders and because of that ratarmount can also be used to bind mount folders read-only to another path similar to bindfs and mount --bind.
+        If you want to "update" a folder with the contents of a given TAR, you will have to specify the folder both as a mount source and as the mount point:
+            ratarmount folder file.tar folder
+        The FUSE option -o nonempty will be automatically added if such a usage is detected.
+        If a file exists in both the folder and the file.tar, then the file from file.tar will be shown in the above usage.
+        If you instead want to show the file in the folder, you only have to swap the mount source order:
+            ratarmount file.tar folder folder
+        Even in this case the folder has to be specified twice or else it will only be recognized as the mount point not as a mount source.
         ''' )
 
     parser.add_argument(
@@ -1780,11 +1862,13 @@ def parseArgs( args = None ):
         '-v', '--version', action='store_true', help = 'Print version string.' )
 
     parser.add_argument(
-        'tarfilepath', metavar = 'tar-file-path',
-        type = TarFileType( 'r', [ '', 'bz2', 'gz' ] ), nargs = 1,
-        help = 'The path to the TAR archive to be mounted.' )
+        'mount_source', nargs = '+',
+        help = 'The path to the TAR archive to be mounted. '
+               'If multiple archives and/or folders are specified, then they will be mounted as if the arguments '
+               'coming first were updated with the contents of the archives or folders specified thereafter, '
+               'i.e., the list of TARs and folders will be union mounted.' )
     parser.add_argument(
-        'mountpath', metavar = 'mount-path', nargs = '?',
+        'mount_point', nargs = '?',
         help = 'The path to a folder to mount the TAR contents into. '
                'If no mount path is specified, the TAR will be mounted to a folder of the same name '
                'but without a file extension.' )
@@ -1792,6 +1876,37 @@ def parseArgs( args = None ):
     args = parser.parse_args( args )
 
     args.gzip_seek_point_spacing = args.gzip_seek_point_spacing * 1024 * 1024
+
+    # This is a hack but because we have two positional arguments (and want that reflected in the auto-generated help),
+    # all positional arguments, including the mountpath will be parsed into the tarfilepaths namespace and we have to
+    # manually separate them depending on the type.
+    if os.path.isdir( args.mount_source[-1] ) or not os.path.exists( args.mount_source[-1] ):
+        args.mount_point = args.mount_source[-1]
+        args.mount_source = args.mount_source[:-1]
+    if not args.mount_source:
+        print( "[Error] You must at least specify one path to a valid TAR file or union mount source directory!" )
+        exit( 1 )
+
+    # Manually check that all specified TARs and folders exist
+    compressions = [ '' ]
+    if 'IndexedBzip2File' in globals():
+        compressions += [ 'bz2' ]
+    if 'IndexedGzipFile' in globals():
+        compressions += [ 'gz' ]
+    args.mount_source = [ TarFileType( mode = 'r', compressions = compressions )( tarFile )[0].name
+                           if not os.path.isdir( tarFile ) else os.path.realpath( tarFile )
+                           for tarFile in args.mount_source ]
+
+    # Automatically generate a default mount path
+    if args.mount_point is None:
+        tarPath = args.mount_source[0]
+        for doubleExtension in [ '.tar.bz2', '.tar.gz' ]:
+            if tarPath[-len( doubleExtension ):].lower() == doubleExtension.lower():
+                args.mount_point = tarPath[:-len( doubleExtension )]
+                break
+        if not args.mount_point:
+            args.mount_point = os.path.splitext( tarPath )[0]
+    args.mount_point = os.path.abspath( args.mount_point )
 
     return args
 
@@ -1803,8 +1918,6 @@ def cli( args = None ):
 
     args = parseArgs( args )
 
-    tarToMount = os.path.abspath( args.tarfilepath[0][0].name )
-
     # Convert the comma separated list of key[=value] options into a dictionary for fusepy
     fusekwargs = dict( [ option.split( '=', 1 ) if '=' in option else ( option, True )
                        for option in args.fuse.split( ',' ) ] ) if args.fuse else {}
@@ -1812,28 +1925,22 @@ def cli( args = None ):
         fusekwargs['modules'] = 'subdir'
         fusekwargs['subdir'] = args.prefix
 
-    mountPath = args.mountpath
-    if mountPath is None:
-        for ext in [ '.tar', '.tar.bz2', '.tbz2', '.tar.gz', '.tgz' ]:
-            if tarToMount[-len( ext ):].lower() == ext.lower():
-                mountPath = tarToMount[:-len( ext )]
-                break
-        if not mountPath:
-            mountPath = os.path.splitext( tarToMount )[0]
+    if args.mount_point in args.mount_source:
+        fusekwargs['nonempty'] = True
 
     global printDebug
     printDebug = args.debug
 
     fuseOperationsObject = TarMount(
-        pathToMount          = tarToMount,
+        pathToMount          = args.mount_source,
         clearIndexCache      = args.recreate_index,
         recursive            = args.recursive,
         serializationBackend = args.serialization_backend,
         gzipSeekPointSpacing = args.gzip_seek_point_spacing,
-        mountPoint           = mountPath )
+        mountPoint           = args.mount_point )
 
     fuse.FUSE( operations = fuseOperationsObject,
-               mountpoint = mountPath,
+               mountpoint = args.mount_point,
                foreground = args.foreground,
                nothreads  = args.serialization_backend == 'sqlite',
                **fusekwargs )

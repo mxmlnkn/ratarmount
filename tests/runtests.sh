@@ -379,6 +379,68 @@ checkAutomaticIndexRecreation()
         returnError 'Index did not change even though TAR filesize did!'
 )
 
+checkUnionMount()
+(
+    ratarmountScript=$( realpath -- ratarmount.py )
+    testsFolder="$( pwd )/tests"
+    cd -- "$( mktemp -d )"
+    keyString='EXTRACTED VERSION'
+
+    tarFiles=( 'hardlink' 'nested-symlinks' 'single-nested-file' 'symlinks' )
+
+    for tarFile in "${tarFiles[@]}"; do
+    (
+        mkdir "$tarFile" &&
+        cd -- "$_" &&
+        tar -xf "$testsFolder/$tarFile.tar" &&
+        find . -type f -execdir bash -c 'echo "$1" >> "$0"' {} "$keyString" \;
+    )
+    done
+
+    mountPoint=$( mktemp -d )
+    for tarFile in "${tarFiles[@]}"; do
+        # Check whether a simple bind mount works, which is now an officially supported perversion of ratarmount
+        python3 "$ratarmountScript" "$tarFile" "$mountPoint"
+        diff -r --no-dereference "$tarFile" "$mountPoint" || returnError 'Bind mounted folder differs!'
+        funmount "$mountPoint"
+
+        # Check that bind mount onto the mount point works
+        python3 "$ratarmountScript" "$tarFile" "$tarFile"
+        [[ $( find "$tarFile" -mindepth 1 | wc -l ) -gt 0 ]] || returnError 'Bind mounted folder is empty!'
+        funmount "$mountPoint"
+
+        # Check whether updating a folder with a TAR works
+        python3 "$ratarmountScript" "$tarFile" "$testsFolder/$tarFile.tar" "$mountPoint"
+        keyContainingFiles=$( find "$mountPoint" -type f -execdir bash -c '
+            if command grep -q "$1" "$0"; then printf "%s\n" "$0"; fi' {} "$keyString" \; | wc -l )
+        [[ $keyContainingFiles -eq 0 ]] || returnError 'Found file from updated folder even though all files are updated!'
+        funmount "$mountPoint"
+
+        # Check whether updating a TAR with a folder works
+        python3 "$ratarmountScript" "$testsFolder/$tarFile.tar" "$tarFile" "$mountPoint"
+        keyNotContainingFiles=$( find "$mountPoint" -type f -execdir bash -c '
+            if ! command grep -q "$1" "$0"; then printf "%s\n" "$0"; fi' {} "$keyString" \; | wc -l )
+        [[ $keyNotContainingFiles -eq 0 ]] || returnError 'Found files from TAR even though it was updated with a folder!'
+        funmount "$mountPoint"
+    done
+)
+
+checkAutoMountPointCreation()
+(
+    ratarmountScript=$( realpath -- ratarmount.py )
+    testsFolder="$( pwd )/tests"
+    cd -- "$( mktemp -d )"
+
+    cp "$testsFolder/single-nested-file.tar" .
+    python3 "$ratarmountScript" *.tar
+    command grep -q 'iriya' single-nested-file/foo/fighter/ufo ||
+    returnError 'Check for auto mount point creation failed!'
+
+    funmount 'single-nested-file'
+    sleep 1s
+    [[ ! -d 'single-nested-file' ]] || returnError 'Automatically created mount point was not removed after unmount!'
+)
+
 
 python3 tests/tests.py || returnError "tests/tests.py"
 
@@ -432,6 +494,8 @@ checkFileInTARPrefix foo tests/single-nested-file.tar fighter/ufo 2709a3348eb2c5
 checkFileInTARPrefix foo/fighter tests/single-nested-file.tar ufo 2709a3348eb2c52302a7606ecf5860bc
 
 checkAutomaticIndexRecreation || returnError 'Automatic index recreation test failed!'
+checkAutoMountPointCreation || returnError 'Automatic mount point creation test failed!'
+checkUnionMount || returnError 'union mounting test failed!'
 
 # Deprecated serialization backend tests
 
