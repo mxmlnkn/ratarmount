@@ -1612,13 +1612,34 @@ class TarMount( fuse.Operations ):
             print( "Caught exception when trying to read data from underlying TAR file! Returning errno.EIO." )
             raise fuse.FuseOSError( fuse.errno.EIO )
 
+
+class TarFileType:
+    """
+    Similar to argparse.FileType but raises an exception if it is not a valid TAR file.
+    """
+
+    def __init__( self, mode = 'r', compressions = [ '' ] ):
+        self.compressions = [ '' if c is None else c for c in compressions ]
+        self.mode = mode
+
+    def __call__( self, tarFile ):
+        for compression in self.compressions:
+            try:
+                return ( tarfile.open( tarFile, mode = self.mode + ':' + compression ), compression )
+            except tarfile.ReadError:
+                None
+
+        raise argparse.ArgumentTypeError(
+            "Archive '{}' can't be opened!\n"
+            "This might happen for xz compressed TAR archives, which currently is not supported.\n"
+            "If you are trying to open a bz2 or gzip compressed file make sure that you have the indexed_bzip2 "
+            "and indexed_gzip modules installed.".format( tarFile ) )
+
+
 def parseArgs( args = None ):
     parser = argparse.ArgumentParser(
         formatter_class = argparse.ArgumentDefaultsHelpFormatter,
         description = '''\
-        If no mount path is specified, then the tar will be mounted to a folder of the same name but without a file extension.
-        TAR files contained inside the tar and even TARs in TARs in TARs will be mounted recursively at folders of the same name barred the file extension '.tar'.
-
         In order to reduce the mounting time, the created index for random access to files inside the tar will be saved to <path to tar>.index.<backend>[.<compression]. If it can't be saved there, it will be saved in ~/.ratarmount/<path to tar: '/' -> '_'>.index.<backend>[.<compression].
         ''' )
 
@@ -1689,11 +1710,13 @@ def parseArgs( args = None ):
 
     parser.add_argument(
         'tarfilepath', metavar = 'tar-file-path',
-        type = argparse.FileType( 'r' ), nargs = 1,
+        type = TarFileType( 'r', [ '', 'bz2', 'gz' ] ), nargs = 1,
         help = 'The path to the TAR archive to be mounted.' )
     parser.add_argument(
         'mountpath', metavar = 'mount-path', nargs = '?',
-        help = 'The path to a folder to mount the TAR contents into.' )
+        help = 'The path to a folder to mount the TAR contents into. '
+               'If no mount path is specified, the TAR will be mounted to a folder of the same name '
+               'but without a file extension.' )
 
     args = parser.parse_args( args )
 
@@ -1709,27 +1732,7 @@ def cli( args = None ):
 
     args = parseArgs( args )
 
-    tarToMount = os.path.abspath( args.tarfilepath[0].name )
-
-    type = None
-
-    try:
-        tarfile.open( tarToMount, mode = 'r:' )
-        type = 'TAR'
-    except tarfile.ReadError:
-        None
-
-    with open( tarToMount, 'rb' ) as file:
-        magicBytes = file.peek( 10 )
-        if magicBytes[0:3] == b"BZh" and magicBytes[4:10] == b"1AY&SY":
-            type = 'BZ2'
-        elif magicBytes[:2] == b'\x1f\x8b':
-            type = 'GZ'
-
-    if not type:
-        print( "Archive", tarToMount, "can't be opened!",
-               "This might happen for compressed TAR archives, which currently is not supported." )
-        return 1
+    tarToMount = os.path.abspath( args.tarfilepath[0][0].name )
 
     # Convert the comma separated list of key[=value] options into a dictionary for fusepy
     fusekwargs = dict( [ option.split( '=', 1 ) if '=' in option else ( option, True )
