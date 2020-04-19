@@ -210,12 +210,19 @@ class SQLiteIndexedTar:
 
     def __init__(
         self,
-        tarFileName     = None, # either string path or file object
-        fileObject      = None, # if not specified, tarFileName will be opened
+        tarFileName     = None,
+        fileObject      = None,
         writeIndex      = False,
         clearIndexCache = False,
         recursive       = False,
     ):
+        """
+        tarFileName : Path to the TAR file to be opened. If not specified, a fileObject must be specified.
+                      If only a fileObject is given, the created index can't be cached (efficiently).
+        fileObject : A io.IOBase derived object. If not specified, tarFileName will be opened.
+                     If it is an instance of IndexedBzip2File or IndexedGzipFile, then the offset
+                     loading and storing from and to the SQLite database is managed automatically by this class.
+        """
         # Version 0.1.0:
         #   - Initial version
         # Version 0.2.0:
@@ -232,7 +239,10 @@ class SQLiteIndexedTar:
             self.createIndex( fileObject )
             # return here because we can't find a save location without any identifying name
             return
-        self.tarFileName = os.path.normpath( tarFileName )
+
+        self.tarFileName = os.path.abspath( tarFileName )
+        if not fileObject:
+            fileObject = open( self.tarFileName, 'rb' )
 
         # will be used for storing indexes if current path is read-only
         possibleIndexFilePaths = [
@@ -253,6 +263,7 @@ class SQLiteIndexedTar:
                 self.indexFileName = indexPath
                 break
         if self.indexIsLoaded():
+            self._loadOrStoreCompressionOffsets( fileObject )
             return
 
         # Find a suitable (writable) location for the index database
@@ -273,11 +284,8 @@ class SQLiteIndexedTar:
                     if printDebug >= 2:
                         print( "Could not create file:", indexPath )
 
-        if fileObject:
-            self.createIndex( fileObject )
-        else:
-            with open( self.tarFileName, 'rb' ) as file:
-                self.createIndex( file )
+        self.createIndex( fileObject )
+        self._loadOrStoreCompressionOffsets( fileObject )
 
         self._storeTarMetadata()
 
@@ -765,6 +773,101 @@ class SQLiteIndexedTar:
 
         return self.indexIsLoaded()
 
+    def _loadOrStoreCompressionOffsets( self, fileObject ):
+        # This should be called after the TAR file index is complete (loaded or created).
+        # If the TAR file index was created, then tarfile has iterated over the whole file once
+        # and therefore completed the implicit compression offset creation.
+        db = self.sqlConnection
+
+        if 'IndexedBzip2File' in globals() and isinstance( fileObject, IndexedBzip2File ):
+            try:
+                offsets = dict( db.execute( 'SELECT blockoffset,dataoffset FROM bzip2blocks;' ) )
+                fileObject.set_block_offsets( offsets )
+            except Exception as e:
+                if printDebug >= 2:
+                    print( "[Info] Could not load BZip2 Block offset data. Will create it from scratch." )
+
+                tables = [ x[0] for x in db.execute( 'SELECT name FROM sqlite_master WHERE type="table";' ) ]
+                if 'bzip2blocks' in tables:
+                    db.execute( 'DROP TABLE bzip2blocks' )
+                db.execute( 'CREATE TABLE bzip2blocks ( blockoffset INTEGER PRIMARY KEY, dataoffset INTEGER )' )
+                db.executemany( 'INSERT INTO bzip2blocks VALUES (?,?)',
+                                fileObject.block_offsets().items() )
+                db.commit()
+            return
+
+        if 'IndexedGzipFile' in globals() and isinstance( fileObject, IndexedGzipFile ):
+            # indexed_gzip index only has a file based API, so we need to write all the index data from the SQL
+            # database out into a temporary file. For that, let's first try to use the same location as the SQLite
+            # database because it should have sufficient writing rights and free disk space.
+            gzindex = None
+            for tmpDir in [ os.path.dirname( self.indexFileName ), None ]:
+                # Try to export data from SQLite database. Note that no error checking against the existence of
+                # gzipindex table is done because the exported data itself might also be wrong and we can't check
+                # against this. Therefore, collate all error checking by catching exceptions.
+                try:
+                    gzindex = tempfile.mkstemp( dir = tmpDir )[1]
+                    with open( gzindex, 'wb' ) as file:
+                        file.write( db.execute( 'SELECT data FROM gzipindex' ).fetchone()[0] )
+                except:
+                    try:
+                        os.remove( gzindex )
+                    except:
+                        pass
+                    gzindex = None
+
+            try:
+                fileObject.import_index( filename = gzindex )
+                return
+            except:
+                pass
+
+            try:
+                os.remove( gzindex )
+            except:
+                pass
+
+            # Store the offsets into a temporary file and then into the SQLite database
+            if printDebug >= 2:
+                print( "[Info] Could not load GZip Block offset data. Will create it from scratch." )
+
+            # Transparently force index to be built if not already done so. build_full_index was buggy for me.
+            # Seeking from end not supported, so we have to read the whole data in in a loop
+            while fileObject.read( 1024*1024 ):
+                pass
+
+            # The created index can unfortunately be pretty large and tmp might actually run out of memory!
+            # Therefore, try different paths, starting with the location where the index resides.
+            gzindex = None
+            for tmpDir in [ os.path.dirname( self.indexFileName ), None ]:
+                gzindex = tempfile.mkstemp( dir = tmpDir )[1]
+                try:
+                    fileObject.export_index( filename = gzindex )
+                except indexed_gzip.ZranError:
+                    try:
+                        os.remove( gzindex )
+                    except:
+                        pass
+                    gzindex = None
+
+            if not gzindex or not os.path.isfile( gzindex ):
+                print( "[Warning] The GZip index required for seeking could not be stored in a temporary file!" )
+                print( "[Info] This might happen when you are out of space in your temporary file and at the" )
+                print( "[Info] the index file location. The gzipindex size takes roughly 32kiB per 4MiB of" )
+                print( "[Info] uncompressed(!) bytes (0.8% of the uncompressed data) by default." )
+                raise Exception( "[Error] Could not initialize the GZip seek cache." )
+            elif printDebug >= 2:
+                print( "Exported GZip index size:", os.stat( gzindex ).st_size )
+
+            # Store contents of temporary file into the SQLite database
+            tables = [ x[0] for x in db.execute( 'SELECT name FROM sqlite_master WHERE type="table"' ) ]
+            if 'gzipindex' in tables:
+                db.execute( 'DROP TABLE gzipindex' )
+            db.execute( 'CREATE TABLE gzipindex ( data BLOB )' )
+            with open( gzindex, 'rb' ) as file:
+                db.execute( 'INSERT INTO gzipindex VALUES (?)', ( file.read(), ) )
+            db.commit()
+            os.remove( gzindex )
 
 class IndexedTar:
     """
@@ -1409,95 +1512,6 @@ class TarMount( fuse.Operations ):
                 writeIndex      = True,
                 clearIndexCache = clearIndexCache,
                 recursive       = recursive )
-
-            # The index creation iterates over the whole file, so now we can query the block offsets gathered during
-            if type == 'BZ2':
-                db = self.indexedTar.sqlConnection
-                try:
-                    offsets = dict( db.execute( 'SELECT blockoffset,dataoffset FROM bzip2blocks' ) )
-                    self.tarFile.set_block_offsets( offsets )
-                except Exception as e:
-                    if printDebug >= 2:
-                        print( "Could not load BZip2 Block offset data. Will create it from scratch." )
-
-                    tables = [ x[0] for x in db.execute( 'SELECT name FROM sqlite_master WHERE type="table"' ) ]
-                    if 'bzip2blocks' in tables:
-                        db.execute( 'DROP TABLE bzip2blocks' )
-                    db.execute( 'CREATE TABLE bzip2blocks ( blockoffset INTEGER PRIMARY KEY, dataoffset INTEGER )' )
-                    db.executemany( 'INSERT INTO bzip2blocks VALUES (?,?)',
-                                    self.tarFile.block_offsets().items() )
-                    db.commit()
-
-            elif type == 'GZ':
-                # indexed_gzip index only has a file based API, so we need to write all the index data from the SQL
-                # database out into a temporary file. For that, let's first try to use the same location as the SQLite
-                # database because it should have sufficient writing rights and free disk space.
-                db = self.indexedTar.sqlConnection
-
-                # Try to export data from SQLite database. Note that no error checking against the existence of
-                # gzipindex table is done because the exported data itself might also be wrong and we can't check
-                # against this. Therefore, collate all error checking by catching exceptions.
-                gzindex = None
-                for tmpDir in [ os.path.dirname( self.indexedTar.indexFileName ), None ]:
-                    try:
-                        gzindex = tempfile.mkstemp( dir = tmpDir )[1]
-                        with open( gzindex, 'wb' ) as file:
-                            file.write( db.execute( 'SELECT data FROM gzipindex' ).fetchone()[0] )
-                    except:
-                        try:
-                            os.remove( gzindex )
-                        except:
-                            pass
-                        gzindex = None
-
-                needToCreateIndex = gzindex is None
-                if not needToCreateIndex:
-                    try:
-                        self.tarFile.import_index( filename = gzindex )
-                    except indexed_gzip.ZranError:
-                        needToCreateIndex = True
-
-                if needToCreateIndex:
-                    if printDebug >= 2:
-                        print( "Could not load GZip Block offset data. Will create it from scratch." )
-
-                    # Transparently force index to be built if not already done so. build_full_index was buggy for me.
-                    # Seeking from end not supported, so we have to read the whole data in in a loop
-                    while self.tarFile.read( 1024*1024 ):
-                        pass
-
-                    # The created index can unfortunately be pretty large and tmp might actually run out of memory!
-                    # Therefore, try different paths, starting with the location where the index resides.
-                    gzindex = None
-                    for tmpDir in [ os.path.dirname( self.indexedTar.indexFileName ), None ]:
-                        gzindex = tempfile.mkstemp( dir = tmpDir )[1]
-                        try:
-                            self.tarFile.export_index( filename = gzindex )
-                        except indexed_gzip.ZranError:
-                            try:
-                                os.remove( gzindex )
-                            except:
-                                pass
-                            gzindex = None
-
-                    if not gzindex or not os.path.isfile( gzindex ):
-                        print( "[Warning] The GZip index required for seeking could not be loaded!" )
-                        print( "[Info] This might happen when you are out of space in your temporary file and at the" )
-                        print( "[Info] the index file location. The gzipindex size takes roughly 32kiB per 4MiB of" )
-                        print( "[Info] uncompressed(!) bytes (0.8% of the uncompressed data) by default." )
-                        raise Exception( "[Error] Could not initialize the GZip seek cache." )
-
-                    if printDebug >= 2:
-                        print( "Exported GZip index size:", os.stat( gzindex ).st_size )
-
-                    tables = [ x[0] for x in db.execute( 'SELECT name FROM sqlite_master WHERE type="table"' ) ]
-                    if 'gzipindex' in tables:
-                        db.execute( 'DROP TABLE gzipindex' )
-                    db.execute( 'CREATE TABLE gzipindex ( data BLOB )' )
-                    with open( gzindex, 'rb' ) as file:
-                        db.execute( 'INSERT INTO gzipindex VALUES (?)', ( file.read(), ) )
-                    db.commit()
-                os.remove( gzindex )
 
         else:
             self.indexedTar = IndexedTar(
