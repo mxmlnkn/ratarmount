@@ -203,7 +203,10 @@ class SQLiteIndexedTar:
         'indexFileName',
         'sqlConnection',
         'parentFolderCache', # stores which parent folders were last tried to add to database and therefore do exist
+        'rawFileObject', # only set when opening a compressed file and only kept to keep the compressed file handle
+                         # from being closed by the garbage collector
         'tarFileObject', # file object to the uncompressed (or decompressed) TAR file to read actual data out of
+        'compression',   # stores what kind of compression the originally specified TAR file uses.
     )
 
     # Names must be identical to the SQLite column headers!
@@ -216,6 +219,7 @@ class SQLiteIndexedTar:
         writeIndex      = False,
         clearIndexCache = False,
         recursive       = False,
+        gzipSeekPointSpacing = 4*1024*1024,
     ):
         """
         tarFileName : Path to the TAR file to be opened. If not specified, a fileObject must be specified.
@@ -244,7 +248,8 @@ class SQLiteIndexedTar:
         self.tarFileName = os.path.abspath( tarFileName )
         if not fileObject:
             fileObject = open( self.tarFileName, 'rb' )
-        self.tarFileObject = fileObject
+        self.tarFileObject, self.rawFileObject, self.compression = \
+            SQLiteIndexedTar._openCompressedFile( fileObject, gzipSeekPointSpacing )
 
         # will be used for storing indexes if current path is read-only
         possibleIndexFilePaths = [
@@ -774,6 +779,59 @@ class SQLiteIndexedTar:
             print( "Loaded index", indexFileName )
 
         return self.indexIsLoaded()
+
+    @staticmethod
+    def _detectCompression( name = None, fileobj = None ):
+        oldOffset = None
+        if fileobj:
+            assert fileobj.seekable()
+            oldOffset = fileobj.tell()
+            if name is None:
+                name = fileobj.name
+
+        for compression in [ '', 'bz2', 'gz', 'xz' ]:
+            try:
+                # Simply opening a TAR file should be fast as only the header should be read!
+                tarfile.open( name = name, fileobj = fileobj, mode = 'r:' + compression )
+
+                if compression == 'bz2' and 'IndexedBzip2File' not in globals():
+                    raise Exception( "Can't open a bzip2 compressed TAR file '{}' without indexed_bzip2 module!"
+                                     .format( name ) )
+                elif compression == 'gz' and 'IndexedGzipFile' not in globals():
+                    raise Exception( "Can't open a bzip2 compressed TAR file '{}' without indexed_gzip module!"
+                                     .format( name ) )
+                elif compression == 'xz':
+                    raise Exception( "Can't open xz compressed TAR file '{}'!".format( name ) )
+
+                if oldOffset is not None:
+                    fileobj.seek( oldOffset )
+                return compression
+
+            except tarfile.ReadError as e:
+                if oldOffset is not None:
+                    fileobj.seek( oldOffset )
+                pass
+
+        raise Exception( "File '{}' does not seem to be a valid TAR file!".format( name ) )
+
+    @staticmethod
+    def _openCompressedFile( fileobj, gzipSeekPointSpacing ):
+        """Opens a file possibly undoing the compression."""
+        rawFile = None
+        tarFile = fileobj
+        compression = SQLiteIndexedTar._detectCompression( fileobj = tarFile )
+
+        if compression == 'bz2':
+            rawFile = tarFile # save so that garbage collector won't close it!
+            tarFile = IndexedBzip2File( rawFile.fileno() )
+        elif compression == 'gz':
+            rawFile = tarFile # save so that garbage collector won't close it!
+            # drop_handles keeps a file handle opening as is required to call tell() during decoding
+            tarFile = IndexedGzipFile( fileobj = rawFile,
+                                       drop_handles = False,
+                                       spacing = gzipSeekPointSpacing )
+
+        return tarFile, rawFile, compression
 
     def _loadOrStoreCompressionOffsets( self ):
         # This should be called after the TAR file index is complete (loaded or created).
@@ -1484,8 +1542,9 @@ class TarMount( fuse.Operations ):
         gzipSeekPointSpacing = 4*1024*1024,
         mountPoint = None
     ):
-        self.indexedTar, self.tarFile, self.rawFile, compression = \
-            self._openTar( pathToMount, clearIndexCache, recursive, serializationBackend, gzipSeekPointSpacing )
+        self.indexedTar = self._openTar( pathToMount, clearIndexCache, recursive,
+                                         serializationBackend, gzipSeekPointSpacing )
+        self.tarFile = self.indexedTar.tarFileObject
 
         # make the mount point read only and executable if readable, i.e., allow directory listing
         # @todo In some cases, I even get 2(!) '.' directories listed with ls -la!
@@ -1524,60 +1583,24 @@ class TarMount( fuse.Operations ):
         except:
             pass
 
-    @staticmethod
-    def _detectCompression( tarFile ):
-        for compression in [ '', 'bz2', 'gz', 'xz' ]:
-            try:
-                # Simply opening a TAR file should be fast as only the header should be read!
-                tarfile.open( tarFile, mode = 'r|' + compression )
-
-                if compression == 'bz2' and 'IndexedBzip2File' not in globals():
-                    raise Exception( "Can't open a bzip2 compressed TAR file without indexed_bzip2 module!" )
-                elif compression == 'gz' and 'IndexedGzipFile' not in globals():
-                    raise Exception( "Can't open a bzip2 compressed TAR file without indexed_gzip module!" )
-                elif compression == 'xz':
-                    raise Exception( "Can't open xz compressed TAR files!" )
-
-                return compression
-            except tarfile.ReadError:
-                None
-        raise Exception( f"File '{ tarFile }' does not seem to be a valid TAR file!" )
-
     def _openTar( self, tarFilePath, clearIndexCache, recursive, serializationBackend, gzipSeekPointSpacing ):
-        rawFile = None
-        tarFile = open( tarFilePath, 'rb' )
-        compression = self._detectCompression( tarFilePath )
-
-        if compression == 'bz2':
-            rawFile = tarFile # save so that garbage collector won't close it!
-            tarFile = IndexedBzip2File( rawFile.fileno() )
-        elif compression == 'gz':
-            rawFile = tarFile # save so that garbage collector won't close it!
-            # drop_handles keeps a file handle opening as is required to call tell() during decoding
-            tarFile = IndexedGzipFile( fileobj = rawFile,
-                                       drop_handles = False,
-                                       spacing = gzipSeekPointSpacing )
-
-        if compression and serializationBackend != 'sqlite':
+        if SQLiteIndexedTar._detectCompression( name = tarFilePath ) and serializationBackend != 'sqlite':
             print( "[Warning] Only the SQLite backend has .tar.bz2 and .tar.gz support, therefore will use that!" )
             serializationBackend = 'sqlite'
 
+        # To be deprecated
         if serializationBackend != 'sqlite':
-            # To be deprecated
-            indexedTar = IndexedTar( tarFilePath,
-                                     writeIndex           = True,
-                                     clearIndexCache      = clearIndexCache,
-                                     recursive            = recursive,
-                                     serializationBackend = serializationBackend )
-        else:
-            indexedTar = SQLiteIndexedTar( tarFilePath,
-                                           tarFile,
-                                           writeIndex      = True,
-                                           clearIndexCache = clearIndexCache,
-                                           recursive       = recursive )
+            return IndexedTar( tarFilePath,
+                               writeIndex           = True,
+                               clearIndexCache      = clearIndexCache,
+                               recursive            = recursive,
+                               serializationBackend = serializationBackend )
 
-        return indexedTar, tarFile, rawFile, compression
-
+        return SQLiteIndexedTar( tarFilePath,
+                                 writeIndex           = True,
+                                 clearIndexCache      = clearIndexCache,
+                                 recursive            = recursive,
+                                 gzipSeekPointSpacing = gzipSeekPointSpacing  )
 
     @overrides( fuse.Operations )
     def getattr( self, path, fh = None ):
