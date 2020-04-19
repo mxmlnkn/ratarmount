@@ -1371,7 +1371,8 @@ class TarMount( fuse.Operations ):
         clearIndexCache = False,
         recursive = False,
         serializationBackend = None,
-        gzipSeekPointSpacing = 4*1024*1024
+        gzipSeekPointSpacing = 4*1024*1024,
+        mountPoint = None
     ):
         self.tarFile = open( pathToMount, 'rb' )
 
@@ -1528,6 +1529,20 @@ class TarMount( fuse.Operations ):
             istar        = True             ,
             issparse     = False
         )
+
+        # Create mount point if it does not exist
+        self.mountPointWasCreated = False
+        if mountPoint and not os.path.exists( mountPoint ):
+            os.mkdir( mountPoint )
+            self.mountPointWasCreated = True
+        self.mountPoint = os.path.abspath( mountPoint )
+
+    def __del__( self ):
+        try:
+            if self.mountPointWasCreated:
+                os.rmdir( self.mountPoint )
+        except:
+            pass
 
     @overrides( fuse.Operations )
     def getattr( self, path, fh = None ):
@@ -1750,10 +1765,6 @@ def cli( args = None ):
         if not mountPath:
             mountPath = os.path.splitext( tarToMount )[0]
 
-    mountPathWasCreated = False
-    if not os.path.exists( mountPath ):
-        os.mkdir( mountPath )
-
     global printDebug
     printDebug = args.debug
 
@@ -1762,18 +1773,14 @@ def cli( args = None ):
         clearIndexCache      = args.recreate_index,
         recursive            = args.recursive,
         serializationBackend = args.serialization_backend,
-        gzipSeekPointSpacing = args.gzip_seek_point_spacing )
+        gzipSeekPointSpacing = args.gzip_seek_point_spacing,
+        mountPoint           = mountPath )
 
     fuse.FUSE( operations = fuseOperationsObject,
                mountpoint = mountPath,
                foreground = args.foreground,
                nothreads  = args.serialization_backend == 'sqlite',
                **fusekwargs )
-
-    if mountPathWasCreated and args.foreground:
-        os.rmdir( mountPath )
-
-    return 0
 
 if __name__ == '__main__':
     cli( sys.argv[1:] )
