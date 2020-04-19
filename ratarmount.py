@@ -22,16 +22,14 @@ from timeit import default_timer as timer
 try:
     import indexed_bzip2
     from indexed_bzip2 import IndexedBzip2File
-    hasBzip2Support = True
 except ImportError:
-    hasBzip2Support = False
+    print( "[Warning] The indexed_bzip2 module was not found. Please install it to open bz2 compressed TAR files!" )
 
 try:
     import indexed_gzip
     from indexed_gzip import IndexedGzipFile
-    hasGzipSupport = True
 except ImportError:
-    hasGzipSupport = False
+    print( "[Warning] The indexed_gzip module was not found. Please install it to open gzip compressed TAR files!" )
 
 import fuse
 
@@ -385,8 +383,8 @@ class SQLiteIndexedTar:
 
         # 2. Open TAR file reader
         try:
-            streamed = ( hasBzip2Support and isinstance( fileObject, IndexedBzip2File ) ) or \
-                       ( hasGzipSupport and isinstance( fileObject, IndexedGzipFile ) )
+            streamed = ( 'IndexedBzip2File' in globals() and isinstance( fileObject, IndexedBzip2File ) ) or \
+                       ( 'IndexedGzipFile' in globals() and isinstance( fileObject, IndexedGzipFile ) )
             # r: uses seeks to skip to the next file inside the TAR while r| doesn't do any seeks.
             # r| might be slower but for compressed files we have to go over all the data once anyways
             # and I had problems with seeks at this stage. Maybe they are gone now after the bz2 bugfix though.
@@ -405,12 +403,12 @@ class SQLiteIndexedTar:
             loadedTarFile.members = []
             globalOffset = streamOffset + tarInfo.offset_data
             globalOffsetHeader = streamOffset + tarInfo.offset
-            if hasBzip2Support and isinstance( fileObject, IndexedBzip2File ):
+            if 'IndexedBzip2File' in globals() and isinstance( fileObject, IndexedBzip2File ):
                 # We will have to adjust the global offset to a rough estimate of the real compressed size.
                 # Note that tell_compressed is always one bzip2 block further, which leads to underestimated
                 # file compression ratio especially in the beginning.
                 progressBar.update( int( globalOffset * fileObject.tell_compressed() / 8 / fileObject.tell() ) )
-            elif hasGzipSupport and isinstance( fileObject, IndexedGzipFile ):
+            elif 'IndexedGzipFile' in globals() and isinstance( fileObject, IndexedGzipFile ):
                 try:
                     progressBar.update( int( globalOffset * fileObject.fileobj().tell() / fileObject.tell() ) )
                 except:
@@ -527,10 +525,10 @@ class SQLiteIndexedTar:
             versions = [ makeVersionRow( 'ratarmount', __version__ ),
                          makeVersionRow( 'index', self.__version__ ) ]
 
-            if hasBzip2Support and isinstance( fileObject, IndexedBzip2File ):
+            if 'IndexedBzip2File' in globals() and isinstance( fileObject, IndexedBzip2File ):
                 versions += [ makeVersionRow( 'indexed_bzip2', indexed_bzip2.__version__ ) ]
 
-            if hasGzipSupport and isinstance( fileObject, IndexedGzipFile ):
+            if 'IndexedGzipFile' in globals() and isinstance( fileObject, IndexedGzipFile ):
                 versions += [ makeVersionRow( 'indexed_gzip', indexed_gzip.__version__ ) ]
 
             self.sqlConnection.executemany( 'INSERT OR REPLACE INTO "versions" VALUES (?,?,?,?,?)', versions )
