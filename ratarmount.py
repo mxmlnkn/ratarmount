@@ -1531,9 +1531,6 @@ class TarMount( fuse.Operations ):
 
     @overrides( fuse.Operations )
     def getattr( self, path, fh = None ):
-        if printDebug >= 2:
-            print( "[getattr( path =", path, ", fh =", fh, ")] Enter" )
-
         if path == '/':
             fileInfo = self.rootFileInfo
         else:
@@ -1542,8 +1539,6 @@ class TarMount( fuse.Operations ):
         if fileInfo is None or (
            not isinstance( fileInfo, IndexedTar.FileInfo ) and
            not isinstance( fileInfo, SQLiteIndexedTar.FileInfo ) ):
-            if printDebug >= 2:
-                print( "Could not find path:", path )
             raise fuse.FuseOSError( fuse.errno.ENOENT )
 
         # Dereference hard links
@@ -1557,9 +1552,6 @@ class TarMount( fuse.Operations ):
         statDict['st_mtime'] = int( statDict['st_mtime'] )
         statDict['st_nlink'] = 2
 
-        if printDebug >= 2:
-            print( "[getattr( path =", path, ", fh =", fh, ")] return:", statDict )
-
         return statDict
 
     @overrides( fuse.Operations )
@@ -1570,21 +1562,13 @@ class TarMount( fuse.Operations ):
         yield '..'
 
         dirInfo = self.indexedTar.getFileInfo( path, listDir = True )
-        if printDebug >= 2:
-            print( "[readdir( path =", path, ", fh =", fh, ")] return:",
-                   dirInfo.keys() if dirInfo else None )
 
         if isinstance( dirInfo, dict ):
             for key in dirInfo.keys():
                 yield key
-        elif printDebug >= 2:
-            print( "[readdir] Could not find path:", path )
 
     @overrides( fuse.Operations )
     def readlink( self, path ):
-        if printDebug >= 2:
-            print( "[readlink( path =", path, ")]" )
-
         fileInfo = self.indexedTar.getFileInfo( path )
         if fileInfo is None or (
            not isinstance( fileInfo, IndexedTar.FileInfo ) and
@@ -1595,9 +1579,6 @@ class TarMount( fuse.Operations ):
 
     @overrides( fuse.Operations )
     def read( self, path, length, offset, fh ):
-        if printDebug >= 2:
-            print( "[read( path =", path, ", length =", length, ", offset =", offset, ",fh =", fh, ")] path:", path )
-
         fileInfo = self.indexedTar.getFileInfo( path )
         if fileInfo is None or (
            not isinstance( fileInfo, IndexedTar.FileInfo ) and
