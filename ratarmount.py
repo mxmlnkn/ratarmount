@@ -1477,52 +1477,11 @@ class TarMount( fuse.Operations ):
         gzipSeekPointSpacing = 4*1024*1024,
         mountPoint = None
     ):
-        self.tarFile = open( pathToMount, 'rb' )
-
-        # check for bzip2 compressed tar archive and add BZip2 reader if so
-        magicBytes = self.tarFile.read( 10 )
-        self.tarFile.seek( 0 ) # For some reason does not get propagated to underlying file descriptor and BZ2Reader?!
-        self.tarFile.flush()
-        type = None
-        if magicBytes[0:3] == b"BZh" and magicBytes[4:10] == b"1AY&SY":
-            if not hasBzip2Support:
-                raise Exception( "You are trying open a bzip2 compressed TAR file but no bzip2 support was detected!" )
-            type = 'BZ2'
-            self.rawFile = self.tarFile # save so that garbage collector won't close it!
-            self.tarFile = IndexedBzip2File( self.rawFile.fileno() )
-
-        elif magicBytes[0:2] == b"\x1f\x8b":
-            if not hasGzipSupport:
-                raise Exception( "You are trying open a gzip compressed TAR file but no gzip support was detected!" )
-            type = 'GZ'
-            self.rawFile = self.tarFile # save so that garbage collector won't close it!
-            # drop_handles keeps a file handle opening as is required to call tell() during decoding
-            self.tarFile = IndexedGzipFile( fileobj = self.rawFile,
-                                            drop_handles = False,
-                                            spacing = gzipSeekPointSpacing )
-
-        if type and serializationBackend != 'sqlite':
-            print( "[Warning] Only the SQLite backend has .tar.bz2 and .tar.gz support, therefore will use that!" )
-            serializationBackend = 'sqlite'
-
-        if serializationBackend == 'sqlite':
-            self.indexedTar = SQLiteIndexedTar(
-                pathToMount,
-                self.tarFile,
-                writeIndex      = True,
-                clearIndexCache = clearIndexCache,
-                recursive       = recursive )
-
-        else:
-            self.indexedTar = IndexedTar(
-                pathToMount,
-                writeIndex           = True,
-                clearIndexCache      = clearIndexCache,
-                recursive            = recursive,
-                serializationBackend = serializationBackend )
+        self.indexedTar, self.tarFile, self.rawFile, compression = \
+            self._openTar( pathToMount, clearIndexCache, recursive, serializationBackend, gzipSeekPointSpacing )
 
         # make the mount point read only and executable if readable, i.e., allow directory listing
-        # @todo In some cases, I even 2(!) '.' directories listed with ls -la!
+        # @todo In some cases, I even get 2(!) '.' directories listed with ls -la!
         #       But without this, the mount directory is owned by root
         tarStats = os.stat( pathToMount )
         # clear higher bits like S_IFREG and set the directory bit instead
@@ -1557,6 +1516,61 @@ class TarMount( fuse.Operations ):
                 os.rmdir( self.mountPoint )
         except:
             pass
+
+    @staticmethod
+    def _detectCompression( tarFile ):
+        for compression in [ '', 'bz2', 'gz', 'xz' ]:
+            try:
+                # Simply opening a TAR file should be fast as only the header should be read!
+                tarfile.open( tarFile, mode = 'r|' + compression )
+
+                if compression == 'bz2' and 'IndexedBzip2File' not in globals():
+                    raise Exception( "Can't open a bzip2 compressed TAR file without indexed_bzip2 module!" )
+                elif compression == 'gz' and 'IndexedGzipFile' not in globals():
+                    raise Exception( "Can't open a bzip2 compressed TAR file without indexed_gzip module!" )
+                elif compression == 'xz':
+                    raise Exception( "Can't open xz compressed TAR files!" )
+
+                return compression
+            except tarfile.ReadError:
+                None
+        raise Exception( f"File '{ tarFile }' does not seem to be a valid TAR file!" )
+
+    def _openTar( self, tarFilePath, clearIndexCache, recursive, serializationBackend, gzipSeekPointSpacing ):
+        rawFile = None
+        tarFile = open( tarFilePath, 'rb' )
+        compression = self._detectCompression( tarFilePath )
+
+        if compression == 'bz2':
+            rawFile = tarFile # save so that garbage collector won't close it!
+            tarFile = IndexedBzip2File( rawFile.fileno() )
+        elif compression == 'gz':
+            rawFile = tarFile # save so that garbage collector won't close it!
+            # drop_handles keeps a file handle opening as is required to call tell() during decoding
+            tarFile = IndexedGzipFile( fileobj = rawFile,
+                                       drop_handles = False,
+                                       spacing = gzipSeekPointSpacing )
+
+        if compression and serializationBackend != 'sqlite':
+            print( "[Warning] Only the SQLite backend has .tar.bz2 and .tar.gz support, therefore will use that!" )
+            serializationBackend = 'sqlite'
+
+        if serializationBackend != 'sqlite':
+            # To be deprecated
+            indexedTar = IndexedTar( tarFilePath,
+                                     writeIndex           = True,
+                                     clearIndexCache      = clearIndexCache,
+                                     recursive            = recursive,
+                                     serializationBackend = serializationBackend )
+        else:
+            indexedTar = SQLiteIndexedTar( tarFilePath,
+                                           tarFile,
+                                           writeIndex      = True,
+                                           clearIndexCache = clearIndexCache,
+                                           recursive       = recursive )
+
+        return indexedTar, tarFile, rawFile, compression
+
 
     @overrides( fuse.Operations )
     def getattr( self, path, fh = None ):
