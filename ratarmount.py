@@ -231,6 +231,8 @@ class SQLiteIndexedTar:
         # Version 0.2.0:
         #   - Add sparse support and 'offsetheader' and 'issparse' columns to the SQLite database
         #   - Add TAR file size metadata in order to quickly check whether the TAR changed
+        #   - Add 'offsetheader' to the primary key of the 'files' table so that files which were
+        #     updated in the TAR can still be accessed if necessary.
         self.__version__ = '0.2.0'
         self.parentFolderCache = []
         self.mountRecursively = recursive
@@ -361,7 +363,12 @@ class SQLiteIndexedTar:
                     /* True for valid TAR files. Internally used to determine where to mount recursive TAR files. */
                     "istar"         BOOL   ,
                     "issparse"      BOOL   ,  /* for sparse files the file size refers to the expanded size! */
-                    PRIMARY KEY (path,name) /* see SQL benchmarks for decision on this */
+                    /* See SQL benchmarks for decision on the primary key.
+                     * See also https://www.sqlite.org/optoverview.html
+                     * (path,name) tuples might appear multiple times in a TAR if it got updated.
+                     * In order to also be able to show older versions, we need to add
+                     * the offsetheader column to the primary key. */
+                    PRIMARY KEY (path,name,offsetheader)
                 );
                 /* "A table created using CREATE TABLE AS has no PRIMARY KEY and no constraints of any kind"
                  * Therefore, it will not be sorted and inserting will be faster! */
@@ -545,50 +552,7 @@ class SQLiteIndexedTar:
                    "<file object>" if self.tarFileName is None else self.tarFileName,
                    "took {:.2f}s".format( t1 - t0 ) )
 
-    def getFileInfo( self, fullPath, listDir = False ):
-        """
-        This is the heart of this class' public interface!
-
-        path    : full path to file where '/' denotes TAR's root, e.g., '/', or '/foo'
-        listDir : if True, return a dictionary for the given directory path: { fileName : FileInfo, ... }
-                  if False, return simple FileInfo to given path (directory or file)
-        if path does not exist, always return None
-        """
-        # @todo cache last listDir as most ofthen a stat over all entries will soon follow
-
-        # also strips trailing '/' except for a single '/' and leading '/'
-        fullPath = '/' + os.path.normpath( fullPath ).lstrip( '/' )
-        if listDir:
-            rows = self.sqlConnection.execute( 'SELECT * FROM "files" WHERE "path" == (?)',
-                                               ( fullPath.rstrip( '/' ), ) )
-            dir = {}
-            gotResults = False
-            for row in rows:
-                gotResults = True
-                if row['name']:
-                    dir[row['name']] = self.FileInfo(
-                        offset       = row['offset'],
-                        offsetheader = row['offsetheader'] if 'offsetheader' in row.keys() else 0,
-                        size         = row['size'],
-                        mtime        = row['mtime'],
-                        mode         = row['mode'],
-                        type         = row['type'],
-                        linkname     = row['linkname'],
-                        uid          = row['uid'],
-                        gid          = row['gid'],
-                        istar        = row['istar'],
-                        issparse     = row['issparse'] if 'issparse' in row.keys() else False
-                    )
-
-            return dir if gotResults else None
-
-        path, name = fullPath.rsplit( '/', 1 )
-        row = self.sqlConnection.execute( 'SELECT * FROM "files" WHERE "path" == (?) AND "name" == (?)',
-                                          ( path, name ) ).fetchone()
-
-        if row is None:
-            return None
-
+    def _rowToFileInfo( self, row ):
         return self.FileInfo(
             offset       = row['offset'],
             offsetheader = row['offsetheader'] if 'offsetheader' in row.keys() else 0,
@@ -602,6 +566,69 @@ class SQLiteIndexedTar:
             istar        = row['istar'],
             issparse     = row['issparse'] if 'issparse' in row.keys() else False
         )
+
+    def getFileInfo( self, fullPath, listDir = False, listVersions = False, fileVersion = 0 ):
+        """
+        This is the heart of this class' public interface!
+
+        path    : full path to file where '/' denotes TAR's root, e.g., '/', or '/foo'
+        listDir : if True, return a dictionary for the given directory path: { fileName : FileInfo, ... }
+                  if False, return simple FileInfo to given path (directory or file)
+        fileVersion : If the TAR contains the same file path multiple times, by default only the last one is shown.
+                      But with this argument other versions can be queried. Version 1 is the oldest one.
+                      Version 0 translates to the most recent one for compatibility with tar --occurrence=<number>.
+                      Version -1 translates to the second most recent, and so on.
+                      For listDir=True, the file version makes no sense and is ignored!
+                      So, even if a folder was overwritten by a file, which is already not well supported by tar,
+                      then listDir for that path will still list all contents of the overwritten folder or folders,
+                      no matter the specified version. The file system layer has to take care that a directory
+                      listing is not even requeted in the first place if it is not a directory.
+                      FUSE already does this by calling getattr for all parent folders in the specified path first.
+
+        If path does not exist, always return None
+
+        If listVersions is true, then return metadata for all versions of a file possibly appearing more than once
+        in the TAR as a directory dictionary. listDir will then be ignored!
+        """
+        # @todo cache last listDir as most often a stat over all entries will soon follow
+
+        assert isinstance( fileVersion, int )
+        # also strips trailing '/' except for a single '/' and leading '/'
+        fullPath = '/' + os.path.normpath( fullPath ).lstrip( '/' )
+
+        if listVersions:
+            path, name = fullPath.rsplit( '/', 1 )
+            rows = self.sqlConnection.execute(
+                'SELECT * FROM "files" WHERE "path" == (?) AND "name" == (?) ORDER BY "offsetheader" ASC',
+                ( path, name )
+            )
+            result = { str( version + 1 ) : self._rowToFileInfo( row ) for version, row in enumerate( rows ) }
+            return result
+
+        if listDir:
+            # For listing directory entries the file version can't be applied meaningfully at this abstraction layer.
+            # E.g., should it affect the file version of the directory to list, or should it work on the listed files
+            # instead and if so how exactly if there aren't the same versions for all files available, ...?
+            # Or, are folders assumed to be overwritten by a new folder entry in a TAR or should they be union mounted?
+            # If they should be union mounted, like is the case now, then the folder version only makes sense for
+            # its attributes.
+            rows = self.sqlConnection.execute( 'SELECT * FROM "files" WHERE "path" == (?)',
+                                               ( fullPath.rstrip( '/' ), ) )
+            dir = {}
+            gotResults = False
+            for row in rows:
+                gotResults = True
+                if row['name']:
+                    dir[row['name']] = self._rowToFileInfo( row )
+            return dir if gotResults else None
+
+        path, name = fullPath.rsplit( '/', 1 )
+        row = self.sqlConnection.execute(
+            'SELECT * FROM "files" WHERE "path" == (?) AND "name" == (?) ORDER BY "offsetheader" {} LIMIT 1 OFFSET (?)'
+            .format( 'DESC' if fileVersion is None or fileVersion <= 0 else 'ASC' ),
+            ( path, name, 0 if fileVersion is None else fileVersion - 1 if fileVersion > 0 else fileVersion )
+        ).fetchone()
+        return self._rowToFileInfo( row ) if row else None
 
     def isDir( self, path ):
         return isinstance( self.getFileInfo( path, listDir = True ), dict )
@@ -704,6 +731,7 @@ class SQLiteIndexedTar:
             # Check for pre-sparse support indexes
             if 'versions' not in tables or 'index' not in versions or versions['index'][1] < 2:
                 print( "[Warning] The found outdated index does not contain any sparse file information." )
+                print( "[Warning] The index will also miss data about multiple versions of a file." )
                 print( "[Warning] Please recreate the index if you have problems with those." )
 
             if 'metadata' in tables:
@@ -939,6 +967,7 @@ class TarMount( fuse.Operations ):
        - Forward access to mounted folders to the respective system calls
        - Resolve hard links returned by SQLiteIndexedTar
        - Get actual file contents either by directly reading from the TAR or by using StenciledFile and tarfile
+       - Provide hidden folders as an interface to get older versions of updated files
     """
 
     __slots__ = (
@@ -1030,21 +1059,153 @@ class TarMount( fuse.Operations ):
             issparse     = False
         )
 
-    def _getFileInfo( self, filePath ):
-        for mountSource in self.mountSources[::-1]:
+    def _getUnionMountFileInfo( self, filePath, fileVersion = 0 ):
+        """Returns the file info from the last (most recent) mount source in mountSources, which contains that file"""
+
+        if filePath == '/':
+            return self.rootFileInfo, None
+
+        # We need to keep the sign of the fileVersion in order to forward it to SQLiteIndexedTar.
+        # When the requested version can't be found in a mount source, increment negative specified versions
+        # by the amount of versions in that mount source or decrement the initially positive version.
+        if fileVersion <= 0:
+            for mountSource in reversed( self.mountSources ):
+                if isinstance( mountSource, str ):
+                    realFilePath = os.path.join( mountSource, filePath.lstrip( os.path.sep ) )
+                    if os.path.lexists( realFilePath ):
+                        if fileVersion == 0:
+                            return self._getFileInfoFromRealFile( realFilePath ), \
+                                   os.path.join( mountSource, filePath.lstrip( os.path.sep ) )
+                        fileVersion += 1
+
+                else:
+                    fileInfo = mountSource.getFileInfo( filePath, listDir = False, fileVersion = fileVersion )
+                    if isinstance( fileInfo, SQLiteIndexedTar.FileInfo ):
+                        return fileInfo, mountSource
+                    fileVersion += len( mountSource.getFileInfo( filePath, listVersions = True ) )
+
+                if fileVersion > 0:
+                    return None
+
+            return None
+
+        # fileVersion >= 1
+        for mountSource in self.mountSources:
             if isinstance( mountSource, str ):
                 realFilePath = os.path.join( mountSource, filePath.lstrip( os.path.sep ) )
                 if os.path.lexists( realFilePath ):
-                    return self._getFileInfoFromRealFile( realFilePath ), mountSource
+                    if fileVersion == 1:
+                        return self._getFileInfoFromRealFile( realFilePath ), \
+                               os.path.join( mountSource, filePath.lstrip( os.path.sep ) )
+                    fileVersion -= 1
 
             else:
-                fileInfo = mountSource.getFileInfo( filePath, listDir = False )
+                fileInfo = mountSource.getFileInfo( filePath, listDir = False, fileVersion = fileVersion )
                 if isinstance( fileInfo, SQLiteIndexedTar.FileInfo ):
                     return fileInfo, mountSource
+                fileVersion -= len( mountSource.getFileInfo( filePath, listVersions = True ) )
+
+            if fileVersion < 1:
+                return None
+
+        return None
+
+    def _decodeVersionsPathAPI( self, filePath ):
+        """
+        Do a loop over the parent path parts to resolve possible versions in parent folders.
+        Note that multiple versions of a folder always are union mounted. So, for the path to a file
+        inside those folders the exact version of a parent folder can simply be removed for lookup.
+        Therefore, translate something like: /foo.version/3/bar.version/2/mimi.version/1 into
+        /foo/bar/mimi.version/1
+        This is possibly time-costly but requesting a different version from the most recent should
+        be a rare occurence and FUSE also checks all parent parts before accessing a file so it
+        might only slow down access by roughly factor 2.
+        """
+
+        # @todo make it work for files ending with '.versions'.
+        # Currently, this feature would be hidden by those files. But, I think this should be quite rare.
+        # I could allow arbitrary amounts of dots like '....versions' but then it wouldn't be discernible
+        # for ...versions whether the versions of ..versions or .versions file was requested. I could add
+        # a rule for the decision, like ...versions shows the versions of .versions and ....versions for
+        # ..versions, however, all of this might require an awful lot of file existence checking.
+        # My first idea was to use hidden subfolders for each file like path/to/file/.versions/1 but FUSE
+        # checks the parents in a path that they are directories first, so getattr or readdir is not even
+        # called for path/to/file/.versions if path/to/file is not a directory.
+        # Another alternative might be one hidden folder at the root for a parallel file tree, like
+        # /.versions/path/to/file/3 but that runs into similar problems when trying to specify the file
+        # version or if a .versions root directory exists.
+
+        filePathParts = filePath.lstrip( '/' ).split( '/' )
+        filePath = ''
+        pathIsVersions = False
+        fileVersion = None # Not valid if None or parentIsVersions is True
+        for part in filePathParts:
+            # Skip over the exact version specified
+            if pathIsVersions:
+                try:
+                    fileVersion = int( part )
+                    assert str( fileVersion ) == part
+                except:
+                    return None
+                pathIsVersions = False
+                continue
+
+            # Simply append normal existing folders
+            tmpFilePath = '/'.join( [ filePath, part ] )
+            if self._getUnionMountFileInfo( tmpFilePath ):
+                filePath = tmpFilePath
+                fileVersion = 0
+                continue
+
+            # If current path does not exist, check if it is a special versions path
+            if part.endswith( '.versions' ) and len( part ) > len( '.versions' ):
+                pathIsVersions = True
+                filePath = tmpFilePath[:-len( '.versions' )]
+                continue
+
+            # Parent path does not exist and is not a versions path, so any subpaths also won't exist either
+            return None
+
+        return filePath, pathIsVersions, ( None if pathIsVersions else fileVersion )
+
+    def _getFileInfo( self, filePath ):
+        """Wrapper for _getUnionMountFileInfo, which also resolves special file version specifications in the path."""
+        result = self._getUnionMountFileInfo( filePath )
+        if result:
+            return result
+
+        # If no file was found, check if a special .versions folder to an existing file/folder was queried.
+        result = self._decodeVersionsPathAPI( filePath )
+        if not result:
+            raise fuse.FuseOSError( fuse.errno.ENOENT )
+        filePath, pathIsVersions, fileVersion = result
+
+        # 2.) Check if the request was for the special .versions folder and return its contents or stats
+        # At this point, filePath is assured to actually exist!
+        if pathIsVersions:
+            parentFileInfo, mountSource = self._getUnionMountFileInfo( filePath )
+            return SQLiteIndexedTar.FileInfo(
+                offset       = None                ,
+                offsetheader = None                ,
+                size         = 0                   ,
+                mtime        = parentFileInfo.mtime,
+                mode         = 0o777 | stat.S_IFDIR,
+                type         = tarfile.DIRTYPE     ,
+                linkname     = ""                  ,
+                uid          = parentFileInfo.uid  ,
+                gid          = parentFileInfo.gid  ,
+                istar        = False               ,
+                issparse     = False
+            ), mountSource
+
+        # 3.) At this point the request is for an actual version of a file or folder
+        result = self._getUnionMountFileInfo( filePath, fileVersion = fileVersion )
+        if result:
+            return result
 
         raise fuse.FuseOSError( fuse.errno.ENOENT )
 
-    def _listDir( self, folderPath ):
+    def _getUnionMountListDir( self, folderPath ):
         """
         Returns the set of all folder contents over all mount sources or None if the path was found in none of them.
         """
@@ -1075,10 +1236,7 @@ class TarMount( fuse.Operations ):
 
     @overrides( fuse.Operations )
     def getattr( self, path, fh = None ):
-        if path == '/':
-            fileInfo = self.rootFileInfo
-        else:
-            fileInfo, _ = self._getFileInfo( path )
+        fileInfo, _ = self._getFileInfo( path )
 
         # Dereference hard links
         if not stat.S_ISREG( fileInfo.mode ) and not stat.S_ISLNK( fileInfo.mode ) and fileInfo.linkname:
@@ -1102,10 +1260,38 @@ class TarMount( fuse.Operations ):
         yield '.'
         yield '..'
 
-        files = self._listDir( path )
-        if files:
+        files = self._getUnionMountListDir( path )
+        if files is not None:
             for key in files:
                 yield key
+            return
+
+        # If no folder was found, check whether the special .versions folder was requested
+        result = self._decodeVersionsPathAPI( path )
+        if not result:
+            return
+        path, pathIsVersions, fileVersion = result
+
+        if not pathIsVersions:
+            files = self._getUnionMountListDir( path )
+            if files is not None:
+                for key in files:
+                    yield key
+            return
+
+        # Print all available versions of the file at filePath as the contents of the special '.versions' folder
+        version = 0
+        for mountSource in self.mountSources:
+            if isinstance( mountSource, str ):
+                realPath = os.path.join( mountSource, path.lstrip( os.path.sep ) )
+                if os.path.lexists( realPath ):
+                    version += 1
+                    yield str( version )
+            else:
+                result = mountSource.getFileInfo( path, listVersions = True )
+                for x in result.keys():
+                    version += 1
+                    yield str( version )
 
     @overrides( fuse.Operations )
     def readlink( self, path ):
@@ -1124,7 +1310,7 @@ class TarMount( fuse.Operations ):
 
         # Handle access to underlying non-empty folder
         if isinstance( mountSource, str ):
-            f = open( os.path.join( mountSource, path.lstrip( os.path.sep ) ), 'rb' )
+            f = open( mountSource, 'rb' )
             f.seek( offset )
             return f.read( length )
 
@@ -1172,22 +1358,73 @@ class TarFileType:
             "If you are trying to open a bz2 or gzip compressed file make sure that you have the indexed_bzip2 "
             "and indexed_gzip modules installed.".format( tarFile ) )
 
+class CustomFormatter( argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter ):
+    pass
 
 def parseArgs( args = None ):
     parser = argparse.ArgumentParser(
-        formatter_class = argparse.ArgumentDefaultsHelpFormatter,
+        formatter_class = CustomFormatter,
         description = '''\
-        In order to reduce the mounting time, the created index for random access to files inside the tar will be saved to <path to tar>.index.sqlite. If it can't be saved there, it will be saved in ~/.ratarmount/<path to tar: '/' -> '_'>.index.sqlite.
+With ratarmount, you can:
+  - Mount a TAR file to a folder for read-only access
+  - Bind mount a folder to another folder for read-only access
+  - Union mount a list of TARs and folders to a folder for read-only access
+''',
+        epilog = '''\
+# Metadata Index Cache
 
-        Note that the things to be (union) mounted can be TARs and/or folders and because of that ratarmount can also be used to bind mount folders read-only to another path similar to bindfs and mount --bind.
-        If you want to "update" a folder with the contents of a given TAR, you will have to specify the folder both as a mount source and as the mount point:
-            ratarmount folder file.tar folder
-        The FUSE option -o nonempty will be automatically added if such a usage is detected.
-        If a file exists in both the folder and the file.tar, then the file from file.tar will be shown in the above usage.
-        If you instead want to show the file in the folder, you only have to swap the mount source order:
-            ratarmount file.tar folder folder
-        Even in this case the folder has to be specified twice or else it will only be recognized as the mount point not as a mount source.
-        ''' )
+In order to reduce the mounting time, the created index for random access
+to files inside the tar will be saved to these locations in order. A lower
+location will only be used if all upper locations can't be written to.
+
+    1. <path to tar>.index.sqlite
+    2. ~/.ratarmount/<path to tar: '/' -> '_'>.index.sqlite
+       E.g., ~/.ratarmount/_media_cdrom_programm.tar.index.sqlite
+
+# Bind Mounting
+
+The mount sources can be TARs and/or folders.  Because of that, ratarmount
+can also be used to bind mount folders read-only to another path similar to
+"bindfs" and "mount --bind". So, for:
+    ratarmount folder mountpoint
+all files in folder will now be visible in mountpoint.
+
+# Union Mounting
+
+If multiple mount sources are specified, the sources on the right side will be
+added to or update existing files from a mount source left of it. For example:
+    ratarmount folder1 folder2 mountpoint
+will make both, the files from folder1 and folder2, visible in mountpoint.
+If a file exists in both multiple source, then the file from the rightmost
+mount source will be used, which in the above example would be "folder2".
+
+If you want to update / overwrite a folder with the contents of a given TAR,
+you can specify the folder both as a mount source and as the mount point:
+    ratarmount folder file.tar folder
+The FUSE option -o nonempty will be automatically added if such a usage is
+detected. If you instead want to update a TAR with a folder, you only have to
+swap the two mount sources:
+    ratarmount file.tar folder folder
+
+# File versions
+
+If a file exists multiple times in a TAR or in multiple mount sources, then
+the hidden versions can be accessed through special <file>.versions folders.
+For example, consider:
+    ratarmount folder updated.tar mountpoint
+and the file "foo" exists both in the folder and in two different versions
+in "updated.tar". Then, you can list all three versions using:
+    ls -la mountpoint/foo.versions/
+        dr-xr-xr-x 2 user group     0 Apr 25 21:41 .
+        dr-x------ 2 user group 10240 Apr 26 15:59 ..
+        -r-x------ 2 user group   123 Apr 25 21:41 1
+        -r-x------ 2 user group   256 Apr 25 21:53 2
+        -r-x------ 2 user group  1024 Apr 25 22:13 3
+In this example, the oldest version has only 123 bytes while the newest and
+by default shown version has 1024 bytes. So, in order to look at the oldest
+version, you can simply do:
+    cat mountpoint/foo.versions/1
+''' )
 
     parser.add_argument(
         '-f', '--foreground', action='store_true', default = False,

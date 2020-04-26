@@ -409,6 +409,37 @@ checkUnionMount()
     done
 )
 
+checkUnionMountFileVersions()
+(
+    ratarmountScript=$( realpath -- ratarmount.py )
+    testsFolder="$( pwd )/tests"
+    cd -- "$( mktemp -d )"
+
+    tarFiles=( 'updated-file.tar' )
+
+    mkdir -p folder/foo/fighter
+    echo 'untarred' > folder/foo/fighter/ufo
+    mkdir emptyFolder
+
+    python3 "$ratarmountScript" emptyFolder folder "$testsFolder/updated-file.tar" emptyFolder folder mountPoint
+
+    untarredFileMd5=$( md5sum folder/foo/fighter/ufo 2>/dev/null | sed 's| .*||' )
+    verifyCheckSum mountPoint foo/fighter/ufo updated-file.tar "$untarredFileMd5" \
+        || returnError "File check failed"
+    verifyCheckSum mountPoint foo/fighter/ufo.versions/1 "$( pwd )" "$untarredFileMd5" \
+        || returnError "File check failed"
+    verifyCheckSum mountPoint foo/fighter/ufo.versions/2 "$( pwd )" 2709a3348eb2c52302a7606ecf5860bc \
+        || returnError "File check failed"
+    verifyCheckSum mountPoint foo/fighter/ufo.versions/3 "$( pwd )" 9a12be5ebb21d497bd1024d159f2cc5f \
+        || returnError "File check failed"
+    verifyCheckSum mountPoint foo/fighter/ufo.versions/4 "$( pwd )" b3de7534cbc8b8a7270c996235d0c2da \
+        || returnError "File check failed"
+    verifyCheckSum mountPoint foo/fighter/ufo.versions/5 "$( pwd )" "$untarredFileMd5" \
+        || returnError "File check failed"
+
+    funmount mountPoint
+)
+
 checkAutoMountPointCreation()
 (
     ratarmountScript=$( realpath -- ratarmount.py )
@@ -450,6 +481,23 @@ tests=(
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   03.sparse1.bin
     b3de7534cbc8b8a7270c996235d0c2da tests/concatenated.tar                       foo/fighter
     2709a3348eb2c52302a7606ecf5860bc tests/concatenated.tar                       foo/bar
+    b3de7534cbc8b8a7270c996235d0c2da tests/updated-file.tar                       foo/fighter/ufo
+    b3de7534cbc8b8a7270c996235d0c2da tests/updated-file.tar                       foo/fighter/ufo.versions/3
+    9a12be5ebb21d497bd1024d159f2cc5f tests/updated-file.tar                       foo/fighter/ufo.versions/2
+    2709a3348eb2c52302a7606ecf5860bc tests/updated-file.tar                       foo/fighter/ufo.versions/1
+    9a12be5ebb21d497bd1024d159f2cc5f tests/updated-folder-with-file.tar           foo
+    b3de7534cbc8b8a7270c996235d0c2da tests/updated-folder-with-file.tar           foo.versions/1/fighter
+    b3de7534cbc8b8a7270c996235d0c2da tests/updated-folder-with-file.tar           foo.versions/1/fighter.versions/2
+    2709a3348eb2c52302a7606ecf5860bc tests/updated-folder-with-file.tar           foo.versions/1/fighter.versions/1
+    b3de7534cbc8b8a7270c996235d0c2da tests/updated-folder-with-file.tar           foo.versions/2/fighter
+    b3de7534cbc8b8a7270c996235d0c2da tests/updated-folder-with-file.tar           foo.versions/2/fighter.versions/2
+    2709a3348eb2c52302a7606ecf5860bc tests/updated-folder-with-file.tar           foo.versions/2/fighter.versions/1
+    9a12be5ebb21d497bd1024d159f2cc5f tests/updated-folder-with-file.tar           foo.versions/3
+    b3de7534cbc8b8a7270c996235d0c2da tests/updated-file-with-folder.tar           foo/fighter
+    b3de7534cbc8b8a7270c996235d0c2da tests/updated-file-with-folder.tar           foo/fighter.versions/1
+    9a12be5ebb21d497bd1024d159f2cc5f tests/updated-file-with-folder.tar           foo.versions/1
+    b3de7534cbc8b8a7270c996235d0c2da tests/updated-file-with-folder.tar           foo.versions/2/fighter
+    b3de7534cbc8b8a7270c996235d0c2da tests/updated-file-with-folder.tar           foo.versions/2/fighter.versions/1
 )
 
 checkLinkInTAR tests/symlinks.tar foo ../foo
@@ -475,7 +523,8 @@ checkFileInTARPrefix foo/fighter tests/single-nested-file.tar ufo 2709a3348eb2c5
 
 checkAutomaticIndexRecreation || returnError 'Automatic index recreation test failed!'
 checkAutoMountPointCreation || returnError 'Automatic mount point creation test failed!'
-checkUnionMount || returnError 'union mounting test failed!'
+checkUnionMount || returnError 'Union mounting test failed!'
+checkUnionMountFileVersions || returnError 'Union mount file version access test failed!'
 
 #benchmarkSerialization # takes quite long, and a benchmark is not a test ...
 
