@@ -388,7 +388,7 @@ class SQLiteIndexedTar:
             # r: uses seeks to skip to the next file inside the TAR while r| doesn't do any seeks.
             # r| might be slower but for compressed files we have to go over all the data once anyways
             # and I had problems with seeks at this stage. Maybe they are gone now after the bz2 bugfix though.
-            loadedTarFile = tarfile.open( fileobj = fileObject, mode = 'r|' if streamed else 'r:' )
+            loadedTarFile = tarfile.open( fileobj = fileObject, mode = 'r|' if streamed else 'r:', ignore_zeros = True )
         except tarfile.ReadError as exception:
             print( "Archive can't be opened! This might happen for compressed TAR archives, "
                    "which currently is not supported." )

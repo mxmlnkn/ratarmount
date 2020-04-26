@@ -402,6 +402,8 @@ tests=(
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   01.sparse1.bin
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   02.normal1.bin
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   03.sparse1.bin
+    b3de7534cbc8b8a7270c996235d0c2da tests/concatenated.tar                       foo/fighter
+    2709a3348eb2c52302a7606ecf5860bc tests/concatenated.tar                       foo/bar
 )
 
 # SQLite backend tests
