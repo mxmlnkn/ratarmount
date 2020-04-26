@@ -52,7 +52,6 @@ returnError()
 
 checkFileInTAR()
 {
-    local type="$1"; shift
     local archive="$1"; shift
     local fileInTar="$1"; shift
     local correctChecksum="$1"
@@ -62,7 +61,7 @@ checkFileInTAR()
     funmount "$mountFolder"
 
     # try with index recreation
-    local cmd=( python3 ratarmount.py -c --recursive --serialization-backend "$type" "$archive" "$mountFolder" )
+    local cmd=( python3 ratarmount.py -c --recursive "$archive" "$mountFolder" )
     "${cmd[@]}" &>/dev/null
     checkStat "$mountFolder" || returnError "${cmd[*]}"
     checkStat "$mountFolder/$fileInTar" || returnError "${cmd[*]}"
@@ -70,7 +69,7 @@ checkFileInTAR()
     funmount "$mountFolder"
 
     # retry without forcing index recreation
-    local cmd=( python3 ratarmount.py --recursive --serialization-backend "$type" "$archive" "$mountFolder" )
+    local cmd=( python3 ratarmount.py --recursive "$archive" "$mountFolder" )
     "${cmd[@]}" &>/dev/null
     checkStat "$mountFolder" || returnError "${cmd[*]}"
     checkStat "$mountFolder/$fileInTar" || returnError "${cmd[*]}"
@@ -86,7 +85,6 @@ checkFileInTAR()
 
 checkFileInTARPrefix()
 {
-    # Prefixing support only works for SQLite backend, therefore it does not take a backend/type parameter
     local prefix="$1"; shift
     local archive="$1"; shift
     local fileInTar="$1"; shift
@@ -221,12 +219,6 @@ memoryUsage()
 testLargeTar()
 {
     local fileNameDataSizeInMB="$1"
-    local serializationLibrary="$2"
-
-    local extraArgs=()
-    if test -n "$serializationLibrary"; then
-        extraArgs=( '--serialization-backend' "$serializationLibrary" )
-    fi
 
     local largeTar="tests/large-tar-with-$fileNameDataSizeInMB-MiB-metadata.tar"
     if ! test -f "$largeTar"; then
@@ -242,7 +234,7 @@ testLargeTar()
 
     # benchmark creating the index
 
-    python3 ./ratarmount.py -c -f --recursive "${extraArgs[@]}" "$largeTar" "$mountFolder" &
+    python3 ./ratarmount.py -c -f --recursive "$largeTar" "$mountFolder" &
     local ratarmountPid="$!"
     #trap "kill $ratarmountPid" SIGINT SIGTERM # for some reason makes the program unclosable ...
 
@@ -257,7 +249,7 @@ testLargeTar()
 
     # do again but this time benchmark loading the created index
 
-    python3 ./ratarmount.py -f --recursive "${extraArgs[@]}" "$largeTar" "$mountFolder" &
+    python3 ./ratarmount.py -f --recursive "$largeTar" "$mountFolder" &
     local ratarmountPid="$!"
 
     local timeSeriesFile="benchmark-memory-${fileNameDataSizeInMB}-MiB-loading.dat"
@@ -291,35 +283,27 @@ benchmarkSerialization()
     echo '# tarMiB indexCreationTime serializationTime serializedSize deserializationTime peakVmSizeCreation peakRssSizeCreation peakVmSizeLoading peakRssSizeLoading' >> "$logFile"
     mkdir -p -- "$benchmarksFolder"
 
-    local type mib compression compressions
+    local mib
     for mib in 1 8 64 256; do
-        for type in sqlite custom pickle2 pickle3 cbor msgpack rapidjson ujson simplejson; do
-            compressions=( '' '.gz' '.lz4' )
-            if [[ "$type" == 'sqlite' ]]; then compressions=( '' ); fi
-            for compression in "${compressions[@]}"; do
-                echoerr "Benchmarking ${type}.${compression} ..."
+        echoerr "Benchmarking ${mib}MiB TAR metadata ..."
 
-                printf '%i ' "$mib" >> "$logFile"
+        printf '%i ' "$mib" >> "$logFile"
 
-                testLargeTar "$mib" "${type}${compression}" | sed -n -r '
-                    s|Creating offset dictionary for /[^:]*.tar took ([0-9.]+)s|\1|p;
-                    s|Writing out TAR.* took ([0-9.]+)s and is sized ([0-9]+) B|\1 \2|p;
-                    s|Loading offset dictionary.* took ([0-9.]+)s|\1|p;
-                ' | sed -z 's|\n| |g' >> "$logFile"
+        testLargeTar "$mib" | sed -n -r '
+            s|Creating offset dictionary for /[^:]*.tar took ([0-9.]+)s|\1|p;
+            s|Writing out TAR.* took ([0-9.]+)s and is sized ([0-9]+) B|\1 \2|p;
+            s|Loading offset dictionary.* took ([0-9.]+)s|\1|p;
+        ' | sed -z 's|\n| |g' >> "$logFile"
 
-                # not nice but hard to do differently as the pipe opens testLargeTar in a subshell and tee
-                # redirects it directly to tty, so we can't store an output!
-                local timeSeriesFile="benchmark-memory-${mib}-MiB-saving.dat"
-                printf '%s %s ' $( getPeakMemoryFromFile "$timeSeriesFile" ) >> "$logFile"
-                'mv' "$timeSeriesFile" "$benchmarksFolder/${type}${compression}-$timeSeriesFile"
+        # not nice but hard to do differently as the pipe opens testLargeTar in a subshell and tee
+        # redirects it directly to tty, so we can't store an output!
+        local timeSeriesFile="benchmark-memory-${mib}-MiB-saving.dat"
+        printf '%s %s ' $( getPeakMemoryFromFile "$timeSeriesFile" ) >> "$logFile"
+        'mv' "$timeSeriesFile" "$benchmarksFolder/$timeSeriesFile"
 
-                local timeSeriesFile="benchmark-memory-${mib}-MiB-loading.dat"
-                printf '%s %s ' $( getPeakMemoryFromFile "$timeSeriesFile" ) >> "$logFile"
-                'mv' "$timeSeriesFile" "$benchmarksFolder/${type}${compression}-$timeSeriesFile"
-
-                echo " # ${type}${compression}" >> "$logFile"
-            done
-        done
+        local timeSeriesFile="benchmark-memory-${mib}-MiB-loading.dat"
+        printf '%s %s ' $( getPeakMemoryFromFile "$timeSeriesFile" ) >> "$logFile"
+        'mv' "$timeSeriesFile" "$benchmarksFolder/$timeSeriesFile"
     done
 }
 
@@ -468,24 +452,20 @@ tests=(
     2709a3348eb2c52302a7606ecf5860bc tests/concatenated.tar                       foo/bar
 )
 
-# SQLite backend tests
-
 checkLinkInTAR tests/symlinks.tar foo ../foo
 checkLinkInTAR tests/symlinks.tar python /usr/bin/python
 
-echoerr "=== Testing SQLite Backend ==="
-
 for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
-    checkFileInTAR sqlite "${tests[iTest+1]}" "${tests[iTest+2]}" "${tests[iTest]}"
+    checkFileInTAR "${tests[iTest+1]}" "${tests[iTest+2]}" "${tests[iTest]}"
 
     tmpBz2=$( mktemp --suffix='.tar.bz2' )
     bzip2 --keep --stdout "${tests[iTest+1]}" > "$tmpBz2"
-    checkFileInTAR sqlite "$tmpBz2" "${tests[iTest+2]}" "${tests[iTest]}"
+    checkFileInTAR "$tmpBz2" "${tests[iTest+2]}" "${tests[iTest]}"
     'rm' -- "$tmpBz2"
 
     tmpGz=$( mktemp --suffix='.tar.gz' )
     gzip --keep --stdout "${tests[iTest+1]}" > "$tmpGz"
-    checkFileInTAR sqlite "$tmpGz" "${tests[iTest+2]}" "${tests[iTest]}"
+    checkFileInTAR "$tmpGz" "${tests[iTest+2]}" "${tests[iTest]}"
     'rm' -- "$tmpGz"
 done
 
@@ -496,33 +476,6 @@ checkFileInTARPrefix foo/fighter tests/single-nested-file.tar ufo 2709a3348eb2c5
 checkAutomaticIndexRecreation || returnError 'Automatic index recreation test failed!'
 checkAutoMountPointCreation || returnError 'Automatic mount point creation test failed!'
 checkUnionMount || returnError 'union mounting test failed!'
-
-# Deprecated serialization backend tests
-
-tests=(
-    d3b07384d113edec49eaa6238ad5ff00 tests/single-file.tar                        bar
-    d3b07384d113edec49eaa6238ad5ff00 tests/single-file-with-leading-dot-slash.tar bar
-    2b87e29fca6ee7f1df6c1a76cb58e101 tests/folder-with-leading-dot-slash.tar      foo/bar
-    2709a3348eb2c52302a7606ecf5860bc tests/folder-with-leading-dot-slash.tar      foo/fighter/ufo
-    2709a3348eb2c52302a7606ecf5860bc tests/single-nested-file.tar                 foo/fighter/ufo
-    2709a3348eb2c52302a7606ecf5860bc tests/single-nested-folder.tar               foo/fighter/ufo
-    2709a3348eb2c52302a7606ecf5860bc tests/nested-tar.tar                         foo/fighter/ufo
-    2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar.tar                         foo/lighter.tar/fighter/bar
-    2709a3348eb2c52302a7606ecf5860bc tests/nested-tar-with-overlapping-name.tar   foo/fighter/ufo
-    2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar-with-overlapping-name.tar   foo/fighter.tar/fighter/bar
-    2709a3348eb2c52302a7606ecf5860bc tests/hardlink.tar                           hardlink/ufo
-    2709a3348eb2c52302a7606ecf5860bc tests/hardlink.tar                           hardlink/natsu
-)
-
-for type in custom pickle2 pickle3 cbor msgpack rapidjson ujson simplejson; do
-    compressions=( '' '.gz' '.lz4' )
-    for compression in "${compressions[@]}"; do
-        echoerr "=== Testing Serialization Backend: ${type}${compression} ==="
-        for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
-            checkFileInTAR "${type}${compression}" "${tests[iTest+1]}" "${tests[iTest+2]}" "${tests[iTest]}"
-        done
-    done
-done
 
 #benchmarkSerialization # takes quite long, and a benchmark is not a test ...
 
