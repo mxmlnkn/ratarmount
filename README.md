@@ -33,34 +33,37 @@ python3 -m pip install --user .
 ratarmount --help
 ```
 
-You can also simply download [ratarmount.py](https://github.com/mxmlnkn/ratarmount/raw/master/ratarmount.py) and call it directly but then BZip2 support will not work and you will have to install the dependencies manually, so at least `pip3 install --user fusepy`.
+You can also simply download [ratarmount.py](https://github.com/mxmlnkn/ratarmount/raw/master/ratarmount.py) and call it directly after installing the dependencies manually with: `pip3 install --user fusepy indexed_bzip2`.
 
-If you want to use other serialization backends instead of the default SQLite one, then either install those packages manually or install ratarmount by specifying the `legacy-serializers` feature:
+If you want to use other serialization backends instead of the default SQLite one, e.g., because you still have indexes lying around created with those backends and don't want to spend time recreating them, then you'll have to install a version older than 0.5.0 with the optional `legacy-serializers` feature:
 
 ```
-pip install ratarmount[legacy-serializers]
+pip install ratarmount[legacy-serializers]==0.4.1
 ```
 
 # Usage
 
 ```
-usage: ratarmount.py [-h] [-f] [-d DEBUG] [-c] [-r] [-s SERIALIZATION_BACKEND]
-                     [-p PREFIX] [--fuse FUSE]
-                     tar-file-path [mount-path]
+usage: ratarmount.py [-h] [-f] [-d DEBUG] [-c] [-r]
+                     [-gs GZIP_SEEK_POINT_SPACING] [-p PREFIX] [-o FUSE] [-v]
+                     mount_source [mount_source ...] [mount_point]
 
-If no mount path is specified, then the tar will be mounted to a folder of the
-same name but without a file extension. TAR files contained inside the tar and
-even TARs in TARs in TARs will be mounted recursively at folders of the same
-name barred the file extension '.tar'. In order to reduce the mounting time,
-the created index for random access to files inside the tar will be saved to
-<path to tar>.index.<backend>[.<compression]. If it can't be saved there, it
-will be saved in ~/.ratarmount/<path to tar: '/' ->
-'_'>.index.<backend>[.<compression].
+With ratarmount, you can:
+  - Mount a TAR file to a folder for read-only access
+  - Bind mount a folder to another folder for read-only access
+  - Union mount a list of TARs and folders to a folder for read-only access
 
 positional arguments:
-  tar-file-path         The path to the TAR archive to be mounted.
-  mount-path            The path to a folder to mount the TAR contents into.
-                        (default: None)
+  mount_source          The path to the TAR archive to be mounted. If multiple
+                        archives and/or folders are specified, then they will
+                        be mounted as if the arguments coming first were
+                        updated with the contents of the archives or folders
+                        specified thereafter, i.e., the list of TARs and
+                        folders will be union mounted.
+  mount_point           The path to a folder to mount the TAR contents into.
+                        If no mount path is specified, the TAR will be mounted
+                        to a folder of the same name but without a file
+                        extension. (default: None)
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -78,28 +81,86 @@ optional arguments:
                         will be effectively ignored. Recreate the index if you
                         want change the recursive mounting policy anyways.
                         (default: False)
-  -s SERIALIZATION_BACKEND, --serialization-backend SERIALIZATION_BACKEND
-                        (deprecated) Specify which library to use for writing
-                        out the TAR index. Supported keywords: (none,pickle,pi
-                        ckle2,pickle3,custom,cbor,msgpack,rapidjson,ujson,simp
-                        lejson,sqlite)[.(lz4,gz)] (default: sqlite)
+  -gs GZIP_SEEK_POINT_SPACING, --gzip-seek-point-spacing GZIP_SEEK_POINT_SPACING
+                        This only is applied when the index is first created
+                        or recreated with the -c option. The spacing given in
+                        MiB specifies the seek point distance in the
+                        uncompressed data. A distance of 16MiB means that
+                        archives smaller than 16MiB in uncompressed size will
+                        not benefit from faster seek times. A seek point takes
+                        roughly 32kiB. So, smaller distances lead to more
+                        responsive seeking but may explode the index size!
+                        (default: 16)
   -p PREFIX, --prefix PREFIX
-                        The specified path to the folder inside the TAR will
-                        be mounted to root. This can be useful when the
-                        archive as created with absolute paths. E.g., for an
-                        archive created with `tar -P cf
-                        /var/log/apt/history.log`, -p /var/log/apt/ can be
-                        specified so that the mount target directory
+                        [deprecated] Use "-o modules=subdir,subdir=<prefix>"
+                        instead. This standard way utilizes FUSE itself and
+                        will also work for other FUSE applications. So, it is
+                        preferable even if a bit more verbose.The specified
+                        path to the folder inside the TAR will be mounted to
+                        root. This can be useful when the archive as created
+                        with absolute paths. E.g., for an archive created with
+                        `tar -P cf /var/log/apt/history.log`, -p /var/log/apt/
+                        can be specified so that the mount target directory
                         >directly< contains history.log. (default: )
-  --fuse FUSE           Comma separated FUSE options. See "man mount.fuse" for
+  -o FUSE, --fuse FUSE  Comma separated FUSE options. See "man mount.fuse" for
                         help. Example: --fuse
                         "allow_other,entry_timeout=2.8,gid=0". (default: )
+  -v, --version         Print version string. (default: False)
+
+# Metadata Index Cache
+
+In order to reduce the mounting time, the created index for random access
+to files inside the tar will be saved to these locations in order. A lower
+location will only be used if all upper locations can't be written to.
+
+    1. <path to tar>.index.sqlite
+    2. ~/.ratarmount/<path to tar: '/' -> '_'>.index.sqlite
+       E.g., ~/.ratarmount/_media_cdrom_programm.tar.index.sqlite
+
+# Bind Mounting
+
+The mount sources can be TARs and/or folders.  Because of that, ratarmount
+can also be used to bind mount folders read-only to another path similar to
+"bindfs" and "mount --bind". So, for:
+    ratarmount folder mountpoint
+all files in folder will now be visible in mountpoint.
+
+# Union Mounting
+
+If multiple mount sources are specified, the sources on the right side will be
+added to or update existing files from a mount source left of it. For example:
+    ratarmount folder1 folder2 mountpoint
+will make both, the files from folder1 and folder2, visible in mountpoint.
+If a file exists in both multiple source, then the file from the rightmost
+mount source will be used, which in the above example would be "folder2".
+
+If you want to update / overwrite a folder with the contents of a given TAR,
+you can specify the folder both as a mount source and as the mount point:
+    ratarmount folder file.tar folder
+The FUSE option -o nonempty will be automatically added if such a usage is
+detected. If you instead want to update a TAR with a folder, you only have to
+swap the two mount sources:
+    ratarmount file.tar folder folder
+
+# File versions
+
+If a file exists multiple times in a TAR or in multiple mount sources, then
+the hidden versions can be accessed through special <file>.versions folders.
+For example, consider:
+    ratarmount folder updated.tar mountpoint
+and the file "foo" exists both in the folder and in two different versions
+in "updated.tar". Then, you can list all three versions using:
+    ls -la mountpoint/foo.versions/
+        dr-xr-xr-x 2 user group     0 Apr 25 21:41 .
+        dr-x------ 2 user group 10240 Apr 26 15:59 ..
+        -r-x------ 2 user group   123 Apr 25 21:41 1
+        -r-x------ 2 user group   256 Apr 25 21:53 2
+        -r-x------ 2 user group  1024 Apr 25 22:13 3
+In this example, the oldest version has only 123 bytes while the newest and
+by default shown version has 1024 bytes. So, in order to look at the oldest
+version, you can simply do:
+    cat mountpoint/foo.versions/1
 ```
-
-Index files are if possible created to / if existing loaded from these file locations in order:
-
-  - `<path to tar>.index.<serialization backend>`
-  - `~/.tarmount/<path to tar: '/' -> '_'>.index.<serialization backend>`
 
 
 # The Problem
@@ -142,7 +203,7 @@ Pros:
 
 Ratarmount creates an index file with file names, ownership, permission flags, and offset information to be stored at the TAR file's location or inside `~/.ratarmount/` and then offers a FUSE mount integration for easy access to the files.
 
-The test with the first version (50e8dbb), which used pickle serialization, for the ImageNet data set is promising:
+The test with the first version (50e8dbb), which used the removed pickle backend for serializing the metadata index, for the ImageNet data set is promising:
 
   - TAR size: 1.31TB
   - Contains TARs: yes
