@@ -3,7 +3,9 @@
 
 import argparse
 import bisect
+import bz2
 import collections
+import gzip
 import io
 import itertools
 import json
@@ -205,6 +207,7 @@ class SQLiteIndexedTar:
                          # from being closed by the garbage collector
         'tarFileObject', # file object to the uncompressed (or decompressed) TAR file to read actual data out of
         'compression',   # stores what kind of compression the originally specified TAR file uses.
+        'isTar',         # can be false for the degenerated case of only a bz2 or gz file not containing a TAR
     )
 
     # Names must be identical to the SQLite column headers!
@@ -248,7 +251,7 @@ class SQLiteIndexedTar:
         self.tarFileName = os.path.abspath( tarFileName )
         if not fileObject:
             fileObject = open( self.tarFileName, 'rb' )
-        self.tarFileObject, self.rawFileObject, self.compression = \
+        self.tarFileObject, self.rawFileObject, self.compression, self.isTar = \
             SQLiteIndexedTar._openCompressedFile( fileObject, gzipSeekPointSpacing )
 
         # will be used for storing indexes if current path is read-only
@@ -335,6 +338,23 @@ class SQLiteIndexedTar:
             PRAGMA SYNCHRONOUS = OFF;
         """ )
 
+    @staticmethod
+    def _updateProgressBar( progressBar, fileobj ):
+        try:
+            if 'IndexedBzip2File' in globals() and isinstance( fileobj, IndexedBzip2File ):
+                # Note that because bz2 works on a bitstream the tell_compressed returns the offset in bits
+                progressBar.update( fileobj.tell_compressed() // 8 )
+                return
+
+            if hasattr( fileobj, 'fileobj' ):
+                progressBar.update( fileobj.fileobj().tell() )
+                return
+
+            progressBar.update( fileobj.tell() )
+
+        except:
+            pass
+
     def createIndex( self, fileObject, progressBar = None, pathPrefix = '', streamOffset = 0 ):
         if printDebug >= 1:
             print( "Creating offset dictionary for",
@@ -389,17 +409,19 @@ class SQLiteIndexedTar:
             self.sqlConnection.executescript( createTables )
 
         # 2. Open TAR file reader
+        loadedTarFile = [] # Feign an empty TAR file if anything goes wrong
         try:
             streamed = ( 'IndexedBzip2File' in globals() and isinstance( fileObject, IndexedBzip2File ) ) or \
                        ( 'IndexedGzipFile' in globals() and isinstance( fileObject, IndexedGzipFile ) )
             # r: uses seeks to skip to the next file inside the TAR while r| doesn't do any seeks.
             # r| might be slower but for compressed files we have to go over all the data once anyways
             # and I had problems with seeks at this stage. Maybe they are gone now after the bz2 bugfix though.
-            loadedTarFile = tarfile.open( fileobj = fileObject, mode = 'r|' if streamed else 'r:', ignore_zeros = True )
+            # Note that with ignore_zeros = True, no invalid header issues or similar will be raised even for
+            # non TAR files!?
+            if self.isTar:
+                loadedTarFile = tarfile.open( fileobj = fileObject, mode = 'r|' if streamed else 'r:', ignore_zeros = True )
         except tarfile.ReadError as exception:
-            print( "Archive can't be opened! This might happen for compressed TAR archives, "
-                   "which currently is not supported." )
-            raise exception
+            pass
 
         if progressBar is None:
             progressBar = ProgressBar( os.fstat( fileObject.fileno() ).st_size )
@@ -410,18 +432,7 @@ class SQLiteIndexedTar:
             loadedTarFile.members = []
             globalOffset = streamOffset + tarInfo.offset_data
             globalOffsetHeader = streamOffset + tarInfo.offset
-            if 'IndexedBzip2File' in globals() and isinstance( fileObject, IndexedBzip2File ):
-                # We will have to adjust the global offset to a rough estimate of the real compressed size.
-                # Note that tell_compressed is always one bzip2 block further, which leads to underestimated
-                # file compression ratio especially in the beginning.
-                progressBar.update( int( globalOffset * fileObject.tell_compressed() / 8 / fileObject.tell() ) )
-            elif 'IndexedGzipFile' in globals() and isinstance( fileObject, IndexedGzipFile ):
-                try:
-                    progressBar.update( int( globalOffset * fileObject.fileobj().tell() / fileObject.tell() ) )
-                except:
-                    progressBar.update( globalOffset )
-            else:
-                progressBar.update( globalOffset )
+            self._updateProgressBar( progressBar, fileObject )
 
             mode = tarInfo.mode
             if tarInfo.isdir() : mode |= stat.S_IFDIR
@@ -481,6 +492,42 @@ class SQLiteIndexedTar:
             if 'unexpected end of data' in str( e ):
                 print( "[Warning] The TAR file is incomplete. Ratarmount will work but some files might be cut off. "
                        "If the TAR file size changes, ratarmount will recreate the index during the next mounting." )
+
+        # If no file is in the TAR, then it most likely indicates a possibly compressed non TAR file.
+        # In that case add that itself to the file index. This won't work when called recursively,
+        # so check stream offset.
+        fileCount = self.sqlConnection.execute( 'SELECT COUNT(*) FROM "files";' ).fetchone()[0]
+        if streamOffset == 0 and fileCount == 0:
+            tarInfo = os.fstat( fileObject.fileno() )
+            fname = os.path.basename( self.tarFileName )
+            for suffix in [ '.gz', '.bz2', '.bzip2', '.gzip' ]:
+                if fname.lower().endswith( suffix ) and len( fname ) > len( suffix ):
+                    fname = fname[:-len( suffix )]
+                    break
+
+            # If the file object is actually an IndexedBzip2File or such, we can't directly use the file size
+            # from os.stat and instead have to gather it from seek. Unfortunately, indexed_gzip does not support
+            # io.SEEK_END even though it could as it has the index ...
+            while fileObject.read( 1024*1024 ):
+                self._updateProgressBar( progressBar, fileObject )
+            fileSize = fileObject.tell()
+
+            fileInfo = (
+                ""                 , # 0 path
+                fname              , # 1
+                None               , # 2 header offset
+                0                  , # 3 data offset
+                fileSize           , # 4
+                tarInfo.st_mtime   , # 5
+                tarInfo.st_mode    , # 6
+                None               , # 7 TAR file type. Don't care because it curerntly is unused and overlaps with mode
+                None               , # 8 linkname
+                tarInfo.st_uid     , # 9
+                tarInfo.st_gid     , # 10
+                False              , # 11 isTar
+                False              , # 12 isSparse, don't care if it is actually sparse or not because it is not in TAR
+            )
+            self._setFileInfo( fileInfo )
 
         # 5. Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
         if openedConnection:
@@ -814,11 +861,13 @@ class SQLiteIndexedTar:
             oldOffset = fileobj.tell()
             if name is None:
                 name = fileobj.name
+        isTar = False
 
         for compression in [ '', 'bz2', 'gz', 'xz' ]:
             try:
                 # Simply opening a TAR file should be fast as only the header should be read!
                 tarfile.open( name = name, fileobj = fileobj, mode = 'r:' + compression )
+                isTar = True
 
                 if compression == 'bz2' and 'IndexedBzip2File' not in globals():
                     raise Exception( "Can't open a bzip2 compressed TAR file '{}' without indexed_bzip2 module!"
@@ -831,12 +880,24 @@ class SQLiteIndexedTar:
 
                 if oldOffset is not None:
                     fileobj.seek( oldOffset )
-                return compression
+
+                return isTar, compression
 
             except tarfile.ReadError as e:
                 if oldOffset is not None:
                     fileobj.seek( oldOffset )
-                pass
+
+            try:
+                if compression == 'bz2':
+                    bz2.open( fileobj if fileobj else name ).read( 1 )
+                    return isTar, compression
+
+                if compression == 'gz':
+                    gzip.open( fileobj if fileobj else name ).read( 1 )
+                    return isTar, compression
+            except:
+                if oldOffset is not None:
+                    fileobj.seek( oldOffset )
 
         raise Exception( "File '{}' does not seem to be a valid TAR file!".format( name ) )
 
@@ -845,7 +906,7 @@ class SQLiteIndexedTar:
         """Opens a file possibly undoing the compression."""
         rawFile = None
         tarFile = fileobj
-        compression = SQLiteIndexedTar._detectCompression( fileobj = tarFile )
+        isTar, compression = SQLiteIndexedTar._detectCompression( fileobj = tarFile )
 
         if compression == 'bz2':
             rawFile = tarFile # save so that garbage collector won't close it!
@@ -857,7 +918,7 @@ class SQLiteIndexedTar:
                                        drop_handles = False,
                                        spacing = gzipSeekPointSpacing )
 
-        return tarFile, rawFile, compression
+        return tarFile, rawFile, compression, isTar
 
     def _loadOrStoreCompressionOffsets( self ):
         # This should be called after the TAR file index is complete (loaded or created).
@@ -1352,17 +1413,33 @@ class TarFileType:
         self.mode = mode
 
     def __call__( self, tarFile ):
+        if not os.path.exists( tarFile ):
+            return
+
         for compression in self.compressions:
             try:
-                return ( tarfile.open( tarFile, mode = self.mode + ':' + compression ), compression )
+                tarfile.open( tarFile, mode = self.mode + ':' + compression )
+                return ( tarFile, compression )
             except tarfile.ReadError:
-                None
+                pass
 
-        raise argparse.ArgumentTypeError(
-            "Archive '{}' can't be opened!\n"
-            "This might happen for xz compressed TAR archives, which currently is not supported.\n"
-            "If you are trying to open a bz2 or gzip compressed file make sure that you have the indexed_bzip2 "
-            "and indexed_gzip modules installed.".format( tarFile ) )
+            try:
+                if compression == 'bz2':
+                    bz2.open( tarFile ).read( 1 )
+                    return ( tarFile, compression )
+                if compression == 'gz':
+                    gzip.open( tarFile ).read( 1 )
+                    return ( tarFile, compression )
+            except:
+                pass
+
+        msg = "Archive '{}' can't be opened!\n".format( tarFile )
+        msg += "This might happen for xz compressed TAR archives, which currently is not supported.\n"
+        if 'IndexedBzip2File' not in globals() or 'IndexedGzipFile' not in globals():
+            msg += "If you are trying to open a bz2 or gzip compressed file make sure that you have the indexed_bzip2 "\
+                   "and indexed_gzip modules installed."
+
+        raise argparse.ArgumentTypeError( msg )
 
 class CustomFormatter( argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter ):
     pass
@@ -1522,7 +1599,7 @@ version, you can simply do:
         compressions += [ 'bz2' ]
     if 'IndexedGzipFile' in globals():
         compressions += [ 'gz' ]
-    args.mount_source = [ TarFileType( mode = 'r', compressions = compressions )( tarFile )[0].name
+    args.mount_source = [ TarFileType( mode = 'r', compressions = compressions )( tarFile )[0]
                            if not os.path.isdir( tarFile ) else os.path.realpath( tarFile )
                            for tarFile in args.mount_source ]
 
