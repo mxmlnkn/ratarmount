@@ -457,6 +457,33 @@ checkAutoMountPointCreation()
 )
 
 
+checkTarEncoding()
+{
+    local archive="$1"; shift
+    local encoding="$1"; shift
+    local fileInTar="$1"; shift
+    local correctChecksum="$1"
+
+    local mountFolder="$( mktemp -d )"
+
+    funmount "$mountFolder"
+
+    # try with index recreation
+    local cmd=( python3 ratarmount.py -c --encoding "$encoding" --recursive "$archive" "$mountFolder" )
+    "${cmd[@]}" &>/dev/null
+    checkStat "$mountFolder" || returnError "${cmd[*]}"
+    checkStat "$mountFolder/$fileInTar" || returnError "${cmd[*]}"
+    verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum" || returnError "${cmd[*]}"
+    funmount "$mountFolder"
+
+    rmdir "$mountFolder"
+
+    echoerr "Tested succesfully '$fileInTar' in '$archive' for encoding $encoding"
+
+    return 0
+}
+
+
 python3 tests/tests.py || returnError "tests/tests.py"
 
 pylint --disable=C0326,C0103 ratarmount.py > pylint.log
@@ -499,6 +526,10 @@ tests=(
     b3de7534cbc8b8a7270c996235d0c2da tests/updated-file-with-folder.tar           foo.versions/2/fighter
     b3de7534cbc8b8a7270c996235d0c2da tests/updated-file-with-folder.tar           foo.versions/2/fighter.versions/1
 )
+
+checkTarEncoding tests/single-file.tar utf-8 bar d3b07384d113edec49eaa6238ad5ff00
+checkTarEncoding tests/single-file.tar latin1 bar d3b07384d113edec49eaa6238ad5ff00
+checkTarEncoding tests/special-char.tar latin1 'Datei-mit-dämlicher-Kodierung.txt' 2709a3348eb2c52302a7606ecf5860bc
 
 checkLinkInTAR tests/symlinks.tar foo ../foo
 checkLinkInTAR tests/symlinks.tar python /usr/bin/python

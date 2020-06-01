@@ -208,6 +208,7 @@ class SQLiteIndexedTar:
         'tarFileObject', # file object to the uncompressed (or decompressed) TAR file to read actual data out of
         'compression',   # stores what kind of compression the originally specified TAR file uses.
         'isTar',         # can be false for the degenerated case of only a bz2 or gz file not containing a TAR
+        'encoding',      # mainly forwarded to tarfile
     )
 
     # Names must be identical to the SQLite column headers!
@@ -221,6 +222,7 @@ class SQLiteIndexedTar:
         clearIndexCache = False,
         recursive       = False,
         gzipSeekPointSpacing = 4*1024*1024,
+        encoding        = tarfile.ENCODING,
     ):
         """
         tarFileName : Path to the TAR file to be opened. If not specified, a fileObject must be specified.
@@ -240,6 +242,7 @@ class SQLiteIndexedTar:
         self.parentFolderCache = []
         self.mountRecursively = recursive
         self.sqlConnection = None
+        self.encoding = encoding
 
         assert tarFileName or fileObject
         if not tarFileName:
@@ -252,7 +255,7 @@ class SQLiteIndexedTar:
         if not fileObject:
             fileObject = open( self.tarFileName, 'rb' )
         self.tarFileObject, self.rawFileObject, self.compression, self.isTar = \
-            SQLiteIndexedTar._openCompressedFile( fileObject, gzipSeekPointSpacing )
+            SQLiteIndexedTar._openCompressedFile( fileObject, gzipSeekPointSpacing, encoding )
 
         # will be used for storing indexes if current path is read-only
         possibleIndexFilePaths = [
@@ -419,7 +422,10 @@ class SQLiteIndexedTar:
             # Note that with ignore_zeros = True, no invalid header issues or similar will be raised even for
             # non TAR files!?
             if self.isTar:
-                loadedTarFile = tarfile.open( fileobj = fileObject, mode = 'r|' if streamed else 'r:', ignore_zeros = True )
+                loadedTarFile = tarfile.open( fileobj      = fileObject,
+                                              mode         = 'r|' if streamed else 'r:',
+                                              ignore_zeros = True,
+                                              encoding     = self.encoding )
         except tarfile.ReadError as exception:
             pass
 
@@ -701,8 +707,34 @@ class SQLiteIndexedTar:
 
     def _setFileInfo( self, row ):
         assert isinstance( row, tuple )
-        self.sqlConnection.execute( 'INSERT OR REPLACE INTO "files" VALUES (' +
-                                    ','.join( '?' * len( row ) ) + ');', row )
+        try:
+            self.sqlConnection.execute( 'INSERT OR REPLACE INTO "files" VALUES (' +
+                                        ','.join( '?' * len( row ) ) + ');', row )
+        except UnicodeEncodeError as e:
+            print( "[Warning] Problem caused by file name encoding when trying to insert this row:", row )
+            print( "[Warning] The file name will now be stored with the bad character being escaped" )
+            print( "[Warning] instead of being correctly interpreted." )
+            print( "[Warning] Please specify a suitable file name encoding using, e.g., --encoding iso-8859-1!" )
+            print( "[Warning] A list of possible encodings can be found here:" )
+            print( "[Warning] https://docs.python.org/3/library/codecs.html#standard-encodings" )
+
+            checkedRow = []
+            for x in list( row ): # check strings
+                if isinstance( x, str ):
+                    try:
+                        x.encode()
+                        checkedRow += [ x ]
+                    except UnicodeEncodeError:
+                        checkedRow += [ x.encode( self.encoding, 'surrogateescape' ) \
+                                         .decode( self.encoding, 'backslashreplace' ) ]
+                else:
+                    checkedRow += [ x ]
+
+            self.sqlConnection.execute( 'INSERT OR REPLACE INTO "files" VALUES (' +
+                                        ','.join( '?' * len( row ) ) + ');', tuple( checkedRow ) )
+            print( "[Warning] The escaped inserted row is now:", row )
+            print()
+
         self._tryAddParentFolders( row[0] )
 
     def setFileInfo( self, fullPath, fileInfo ):
@@ -854,7 +886,7 @@ class SQLiteIndexedTar:
         return self.indexIsLoaded()
 
     @staticmethod
-    def _detectCompression( name = None, fileobj = None ):
+    def _detectCompression( name = None, fileobj = None, encoding = tarfile.ENCODING ):
         oldOffset = None
         if fileobj:
             assert fileobj.seekable()
@@ -866,7 +898,7 @@ class SQLiteIndexedTar:
         for compression in [ '', 'bz2', 'gz', 'xz' ]:
             try:
                 # Simply opening a TAR file should be fast as only the header should be read!
-                tarfile.open( name = name, fileobj = fileobj, mode = 'r:' + compression )
+                tarfile.open( name = name, fileobj = fileobj, mode = 'r:' + compression, encoding = encoding )
                 isTar = True
 
                 if compression == 'bz2' and 'IndexedBzip2File' not in globals():
@@ -902,11 +934,11 @@ class SQLiteIndexedTar:
         raise Exception( "File '{}' does not seem to be a valid TAR file!".format( name ) )
 
     @staticmethod
-    def _openCompressedFile( fileobj, gzipSeekPointSpacing ):
+    def _openCompressedFile( fileobj, gzipSeekPointSpacing, encoding ):
         """Opens a file possibly undoing the compression."""
         rawFile = None
         tarFile = fileobj
-        isTar, compression = SQLiteIndexedTar._detectCompression( fileobj = tarFile )
+        isTar, compression = SQLiteIndexedTar._detectCompression( fileobj = tarFile, encoding = encoding )
 
         if compression == 'bz2':
             rawFile = tarFile # save so that garbage collector won't close it!
@@ -1037,6 +1069,7 @@ class TarMount( fuse.Operations ):
         'mountPoint',
         'mountPointFd',
         'mountPointWasCreated',
+        'encoding',
     )
 
     def __init__(
@@ -1045,15 +1078,18 @@ class TarMount( fuse.Operations ):
         clearIndexCache = False,
         recursive = False,
         gzipSeekPointSpacing = 4*1024*1024,
-        mountPoint = None
+        mountPoint = None,
+        encoding = tarfile.ENCODING,
     ):
+        self.encoding = encoding
+
         try:
             os.fspath( pathToMount )
             pathToMount = [ pathToMount ]
         except:
             pass
 
-        self.mountSources = [ self._openTar( tarFile, clearIndexCache, recursive, gzipSeekPointSpacing )
+        self.mountSources = [ self._openTar( tarFile, clearIndexCache, recursive, gzipSeekPointSpacing, encoding )
                               if not os.path.isdir( tarFile ) else os.path.realpath( tarFile )
                               for tarFile in pathToMount ]
 
@@ -1096,12 +1132,13 @@ class TarMount( fuse.Operations ):
 
         os.close( self.mountPointFd )
 
-    def _openTar( self, tarFilePath, clearIndexCache, recursive, gzipSeekPointSpacing ):
+    def _openTar( self, tarFilePath, clearIndexCache, recursive, gzipSeekPointSpacing, encoding ):
         return SQLiteIndexedTar( tarFilePath,
                                  writeIndex           = True,
                                  clearIndexCache      = clearIndexCache,
                                  recursive            = recursive,
-                                 gzipSeekPointSpacing = gzipSeekPointSpacing  )
+                                 gzipSeekPointSpacing = gzipSeekPointSpacing,
+                                 encoding             = encoding )
 
     @staticmethod
     def _getFileInfoFromRealFile( filePath ):
@@ -1387,7 +1424,7 @@ class TarMount( fuse.Operations ):
             # the sparse file using StenciledFile and then use tarfile on it to expand the sparse file correctly.
             tarBlockSize = fileInfo.offset - fileInfo.offsetheader + fileInfo.size
             tarSubFile = StenciledFile( mountSource.tarFileObject, [ ( fileInfo.offsetheader, tarBlockSize ) ] )
-            tmpTarFile = tarfile.open( fileobj = tarSubFile, mode = 'r:' )
+            tmpTarFile = tarfile.open( fileobj = tarSubFile, mode = 'r:', encoding = self.encoding )
             tmpFileObject = tmpTarFile.extractfile( next( iter( tmpTarFile ) ) )
             tmpFileObject.seek( offset, os.SEEK_SET )
             result = tmpFileObject.read( length )
@@ -1408,9 +1445,10 @@ class TarFileType:
     Similar to argparse.FileType but raises an exception if it is not a valid TAR file.
     """
 
-    def __init__( self, mode = 'r', compressions = [ '' ] ):
+    def __init__( self, mode = 'r', compressions = [ '' ], encoding = tarfile.ENCODING ):
         self.compressions = [ '' if c is None else c for c in compressions ]
         self.mode = mode
+        self.encoding = encoding
 
     def __call__( self, tarFile ):
         if not os.path.exists( tarFile ):
@@ -1418,7 +1456,7 @@ class TarFileType:
 
         for compression in self.compressions:
             try:
-                tarfile.open( tarFile, mode = self.mode + ':' + compression )
+                tarfile.open( tarFile, mode = self.mode + ':' + compression, encoding = self.encoding )
                 return ( tarFile, compression )
             except tarfile.ReadError:
                 pass
@@ -1560,6 +1598,12 @@ version, you can simply do:
                '>directly< contains history.log.' )
 
     parser.add_argument(
+        '-e', '--encoding', type = str, default = tarfile.ENCODING,
+        help = 'Specify an input encoding used for file names among others in the TAR. '
+               'This must be used when, e.g., trying to open a latin1 encoded TAR on an UTF-8 system. '
+               'Possible encodings: https://docs.python.org/3/library/codecs.html#standard-encodings' )
+
+    parser.add_argument(
         '-o', '--fuse', type = str, default = '',
         help = 'Comma separated FUSE options. See "man mount.fuse" for help. '
                'Example: --fuse "allow_other,entry_timeout=2.8,gid=0". ' )
@@ -1599,9 +1643,9 @@ version, you can simply do:
         compressions += [ 'bz2' ]
     if 'IndexedGzipFile' in globals():
         compressions += [ 'gz' ]
-    args.mount_source = [ TarFileType( mode = 'r', compressions = compressions )( tarFile )[0]
-                           if not os.path.isdir( tarFile ) else os.path.realpath( tarFile )
-                           for tarFile in args.mount_source ]
+    args.mount_source = [ TarFileType( mode = 'r', compressions = compressions, encoding = args.encoding )( tarFile )[0]
+                          if not os.path.isdir( tarFile ) else os.path.realpath( tarFile )
+                          for tarFile in args.mount_source ]
 
     # Automatically generate a default mount path
     if args.mount_point is None:
@@ -1642,7 +1686,8 @@ def cli( args = None ):
         clearIndexCache      = args.recreate_index,
         recursive            = args.recursive,
         gzipSeekPointSpacing = args.gzip_seek_point_spacing,
-        mountPoint           = args.mount_point )
+        mountPoint           = args.mount_point,
+        encoding             = args.encoding )
 
     fuse.FUSE( operations = fuseOperationsObject,
                mountpoint = args.mount_point,
