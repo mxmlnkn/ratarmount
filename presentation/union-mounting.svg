@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   width="526.75391"
+   height="278.94916"
+   viewBox="0 0 139.3703 73.805302"
+   version="1.1"
+   id="svg8">
+  <defs
+     id="defs2" />
+  <metadata
+     id="metadata5">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     id="layer1"
+     transform="translate(-33.622887,-80.116443)">
+    <text
+       id="text1349"
+       y="118.21513"
+       x="37.294231"
+       style="font-style:normal;font-weight:normal;font-size:4.23333311px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       xml:space="preserve"><tspan
+         style="stroke-width:0.26458332"
+         y="118.21513"
+         x="37.294231"
+         id="tspan1347">updated-settings.tar</tspan><tspan
+         id="tspan1351"
+         style="stroke-width:0.26458332"
+         y="123.5068"
+         x="37.294231">    auto.master</tspan><tspan
+         id="tspan1358"
+         style="stroke-width:0.26458332"
+         y="128.79846"
+         x="37.294231">    auto.master</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:4.23333311px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="92.838867"
+       y="91.56443"
+       id="text817"><tspan
+         id="tspan815"
+         x="92.838867"
+         y="91.56443"
+         style="font-weight:bold;font-size:4.23333311px;stroke-width:0.26458332">ratarmount</tspan></text>
+    <g
+       id="g879"
+       transform="translate(-5.291668,26.458335)">
+      <path
+         id="path871"
+         style="fill:none;stroke:#000000;stroke-width:0.5291667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+         d="m 46.963541,96.152893 -2.864026,-1.25e-4 -4.3e-5,-2.812148" />
+      <path
+         d="m 46.963541,96.152893 -2.864026,-1.25e-4"
+         style="fill:none;stroke:#000000;stroke-width:0.5291667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+         id="path1360" />
+      <path
+         id="path1362"
+         style="fill:none;stroke:#000000;stroke-width:0.5291667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+         d="m 46.963541,101.44456 -2.864026,-1.3e-4 -4.3e-5,-8.10381" />
+    </g>
+    <g
+       id="g1357"
+       transform="rotate(-90,66.603918,87.126466)">
+      <path
+         id="path1335"
+         d="m 56.260235,121.67118 v 9.88897"
+         style="fill:none;stroke:#000000;stroke-width:0.5291667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
+      <path
+         style="fill:none;stroke:#000000;stroke-width:0.5291667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+         d="m 57.318566,121.67118 v 9.88897"
+         id="path1337" />
+      <path
+         style="fill:none;stroke:#000000;stroke-width:0.5291667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+         d="m 59.69979,129.23511 -2.910417,2.85421 -2.910417,-2.85421"
+         id="path1339" />
+    </g>
+    <text
+       id="text872"
+       y="67.861145"
+       x="109.01972"
+       style="font-style:normal;font-weight:normal;font-size:4.23333359px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458335"
+       xml:space="preserve"><tspan
+         style="stroke-width:0.26458335"
+         y="71.606651"
+         x="109.01972"
+         id="tspan870" /></text>
+    <g
+       transform="translate(-42.333336)"
+       id="g902">
+      <text
+         id="text886"
+         y="91.870636"
+         x="79.671158"
+         style="font-style:normal;font-weight:normal;font-size:4.23333311px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+         xml:space="preserve"><tspan
+           style="stroke-width:0.26458332"
+           y="91.870636"
+           x="79.671158"
+           id="tspan874">old-settings.tar.bz2</tspan><tspan
+           dx="0 0"
+           id="tspan876"
+           style="stroke-width:0.26458332"
+           y="97.1623"
+           x="79.671158">    auto.master</tspan><tspan
+           id="tspan878"
+           style="stroke-width:0.26458332"
+           y="102.45397"
+           x="79.671158">    crontab</tspan></text>
+      <g
+         id="g900"
+         transform="translate(37.041668)">
+        <path
+           style="fill:none;stroke:#000000;stroke-width:0.5291667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+           d="M 46.963541,96.152893 H 43.986979"
+           id="path892" />
+        <path
+           d="m 46.963541,101.44456 -2.864025,-1.2e-4 -4.4e-5,-8.10382"
+           style="fill:none;stroke:#000000;stroke-width:0.5291667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+           id="path894" />
+      </g>
+    </g>
+    <g
+       id="g1058"
+       transform="translate(42.333333,5.2916668)">
+      <text
+         id="text1167"
+         y="91.874435"
+         x="79.729622"
+         style="font-style:normal;font-weight:normal;font-size:4.23333359px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458335"
+         xml:space="preserve"><tspan
+           style="stroke-width:0.26458335"
+           y="91.874435"
+           x="79.729622"
+           id="tspan1165">/etc/</tspan><tspan
+           id="tspan1169"
+           style="stroke-width:0.26458335"
+           y="97.1661"
+           x="79.729622">    auto.master</tspan><tspan
+           id="tspan1171"
+           style="stroke-width:0.26458335"
+           y="102.45777"
+           x="79.729622">    <tspan
+   id="tspan1193"
+   style="fill:#a9a9a9;fill-opacity:1">auto.master.versions</tspan></tspan><tspan
+           id="tspan1175"
+           style="fill:#d3d3d3;fill-opacity:1;stroke-width:0.26458335"
+           y="107.74944"
+           x="79.729622">         <tspan
+   id="tspan1195"
+   style="fill:#a9a9a9;fill-opacity:1">1</tspan></tspan><tspan
+           id="tspan1179"
+           style="fill:#d3d3d3;fill-opacity:1;stroke-width:0.26458335"
+           y="113.04111"
+           x="79.729622">         <tspan
+   id="tspan1197"
+   style="fill:#a9a9a9;fill-opacity:1">2</tspan></tspan><tspan
+           id="tspan1364"
+           style="fill:#d3d3d3;fill-opacity:1;stroke-width:0.26458335"
+           y="118.33277"
+           x="79.729622">         <tspan
+   id="tspan1366"
+   style="fill:#a9a9a9;fill-opacity:1">3</tspan></tspan><tspan
+           id="tspan1181"
+           style="stroke-width:0.26458335"
+           y="123.62444"
+           x="79.729622">    crontab</tspan><tspan
+           id="tspan1187"
+           style="fill:#a9a9a9;fill-opacity:1;stroke-width:0.26458335"
+           y="128.91611"
+           x="79.729622">    crontab.versions</tspan><tspan
+           id="tspan1183"
+           style="fill:#d3d3d3;fill-opacity:1;stroke-width:0.26458335"
+           y="134.20776"
+           x="79.729622">         <tspan
+   id="tspan1199"
+   style="fill:#a9a9a9;fill-opacity:1">1</tspan></tspan><tspan
+           id="tspan1185"
+           style="fill:#d3d3d3;fill-opacity:1;stroke-width:0.26458335"
+           y="139.49944"
+           x="79.729622">         <tspan
+   id="tspan1201"
+   style="fill:#a9a9a9;fill-opacity:1">2</tspan></tspan></text>
+      <g
+         transform="translate(37.041668)"
+         id="g1056">
+        <path
+           id="path1048"
+           d="M 46.963541,96.152893 H 43.986979"
+           style="fill:none;stroke:#000000;stroke-width:0.5291667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
+        <path
+           style="fill:none;stroke:#000000;stroke-width:0.5291667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+           d="M 46.963541,101.44456 H 43.986979"
+           id="path1050" />
+        <path
+           d="m 46.963541,127.90291 -2.864057,1.3e-4 -1.2e-5,-34.56242"
+           style="fill:none;stroke:#000000;stroke-width:0.5291667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+           id="path1152" />
+        <path
+           style="fill:none;stroke:#000000;stroke-width:0.5291667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+           d="M 46.963541,122.61124 H 43.986979"
+           id="path1368" />
+      </g>
+      <g
+         id="g1149"
+         transform="translate(42.333335,10.583334)">
+        <path
+           style="fill:none;stroke:#000000;stroke-width:0.5291667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+           d="M 46.963541,96.152893 H 43.986979"
+           id="path1141" />
+        <path
+           d="m 46.963541,106.73623 -2.864057,-1.3e-4 -1.2e-5,-13.39548"
+           style="fill:none;stroke:#000000;stroke-width:0.5291667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+           id="path1143" />
+        <path
+           id="path1370"
+           d="M 46.963541,101.44456 H 43.986979"
+           style="fill:none;stroke:#000000;stroke-width:0.5291667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
+      </g>
+      <g
+         transform="translate(42.333335,31.750002)"
+         id="g1207">
+        <path
+           id="path1203"
+           d="M 46.963541,101.44456 H 43.986979"
+           style="fill:none;stroke:#000000;stroke-width:0.5291667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
+        <path
+           id="path1205"
+           style="fill:none;stroke:#000000;stroke-width:0.5291667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+           d="m 46.963541,106.73623 -2.864057,-1.3e-4 -1.2e-5,-8.103813" />
+      </g>
+    </g>
+    <text
+       id="text1213"
+       y="84.655701"
+       x="34.958206"
+       style="font-style:normal;font-weight:normal;font-size:4.23333359px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458335"
+       xml:space="preserve"><tspan
+         style="stroke-width:0.26458335"
+         y="84.655701"
+         x="34.958206"
+         id="tspan1211">First input: compressed TAR</tspan></text>
+    <rect
+       y="87.026779"
+       x="35.493614"
+       height="17.59185"
+       width="45.662327"
+       id="rect1215"
+       style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.5291667;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
+    <rect
+       style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.58159137;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       id="rect1217"
+       width="46.968094"
+       height="16.931131"
+       x="35.519825"
+       y="113.51142" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:4.23333359px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458335"
+       x="34.958206"
+       y="111.11402"
+       id="text1221"><tspan
+         id="tspan1219"
+         x="34.958206"
+         y="111.11402"
+         style="stroke-width:0.26458335">Second input: simple TAR</tspan></text>
+    <g
+       transform="translate(0,5.2916667)"
+       id="g1345">
+      <g
+         id="g1028"
+         transform="translate(-42.333336,47.625003)">
+        <text
+           xml:space="preserve"
+           style="font-style:normal;font-weight:normal;font-size:4.23333311px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+           x="79.671158"
+           y="91.870636"
+           id="text998"><tspan
+             id="tspan986"
+             x="79.671158"
+             y="91.870636"
+             style="stroke-width:0.26458332">/etc/</tspan><tspan
+             x="79.671158"
+             y="97.1623"
+             style="stroke-width:0.26458332"
+             id="tspan988"
+             dx="0 0">    crontab</tspan></text>
+        <g
+           transform="translate(37.041668)"
+           id="g1012">
+          <path
+             id="path1004"
+             style="fill:none;stroke:#000000;stroke-width:0.5291667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+             d="m 46.963541,96.152893 -2.864028,-1.25e-4 -4.1e-5,-2.812148" />
+        </g>
+      </g>
+      <rect
+         style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.5291667;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+         id="rect1223"
+         width="25.46994"
+         height="12.390793"
+         x="35.493614"
+         y="134.65178" />
+      <text
+         xml:space="preserve"
+         style="font-style:normal;font-weight:normal;font-size:4.23333359px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458335"
+         x="34.958206"
+         y="132.28069"
+         id="text1227"><tspan
+           id="tspan1225"
+           x="34.958206"
+           y="132.28069"
+           style="stroke-width:0.26458335">Third input: folder</tspan></text>
+    </g>
+    <path
+       id="path1229"
+       d="m 83.998408,122.59291 c 20.554322,0 18.422772,-5.35404 37.585962,-5.35404"
+       style="fill:none;stroke:#000000;stroke-width:0.26458335;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.26458334, 0.26458334;stroke-dashoffset:0;stroke-opacity:1" />
+    <path
+       id="path1231"
+       d="m 82.915124,96.128649 c 20.914206,0 18.170676,15.756181 38.516276,15.756181"
+       style="fill:none;stroke:#000000;stroke-width:0.26458335;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.26458334, 0.26458334;stroke-dashoffset:0;stroke-opacity:1" />
+    <path
+       id="path1233"
+       d="m 121.15828,101.32972 c -16.0395,0 -15.98453,26.55486 -37.159872,26.55486 21.110522,0 15.932665,-5.35404 37.585962,-5.35404"
+       style="fill:none;stroke:#000000;stroke-width:0.26458335;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.26458334, 0.26458334;stroke-dashoffset:0;stroke-opacity:1" />
+    <path
+       id="path1235"
+       d="m 126.35935,143.64076 c -30.948623,0 -30.773628,5.0481 -63.942556,5.0481 33.440225,0 32.43672,-20.80428 59.200406,-20.80428"
+       style="fill:none;stroke:#000000;stroke-width:0.26458335;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.26458334, 0.26458334;stroke-dashoffset:0;stroke-opacity:1" />
+    <path
+       id="path1237"
+       d="m 82.762152,101.78864 c 23.471138,0 24.116298,36.49808 43.750168,36.49808"
+       style="fill:none;stroke:#000000;stroke-width:0.26458335;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.26458334, 0.26458334;stroke-dashoffset:0;stroke-opacity:1" />
+  </g>
+</svg>
