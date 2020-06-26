@@ -1251,6 +1251,12 @@ class TarMount( fuse.Operations ):
         statDict['st_mtime'] = int( statDict['st_mtime'] )
         statDict['st_nlink'] = 2
 
+        # du by default sums disk usage (the number of blocks used by a file)
+        # instead of file size directly. Tar files are usually a series of 512B
+        # blocks, so we report a 1-block header + ceil(filesize / 512).
+        statDict['st_blksize'] = 512
+        statDict['st_blocks'] = 1 + ((fileInfo.size + 511) // 512)
+
         return statDict
 
     @overrides( fuse.Operations )
