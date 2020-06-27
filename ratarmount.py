@@ -1249,7 +1249,7 @@ class TarMount( fuse.Operations ):
         # signal that everything was mounted read-only
         statDict['st_mode'] &= ~( stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH )
         statDict['st_mtime'] = int( statDict['st_mtime'] )
-        statDict['st_nlink'] = 2
+        statDict['st_nlink'] = 1  # TODO: this is wrong for files with hardlinks
 
         # du by default sums disk usage (the number of blocks used by a file)
         # instead of file size directly. Tar files are usually a series of 512B
