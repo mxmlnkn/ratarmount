@@ -743,7 +743,7 @@ class SQLiteIndexedTar:
                 if hasattr( tarStats, "st_size" ) and 'st_size' in values \
                    and tarStats.st_size != values['st_size']:
                     raise Exception( "TAR file for this SQLite index has changed size from",
-                                     tarStats.st_size, "to", values['st_size'] )
+                                     values['st_size'], "to", tarStats.st_size)
 
                 if hasattr( tarStats, "st_mtime" ) and 'st_mtime' in values \
                    and tarStats.st_mtime != values['st_mtime']:
