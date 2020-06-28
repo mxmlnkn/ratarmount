@@ -743,7 +743,7 @@ class SQLiteIndexedTar:
                 if hasattr( tarStats, "st_size" ) and 'st_size' in values \
                    and tarStats.st_size != values['st_size']:
                     raise Exception( "TAR file for this SQLite index has changed size from",
-                                     tarStats.st_size, "to", values['st_size'] )
+                                     values['st_size'], "to", tarStats.st_size)
 
                 if hasattr( tarStats, "st_mtime" ) and 'st_mtime' in values \
                    and tarStats.st_mtime != values['st_mtime']:
@@ -1249,7 +1249,13 @@ class TarMount( fuse.Operations ):
         # signal that everything was mounted read-only
         statDict['st_mode'] &= ~( stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH )
         statDict['st_mtime'] = int( statDict['st_mtime'] )
-        statDict['st_nlink'] = 2
+        statDict['st_nlink'] = 1  # TODO: this is wrong for files with hardlinks
+
+        # du by default sums disk usage (the number of blocks used by a file)
+        # instead of file size directly. Tar files are usually a series of 512B
+        # blocks, so we report a 1-block header + ceil(filesize / 512).
+        statDict['st_blksize'] = 512
+        statDict['st_blocks'] = 1 + ((fileInfo.size + 511) // 512)
 
         return statDict
 
