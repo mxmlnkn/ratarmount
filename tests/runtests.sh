@@ -59,7 +59,7 @@ checkFileInTAR()
     funmount "$mountFolder"
 
     # try with index recreation
-    local cmd=( python3 ratarmount.py -c --recursive "$archive" "$mountFolder" )
+    local cmd=( python3 ratarmount.py -c --ignore-zeros --recursive "$archive" "$mountFolder" )
     "${cmd[@]}" &>/dev/null
     checkStat "$mountFolder" || returnError "${cmd[*]}"
     checkStat "$mountFolder/$fileInTar" || returnError "${cmd[*]}"
@@ -67,7 +67,7 @@ checkFileInTAR()
     funmount "$mountFolder"
 
     # retry without forcing index recreation
-    local cmd=( python3 ratarmount.py --recursive "$archive" "$mountFolder" )
+    local cmd=( python3 ratarmount.py --ignore-zeros --recursive "$archive" "$mountFolder" )
     "${cmd[@]}" &>/dev/null
     checkStat "$mountFolder" || returnError "${cmd[*]}"
     checkStat "$mountFolder/$fileInTar" || returnError "${cmd[*]}"
@@ -320,7 +320,7 @@ checkAutomaticIndexRecreation()
 
     # 1. Check and create index
     python3 "$ratarmountScript" "$archive"
-    diff -- "$fileName" "$mountFolder/$fileName" || returnError 'Files differ!'
+    diff -- "$fileName" "$mountFolder/$fileName" || returnError 'Files differ on simple mount!'
     funmount "$mountFolder"
 
     # 2. Check that index does not get recreated normally
@@ -329,7 +329,7 @@ checkAutomaticIndexRecreation()
     [[ -f $indexFile ]] || returnError 'Index file not found!'
     lastModification=$( stat -c %Y -- "$indexFile" )
     python3 "$ratarmountScript" "$archive"
-    diff -- "$fileName" "$mountFolder/$fileName" || returnError 'Files differ!'
+    diff -- "$fileName" "$mountFolder/$fileName" || returnError 'Files differ on simple remount!'
     funmount "$mountFolder"
     [[ $lastModification -eq $( stat -c %Y -- "$indexFile" ) ]] || returnError 'Index changed even though TAR did not!'
 
@@ -340,9 +340,16 @@ checkAutomaticIndexRecreation()
     echo 'momo' > "$fileName"
     tar -cf "$archive" "$fileName"
 
+    # modification timestamp detection is turned off for now by default to facilitate index sharing because
+    # the mtime check can proove problematic as the mtime changes when downloading a file.
     python3 "$ratarmountScript" "$archive"
-    diff -- "$fileName" "$mountFolder/${fileName}" || returnError 'Files differ!'
+    diff -- "$fileName" "$mountFolder/${fileName}" && returnError 'Index should not have been recreated!'
     funmount "$mountFolder"
+
+    python3 "$ratarmountScript" --verify-mtime "$archive"
+    diff -- "$fileName" "$mountFolder/${fileName}" || returnError 'Files differ when trying to trigger index recreation!'
+    funmount "$mountFolder"
+
     [[ $lastModification -ne $( stat -c %Y -- "$indexFile" ) ]] || \
         returnError 'Index did not change even though TAR did!'
     lastModification=$( stat -c %Y -- "$indexFile" )

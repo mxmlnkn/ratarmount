@@ -196,33 +196,21 @@ class SQLiteIndexedTar:
     for all contained files in an index to support fast seeking to a given file.
     """
 
-    __slots__ = (
-        '__version__',
-        'tarFileName',
-        'mountRecursively',
-        'indexFileName',
-        'sqlConnection',
-        'parentFolderCache', # stores which parent folders were last tried to add to database and therefore do exist
-        'rawFileObject', # only set when opening a compressed file and only kept to keep the compressed file handle
-                         # from being closed by the garbage collector
-        'tarFileObject', # file object to the uncompressed (or decompressed) TAR file to read actual data out of
-        'compression',   # stores what kind of compression the originally specified TAR file uses.
-        'isTar',         # can be false for the degenerated case of only a bz2 or gz file not containing a TAR
-        'encoding',      # mainly forwarded to tarfile
-    )
-
     # Names must be identical to the SQLite column headers!
     FileInfo = collections.namedtuple( "FileInfo", "offsetheader offset size mtime mode type linkname uid gid istar issparse" )
 
     def __init__(
         self,
-        tarFileName     = None,
-        fileObject      = None,
-        writeIndex      = False,
-        clearIndexCache = False,
-        recursive       = False,
-        gzipSeekPointSpacing = 4*1024*1024,
-        encoding        = tarfile.ENCODING,
+        tarFileName                = None,
+        fileObject                 = None,
+        writeIndex                 = False,
+        clearIndexCache            = False,
+        recursive                  = False,
+        gzipSeekPointSpacing       = 4*1024*1024,
+        encoding                   = tarfile.ENCODING,
+        stripRecursiveTarExtension = False,
+        ignoreZeros                = False,
+        verifyModificationTime     = False,
     ):
         """
         tarFileName : Path to the TAR file to be opened. If not specified, a fileObject must be specified.
@@ -230,6 +218,12 @@ class SQLiteIndexedTar:
         fileObject : A io.IOBase derived object. If not specified, tarFileName will be opened.
                      If it is an instance of IndexedBzip2File or IndexedGzipFile, then the offset
                      loading and storing from and to the SQLite database is managed automatically by this class.
+        encoding : Will be forwarded to tarfile. Specifies how filenames inside the TAR are encoded.
+        ignoreZeros : Will be forwarded to tarfile. Specifies to not only skip zero blocks but also blocks with
+                      invalid data. Setting this to true can lead to some problems but is required to correctly
+                      read concatenated tars.
+        stripRecursiveTarExtension : If true and if recursive is also true, then a <file>.tar inside the current
+                                     tar will be mounted at <file>/ instead of <file>.tar/.
         """
         # Version 0.1.0:
         #   - Initial version
@@ -239,10 +233,15 @@ class SQLiteIndexedTar:
         #   - Add 'offsetheader' to the primary key of the 'files' table so that files which were
         #     updated in the TAR can still be accessed if necessary.
         self.__version__ = '0.2.0'
+
+        # stores which parent folders were last tried to add to database and therefore do exist
         self.parentFolderCache = []
         self.mountRecursively = recursive
         self.sqlConnection = None
         self.encoding = encoding
+        self.stripRecursiveTarExtension = stripRecursiveTarExtension
+        self.ignoreZeros = ignoreZeros
+        self.verifyModificationTime = verifyModificationTime
 
         assert tarFileName or fileObject
         if not tarFileName:
@@ -254,6 +253,12 @@ class SQLiteIndexedTar:
         self.tarFileName = os.path.abspath( tarFileName )
         if not fileObject:
             fileObject = open( self.tarFileName, 'rb' )
+
+        # rawFileObject : Only set when opening a compressed file and only kept to keep the
+        #                 compressed file handle from being closed by the garbage collector.
+        # tarFileObject : File object to the uncompressed (or decompressed) TAR file to read actual data out of.
+        # compression   : Stores what kind of compression the originally specified TAR file uses.
+        # isTar         : Can be false for the degenerated case of only a bz2 or gz file not containing a TAR
         self.tarFileObject, self.rawFileObject, self.compression, self.isTar = \
             SQLiteIndexedTar._openCompressedFile( fileObject, gzipSeekPointSpacing, encoding )
 
@@ -426,7 +431,7 @@ class SQLiteIndexedTar:
             if self.isTar:
                 loadedTarFile = tarfile.open( fileobj      = fileObject,
                                               mode         = 'r|' if streamed else 'r:',
-                                              ignore_zeros = True,
+                                              ignore_zeros = self.ignoreZeros,
                                               encoding     = self.encoding )
         except tarfile.ReadError as exception:
             pass
@@ -455,8 +460,12 @@ class SQLiteIndexedTar:
             fullPath = pathPrefix + "/" + os.path.normpath( tarInfo.name ).lstrip( '/' )
 
             # 4. Open contained TARs for recursive mounting
+            tarExtension = '.tar'
             isTar = False
-            if self.mountRecursively and tarInfo.isfile() and tarInfo.name.endswith( ".tar" ):
+            if self.mountRecursively and tarInfo.isfile() and tarInfo.name.endswith( tarExtension ):
+                if self.stripRecursiveTarExtension and len( tarExtension ) > 0 and fullPath.endswith( tarExtension ):
+                    fullPath = fullPath[:-len( tarExtension )]
+
                 oldPos = fileObject.tell()
                 fileObject.seek( globalOffset )
                 oldPrintName = self.tarFileName
@@ -843,7 +852,9 @@ class SQLiteIndexedTar:
                     raise Exception( "TAR file for this SQLite index has changed size from",
                                      values['st_size'], "to", tarStats.st_size)
 
-                if hasattr( tarStats, "st_mtime" ) and 'st_mtime' in values \
+                if self.verifyModificationTime \
+                   and hasattr( tarStats, "st_mtime" ) \
+                   and 'st_mtime' in values \
                    and tarStats.st_mtime != values['st_mtime']:
                     raise Exception( "The modification date for the TAR file", values['st_mtime'],
                                      "to this SQLite index has changed (" + str( tarStats.st_mtime ) + ")" )
@@ -1091,15 +1102,7 @@ class TarMount( fuse.Operations ):
         'encoding',
     )
 
-    def __init__(
-        self,
-        pathToMount,
-        clearIndexCache = False,
-        recursive = False,
-        gzipSeekPointSpacing = 4*1024*1024,
-        mountPoint = None,
-        encoding = tarfile.ENCODING,
-    ):
+    def __init__( self, pathToMount, mountPoint = None, encoding = tarfile.ENCODING, **sqliteIndexedTarOptions ):
         self.encoding = encoding
 
         try:
@@ -1108,7 +1111,10 @@ class TarMount( fuse.Operations ):
         except:
             pass
 
-        self.mountSources = [ self._openTar( tarFile, clearIndexCache, recursive, gzipSeekPointSpacing, encoding )
+        self.mountSources = [ SQLiteIndexedTar( tarFile,
+                                                writeIndex = True,
+                                                encoding = self.encoding,
+                                                **sqliteIndexedTarOptions )
                               if not os.path.isdir( tarFile ) else os.path.realpath( tarFile )
                               for tarFile in pathToMount ]
 
@@ -1150,14 +1156,6 @@ class TarMount( fuse.Operations ):
             pass
 
         os.close( self.mountPointFd )
-
-    def _openTar( self, tarFilePath, clearIndexCache, recursive, gzipSeekPointSpacing, encoding ):
-        return SQLiteIndexedTar( tarFilePath,
-                                 writeIndex           = True,
-                                 clearIndexCache      = clearIndexCache,
-                                 recursive            = recursive,
-                                 gzipSeekPointSpacing = gzipSeekPointSpacing,
-                                 encoding             = encoding )
 
     @staticmethod
     def _getFileInfoFromRealFile( filePath ):
@@ -1623,6 +1621,25 @@ version, you can simply do:
                'Possible encodings: https://docs.python.org/3/library/codecs.html#standard-encodings' )
 
     parser.add_argument(
+        '-i', '--ignore-zeros', action = 'store_true',
+        help = 'Ignore zeroed blocks in archive. Normally, two consecutive 512-blocks filled with zeroes mean EOF '
+               'and ratarmount stops reading after encountering them. This option instructs it to read further and '
+               'is useful when reading archives created with the -A option.' )
+
+    parser.add_argument(
+        '--verify-mtime', action = 'store_true',
+        help = 'By default, only the TAR file size is checked to match the one in the found existing ratarmount index. '
+               'If this option is specified, then also check the modification timestamp. But beware that the mtime '
+               'might change during copying or downloading without the contents changing. So, this check might cause '
+               'false positives.' )
+
+    parser.add_argument(
+        '-s', '--strip-recursive-tar-extension', action = 'store_true',
+        help = 'If true, then recursively mounted TARs named <file>.tar will be mounted at <file>/. '
+               'This might lead to folders of the same name being overwritten, so use with care. '
+               'The index needs to be (re)created to apply this option!' )
+
+    parser.add_argument(
         '-o', '--fuse', type = str, default = '',
         help = 'Comma separated FUSE options. See "man mount.fuse" for help. '
                'Example: --fuse "allow_other,entry_timeout=2.8,gid=0". ' )
@@ -1701,12 +1718,16 @@ def cli( args = None ):
     printDebug = args.debug
 
     fuseOperationsObject = TarMount(
-        pathToMount          = args.mount_source,
-        clearIndexCache      = args.recreate_index,
-        recursive            = args.recursive,
-        gzipSeekPointSpacing = args.gzip_seek_point_spacing,
-        mountPoint           = args.mount_point,
-        encoding             = args.encoding )
+        pathToMount                = args.mount_source,
+        clearIndexCache            = args.recreate_index,
+        recursive                  = args.recursive,
+        gzipSeekPointSpacing       = args.gzip_seek_point_spacing,
+        mountPoint                 = args.mount_point,
+        encoding                   = args.encoding,
+        ignoreZeros                = args.ignore_zeros,
+        verifyModificationTime     = args.verify_mtime,
+        stripRecursiveTarExtension = args.strip_recursive_tar_extension,
+    )
 
     fuse.FUSE( operations = fuseOperationsObject,
                mountpoint = args.mount_point,
