@@ -35,12 +35,10 @@ verifyCheckSum()
 funmount()
 {
     local mountFolder="$1"
-    if mountpoint "$mountFolder" &>/dev/null; then
+    while mountpoint "$mountFolder" &>/dev/null; do
+        sleep 0.2s
         fusermount -u "$mountFolder"
-        while mountpoint "$mountFolder" &>/dev/null; do
-            sleep 0.2s
-        done
-    fi
+    done
 }
 
 returnError()
@@ -525,6 +523,10 @@ tests=(
     9a12be5ebb21d497bd1024d159f2cc5f tests/updated-file-with-folder.tar           foo.versions/1
     b3de7534cbc8b8a7270c996235d0c2da tests/updated-file-with-folder.tar           foo.versions/2/fighter
     b3de7534cbc8b8a7270c996235d0c2da tests/updated-file-with-folder.tar           foo.versions/2/fighter.versions/1
+    b026324c6904b2a9cb4b88d6d61c81d1 tests/2k-recursive-tars.tar.bz2              mimi/00001.tar/foo
+    8f30b20831bade7a2236edf09a55af60 tests/2k-recursive-tars.tar.bz2              mimi/01333.tar/foo
+    f95f8943f6dcf7b3c1c8c2cab5455f8b tests/2k-recursive-tars.tar.bz2              mimi/02000.tar/foo
+    c157a79031e1c40f85931829bc5fc552 tests/2k-recursive-tars.tar.bz2              mimi/foo
 )
 
 checkTarEncoding tests/single-file.tar utf-8 bar d3b07384d113edec49eaa6238ad5ff00
@@ -535,17 +537,49 @@ checkLinkInTAR tests/symlinks.tar foo ../foo
 checkLinkInTAR tests/symlinks.tar python /usr/bin/python
 
 for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
-    checkFileInTAR "${tests[iTest+1]}" "${tests[iTest+2]}" "${tests[iTest]}"
+    checksum=${tests[iTest]}
+    tarPath=${tests[iTest+1]}
+    fileName=${tests[iTest+2]}
 
-    tmpBz2=$( mktemp --suffix='.tar.bz2' )
-    bzip2 --keep --stdout "${tests[iTest+1]}" > "$tmpBz2"
-    checkFileInTAR "$tmpBz2" "${tests[iTest+2]}" "${tests[iTest]}"
-    'rm' -- "$tmpBz2"
+    toCleanUp=()
+    tbz2Path=
+    tgzPath=
 
-    tmpGz=$( mktemp --suffix='.tar.gz' )
-    gzip --keep --stdout "${tests[iTest+1]}" > "$tmpGz"
-    checkFileInTAR "$tmpGz" "${tests[iTest+2]}" "${tests[iTest]}"
-    'rm' -- "$tmpGz"
+    mimeType=$( file --brief --mime-type -- "$tarPath" )
+    case $mimeType in
+        'application/x-bzip2')
+            tbz2Path=$tarPath
+            tarPath=$( mktemp --suffix='.tar' )
+            toCleanUp+=( "$tarPath" )
+            bzip2 --keep --stdout --decompress -- "$tbz2Path" > "$tarPath"
+            ;;
+        'application/gzip')
+            tgzPath=$tarPath
+            tarPath=$( mktemp --suffix='.tar' )
+            toCleanUp+=( "$tarPath" )
+            gzip --keep --stdout --decompress -- "$tgzPath" > "$tarPath"
+            ;;
+    esac
+
+    if [[ -z "$tbz2Path" ]]; then
+        tbz2Path=$( mktemp --suffix='.tar.bz2' )
+        toCleanUp+=( "$tbz2Path" )
+        bzip2 --keep --stdout "$tarPath" > "$tbz2Path"
+    fi
+
+    if [[ -z "$tgzPath" ]]; then
+        tgzPath=$( mktemp --suffix='.tar.gz' )
+        toCleanUp+=( "$tgzPath" )
+        gzip --keep --stdout "$tarPath" > "$tgzPath"
+    fi
+
+    checkFileInTAR "$tarPath" "$fileName" "$checksum"
+    checkFileInTAR "$tbz2Path" "$fileName" "$checksum"
+    checkFileInTAR "$tgzPath" "$fileName" "$checksum"
+
+    for tmpFile in "${toCleanUp[@]}"; do
+        command rm -- "$tmpFile"
+    done
 done
 
 checkFileInTARPrefix '' tests/single-nested-file.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc

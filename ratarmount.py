@@ -414,13 +414,15 @@ class SQLiteIndexedTar:
         # 2. Open TAR file reader
         loadedTarFile = [] # Feign an empty TAR file if anything goes wrong
         try:
-            streamed = ( 'IndexedBzip2File' in globals() and isinstance( fileObject, IndexedBzip2File ) ) or \
-                       ( 'IndexedGzipFile' in globals() and isinstance( fileObject, IndexedGzipFile ) )
+            streamed = bool( self.compression )
             # r: uses seeks to skip to the next file inside the TAR while r| doesn't do any seeks.
             # r| might be slower but for compressed files we have to go over all the data once anyways
             # and I had problems with seeks at this stage. Maybe they are gone now after the bz2 bugfix though.
             # Note that with ignore_zeros = True, no invalid header issues or similar will be raised even for
             # non TAR files!?
+            # Using r: is buggy because the bz2 readers tell() is buggy and returns the number of total decoded bytes.
+            # In seeking mode, tell() is used to initialize offset and offset_data so those are also bugged then!
+            # This has been fixed starting from indexed_bzip2 1.1.2.
             if self.isTar:
                 loadedTarFile = tarfile.open( fileobj      = fileObject,
                                               mode         = 'r|' if streamed else 'r:',
@@ -457,11 +459,15 @@ class SQLiteIndexedTar:
             if self.mountRecursively and tarInfo.isfile() and tarInfo.name.endswith( ".tar" ):
                 oldPos = fileObject.tell()
                 fileObject.seek( globalOffset )
-
                 oldPrintName = self.tarFileName
+
                 try:
                     self.tarFileName = tarInfo.name.lstrip( '/' ) # This is for output of the recursive call
-                    self.createIndex( fileObject, progressBar, fullPath, globalOffset if streamed else 0 )
+                    # StenciledFile's tell returns the offset inside the file chunk instead of the global one,
+                    # so we have to always communicate the offset of this chunk to the recursive call no matter
+                    # whether tarfile has streaming access or seeking access!
+                    tarFileObject = StenciledFile( fileObject, [ ( globalOffset, tarInfo.size ) ] )
+                    self.createIndex( tarFileObject, progressBar, fullPath, globalOffset )
 
                     # if the TAR file contents could be read, we need to adjust the actual
                     # TAR file's metadata to be a directory instead of a file
@@ -473,8 +479,9 @@ class SQLiteIndexedTar:
 
                 except tarfile.ReadError:
                     None
-                self.tarFileName = oldPrintName
 
+                self.tarFileName = oldPrintName
+                del tarFileObject
                 fileObject.seek( oldPos )
 
             path, name = fullPath.rsplit( "/", 1 )
