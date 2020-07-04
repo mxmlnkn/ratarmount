@@ -499,11 +499,20 @@ class SQLiteIndexedTar:
                 print( "[Warning] The TAR file is incomplete. Ratarmount will work but some files might be cut off. "
                        "If the TAR file size changes, ratarmount will recreate the index during the next mounting." )
 
+        # Everything below should not be done in a recursive call of createIndex
+        if streamOffset > 0:
+            t1 = timer()
+            if printDebug >= 1:
+                print( "Creating offset dictionary for",
+                       "<file object>" if self.tarFileName is None else self.tarFileName,
+                       "took {:.2f}s".format( t1 - t0 ) )
+            return
+
         # If no file is in the TAR, then it most likely indicates a possibly compressed non TAR file.
         # In that case add that itself to the file index. This won't work when called recursively,
         # so check stream offset.
         fileCount = self.sqlConnection.execute( 'SELECT COUNT(*) FROM "files";' ).fetchone()[0]
-        if streamOffset == 0 and fileCount == 0:
+        if fileCount == 0:
             tarInfo = os.fstat( fileObject.fileno() )
             fname = os.path.basename( self.tarFileName )
             for suffix in [ '.gz', '.bz2', '.bzip2', '.gzip' ]:
@@ -535,25 +544,28 @@ class SQLiteIndexedTar:
             )
             self._setFileInfo( fileInfo )
 
-        # 5. Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
-        if openedConnection:
-            if printDebug >= 2:
-                print( "Resorting files by path ..." )
+        # All the code below is for database finalizing which should not be done in a recursive call of createIndex!
+        if not openedConnection:
+            return
 
-            cleanupDatabase = """
-                INSERT OR REPLACE INTO "files" SELECT * FROM "filestmp" ORDER BY "path","name",rowid;
-                DROP TABLE "filestmp";
-                INSERT OR IGNORE INTO "files"
-                    /* path name offsetheader offset size mtime mode type linkname uid gid istar issparse */
-                    SELECT path,name,0,0,1,0,{},{},"",0,0,0,0
-                    FROM "parentfolders" ORDER BY "path","name";
-                DROP TABLE "parentfolders";
-            """.format( int( 0o555 | stat.S_IFDIR ), int( tarfile.DIRTYPE ) )
-            self.sqlConnection.executescript( cleanupDatabase )
+        # 5. Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
+        if printDebug >= 2:
+            print( "Resorting files by path ..." )
+
+        cleanupDatabase = """
+            INSERT OR REPLACE INTO "files" SELECT * FROM "filestmp" ORDER BY "path","name",rowid;
+            DROP TABLE "filestmp";
+            INSERT OR IGNORE INTO "files"
+                /* path name offsetheader offset size mtime mode type linkname uid gid istar issparse */
+                SELECT path,name,0,0,1,0,{},{},"",0,0,0,0
+                FROM "parentfolders" ORDER BY "path","name";
+            DROP TABLE "parentfolders";
+        """.format( int( 0o555 | stat.S_IFDIR ), int( tarfile.DIRTYPE ) )
+        self.sqlConnection.executescript( cleanupDatabase )
 
         # 6. Add Metadata
         metadataTables = """
-            /* empty table whose sole existence specifies that we finished iterating the tar */
+            /* This table's sole existence specifies that we finished iterating the tar for older ratarmount versions */
             CREATE TABLE "versions" (
                 "name"     VARCHAR(65535) NOT NULL, /* which component the version belongs to */
                 "version"  VARCHAR(65535) NOT NULL, /* free form version string */
