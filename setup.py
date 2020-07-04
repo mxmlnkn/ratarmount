@@ -11,7 +11,7 @@ with open( os.path.join( scriptPath, 'README.md' ), encoding = 'utf-8' ) as file
 
 setup(
     name             = 'ratarmount',
-    version          = '0.5.0',
+    version          = '0.6.0',
 
     description      = 'Random Access Read-Only Tar Mount',
     url              = 'https://github.com/mxmlnkn/ratarmount',

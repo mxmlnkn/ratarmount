@@ -1,5 +1,16 @@
 
-# Version 0.5.0 built on 2019-05-09
+# Version 0.6.0 built on 2020-10-02
+
+ - Fix bug with filename encoding on some special characters like accented vowels or umlauts.
+ - Add support to mount simple .gz or .bz2 files, which are not compressed TARs.
+ - Fix number of hardlinks being always shown as 2. Changed to show 1.
+ - Fix wrong size reporting when index size has changed.
+ - Fix blocksize and therefore `du` results always showing 0.
+ - Add command line option to turn on modification timestamp checking.
+ - Add command to mount recursive tars at folders where the .tar extension is stripped.
+ - Fix recursion limit hit when mounting a TAR with more than or equal 1000 contained TARs.
+
+# Version 0.5.0 built on 2020-05-09
 
  - Add support for sparse files inside the TAR.
  - Automatically detect if the TAR file has grown since the last index creation.
@@ -11,7 +22,7 @@
  - Detect changes in TAR files and recreate the index if so.
  - Remove support for old non-SQLite index backends.
 
-# Version 0.4.1 built on 2019-04-10
+# Version 0.4.1 built on 2020-04-10
 
  - Add option for gzip index seek point spacing to CLI.
  - Fix absolute symbolic links being stripped of their leading '/'.
