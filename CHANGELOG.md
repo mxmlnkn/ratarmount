@@ -1,4 +1,8 @@
 
+# Version 0.6.1 built on 2020-10-02
+
+ - Fix broken CLI and add test for it.
+
 # Version 0.6.0 built on 2020-10-02
 
  - Fix bug with filename encoding on some special characters like accented vowels or umlauts.
