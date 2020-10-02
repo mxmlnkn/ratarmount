@@ -1704,11 +1704,13 @@ version, you can simply do:
 
     return args
 
-def cli( args ):
-    args = parseArgs( args )
-    if args.version:
+def cli( args = None ):
+    tmpArgs = sys.argv if args is None else args
+    if '--version' in tmpArgs or '-v' in tmpArgs:
         print( "ratarmount", __version__ )
         return
+
+    args = parseArgs( args )
 
     # Convert the comma separated list of key[=value] options into a dictionary for fusepy
     fusekwargs = dict( [ option.split( '=', 1 ) if '=' in option else ( option, True )
