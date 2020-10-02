@@ -26,6 +26,8 @@ script:
   - pip install "$( find dist -name '*.tar.gz' | head -1)"[legacy-serializers]
   # test ratarmount
   - bash tests/runtests.sh
+  - ratarmount --help
+  - ratarmount --version
 
 env:
   global:
