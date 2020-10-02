@@ -123,10 +123,9 @@ class StenciledFile(io.BufferedIOBase):
 
     @overrides(io.BufferedIOBase)
     def close(self):
-        self.fileobj.close()
-
-    def closed(self):
-        return self.fileobj.closed()
+        # Don't close the object given to us
+        #self.fileobj.close()
+        pass
 
     @overrides(io.BufferedIOBase)
     def fileno(self):
