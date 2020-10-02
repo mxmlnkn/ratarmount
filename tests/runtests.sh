@@ -534,6 +534,8 @@ tests=(
     8f30b20831bade7a2236edf09a55af60 tests/2k-recursive-tars.tar.bz2              mimi/01333.tar/foo
     f95f8943f6dcf7b3c1c8c2cab5455f8b tests/2k-recursive-tars.tar.bz2              mimi/02000.tar/foo
     c157a79031e1c40f85931829bc5fc552 tests/2k-recursive-tars.tar.bz2              mimi/foo
+    19696f24a91fc4e8950026f9c801a0d0 tests/simple.bz2                             simple
+    19696f24a91fc4e8950026f9c801a0d0 tests/simple.gz                              simple
 )
 
 checkTarEncoding tests/single-file.tar utf-8 bar d3b07384d113edec49eaa6238ad5ff00
@@ -551,38 +553,41 @@ for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
     toCleanUp=()
     tbz2Path=
     tgzPath=
+    isSingleArchive=0
 
-    mimeType=$( file --brief --mime-type -- "$tarPath" )
-    case $mimeType in
-        'application/x-bzip2')
+    case "$tarPath" in
+        *.tar.bz2|*.tbz2)
             tbz2Path=$tarPath
             tarPath=$( mktemp --suffix='.tar' )
             toCleanUp+=( "$tarPath" )
             bzip2 --keep --stdout --decompress -- "$tbz2Path" > "$tarPath"
             ;;
-        'application/gzip')
+        *.tar.gz|*.tgz)
             tgzPath=$tarPath
             tarPath=$( mktemp --suffix='.tar' )
             toCleanUp+=( "$tarPath" )
             gzip --keep --stdout --decompress -- "$tgzPath" > "$tarPath"
             ;;
+        *.bz2|*.gz)
+            isSingleArchive=1
+            ;;
     esac
 
-    if [[ -z "$tbz2Path" ]]; then
+    if [[ -z "$tbz2Path" && "$isSingleArchive" -ne 1 ]]; then
         tbz2Path=$( mktemp --suffix='.tar.bz2' )
         toCleanUp+=( "$tbz2Path" )
         bzip2 --keep --stdout "$tarPath" > "$tbz2Path"
     fi
 
-    if [[ -z "$tgzPath" ]]; then
+    if [[ -z "$tgzPath" && "$isSingleArchive" -ne 1 ]]; then
         tgzPath=$( mktemp --suffix='.tar.gz' )
         toCleanUp+=( "$tgzPath" )
         gzip --keep --stdout "$tarPath" > "$tgzPath"
     fi
 
     checkFileInTAR "$tarPath" "$fileName" "$checksum"
-    checkFileInTAR "$tbz2Path" "$fileName" "$checksum"
-    checkFileInTAR "$tgzPath" "$fileName" "$checksum"
+    if [[ -f "$tbz2Path" ]]; then checkFileInTAR "$tbz2Path" "$fileName" "$checksum"; fi
+    if [[ -f "$tgzPath" ]]; then checkFileInTAR "$tgzPath" "$fileName" "$checksum"; fi
 
     for tmpFile in "${toCleanUp[@]}"; do
         command rm -- "$tmpFile"
