@@ -43,6 +43,7 @@ printDebug = 1
 def overrides( parentClass ):
     def overrider( method ):
         assert method.__name__ in dir( parentClass )
+        assert callable( getattr( parentClass, method.__name__ ) )
         return method
     return overrider
 
@@ -120,24 +121,30 @@ class StenciledFile(io.BufferedIOBase):
         assert i >= 0
         return i
 
+    @overrides(io.BufferedIOBase)
     def close(self):
         self.fileobj.close()
 
     def closed(self):
         return self.fileobj.closed()
 
+    @overrides(io.BufferedIOBase)
     def fileno(self):
         return self.fileobj.fileno()
 
+    @overrides(io.BufferedIOBase)
     def seekable(self):
         return self.fileobj.seekable()
 
+    @overrides(io.BufferedIOBase)
     def readable(self):
         return self.fileobj.readable()
 
+    @overrides(io.BufferedIOBase)
     def writable(self):
         return False
 
+    @overrides(io.BufferedIOBase)
     def read(self, size=-1):
         if size == -1:
             size = self.cumsizes[-1] - self.offset
@@ -165,6 +172,7 @@ class StenciledFile(io.BufferedIOBase):
 
         return result
 
+    @overrides(io.BufferedIOBase)
     def seek(self, offset, whence=io.SEEK_SET):
         if whence == io.SEEK_CUR:
             self.offset += offset
@@ -186,6 +194,7 @@ class StenciledFile(io.BufferedIOBase):
 
         return self.offset
 
+    @overrides(io.BufferedIOBase)
     def tell(self):
         return self.offset
 
