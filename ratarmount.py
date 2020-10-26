@@ -213,6 +213,7 @@ class SQLiteIndexedTar:
         fileObject                 = None,
         writeIndex                 = False,
         clearIndexCache            = False,
+        indexFileName              = None,
         recursive                  = False,
         gzipSeekPointSpacing       = 4*1024*1024,
         encoding                   = tarfile.ENCODING,
@@ -271,7 +272,7 @@ class SQLiteIndexedTar:
             SQLiteIndexedTar._openCompressedFile( fileObject, gzipSeekPointSpacing, encoding )
 
         # will be used for storing indexes if current path is read-only
-        possibleIndexFilePaths = [
+        possibleIndexFilePaths = [indexFileName] if indexFileName is not None else [
             self.tarFileName + ".index.sqlite",
             os.path.expanduser( os.path.join( "~", ".ratarmount",
                                               self.tarFileName.replace( "/", "_" ) + ".index.sqlite" ) )
@@ -1648,6 +1649,11 @@ version, you can simply do:
                'The index needs to be (re)created to apply this option!' )
 
     parser.add_argument(
+        '--index-file', type = str,
+        help = 'Specify a path to the .index.sqlite file.')
+
+
+    parser.add_argument(
         '-o', '--fuse', type = str, default = '',
         help = 'Comma separated FUSE options. See "man mount.fuse" for help. '
                'Example: --fuse "allow_other,entry_timeout=2.8,gid=0". ' )
@@ -1735,6 +1741,7 @@ def cli( args = None ):
         ignoreZeros                = args.ignore_zeros,
         verifyModificationTime     = args.verify_mtime,
         stripRecursiveTarExtension = args.strip_recursive_tar_extension,
+        indexFileName              = args.index_file,
     )
 
     fuse.FUSE( operations = fuseOperationsObject,
