@@ -272,7 +272,7 @@ class SQLiteIndexedTar:
             SQLiteIndexedTar._openCompressedFile( fileObject, gzipSeekPointSpacing, encoding )
 
         # will be used for storing indexes if current path is read-only
-        possibleIndexFilePaths = [indexFileName] if indexFileName is not None else [
+        possibleIndexFilePaths = [ os.path.abspath( indexFileName ) ] if indexFileName is not None else [
             self.tarFileName + ".index.sqlite",
             os.path.expanduser( os.path.join( "~", ".ratarmount",
                                               self.tarFileName.replace( "/", "_" ) + ".index.sqlite" ) )
@@ -298,7 +298,8 @@ class SQLiteIndexedTar:
             for indexPath in possibleIndexFilePaths:
                 try:
                     folder = os.path.dirname( indexPath )
-                    os.makedirs( folder, exist_ok = True )
+                    if folder:
+                        os.makedirs( folder, exist_ok = True )
 
                     f = open( indexPath, 'wb' )
                     f.write( b'\0' * 1024 * 1024 )
@@ -309,7 +310,13 @@ class SQLiteIndexedTar:
                     break
                 except IOError:
                     if printDebug >= 2:
+                        traceback.print_exc()
                         print( "Could not create file:", indexPath )
+
+        if not self.indexFileName:
+            raise Exception( "[Error] Could not find any existing index or writable location for an index in "
+                             + str( possibleIndexFilePaths ) )
+
 
         self.createIndex( self.tarFileObject )
         self._loadOrStoreCompressionOffsets()
@@ -1164,7 +1171,10 @@ class TarMount( fuse.Operations ):
         except:
             pass
 
-        os.close( self.mountPointFd )
+        try:
+            os.close( self.mountPointFd )
+        except:
+            pass
 
     @staticmethod
     def _getFileInfoFromRealFile( filePath ):
