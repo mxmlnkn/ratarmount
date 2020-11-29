@@ -25,7 +25,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install Dependencies
       run: |
-        sudo apt-get -y install bzip2 pbzip2 zstd # necessary for tests
+        sudo apt-get -y install bzip2 pbzip2 pixz zstd # necessary for tests
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade-strategy eager --upgrade cython twine pylint wheel
     - name: Pylint
@@ -36,7 +36,7 @@ jobs:
       run: |
         python3 setup.py sdist bdist_wheel
         twine check dist/*
-        python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )"
+        python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )[full]"
     - name: Test Simple Startup
       run: |
         ratarmount --help
