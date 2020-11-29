@@ -30,5 +30,14 @@ setup(
 
     py_modules       = [ 'ratarmount' ],
     install_requires = [ 'fusepy', 'indexed_gzip', 'indexed_bzip2>=1.1.2' ],
+    # Make these optional requirements because the have no binaries on PyPI meaning they are built from source
+    # and will fail if system dependencies are not installed.
+    extras_require   = {
+                            'full' : [ 'cffi', 'lzmaffi' ],
+                            # cffi dependency seems to be configured wrong in lzmaffi,
+                            # therefore also list it here before lzmaffi:
+                            # https://github.com/r3m0t/backports.lzma/issues/3
+                            'xz' : [ 'cffi', 'lzmaffi' ],
+                       },
     entry_points = { 'console_scripts': [ 'ratarmount=ratarmount:cli' ] }
 )

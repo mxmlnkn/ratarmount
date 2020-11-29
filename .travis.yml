@@ -15,10 +15,11 @@ python:
 
 before_install:
   - sudo apt-get update
-  - sudo apt-get -y install bzip2 pbzip2 # necessary for tests
+  - sudo apt-get -y install bzip2 pbzip2 xz-utils # necessary for tests
 
 install:
-  - pip install --upgrade-strategy eager --upgrade cython twine pylint
+  # For some reason, the cffi dependency of lzmaffi is not installed at the correct time automatically
+  - pip install --upgrade-strategy eager --upgrade cython twine pylint cffi
 
 script:
   # test whether installation from tarball works
