@@ -1,4 +1,9 @@
 
+# Version 0.7.0 built on 2020-12-xx
+
+ - Add CLI option to specify an index location.
+ - Add support for xz compressed TARs using the lzmaffi Python module.
+
 # Version 0.6.1 built on 2020-10-02
 
  - Fix broken CLI and add test for it.
