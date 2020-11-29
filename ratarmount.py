@@ -33,6 +33,11 @@ try:
 except ImportError:
     print( "[Warning] The indexed_gzip module was not found. Please install it to open gzip compressed TAR files!" )
 
+try:
+    import lzmaffi
+except ImportError:
+    print( "[Warning] The lzmaffi module was not found. Please install it to open xz compressed TAR files!" )
+
 import fuse
 
 
@@ -271,6 +276,19 @@ class SQLiteIndexedTar:
         self.tarFileObject, self.rawFileObject, self.compression, self.isTar = \
             SQLiteIndexedTar._openCompressedFile( fileObject, gzipSeekPointSpacing, encoding )
 
+        if self.compression == 'xz':
+            try:
+                if len( self.tarFileObject.block_boundaries ) <= 1:
+                    print( "[Warning] The specified file '{}'".format( self.tarFileName ) )
+                    print( "[Warning] is compressed using xz but only contains one xz block. This makes it " )
+                    print( "[Warning] impossible to use true seeking! Please (re)compress your TAR using pixz" )
+                    print( "[Warning] (see https://github.com/vasi/pixz) in order for ratarmount to do be able " )
+                    print( "[Warning] to do fast seeking to requested files." )
+                    print( "[Warning] As it is, each file access will decompress the whole TAR from the beginning!" )
+                    print()
+            except:
+                pass
+
         # will be used for storing indexes if current path is read-only
         possibleIndexFilePaths = [ os.path.abspath( indexFileName ) ] if indexFileName is not None else [
             self.tarFileName + ".index.sqlite",
@@ -362,8 +380,7 @@ class SQLiteIndexedTar:
             PRAGMA SYNCHRONOUS = OFF;
         """ )
 
-    @staticmethod
-    def _updateProgressBar( progressBar, fileobj ):
+    def _updateProgressBar( self, progressBar, fileobj ):
         try:
             if 'IndexedBzip2File' in globals() and isinstance( fileobj, IndexedBzip2File ):
                 # Note that because bz2 works on a bitstream the tell_compressed returns the offset in bits
@@ -372,6 +389,10 @@ class SQLiteIndexedTar:
 
             if hasattr( fileobj, 'fileobj' ):
                 progressBar.update( fileobj.fileobj().tell() )
+                return
+
+            if self.rawFileObject and hasattr( self.rawFileObject, 'tell' ):
+                progressBar.update( self.rawFileObject.tell() )
                 return
 
             progressBar.update( fileobj.tell() )
@@ -547,7 +568,7 @@ class SQLiteIndexedTar:
         if fileCount == 0:
             tarInfo = os.fstat( fileObject.fileno() )
             fname = os.path.basename( self.tarFileName )
-            for suffix in [ '.gz', '.bz2', '.bzip2', '.gzip' ]:
+            for suffix in [ '.gz', '.bz2', '.bzip2', '.gzip', '.xz' ]:
                 if fname.lower().endswith( suffix ) and len( fname ) > len( suffix ):
                     fname = fname[:-len( suffix )]
                     break
@@ -953,8 +974,9 @@ class SQLiteIndexedTar:
                 elif compression == 'gz' and 'IndexedGzipFile' not in globals():
                     raise Exception( "Can't open a bzip2 compressed TAR file '{}' without indexed_gzip module!"
                                      .format( name ) )
-                elif compression == 'xz':
-                    raise Exception( "Can't open xz compressed TAR file '{}'!".format( name ) )
+                elif compression == 'xz' and 'lzmaffi' not in globals():
+                    raise Exception( "Can't open xz compressed TAR file '{}' without lzmaffi module!"
+                                     .format( name ) )
 
                 if oldOffset is not None:
                     fileobj.seek( oldOffset )
@@ -973,6 +995,11 @@ class SQLiteIndexedTar:
                 if compression == 'gz':
                     gzip.open( fileobj if fileobj else name ).read( 1 )
                     return isTar, compression
+
+                if compression == 'xz':
+                    lzmaffi.open( fileobj if fileobj else name ).read( 1 )
+                    return isTar, compression
+
             except:
                 if oldOffset is not None:
                     fileobj.seek( oldOffset )
@@ -995,6 +1022,9 @@ class SQLiteIndexedTar:
             tarFile = IndexedGzipFile( fileobj = rawFile,
                                        drop_handles = False,
                                        spacing = gzipSeekPointSpacing )
+        elif compression == 'xz':
+            rawFile = tarFile # save so that garbage collector won't close it!
+            tarFile = lzmaffi.open( rawFile )
 
         return tarFile, rawFile, compression, isTar
 
@@ -1094,6 +1124,8 @@ class SQLiteIndexedTar:
                 db.execute( 'INSERT INTO gzipindex VALUES (?)', ( file.read(), ) )
             db.commit()
             os.remove( gzindex )
+
+        # Note that for xz seeking loading and storing block indexes is unnecessary because it has an index included!
 
 
 class TarMount( fuse.Operations ):
@@ -1504,6 +1536,9 @@ class TarFileType:
                 if compression == 'gz':
                     gzip.open( tarFile ).read( 1 )
                     return ( tarFile, compression )
+                if compression == 'xz':
+                    lzmaffi.open( tarFile ).read( 1 )
+                    return ( tarFile, compression )
             except:
                 pass
 
@@ -1703,6 +1738,8 @@ version, you can simply do:
         compressions += [ 'bz2' ]
     if 'IndexedGzipFile' in globals():
         compressions += [ 'gz' ]
+    if 'lzmaffi' in globals():
+        compressions += [ 'xz' ]
     args.mount_source = [ TarFileType( mode = 'r', compressions = compressions, encoding = args.encoding )( tarFile )[0]
                           if not os.path.isdir( tarFile ) else os.path.realpath( tarFile )
                           for tarFile in args.mount_source ]
@@ -1710,7 +1747,10 @@ version, you can simply do:
     # Automatically generate a default mount path
     if args.mount_point is None:
         tarPath = args.mount_source[0]
-        for doubleExtension in [ '.tar.bz2', '.tar.gz' ]:
+        for compression in compressions:
+            if not compression:
+                continue
+            doubleExtension = '.tar.' + compression
             if tarPath[-len( doubleExtension ):].lower() == doubleExtension.lower():
                 args.mount_point = tarPath[:-len( doubleExtension )]
                 break
