@@ -18,7 +18,7 @@ before_install:
   - sudo apt-get -y install bzip2 pbzip2 # necessary for tests
 
 install:
-  - pip install --upgrade-strategy eager --upgrade cython twine
+  - pip install --upgrade-strategy eager --upgrade cython twine pylint
 
 script:
   # test whether installation from tarball works
