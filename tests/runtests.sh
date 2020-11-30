@@ -491,7 +491,11 @@ checkTarEncoding()
 
 python3 tests/tests.py || returnError "tests/tests.py"
 
-pylint --disable=C0326,C0103 ratarmount.py > pylint.log
+pylint --disable=C0326,C0103,C0330,W0702,W0703 --max-line-length=120 ratarmount.py | tee pylint.log
+if 'grep' -q ': E[0-9]{4}: ' pylint.log; then
+    echoerr 'There were warnings during the pylint run!'
+    exit 1
+fi
 
 rm -f tests/*.index.*
 
