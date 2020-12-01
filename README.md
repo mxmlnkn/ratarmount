@@ -4,6 +4,8 @@
 [![Downloads](https://pepy.tech/badge/ratarmount/month)](https://pepy.tech/project/ratarmount/month)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](http://opensource.org/licenses/MIT)
 [![Build Status](https://travis-ci.org/mxmlnkn/ratarmount.svg?branch=master)](https://travis-ci.com/mxmlnkn/ratarmount)
+[![Discord](https://img.shields.io/discord/783411320354766878?label=discord)](https://discord.gg/Wra6t6akh2)
+[![Telegram](https://img.shields.io/badge/Chat-Telegram-%2330A3E6)](https://t.me/joinchat/FUdXxkXIv6c4Ib8bgaSxNg)
 
 Combines the random access indexing idea from [tarindexer](https://github.com/devsnd/tarindexer) and then **mounts** the **TAR** using [fusepy](https://github.com/fusepy/fusepy) for easy read-only access just like [archivemount](https://github.com/cybernoid/archivemount/).
 It also will mount TARs inside TARs inside TARs, ... **recursively** into folders of the same name, which is useful for the ImageNet data set.
@@ -24,16 +26,12 @@ You can simply install it from PyPI:
 pip install ratarmount
 ```
 
-Or, if you want to test the latest development version on a Debian-like system:
+Or, if you want to test the latest version:
 ```bash
-sudo apt-get update
-sudo apt-get install python3 python3-pip git
-git clone https://github.com/mxmlnkn/ratarmount.git
-python3 -m pip install --user .
-ratarmount --help
+pip install git+https://github.com/mxmlnkn/ratarmount.git@develop#egginfo=ratarmount
 ```
 
-You can also simply download [ratarmount.py](https://github.com/mxmlnkn/ratarmount/raw/master/ratarmount.py) and call it directly after installing the dependencies manually with: `pip3 install --user fusepy indexed_bzip2`.
+You can also simply download [ratarmount.py](https://github.com/mxmlnkn/ratarmount/raw/master/ratarmount.py) and call it directly after installing the dependencies manually with: `pip3 install --user fusepy indexed_bzip2 indexed_gzip lzmaffi`.
 
 If you want to use other serialization backends instead of the default SQLite one, e.g., because you still have indexes lying around created with those backends and don't want to spend time recreating them, then you'll have to install a version older than 0.5.0 with the optional `legacy-serializers` feature:
 
@@ -237,6 +235,7 @@ Here is a more recent test for version 0.2.0 with the new default SQLite backend
   - Reading a 64kB file: ~4ms
   - Running 'find mountPoint -type f | wc -l' (1.26M stat calls): 1m 50s
 
+
 ## Benchmarks
 
 During the making of this project several benchmarks were created. These can be viewed [here](benchmarks/BENCHMARKS.md).
@@ -247,3 +246,15 @@ These are some of the things benchmarked and compared there:
   - Mounting and file access time comparison between archivemount and ratarmount
 
 ![Benchmark comparison between ratarmount and archivemount](benchmarks/plots/archivemount-comparison.png)
+
+
+## Donations
+
+If ratarmount helped you out and made you so happy that you can't help but want to donate, toss a coin to your programmer through one of these addresses:
+
+| Type | Address                                    |
+|------|--------------------------------------------|
+| BTC  | bc1qkc7stljxazpkk5lzcj4gqu2tvh0dh4exz4563t |
+| ETH  | 0xB6e1809D5C6f52156df7Bd2eE95f586885178c74 |
+| LTC  | LTRbWdUY576MNkhXhXEXNpt3NuY2ecR9F9         |
+| ZEC  | t1bnLeVVub5AzAqj3wV977spttnpa5kdRCm        |
