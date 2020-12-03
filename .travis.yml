@@ -14,10 +14,11 @@ python:
 
 before_install:
   - sudo apt-get update
-  - sudo apt-get -y install bzip2 pbzip2 xz-utils # necessary for tests
+  - sudo apt-get -y install bzip2 pbzip2 xz-utils zstd # necessary for tests
 
 install:
   - pip install --upgrade-strategy eager --upgrade cython twine pylint
+  - pip install git+https://github.com/martinellimarco/indexed_zstd
 
 script:
   # test whether installation from tarball works
