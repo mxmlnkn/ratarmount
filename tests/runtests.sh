@@ -558,6 +558,7 @@ for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
     tbz2Path=
     tgzPath=
     txzPath=
+    tzstdPath=
     isSingleArchive=0
 
     case "$tarPath" in
@@ -579,7 +580,13 @@ for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
             toCleanUp+=( "$tarPath" )
             xz --keep --stdout --decompress -- "$txzPath" > "$tarPath"
             ;;
-        *.bz2|*.gz|*.xz)
+        *.tar.zstd|*.tzstd)
+            tzstdPath=$tarPath
+            tarPath=$( mktemp --suffix='.tar' )
+            toCleanUp+=( "$tarPath" )
+            zstd --keep --stdout --decompress -- "$tzstdPath" > "$tarPath"
+            ;;
+        *.bz2|*.gz|*.xz|*.zstd)
             isSingleArchive=1
             ;;
     esac
@@ -602,10 +609,17 @@ for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
         xz --keep --stdout "$tarPath" > "$txzPath"
     fi
 
+    if [[ -z "$tzstdPath" && "$isSingleArchive" -ne 1 ]]; then
+        tzstdPath=$( mktemp --suffix='.tar.zstd' )
+        toCleanUp+=( "$tzstdPath" )
+        zstd --keep --stdout "$tarPath" > "$tzstdPath"
+    fi
+
     checkFileInTAR "$tarPath" "$fileName" "$checksum"
     if [[ -f "$tbz2Path" ]]; then checkFileInTAR "$tbz2Path" "$fileName" "$checksum"; fi
     if [[ -f "$tgzPath" ]]; then checkFileInTAR "$tgzPath" "$fileName" "$checksum"; fi
     if [[ -f "$txzPath" ]]; then checkFileInTAR "$txzPath" "$fileName" "$checksum"; fi
+    if [[ -f "$tzstdPath" ]]; then checkFileInTAR "$tzstdPath" "$fileName" "$checksum"; fi
 
     for tmpFile in "${toCleanUp[@]}"; do
         command rm -- "$tmpFile"
