@@ -60,7 +60,7 @@ checkFileInTAR()
 
     # try with index recreation
     local cmd=( python3 ratarmount.py -c --ignore-zeros --recursive "$archive" "$mountFolder" )
-    "${cmd[@]}" &>/dev/null
+    "${cmd[@]}" >/dev/null || returnError "${cmd[*]}"
     checkStat "$mountFolder" || returnError "${cmd[*]}"
     checkStat "$mountFolder/$fileInTar" || returnError "${cmd[*]}"
     verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum" || returnError "${cmd[*]}"
@@ -68,7 +68,7 @@ checkFileInTAR()
 
     # retry without forcing index recreation
     local cmd=( python3 ratarmount.py --ignore-zeros --recursive "$archive" "$mountFolder" )
-    "${cmd[@]}" &>/dev/null
+    "${cmd[@]}" >/dev/null || returnError "${cmd[*]}"
     checkStat "$mountFolder" || returnError "${cmd[*]}"
     checkStat "$mountFolder/$fileInTar" || returnError "${cmd[*]}"
     verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum" || returnError "${cmd[*]}"
@@ -94,7 +94,7 @@ checkFileInTARPrefix()
 
     # try with index recreation
     local cmd=( python3 ratarmount.py -c --recursive --prefix "$prefix" "$archive" "$mountFolder" )
-    "${cmd[@]}" &>/dev/null
+    "${cmd[@]}" >/dev/null || returnError "${cmd[*]}"
     checkStat "$mountFolder" || returnError "${cmd[*]}"
     checkStat "$mountFolder/$fileInTar" || returnError "${cmd[*]}"
     verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum" || returnError "${cmd[*]}"
@@ -119,7 +119,7 @@ checkLinkInTAR()
 
     # try with index recreation
     local cmd=( python3 ratarmount.py -c --recursive "$archive" "$mountFolder" )
-    "${cmd[@]}" &>/dev/null
+    "${cmd[@]}" >/dev/null || returnError "${cmd[*]}"
     checkStat "$mountFolder" || returnError "${cmd[*]}"
     checkStat "$mountFolder/$fileInTar" || returnError "${cmd[*]}"
     if [[ $( readlink -- "$mountFolder/$fileInTar" ) != $correctLinkTarget ]]; then
@@ -475,7 +475,7 @@ checkTarEncoding()
 
     # try with index recreation
     local cmd=( python3 ratarmount.py -c --encoding "$encoding" --recursive "$archive" "$mountFolder" )
-    "${cmd[@]}" &>/dev/null
+    "${cmd[@]}" || returnError "${cmd[*]}"
     checkStat "$mountFolder" || returnError "${cmd[*]}"
     checkStat "$mountFolder/$fileInTar" || returnError "${cmd[*]}"
     verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum" || returnError "${cmd[*]}"
