@@ -25,7 +25,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install Dependencies
       run: |
-        sudo apt-get -y install bzip2 pbzip2 # necessary for tests
+        sudo apt-get -y install bzip2 pbzip2 zstd # necessary for tests
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade-strategy eager --upgrade cython twine pylint wheel
     - name: Pylint
