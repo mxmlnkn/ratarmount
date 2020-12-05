@@ -23,7 +23,7 @@ script:
   # test whether installation from tarball works
   - python3 setup.py sdist bdist_wheel
   - twine check dist/*
-  - pip install "$( find dist -name '*.tar.gz' | head -1)"[legacy-serializers]
+  - pip install "$( find dist -name '*.tar.gz' | head -1)"
   # test ratarmount
   - bash tests/runtests.sh
   - ratarmount --help
