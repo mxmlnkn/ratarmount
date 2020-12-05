@@ -16,7 +16,6 @@ python:
 before_install:
   - sudo apt-get update
   - sudo apt-get -y install bzip2 pbzip2 xz-utils zstd # necessary for tests
-  - sudo apt-get -y install libzstd-dev g++ # todo remove after having pre-built wheels for all targets
 
 install:
   - pip install --upgrade-strategy eager --upgrade cython twine pylint
