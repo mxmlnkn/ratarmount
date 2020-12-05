@@ -31,12 +31,40 @@ try:
 except ImportError:
     print( "[Warning] The indexed_gzip module was not found. Please install it to open gzip compressed TAR files!" )
 
+try:
+    import indexed_zstd
+    from indexed_zstd import IndexedZstdFile
+except ImportError:
+    print( "[Warning] The indexed_zstd module was not found. Please install it to open zstd compressed TAR files!" )
+
 import fuse
 
 
 __version__ = '0.7.0'
 
 printDebug = 1
+
+zstdMultiFrameCompressorBashFunction = """
+function createMultiFrameZstd()
+{
+    local file frameSize fileSize offset
+    file=$1
+    frameSize=$2
+
+    if [[ ! -f "$file" ]]; then echo "Could not find file '$file'" 1>&2; return 1; fi
+    if [[ ! $frameSize =~ ^[0-9]+$ ]]; then echo "Frame size '$frameSize' is not a valid number" 1>&2; fi
+
+    fileSize=$( stat -c %s -- "$file" )
+
+    > "$file.zstd"
+    for (( offset = 0; offset < fileSize; offset += frameSize )); do
+        dd if="$file" bs=$(( 1024*1024 )) iflag=skip_bytes,count_bytes skip="$offset" count="$frameSize" 2>/dev/null |
+            zstdcat --compress --no-progress >> "$file.zstd"
+    done
+}
+
+createMultiFrameZstd <path-to-file-to-compress> $(( 4*1024*1024 ))
+"""
 
 def overrides( parentClass ):
     def overrider( method ):
@@ -227,7 +255,7 @@ class SQLiteIndexedTar:
         tarFileName : Path to the TAR file to be opened. If not specified, a fileObject must be specified.
                       If only a fileObject is given, the created index can't be cached (efficiently).
         fileObject : A io.IOBase derived object. If not specified, tarFileName will be opened.
-                     If it is an instance of IndexedBzip2File or IndexedGzipFile, then the offset
+                     If it is an instance of IndexedBzip2File, IndexedGzipFile, or IndexedZstdFile, then the offset
                      loading and storing from and to the SQLite database is managed automatically by this class.
         encoding : Will be forwarded to tarfile. Specifies how filenames inside the TAR are encoded.
         ignoreZeros : Will be forwarded to tarfile. Specifies to not only skip zero blocks but also blocks with
@@ -323,6 +351,25 @@ class SQLiteIndexedTar:
         self.createIndex( self.tarFileObject )
         self._loadOrStoreCompressionOffsets()
 
+        # If the uncompressed sizes are not stored in the zstd (they are optional), getting the offsets requires
+        # decoding everything. Therefore, do this check only after reading the whole file.
+        # ToDo: Extend the API to query the number of frames as that is the only thing needed and "zstd -l" seems
+        #       to be able to query the number of frames quickly even when it can't query the uncompressed size.
+        # Ideas: pyzstd.get_frame_size
+        if self.compression == 'zstd':
+            try:
+                if len( self.tarFileObject.block_offsets ) <= 1:
+                    print( "[Warning] The specified file '{}'".format( self.tarFileName ) )
+                    print( "[Warning] is compressed using zstd but only contains one zstd frame. This makes it " )
+                    print( "[Warning] impossible to use true seeking! Please (re)compress your TAR using multiple " )
+                    print( "[Warning] frames in order for ratarmount to do be able to do fast seeking to requested " )
+                    print( "[Warning] files. Else, each file access will decompress the whole TAR from the beginning!" )
+                    print( "[Warning] Here is a simple bash script demonstrating how to do this:" )
+                    print( zstdMultiFrameCompressorBashFunction )
+                    print()
+            except:
+                pass
+
         self._storeTarMetadata()
 
         if printDebug >= 1 and writeIndex:
@@ -370,6 +417,10 @@ class SQLiteIndexedTar:
             if 'IndexedBzip2File' in globals() and isinstance( fileobj, IndexedBzip2File ):
                 # Note that because bz2 works on a bitstream the tell_compressed returns the offset in bits
                 progressBar.update( fileobj.tell_compressed() // 8 )
+                return
+
+            if 'IndexedZstdFile' in globals() and isinstance( fileobj, IndexedZstdFile ):
+                progressBar.update( fileobj.tell_compressed() )
                 return
 
             if hasattr( fileobj, 'fileobj' ):
@@ -558,7 +609,7 @@ class SQLiteIndexedTar:
         if fileCount == 0:
             tarInfo = os.fstat( fileObject.fileno() )
             fname = os.path.basename( self.tarFileName )
-            for suffix in [ '.gz', '.bz2', '.bzip2', '.gzip' ]:
+            for suffix in [ '.gz', '.bz2', '.bzip2', '.gzip', '.zstd' ]:
                 if fname.lower().endswith( suffix ) and len( fname ) > len( suffix ):
                     fname = fname[:-len( suffix )]
                     break
@@ -645,6 +696,9 @@ class SQLiteIndexedTar:
 
             if 'IndexedGzipFile' in globals() and isinstance( fileObject, IndexedGzipFile ):
                 versions += [ makeVersionRow( 'indexed_gzip', indexed_gzip.__version__ ) ]
+
+            if 'IndexedZstdFile' in globals() and isinstance( fileObject, IndexedZstdFile ):
+                versions += [ makeVersionRow( 'indexed_zstd', indexed_zstd.__version__ ) ]
 
             self.sqlConnection.executemany( 'INSERT OR REPLACE INTO "versions" VALUES (?,?,?,?,?)', versions )
         except Exception as exception:
@@ -975,7 +1029,7 @@ class SQLiteIndexedTar:
 
                 return isTar, compression
 
-            except tarfile.ReadError:
+            except ( tarfile.ReadError, tarfile.CompressionError ):
                 if oldOffset is not None:
                     fileobj.seek( oldOffset )
 
@@ -990,6 +1044,36 @@ class SQLiteIndexedTar:
             except:
                 if oldOffset is not None:
                     fileobj.seek( oldOffset )
+
+        # Starting from here, these compressions are not support by tarfile, so we have to check differently
+
+        foundCompression = False
+        for compression in [ 'zstd' ]:
+            if compression == 'zstd' and 'IndexedZstdFile' not in globals():
+                raise Exception( "Can't open a zstd compressed TAR file '{}' without indexed_zstd module!"
+                                 .format( name ) )
+
+            try:
+                # ToDo: Check whether IndexedZstdFile correctly throws on incorrect input
+                compressedFile = IndexedZstdFile( fileobj.fileno() if fileobj else name )
+                compressedFile.block_offsets() # ToDo: AVOID HAVING TO DO THIS!
+                foundCompression = True
+
+                # Simply opening a TAR file should be fast as only the header should be read!
+                tarfile.open( fileobj = compressedFile, mode = 'r:', encoding = encoding )
+                isTar = True
+
+                if oldOffset is not None:
+                    fileobj.seek( oldOffset )
+
+                return isTar, compression
+
+            except ( tarfile.ReadError, tarfile.CompressionError ):
+                if oldOffset is not None:
+                    fileobj.seek( oldOffset )
+
+                if foundCompression:
+                    return isTar, compression
 
         raise Exception( "File '{}' does not seem to be a valid TAR file!".format( name ) )
 
@@ -1009,6 +1093,12 @@ class SQLiteIndexedTar:
             tarFile = IndexedGzipFile( fileobj = rawFile,
                                        drop_handles = False,
                                        spacing = gzipSeekPointSpacing )
+        elif compression == 'zstd':
+            rawFile = tarFile # save so that garbage collector won't close it!
+            tarFile = IndexedZstdFile( rawFile.fileno() )
+            # Currently, block_offsets has to be called to ensure that the block offsets exist before reading!
+            # ToDo: Refactor indexed_zstd to avoid requiring this.
+            tarFile.block_offsets()
 
         return tarFile, rawFile, compression, isTar
 
@@ -1032,6 +1122,23 @@ class SQLiteIndexedTar:
                     db.execute( 'DROP TABLE bzip2blocks' )
                 db.execute( 'CREATE TABLE bzip2blocks ( blockoffset INTEGER PRIMARY KEY, dataoffset INTEGER )' )
                 db.executemany( 'INSERT INTO bzip2blocks VALUES (?,?)',
+                                fileObject.block_offsets().items() )
+                db.commit()
+            return
+
+        if 'IndexedZstdFile' in globals() and isinstance( fileObject, IndexedZstdFile ):
+            try:
+                offsets = dict( db.execute( 'SELECT blockoffset,dataoffset FROM zstdblocks;' ) )
+                fileObject.set_block_offsets( offsets )
+            except:
+                if printDebug >= 2:
+                    print( "[Info] Could not load zstd block offset data. Will create it from scratch." )
+
+                tables = [ x[0] for x in db.execute( 'SELECT name FROM sqlite_master WHERE type="table";' ) ]
+                if 'zstdblocks' in tables:
+                    db.execute( 'DROP TABLE zstdblocks' )
+                db.execute( 'CREATE TABLE zstdblocks ( blockoffset INTEGER PRIMARY KEY, dataoffset INTEGER )' )
+                db.executemany( 'INSERT INTO zstdblocks VALUES (?,?)',
                                 fileObject.block_offsets().items() )
                 db.commit()
             return
@@ -1511,7 +1618,7 @@ class TarFileType:
             try:
                 tarfile.open( tarFile, mode = self.mode + ':' + compression, encoding = self.encoding )
                 return ( tarFile, compression )
-            except tarfile.ReadError:
+            except ( tarfile.ReadError, tarfile.CompressionError ):
                 pass
 
             try:
@@ -1521,14 +1628,26 @@ class TarFileType:
                 if compression == 'gz':
                     gzip.open( tarFile ).read( 1 )
                     return ( tarFile, compression )
+                if compression == 'zstd':
+                    IndexedZstdFile( tarFile ).read( 1 )
+                    return ( tarFile, compression )
             except:
                 pass
 
         msg = "Archive '{}' can't be opened!\n".format( tarFile )
         msg += "This might happen for xz compressed TAR archives, which currently is not supported.\n"
-        if 'IndexedBzip2File' not in globals() or 'IndexedGzipFile' not in globals():
-            msg += "If you are trying to open a bz2 or gzip compressed file make sure that you have the indexed_bzip2 "\
-                   "and indexed_gzip modules installed."
+        if (
+            'IndexedBzip2File' not in globals() or
+            'IndexedGzipFile' not in globals() or
+            'IndexedZstdFile' not in globals() or
+            'lzmaffi' not in globals()
+        ):
+            msg += "If you are trying to open a compressed file, make sure\n"
+            msg += "that you have the respective modules installed:\n"
+            msg += "   bzip2 : indexed_bzip2\n"
+            msg += "   gzip  : indexed_gzip\n"
+            msg += "   xz    : lzmaffi\n"
+            msg += "   zstd  : indexed_zstd\n"
 
         raise argparse.ArgumentTypeError( msg )
 
@@ -1720,6 +1839,8 @@ version, you can simply do:
         compressions += [ 'bz2' ]
     if 'IndexedGzipFile' in globals():
         compressions += [ 'gz' ]
+    if 'IndexedZstdFile' in globals():
+        compressions += [ 'zstd' ]
     args.mount_source = [ TarFileType( mode = 'r', compressions = compressions, encoding = args.encoding )( tarFile )[0]
                           if not os.path.isdir( tarFile ) else os.path.realpath( tarFile )
                           for tarFile in args.mount_source ]
