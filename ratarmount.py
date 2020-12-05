@@ -374,6 +374,7 @@ class SQLiteIndexedTar:
         # decoding everything. Therefore, do this check only after reading the whole file.
         # ToDo: Extend the API to query the number of frames as that is the only thing needed and "zstd -l" seems
         #       to be able to query the number of frames quickly even when it can't query the uncompressed size.
+        # Ideas: pyzstd.get_frame_size
         if self.compression == 'zstd':
             try:
                 if len( self.tarFileObject.block_offsets ) <= 1:
