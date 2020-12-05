@@ -8,15 +8,12 @@ git:
   quiet: true
 
 python:
-  #  - 3.5
-  #  - 3.6
-  #  - 3.7
-  #  - 3.8
+  - 3.8
   - 3.9
 
 before_install:
   - sudo apt-get update
-  - sudo apt-get -y install bzip2 pbzip2 xz-utils wget zstd libzstd-dev # necessary for tests
+  - sudo apt-get -y install bzip2 pbzip2 xz-utils wget zstd libzstd-dev gdb apport python3-dbg # necessary for tests
   # on xenial (libzstd-dev 0.5.1) and bionic (libzstd-dev 1.3.3) libzstd-dev is too old for indexed_zstd
   - if [ "$TRAVIS_DIST" == xenial ] || [ "$TRAVIS_DIST" == bionic ]; then (
         cd -- $( mktemp -d ) &&
@@ -32,10 +29,14 @@ script:
   # test whether installation from tarball works
   - python3 setup.py sdist bdist_wheel
   - twine check dist/*
-  - pip install "$( find dist -name '*.tar.gz' | head -1)"[full]
+  - pip install --global-option build --global-option --debug "$( find dist -name '*.tar.gz' | head -1)"[full]
   # test ratarmount
   - bash tests/runtests.sh
-  - ls -lart
+  - ls -lart /var/crash
+  - folder=$( mktemp -d )
+  # apport is such a shitty patchwork I can't believe my eyes, it's crashing elft and right with errors!!!
+  - apport-unpack "/var/crash/$( ls -t1 /var/crash | head -1 )" "$folder"
+  - echo 'thread apply all bt' | gdb --core="$folder/CoreDump"
   - ratarmount --help
   - ratarmount --version
 
