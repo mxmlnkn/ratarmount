@@ -307,6 +307,23 @@ class SQLiteIndexedTar:
         self.tarFileObject, self.rawFileObject, self.compression, self.isTar = \
             SQLiteIndexedTar._openCompressedFile( fileObject, gzipSeekPointSpacing, encoding )
 
+        # Determining if there are many frames in zstd is O(1) with is_multiframe
+        if self.compression == 'zstd':
+            try:
+                if not self.tarFileObject.is_multiframe():
+                    print( "[Warning] The specified file '{}'".format( self.tarFileName ) )
+                    print( "[Warning] is compressed using zstd but only contains one zstd frame. This makes it " )
+                    print( "[Warning] impossible to use true seeking! Please (re)compress your TAR using multiple " )
+                    print( "[Warning] frames in order for ratarmount to do be able to do fast seeking to requested " )
+                    print( "[Warning] files. Else, each file access will decompress the whole TAR from the beginning!" )
+                    print( "[Warning] Here is a simple bash script demonstrating how to do this:" )
+                    print( zstdMultiFrameCompressorBashFunction )
+                    print( "[Warning] The zstd command line tool does not support an option to do this automatically." )
+                    print( "[Warning] See https://github.com/facebook/zstd/issues/2121" )
+                    print()
+            except:
+                pass
+
         # will be used for storing indexes if current path is read-only
         possibleIndexFilePaths = [ os.path.abspath( indexFileName ) ] if indexFileName is not None else [
             self.tarFileName + ".index.sqlite",
@@ -356,27 +373,6 @@ class SQLiteIndexedTar:
 
         self.createIndex( self.tarFileObject )
         self._loadOrStoreCompressionOffsets()
-
-        # If the uncompressed sizes are not stored in the zstd (they are optional), getting the offsets requires
-        # decoding everything. Therefore, do this check only after reading the whole file.
-        # ToDo: Extend the API to query the number of frames as that is the only thing needed and "zstd -l" seems
-        #       to be able to query the number of frames quickly even when it can't query the uncompressed size.
-        # Ideas: pyzstd.get_frame_size
-        if self.compression == 'zstd':
-            try:
-                if len( self.tarFileObject.block_offsets ) <= 1:
-                    print( "[Warning] The specified file '{}'".format( self.tarFileName ) )
-                    print( "[Warning] is compressed using zstd but only contains one zstd frame. This makes it " )
-                    print( "[Warning] impossible to use true seeking! Please (re)compress your TAR using multiple " )
-                    print( "[Warning] frames in order for ratarmount to do be able to do fast seeking to requested " )
-                    print( "[Warning] files. Else, each file access will decompress the whole TAR from the beginning!" )
-                    print( "[Warning] Here is a simple bash script demonstrating how to do this:" )
-                    print( zstdMultiFrameCompressorBashFunction )
-                    print( "[Warning] The zstd command line tool does not support an option to do this automatically." )
-                    print( "[Warning] See https://github.com/facebook/zstd/issues/2121" )
-                    print()
-            except:
-                pass
 
         self._storeTarMetadata()
 
@@ -617,7 +613,7 @@ class SQLiteIndexedTar:
         if fileCount == 0:
             tarInfo = os.fstat( fileObject.fileno() )
             fname = os.path.basename( self.tarFileName )
-            for suffix in [ '.gz', '.bz2', '.bzip2', '.gzip', '.zstd' ]:
+            for suffix in [ '.gz', '.bz2', '.bzip2', '.gzip', '.zst', '.zstd' ]:
                 if fname.lower().endswith( suffix ) and len( fname ) > len( suffix ):
                     fname = fname[:-len( suffix )]
                     break
@@ -1064,7 +1060,6 @@ class SQLiteIndexedTar:
             try:
                 # ToDo: Check whether IndexedZstdFile correctly throws on incorrect input
                 compressedFile = IndexedZstdFile( fileobj.fileno() if fileobj else name )
-                compressedFile.block_offsets() # ToDo: AVOID HAVING TO DO THIS!
                 foundCompression = True
 
                 # Simply opening a TAR file should be fast as only the header should be read!
@@ -1104,9 +1099,6 @@ class SQLiteIndexedTar:
         elif compression == 'zstd':
             rawFile = tarFile # save so that garbage collector won't close it!
             tarFile = IndexedZstdFile( rawFile.fileno() )
-            # Currently, block_offsets has to be called to ensure that the block offsets exist before reading!
-            # ToDo: Refactor indexed_zstd to avoid requiring this.
-            tarFile.block_offsets()
 
         return tarFile, rawFile, compression, isTar
 

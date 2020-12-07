@@ -29,6 +29,6 @@ setup(
     long_description_content_type = 'text/markdown',
 
     py_modules       = [ 'ratarmount' ],
-    install_requires = [ 'fusepy', 'indexed_gzip', 'indexed_bzip2>=1.1.2', 'indexed_zstd' ],
+    install_requires = [ 'fusepy', 'indexed_gzip', 'indexed_bzip2>=1.1.2', 'indexed_zstd>=1.2.0' ],
     entry_points = { 'console_scripts': [ 'ratarmount=ratarmount:cli' ] }
 )
