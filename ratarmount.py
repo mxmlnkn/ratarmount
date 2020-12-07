@@ -56,10 +56,10 @@ function createMultiFrameZstd()
 
     fileSize=$( stat -c %s -- "$file" )
 
-    > "$file.zstd"
+    > "$file.zst"
     for (( offset = 0; offset < fileSize; offset += frameSize )); do
         dd if="$file" bs=$(( 1024*1024 )) iflag=skip_bytes,count_bytes skip="$offset" count="$frameSize" 2>/dev/null |
-            zstdcat --compress --no-progress >> "$file.zstd"
+            zstdcat --compress --no-progress >> "$file.zst"
     done
 }
 
@@ -609,7 +609,7 @@ class SQLiteIndexedTar:
         if fileCount == 0:
             tarInfo = os.fstat( fileObject.fileno() )
             fname = os.path.basename( self.tarFileName )
-            for suffix in [ '.gz', '.bz2', '.bzip2', '.gzip', '.zstd' ]:
+            for suffix in [ '.gz', '.bz2', '.bzip2', '.gzip', '.zst', '.zstd' ]:
                 if fname.lower().endswith( suffix ) and len( fname ) > len( suffix ):
                     fname = fname[:-len( suffix )]
                     break
