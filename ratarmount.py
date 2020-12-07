@@ -1086,7 +1086,6 @@ class SQLiteIndexedTar:
             try:
                 # ToDo: Check whether IndexedZstdFile correctly throws on incorrect input
                 compressedFile = IndexedZstdFile( fileobj.fileno() if fileobj else name )
-                compressedFile.block_offsets() # ToDo: AVOID HAVING TO DO THIS!
                 foundCompression = True
 
                 # Simply opening a TAR file should be fast as only the header should be read!
@@ -1129,9 +1128,6 @@ class SQLiteIndexedTar:
         elif compression == 'zstd':
             rawFile = tarFile # save so that garbage collector won't close it!
             tarFile = IndexedZstdFile( rawFile.fileno() )
-            # Currently, block_offsets has to be called to ensure that the block offsets exist before reading!
-            # ToDo: Refactor indexed_zstd to avoid requiring this.
-            tarFile.block_offsets()
 
         return tarFile, rawFile, compression, isTar
 
