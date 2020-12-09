@@ -351,14 +351,10 @@ class SQLiteIndexedTar:
         self.createIndex( self.tarFileObject )
         self._loadOrStoreCompressionOffsets()
 
-        # If the uncompressed sizes are not stored in the zstd (they are optional), getting the offsets requires
-        # decoding everything. Therefore, do this check only after reading the whole file.
-        # ToDo: Extend the API to query the number of frames as that is the only thing needed and "zstd -l" seems
-        #       to be able to query the number of frames quickly even when it can't query the uncompressed size.
-        # Ideas: pyzstd.get_frame_size
+        # Determining if there are many frames in zstd is O(1) with is_multiframe
         if self.compression == 'zstd':
             try:
-                if len( self.tarFileObject.block_offsets ) <= 1:
+                if not self.tarFileObject.is_multiframe():
                     print( "[Warning] The specified file '{}'".format( self.tarFileName ) )
                     print( "[Warning] is compressed using zstd but only contains one zstd frame. This makes it " )
                     print( "[Warning] impossible to use true seeking! Please (re)compress your TAR using multiple " )
