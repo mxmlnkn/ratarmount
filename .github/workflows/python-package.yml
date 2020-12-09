@@ -1,0 +1,47 @@
+name: tests
+
+on: [push, pull_request]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Oldest and newest versions should be enough. Python versions are supported 5 years from release date.
+        # 3.5 was released 2015-09-13 and end-of-life was 2020-09-13
+        # 3.6 was released 2016-12-23 and end-of-life will be 2021-12-23
+        # 3.7 was released 2018-06-27 and end-of-life will be 2023-06-27
+        # 3.8 was released 2019-10-14 and end-of-life will be 2024-10-14
+        # 3.9 was released 2020-10-05 and end-of-life will be 2025-10-25
+        # 3.10 is to be released 2021-10-25
+        python-version: ['3.6', '3.9']
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install Dependencies
+      run: |
+        sudo apt-get -y install bzip2 pbzip2 # necessary for tests
+        python3 -m pip install --upgrade pip
+        python3 -m pip install --upgrade-strategy eager --upgrade cython twine pylint wheel
+    - name: Pylint
+      run: |
+        pylint *.py | tee pylint.log
+        ! 'egrep' ': E[0-9]{4}: '
+    - name: Test Installation From Tarball
+      run: |
+        python3 setup.py sdist bdist_wheel
+        twine check dist/*
+        python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )"
+    - name: Test Simple Startup
+      run: |
+        ratarmount --help
+        ratarmount --version
+        bash tests/runtests.sh
+    - name: Regression Tests
+      run: |
+        bash tests/runtests.sh
