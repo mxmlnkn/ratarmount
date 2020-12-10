@@ -41,7 +41,6 @@ jobs:
       run: |
         ratarmount --help
         ratarmount --version
-        bash tests/runtests.sh
     - name: Regression Tests
       run: |
         bash tests/runtests.sh
