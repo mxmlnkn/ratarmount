@@ -308,8 +308,8 @@ class SQLiteIndexedTar:
         self.tarFileObject, self.rawFileObject, self.compression, self.isTar = \
             SQLiteIndexedTar._openCompressedFile( fileObject, gzipSeekPointSpacing, encoding )
 
-        # Determining if there are many frames in zstd is O(1) with is_multiframe
-        if self.compression == 'zstd':
+        # Determining if there are many frames in zst is O(1) with is_multiframe
+        if self.compression == 'zst':
             try:
                 if not self.tarFileObject.is_multiframe():
                     print( "[Warning] The specified file '{}'".format( self.tarFileName ) )
@@ -1093,8 +1093,8 @@ class SQLiteIndexedTar:
         # Starting from here, these compressions are not support by tarfile, so we have to check differently
 
         foundCompression = False
-        for compression in [ 'zstd' ]:
-            if compression == 'zstd' and 'IndexedZstdFile' not in globals():
+        for compression in [ 'zst' ]:
+            if compression == 'zst' and 'IndexedZstdFile' not in globals():
                 raise Exception( "Can't open a zstd compressed TAR file '{}' without indexed_zstd module!"
                                  .format( name ) )
 
@@ -1137,7 +1137,7 @@ class SQLiteIndexedTar:
             tarFile = IndexedGzipFile( fileobj = rawFile,
                                        drop_handles = False,
                                        spacing = gzipSeekPointSpacing )
-        elif compression == 'zstd':
+        elif compression == 'zst':
             rawFile = tarFile # save so that garbage collector won't close it!
             tarFile = IndexedZstdFile( rawFile.fileno() )
 
@@ -1669,7 +1669,7 @@ class TarFileType:
                 if compression == 'gz':
                     gzip.open( tarFile ).read( 1 )
                     return ( tarFile, compression )
-                if compression == 'zstd':
+                if compression == 'zst':
                     IndexedZstdFile( tarFile ).read( 1 )
                     return ( tarFile, compression )
             except:
@@ -1909,7 +1909,7 @@ version, you can simply do:
     if 'IndexedGzipFile' in globals():
         compressions += [ 'gz' ]
     if 'IndexedZstdFile' in globals():
-        compressions += [ 'zstd' ]
+        compressions += [ 'zst' ]
     args.mount_source = [ TarFileType( mode = 'r', compressions = compressions, encoding = args.encoding )( tarFile )[0]
                           if not os.path.isdir( tarFile ) else os.path.realpath( tarFile )
                           for tarFile in args.mount_source ]
