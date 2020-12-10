@@ -349,22 +349,9 @@ class SQLiteIndexedTar:
         # Find a suitable (writable) location for the index database
         if writeIndex:
             for indexPath in possibleIndexFilePaths:
-                try:
-                    folder = os.path.dirname( indexPath )
-                    if folder:
-                        os.makedirs( folder, exist_ok = True )
-
-                    f = open( indexPath, 'wb' )
-                    f.write( b'\0' * 1024 * 1024 )
-                    f.close()
-                    os.remove( indexPath )
-
+                if self._pathIsWritable( indexPath ) and self._pathCanBeUsedForSqlite( indexPath ):
                     self.indexFileName = indexPath
                     break
-                except IOError:
-                    if printDebug >= 2:
-                        traceback.print_exc()
-                        print( "Could not create file:", indexPath )
 
         if not self.indexFileName:
             raise Exception( "[Error] Could not find any existing index or writable location for an index in "
@@ -405,15 +392,60 @@ class SQLiteIndexedTar:
             print( "[Warning] There was an error when adding file metadata information." )
             print( "[Warning] Automatic detection of changed TAR files during index loading might not work." )
 
-    def _openSqlDb( self, filePath ):
-        self.sqlConnection = sqlite3.connect( filePath )
-        self.sqlConnection.row_factory = sqlite3.Row
-        self.sqlConnection.executescript( """
+    @staticmethod
+    def _pathIsWritable( path ):
+        try:
+            folder = os.path.dirname( path )
+            if folder:
+                os.makedirs( folder, exist_ok = True )
+
+            f = open( path, 'wb' )
+            f.write( b'\0' * 1024 * 1024 )
+            f.close()
+            os.remove( path )
+
+            return True
+
+        except IOError:
+            if printDebug >= 2:
+                traceback.print_exc()
+                print( "Could not create file:", path )
+
+        return False
+
+    @staticmethod
+    def _pathCanBeUsedForSqlite( path ):
+        try:
+            folder = os.path.dirname( path )
+            if folder:
+                os.makedirs( folder, exist_ok = True )
+
+            connection = SQLiteIndexedTar._openSqlDb( path )
+            connection.executescript( 'CREATE TABLE "files" ( "path" VARCHAR(65535) NOT NULL );' )
+            connection.commit()
+            connection.close()
+            os.remove( path )
+
+            return True
+
+        except sqlite3.OperationalError:
+            if printDebug >= 2:
+                traceback.print_exc()
+                print( "Could not create SQLite database at:", path )
+
+        return False
+
+    @staticmethod
+    def _openSqlDb( path ):
+        sqlConnection = sqlite3.connect( path )
+        sqlConnection.row_factory = sqlite3.Row
+        sqlConnection.executescript( """
             PRAGMA LOCKING_MODE = EXCLUSIVE;
             PRAGMA TEMP_STORE = MEMORY;
             PRAGMA JOURNAL_MODE = OFF;
             PRAGMA SYNCHRONOUS = OFF;
         """ )
+        return sqlConnection
 
     @staticmethod
     def _updateProgressBar( progressBar, fileobj ):
@@ -482,7 +514,7 @@ class SQLiteIndexedTar:
             """
 
             openedConnection = True
-            self._openSqlDb( self.indexFileName if self.indexFileName else ':memory:' )
+            self.sqlConnection = self._openSqlDb( self.indexFileName if self.indexFileName else ':memory:' )
             tables = self.sqlConnection.execute( 'SELECT name FROM sqlite_master WHERE type = "table";' )
             if { "files", "filestmp", "parentfolders" }.intersection( { t[0] for t in tables } ):
                 raise Exception( "[Error] The index file {} already seems to contain a table. "
@@ -895,7 +927,7 @@ class SQLiteIndexedTar:
             return
 
         t0 = time.time()
-        self._openSqlDb( indexFileName )
+        self.sqlConnection = self._openSqlDb( indexFileName )
         tables = [ x[0] for x in self.sqlConnection.execute( 'SELECT name FROM sqlite_master WHERE type="table"' ) ]
         versions = None
         try:

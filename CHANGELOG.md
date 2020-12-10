@@ -3,6 +3,7 @@
 
  - Add CLI option to specify an index location.
  - Add support for zstd compressed TARs.
+ - Fix index location check not accounting for SQLite special requirements.
 
 # Version 0.6.1 built on 2020-10-02
 
