@@ -1,7 +1,7 @@
 
 # Version 0.7.0 built on 2020-12-xx
 
- - Add CLI option to specify an index location.
+ - Add CLI options --index-file and --index-folder to specify an index location or folder.
  - Add support for zstd compressed TARs.
  - Fix index location check not accounting for SQLite special requirements.
 
