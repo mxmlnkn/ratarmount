@@ -31,7 +31,7 @@ jobs:
     - name: Pylint
       run: |
         pylint *.py | tee pylint.log
-        ! 'egrep' ': E[0-9]{4}: '
+        ! 'egrep' ': E[0-9]{4}: ' pylint.log
     - name: Test Startup Without Compression Dependencies
       run: |
         python3 -m pip install --upgrade fusepy
