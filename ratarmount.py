@@ -3,9 +3,7 @@
 
 import argparse
 import bisect
-import bz2
 import collections
-import gzip
 import io
 import json
 import os
@@ -19,33 +17,49 @@ import time
 import traceback
 from timeit import default_timer as timer
 
+import fuse
+
+# Can't do this dynamically with importlib.import_module and using supportedCompressions
+# because then the static checkers like mypy and pylint won't recognize the modules!
 try:
     import indexed_bzip2
-    from indexed_bzip2 import IndexedBzip2File
 except ImportError:
-    print( "[Warning] The indexed_bzip2 module was not found. Please install it to open bz2 compressed TAR files!" )
-
+    pass
 try:
     import indexed_gzip
-    from indexed_gzip import IndexedGzipFile
 except ImportError:
-    print( "[Warning] The indexed_gzip module was not found. Please install it to open gzip compressed TAR files!" )
-
+    pass
 try:
     import indexed_zstd
-    from indexed_zstd import IndexedZstdFile
 except ImportError:
-    print( "[Warning] The indexed_zstd module was not found. Please install it to open zstd compressed TAR files!" )
-
+    pass
 try:
     import lzmaffi
 except ImportError:
-    print( "[Warning] The lzmaffi module was not found. Please install it to open xz compressed TAR files!" )
-
-import fuse
+    pass
 
 
 __version__ = '0.7.0'
+
+
+# Defining lambdas does not yet check the names of entities used inside the lambda!
+CompressionInfo = collections.namedtuple( 'CompressionInfo', [ 'suffixes', 'moduleName', 'checkHeader', 'open' ] )
+supportedCompressions = {
+    'bz2' : CompressionInfo( [ 'bz2', 'bzip2' ], 'indexed_bzip2',
+                             lambda x : ( x.read(4)[:3] == b'BZh'
+                                          and x.read(6) == (0x314159265359).to_bytes(6, 'big') ),
+                             lambda x : indexed_bzip2.IndexedBzip2File( x.fileno() ) ),
+    'gz'  : CompressionInfo( [ 'gz', 'gzip' ], 'indexed_gzip' ,
+                             lambda x : x.read(2) == b'\x1F\x8B',
+                             lambda x : indexed_gzip.IndexedGzipFile( fileobj = x ) ),
+    'xz'  : CompressionInfo( [ 'xz' ], 'lzmaffi',
+                             lambda x : x.read(6) == b"\xFD7zXZ\x00",
+                             lambda x : lzmaffi.open( x ) ),
+    'zst' : CompressionInfo( [ 'zst', 'zstd' ], 'indexed_zstd',
+                             lambda x : x.read(4) == (0xFD2FB528).to_bytes(4, 'little'),
+                             lambda x : indexed_zstd.IndexedZstdFile( x.fileno() ) ),
+}
+
 
 printDebug = 1
 
@@ -78,6 +92,7 @@ createMultiFrameZstd <path-to-file-to-compress> $(( 4*1024*1024 ))
 """
 
 def overrides( parentClass ):
+    """Simple decorator that checks that a method with the same name exists in the parent class"""
     def overrider( method ):
         assert method.__name__ in dir( parentClass )
         assert callable( getattr( parentClass, method.__name__ ) )
@@ -85,6 +100,7 @@ def overrides( parentClass ):
     return overrider
 
 class ProgressBar:
+    """Simple progress bar which keeps track of changes and prints the progress and a time estimate."""
     def __init__( self, maxValue ):
         self.maxValue = maxValue
         self.lastUpdateTime = time.time()
@@ -476,12 +492,12 @@ class SQLiteIndexedTar:
 
     def _updateProgressBar( self, progressBar, fileobj ):
         try:
-            if 'IndexedBzip2File' in globals() and isinstance( fileobj, IndexedBzip2File ):
+            if hasattr( fileobj, 'tell_compressed' ) and self.compression == 'bz2':
                 # Note that because bz2 works on a bitstream the tell_compressed returns the offset in bits
                 progressBar.update( fileobj.tell_compressed() // 8 )
                 return
 
-            if 'IndexedZstdFile' in globals() and isinstance( fileobj, IndexedZstdFile ):
+            if hasattr( fileobj, 'tell_compressed' ):
                 progressBar.update( fileobj.tell_compressed() )
                 return
 
@@ -757,14 +773,9 @@ class SQLiteIndexedTar:
             versions = [ makeVersionRow( 'ratarmount', __version__ ),
                          makeVersionRow( 'index', self.__version__ ) ]
 
-            if 'IndexedBzip2File' in globals() and isinstance( fileObject, IndexedBzip2File ):
-                versions += [ makeVersionRow( 'indexed_bzip2', indexed_bzip2.__version__ ) ]
-
-            if 'IndexedGzipFile' in globals() and isinstance( fileObject, IndexedGzipFile ):
-                versions += [ makeVersionRow( 'indexed_gzip', indexed_gzip.__version__ ) ]
-
-            if 'IndexedZstdFile' in globals() and isinstance( fileObject, IndexedZstdFile ):
-                versions += [ makeVersionRow( 'indexed_zstd', indexed_zstd.__version__ ) ]
+            for _, cinfo in supportedCompressions.items():
+                if cinfo.moduleName in globals():
+                    versions += [ makeVersionRow( cinfo.moduleName, globals()[cinfo.moduleName].__version__ ) ]
 
             self.sqlConnection.executemany( 'INSERT OR REPLACE INTO "versions" VALUES (?,?,?,?,?)', versions )
         except Exception as exception:
@@ -940,6 +951,7 @@ class SQLiteIndexedTar:
         self._setFileInfo( row )
 
     def indexIsLoaded( self ):
+        """Returns true if the SQLite database has been opened for reading and a "files" table exists."""
         if not self.sqlConnection:
             return False
 
@@ -1068,112 +1080,76 @@ class SQLiteIndexedTar:
         return self.indexIsLoaded()
 
     @staticmethod
-    def _detectCompression( name = None, fileobj = None, encoding = tarfile.ENCODING ):
-        oldOffset = None
-        if fileobj:
-            assert fileobj.seekable()
-            oldOffset = fileobj.tell()
-            if name is None:
-                name = fileobj.name
-        isTar = False
+    def _detectCompression( fileobj ):
+        if not isinstance( fileobj, io.IOBase ) or not fileobj.seekable():
+            return None
 
-        for compression in [ '', 'bz2', 'gz', 'xz' ]:
-            try:
-                # Simply opening a TAR file should be fast as only the header should be read!
-                tarfile.open( name = name, fileobj = fileobj, mode = 'r:' + compression, encoding = encoding )
-                isTar = True
+        oldOffset = fileobj.tell()
+        for compressionId, compression in supportedCompressions.items():
+            # The header check is a necessary condition not a sufficient condition.
+            # Especially for gzip, which only has 2 magic bytes, false positives might happen.
+            # Therefore, only use the magic bytes based check if the module could not be found
+            # in order to still be able to print pinpoint error messages.
+            matches = compression.checkHeader(fileobj)
+            fileobj.seek( oldOffset )
+            if not matches:
+                continue
 
-                if compression == 'bz2' and 'IndexedBzip2File' not in globals():
-                    raise Exception( "Can't open a bzip2 compressed TAR file '{}' without indexed_bzip2 module!"
-                                     .format( name ) )
-                if compression == 'gz' and 'IndexedGzipFile' not in globals():
-                    raise Exception( "Can't open a bzip2 compressed TAR file '{}' without indexed_gzip module!"
-                                     .format( name ) )
-                if compression == 'xz' and 'lzmaffi' not in globals():
-                    raise Exception( "Can't open xz compressed TAR file '{}' without lzmaffi module!"
-                                     .format( name ) )
-
-                if oldOffset is not None:
-                    fileobj.seek( oldOffset )
-
-                return isTar, compression
-
-            except ( tarfile.ReadError, tarfile.CompressionError ):
-                if oldOffset is not None:
-                    fileobj.seek( oldOffset )
+            if compression.moduleName not in globals() and matches:
+                return compressionId
 
             try:
-                if compression == 'bz2':
-                    bz2.open( fileobj if fileobj else name ).read( 1 )
-                    return isTar, compression
-
-                if compression == 'gz':
-                    gzip.open( fileobj if fileobj else name ).read( 1 )
-                    return isTar, compression
-
-                if compression == 'xz':
-                    lzmaffi.open( fileobj if fileobj else name ).read( 1 )
-                    return isTar, compression
-
+                compressedFileobj = compression.open( fileobj )
+                compressedFileobj.read( 1 )
+                compressedFileobj.close()
+                fileobj.seek( oldOffset )
+                return compressionId
             except:
-                if oldOffset is not None:
-                    fileobj.seek( oldOffset )
+                fileobj.seek( oldOffset )
 
-        # Starting from here, these compressions are not support by tarfile, so we have to check differently
+        return None
 
-        foundCompression = False
-        for compression in [ 'zst' ]:
-            if compression == 'zst' and 'IndexedZstdFile' not in globals():
-                raise Exception( "Can't open a zstd compressed TAR file '{}' without indexed_zstd module!"
-                                 .format( name ) )
+    @staticmethod
+    def _detectTar( fileobj, encoding ):
+        if not isinstance( fileobj, io.IOBase ) or not fileobj.seekable():
+            return False
 
-            try:
-                # ToDo: Check whether IndexedZstdFile correctly throws on incorrect input
-                compressedFile = IndexedZstdFile( fileobj.fileno() if fileobj else name )
-                foundCompression = True
-
-                # Simply opening a TAR file should be fast as only the header should be read!
-                tarfile.open( fileobj = compressedFile, mode = 'r:', encoding = encoding )
+        oldOffset = fileobj.tell()
+        isTar = False
+        try:
+            with tarfile.open( fileobj = fileobj, mode = 'r:', encoding = encoding ):
                 isTar = True
+        except ( tarfile.ReadError, tarfile.CompressionError ):
+            pass
 
-                if oldOffset is not None:
-                    fileobj.seek( oldOffset )
-
-                return isTar, compression
-
-            except ( tarfile.ReadError, tarfile.CompressionError ):
-                if oldOffset is not None:
-                    fileobj.seek( oldOffset )
-
-                if foundCompression:
-                    return isTar, compression
-
-        raise Exception( "File '{}' does not seem to be a valid TAR file!".format( name ) )
+        fileobj.seek( oldOffset )
+        return isTar
 
     @staticmethod
     def _openCompressedFile( fileobj, gzipSeekPointSpacing, encoding ):
-        """Opens a file possibly undoing the compression."""
-        rawFile = None
-        tarFile = fileobj
-        isTar, compression = SQLiteIndexedTar._detectCompression( fileobj = tarFile, encoding = encoding )
+        """
+        Opens a file possibly undoing the compression.
+        Returns (tar_file_obj, raw_file_obj, compression, isTar).
+        raw_file_obj will be none if compression is None.
+        """
+        compression = SQLiteIndexedTar._detectCompression( fileobj )
+        if compression not in supportedCompressions:
+            return fileobj, None, compression, SQLiteIndexedTar._detectTar( fileobj, encoding )
 
-        if compression == 'bz2':
-            rawFile = tarFile # save so that garbage collector won't close it!
-            tarFile = IndexedBzip2File( rawFile.fileno() )
-        elif compression == 'gz':
-            rawFile = tarFile # save so that garbage collector won't close it!
+        cinfo = supportedCompressions[compression]
+        if cinfo.moduleName not in globals():
+            raise Exception( "Can't open a {} compressed file '{}' without {} module!"
+                             .format( compression, fileobj.name, cinfo.moduleName ) )
+
+        if compression == 'gz':
             # drop_handles keeps a file handle opening as is required to call tell() during decoding
-            tarFile = IndexedGzipFile( fileobj = rawFile,
-                                       drop_handles = False,
-                                       spacing = gzipSeekPointSpacing )
-        elif compression == 'xz':
-            rawFile = tarFile # save so that garbage collector won't close it!
-            tarFile = lzmaffi.open( rawFile )
-        elif compression == 'zst':
-            rawFile = tarFile # save so that garbage collector won't close it!
-            tarFile = IndexedZstdFile( rawFile.fileno() )
+            tar_file = indexed_gzip.IndexedGzipFile( fileobj = fileobj,
+                                                     drop_handles = False,
+                                                     spacing = gzipSeekPointSpacing )
+        else:
+            tar_file = cinfo.open( fileobj )
 
-        return tarFile, rawFile, compression, isTar
+        return tar_file, fileobj, compression, SQLiteIndexedTar._detectTar( tar_file, encoding )
 
     def _loadOrStoreCompressionOffsets( self ):
         # This should be called after the TAR file index is complete (loaded or created).
@@ -1182,41 +1158,39 @@ class SQLiteIndexedTar:
         db = self.sqlConnection
         fileObject = self.tarFileObject
 
-        if 'IndexedBzip2File' in globals() and isinstance( fileObject, IndexedBzip2File ):
+        if (
+            hasattr( fileObject, 'set_block_offsets' )
+            and hasattr( fileObject, 'block_offsets' )
+            and self.compression in [ 'bz2', 'zst' ]
+        ):
+            if self.compression == 'bz2':
+                table_name = 'bzip2blocks'
+            elif self.compression == 'zst':
+                table_name = 'zstdblocks'
+
             try:
-                offsets = dict( db.execute( 'SELECT blockoffset,dataoffset FROM bzip2blocks;' ) )
+                offsets = dict( db.execute( 'SELECT blockoffset,dataoffset FROM {};'.format( table_name ) ) )
                 fileObject.set_block_offsets( offsets )
             except:
                 if printDebug >= 2:
-                    print( "[Info] Could not load BZip2 Block offset data. Will create it from scratch." )
+                    print( "[Info] Could not load {} block offset data. Will create it from scratch."
+                           .format( self.compression ) )
 
                 tables = [ x[0] for x in db.execute( 'SELECT name FROM sqlite_master WHERE type="table";' ) ]
-                if 'bzip2blocks' in tables:
-                    db.execute( 'DROP TABLE bzip2blocks' )
-                db.execute( 'CREATE TABLE bzip2blocks ( blockoffset INTEGER PRIMARY KEY, dataoffset INTEGER )' )
-                db.executemany( 'INSERT INTO bzip2blocks VALUES (?,?)',
+                if table_name in tables:
+                    db.execute( 'DROP TABLE {}'.format( table_name ) )
+                db.execute( 'CREATE TABLE {} ( blockoffset INTEGER PRIMARY KEY, dataoffset INTEGER )'
+                            .format( table_name ) )
+                db.executemany( 'INSERT INTO {} VALUES (?,?)'.format( table_name ),
                                 fileObject.block_offsets().items() )
                 db.commit()
             return
 
-        if 'IndexedZstdFile' in globals() and isinstance( fileObject, IndexedZstdFile ):
-            try:
-                offsets = dict( db.execute( 'SELECT blockoffset,dataoffset FROM zstdblocks;' ) )
-                fileObject.set_block_offsets( offsets )
-            except:
-                if printDebug >= 2:
-                    print( "[Info] Could not load zstd block offset data. Will create it from scratch." )
-
-                tables = [ x[0] for x in db.execute( 'SELECT name FROM sqlite_master WHERE type="table";' ) ]
-                if 'zstdblocks' in tables:
-                    db.execute( 'DROP TABLE zstdblocks' )
-                db.execute( 'CREATE TABLE zstdblocks ( blockoffset INTEGER PRIMARY KEY, dataoffset INTEGER )' )
-                db.executemany( 'INSERT INTO zstdblocks VALUES (?,?)',
-                                fileObject.block_offsets().items() )
-                db.commit()
-            return
-
-        if 'IndexedGzipFile' in globals() and isinstance( fileObject, IndexedGzipFile ):
+        if (
+            hasattr( fileObject, 'import_index' )
+            and hasattr( fileObject, 'export_index' )
+            and self.compression == 'gz'
+        ):
             # indexed_gzip index only has a file based API, so we need to write all the index data from the SQL
             # database out into a temporary file. For that, let's first try to use the same location as the SQLite
             # database because it should have sufficient writing rights and free disk space.
@@ -1288,9 +1262,14 @@ class SQLiteIndexedTar:
                 db.execute( 'INSERT INTO gzipindex VALUES (?)', ( file.read(), ) )
             db.commit()
             os.remove( gzindex )
+            return
 
-        # Note that for xz seeking loading and storing block indexes is unnecessary because it has an index included!
+        # Note that for xz seeking, loading and storing block indexes is unnecessary because it has an index included!
+        if self.compression in [ None, 'xz' ]:
+            return
 
+        raise Exception( "Could not load or store block offsets for {} probably because adding support was forgotten!"
+                         .format( self.compression ) )
 
 class TarMount( fuse.Operations ):
     """
@@ -1638,20 +1617,20 @@ class TarMount( fuse.Operations ):
         return fileInfo.linkname
 
     @overrides( fuse.Operations )
-    def read( self, path, length, offset, fh ):
+    def read( self, path, size, offset, fh ):
         fileInfo, mountSource = self._getFileInfo( path )
 
         # Dereference hard links
         if not stat.S_ISREG( fileInfo.mode ) and not stat.S_ISLNK( fileInfo.mode ) and fileInfo.linkname:
             targetLink = '/' + fileInfo.linkname.lstrip( '/' )
             if targetLink != path:
-                return self.read( targetLink, length, offset, fh )
+                return self.read( targetLink, size, offset, fh )
 
         # Handle access to underlying non-empty folder
         if isinstance( mountSource, str ):
             f = open( mountSource, 'rb' )
             f.seek( offset )
-            return f.read( length )
+            return f.read( size )
 
         if fileInfo.issparse:
             # The TAR file format is very simple. It's just a concatenation of TAR blocks. There is not even a
@@ -1662,17 +1641,17 @@ class TarMount( fuse.Operations ):
             tmpTarFile = tarfile.open( fileobj = tarSubFile, mode = 'r:', encoding = self.encoding )
             tmpFileObject = tmpTarFile.extractfile( next( iter( tmpTarFile ) ) )
             tmpFileObject.seek( offset, os.SEEK_SET )
-            result = tmpFileObject.read( length )
+            result = tmpFileObject.read( size )
             tmpTarFile.close()
             return result
 
         try:
             mountSource.tarFileObject.seek( fileInfo.offset + offset, os.SEEK_SET )
-            return mountSource.tarFileObject.read( length )
-        except RuntimeError:
+            return mountSource.tarFileObject.read( size )
+        except RuntimeError as exception:
             traceback.print_exc()
             print( "Caught exception when trying to read data from underlying TAR file! Returning errno.EIO." )
-            raise fuse.FuseOSError( fuse.errno.EIO )
+            raise fuse.FuseOSError( fuse.errno.EIO ) from exception
 
 
 class TarFileType:
@@ -1680,54 +1659,28 @@ class TarFileType:
     Similar to argparse.FileType but raises an exception if it is not a valid TAR file.
     """
 
-    def __init__( self, mode = 'r', compressions = [ '' ], encoding = tarfile.ENCODING ):
-        self.compressions = [ '' if c is None else c for c in compressions ]
-        self.mode = mode
+    def __init__( self, encoding = tarfile.ENCODING ):
         self.encoding = encoding
 
     def __call__( self, tarFile ):
         if not os.path.exists( tarFile ):
             raise argparse.ArgumentTypeError( "File '{}' does not exist!" )
 
-        for compression in self.compressions:
-            try:
-                tarfile.open( tarFile, mode = self.mode + ':' + compression, encoding = self.encoding )
-                return ( tarFile, compression )
-            except ( tarfile.ReadError, tarfile.CompressionError ):
-                pass
+        with open( tarFile, 'rb' ) as fileobj:
+            compression = SQLiteIndexedTar._detectCompression( fileobj )
+            if compression not in supportedCompressions:
+                if SQLiteIndexedTar._detectTar( fileobj, self.encoding ):
+                    return tarFile, compression
+                raise argparse.ArgumentTypeError( "Archive '{}' can't be opened!\n".format( tarFile ) )
 
-            try:
-                if compression == 'bz2':
-                    bz2.open( tarFile ).read( 1 )
-                    return ( tarFile, compression )
-                if compression == 'gz':
-                    gzip.open( tarFile ).read( 1 )
-                    return ( tarFile, compression )
-                if compression == 'xz':
-                    lzmaffi.open( tarFile ).read( 1 )
-                    return ( tarFile, compression )
-                if compression == 'zst':
-                    IndexedZstdFile( tarFile ).read( 1 )
-                    return ( tarFile, compression )
-            except:
-                pass
+        cinfo = supportedCompressions[compression]
+        if cinfo.moduleName not in globals():
+            raise argparse.ArgumentTypeError(
+                "Can't open a {} compressed TAR file '{}' without {} module!"
+                .format( compression, fileobj.name, cinfo.moduleName )
+            )
 
-        msg = "Archive '{}' can't be opened!\n".format( tarFile )
-        msg += "This might happen for xz compressed TAR archives, which currently is not supported.\n"
-        if (
-            'IndexedBzip2File' not in globals() or
-            'IndexedGzipFile' not in globals() or
-            'IndexedZstdFile' not in globals() or
-            'lzmaffi' not in globals()
-        ):
-            msg += "If you are trying to open a compressed file, make sure\n"
-            msg += "that you have the respective modules installed:\n"
-            msg += "   bzip2 : indexed_bzip2\n"
-            msg += "   gzip  : indexed_gzip\n"
-            msg += "   xz    : lzmaffi\n"
-            msg += "   zstd  : indexed_zstd\n"
-
-        raise argparse.ArgumentTypeError( msg )
+        return tarFile, compression
 
 class CustomFormatter( argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter ):
     pass
@@ -1737,9 +1690,11 @@ def parseArgs( args = None ):
         formatter_class = CustomFormatter,
         description = '''\
 With ratarmount, you can:
-  - Mount a TAR file to a folder for read-only access
+  - Mount a (compressed) TAR file to a folder for read-only access
+  - Mount a compressed file to `<mountpoint>/<filename>`
   - Bind mount a folder to another folder for read-only access
-  - Union mount a list of TARs and folders to a folder for read-only access
+  - Union mount a list of TARs, compressed files, and folders to a mount point
+    for read-only access
 ''',
         epilog = '''\
 # Metadata Index Cache
@@ -1812,6 +1767,13 @@ In this example, the oldest version has only 123 bytes while the newest and
 by default shown version has 1024 bytes. So, in order to look at the oldest
 version, you can simply do:
     cat mountpoint/foo.versions/1
+
+# Compressed non-TAR files
+
+If you want a compressed file not containing a TAR, e.g., `foo.bz2`, then
+you can also use ratarmount for that. The uncompressed view will then be
+mounted to `<mountpoint>/foo` and you will be able to leverage ratarmount's
+seeking capabilities when opening that file.
 ''' )
 
     parser.add_argument(
@@ -1927,7 +1889,7 @@ version, you can simply do:
 
     args = parser.parse_args( args )
 
-    args.gzip_seek_point_spacing = args.gzip_seek_point_spacing * 1024 * 1024
+    args.gzipSeekPointSpacing = args.gzip_seek_point_spacing * 1024 * 1024
 
     # This is a hack but because we have two positional arguments (and want that reflected in the auto-generated help),
     # all positional arguments, including the mountpath will be parsed into the tarfilepaths namespace and we have to
@@ -1940,23 +1902,14 @@ version, you can simply do:
         sys.exit( 1 )
 
     # Manually check that all specified TARs and folders exist
-    compressions = [ '' ]
-    if 'IndexedBzip2File' in globals():
-        compressions += [ 'bz2' ]
-    if 'IndexedGzipFile' in globals():
-        compressions += [ 'gz' ]
-    if 'lzmaffi' in globals():
-        compressions += [ 'xz' ]
-    if 'IndexedZstdFile' in globals():
-        compressions += [ 'zst' ]
-    args.mount_source = [ TarFileType( mode = 'r', compressions = compressions, encoding = args.encoding )( tarFile )[0]
+    args.mount_source = [ TarFileType( encoding = args.encoding )( tarFile )[0]
                           if not os.path.isdir( tarFile ) else os.path.realpath( tarFile )
                           for tarFile in args.mount_source ]
 
     # Automatically generate a default mount path
     if args.mount_point is None:
         tarPath = args.mount_source[0]
-        for compression in compressions:
+        for compression in [ s for c in supportedCompressions.values() for s in c.suffixes ]:
             if not compression:
                 continue
             doubleExtension = '.tar.' + compression
@@ -1977,6 +1930,8 @@ version, you can simply do:
     return args
 
 def cli( args = None ):
+    """Command line interface for ratarmount. Call with args = [ '--help' ] for a description."""
+
     tmpArgs = sys.argv if args is None else args
     if '--version' in tmpArgs or '-v' in tmpArgs:
         print( "ratarmount", __version__ )
@@ -2001,7 +1956,7 @@ def cli( args = None ):
         pathToMount                = args.mount_source,
         clearIndexCache            = args.recreate_index,
         recursive                  = args.recursive,
-        gzipSeekPointSpacing       = args.gzip_seek_point_spacing,
+        gzipSeekPointSpacing       = args.gzipSeekPointSpacing,
         mountPoint                 = args.mount_point,
         encoding                   = args.encoding,
         ignoreZeros                = args.ignore_zeros,

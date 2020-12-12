@@ -70,6 +70,8 @@ disable=invalid-name,
         too-many-instance-attributes,
         too-many-locals,
         too-many-lines,
+        too-few-public-methods,
+        unnecessary-lambda,
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
