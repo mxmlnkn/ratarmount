@@ -1,8 +1,13 @@
 tests/*.tar*
 benchmarks/data/**/*.png
 benchmarks/**/*.tar
-notes.txt
+*.txt
 knowledge
+/*zst
+*.diff
+worktrees
+indexed*/
+*zstd/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
