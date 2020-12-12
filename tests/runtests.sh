@@ -491,17 +491,15 @@ checkTarEncoding()
 
 python3 tests/tests.py || returnError "tests/tests.py"
 
-# Disabling errors is not a good idea however, to the best of my knowledge it looks like a false positive.
-# If it really was an error, then ratarmount wouldn't even be able to list directories.
-# Also, 8 lines down below is the same code a second time and there the error does not appear
-# ratarmount.py:1422:23: E1133: Non-iterable value files is used in an iterating context (not-an-iterable)
-#    for key in files:
-pylint ratarmount.py | tee pylint.log
-if 'egrep' -q ': E[0-9]{4}: ' pylint.log; then
-    echoerr 'There were warnings during the pylint run!'
-    exit 1
+# Ignore Python 3.9. because of the Optiona[T] type hint bug in pylint: https://github.com/PyCQA/pylint/issues/3882
+if [[ ! $( python3 --version ) =~ \ 3\.9\.* ]]; then
+    pylint ratarmount.py setup.py | tee pylint.log
+    if 'egrep' -q ': E[0-9]{4}: ' pylint.log; then
+        echoerr 'There were warnings during the pylint run!'
+        exit 1
+    fi
 fi
-
+mypy ratarmount.py setup.py
 rm -f tests/*.index.*
 
 tests=(

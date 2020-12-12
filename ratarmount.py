@@ -16,6 +16,7 @@ import tempfile
 import time
 import traceback
 from timeit import default_timer as timer
+from typing import Any, AnyStr, BinaryIO, Dict, IO, List, Optional, Set, Tuple, Union
 
 import fuse
 
@@ -101,14 +102,14 @@ def overrides( parentClass ):
 
 class ProgressBar:
     """Simple progress bar which keeps track of changes and prints the progress and a time estimate."""
-    def __init__( self, maxValue ):
-        self.maxValue = maxValue
-        self.lastUpdateTime = time.time()
-        self.lastUpdateValue = 0
-        self.updateInterval = 2 # seconds
-        self.creationTime = time.time()
+    def __init__( self, maxValue : float ):
+        self.maxValue        : float = maxValue
+        self.lastUpdateTime  : float = time.time()
+        self.lastUpdateValue : float = 0
+        self.updateInterval  : float = 2 # seconds
+        self.creationTime    : float = time.time()
 
-    def update( self, value ):
+    def update( self, value : float ) -> None:
         if self.lastUpdateTime is not None and ( time.time() - self.lastUpdateTime ) < self.updateInterval:
             return
 
@@ -133,7 +134,7 @@ class ProgressBar:
 class StenciledFile(io.BufferedIOBase):
     """A file abstraction layer giving a stenciled view to an underlying file."""
 
-    def __init__(self, fileobj, stencils):
+    def __init__(self, fileobj: IO, stencils: List[Tuple[int, int]]) -> None:
         """
         stencils: A list tuples specifying the offset and length of the underlying file to use.
                   The order of these tuples will be kept.
@@ -163,7 +164,7 @@ class StenciledFile(io.BufferedIOBase):
         # Seek to the first stencil offset in the underlying file so that "read" will work out-of-the-box
         self.seek( 0 )
 
-    def _findStencil( self, offset ):
+    def _findStencil( self, offset: int ) -> int:
         """
         Return index to stencil where offset belongs to. E.g., for stencils [(3,5),(8,2)], offsets 0 to
         and including 4 will still be inside stencil (3,5), i.e., index 0 will be returned. For offset 6,
@@ -178,29 +179,29 @@ class StenciledFile(io.BufferedIOBase):
         return i
 
     @overrides(io.BufferedIOBase)
-    def close(self):
+    def close(self) -> None:
         # Don't close the object given to us
         #self.fileobj.close()
         pass
 
     @overrides(io.BufferedIOBase)
-    def fileno(self):
+    def fileno(self) -> int:
         return self.fileobj.fileno()
 
     @overrides(io.BufferedIOBase)
-    def seekable(self):
+    def seekable(self) -> bool:
         return self.fileobj.seekable()
 
     @overrides(io.BufferedIOBase)
-    def readable(self):
+    def readable(self) -> bool:
         return self.fileobj.readable()
 
     @overrides(io.BufferedIOBase)
-    def writable(self):
+    def writable(self) -> bool:
         return False
 
     @overrides(io.BufferedIOBase)
-    def read(self, size=-1):
+    def read(self, size: int=-1) -> bytes:
         if size == -1:
             size = self.cumsizes[-1] - self.offset
 
@@ -228,7 +229,7 @@ class StenciledFile(io.BufferedIOBase):
         return result
 
     @overrides(io.BufferedIOBase)
-    def seek(self, offset, whence=io.SEEK_SET):
+    def seek(self, offset: int, whence: int=io.SEEK_SET) -> int:
         if whence == io.SEEK_CUR:
             self.offset += offset
         elif whence == io.SEEK_END:
@@ -250,9 +251,12 @@ class StenciledFile(io.BufferedIOBase):
         return self.offset
 
     @overrides(io.BufferedIOBase)
-    def tell(self):
+    def tell(self) -> int:
         return self.offset
 
+# Names must be identical to the SQLite column headers!
+FileInfo = collections.namedtuple( "FileInfo",
+                                   "offsetheader offset size mtime mode type linkname uid gid istar issparse" )
 
 class SQLiteIndexedTar:
     """
@@ -260,25 +264,21 @@ class SQLiteIndexedTar:
     for all contained files in an index to support fast seeking to a given file.
     """
 
-    # Names must be identical to the SQLite column headers!
-    FileInfo = collections.namedtuple( "FileInfo",
-                                       "offsetheader offset size mtime mode type linkname uid gid istar issparse" )
-
     def __init__(
         self,
-        tarFileName                = None,
-        fileObject                 = None,
-        writeIndex                 = False,
-        clearIndexCache            = False,
-        indexFileName              = None,
-        indexFolders               = None,
-        recursive                  = False,
-        gzipSeekPointSpacing       = 4*1024*1024,
-        encoding                   = tarfile.ENCODING,
-        stripRecursiveTarExtension = False,
-        ignoreZeros                = False,
-        verifyModificationTime     = False,
-    ):
+        tarFileName                : Optional[str]       = None,
+        fileObject                 : Optional[BinaryIO]  = None,
+        writeIndex                 : bool                = False,
+        clearIndexCache            : bool                = False,
+        indexFileName              : Optional[str]       = None,
+        indexFolders               : Optional[List[str]] = None,
+        recursive                  : bool                = False,
+        gzipSeekPointSpacing       : int                 = 4*1024*1024,
+        encoding                   : str                 = tarfile.ENCODING,
+        stripRecursiveTarExtension : bool                = False,
+        ignoreZeros                : bool                = False,
+        verifyModificationTime     : bool                = False,
+    ) -> None:
         """
         tarFileName : Path to the TAR file to be opened. If not specified, a fileObject must be specified.
                       If only a fileObject is given, the created index can't be cached (efficiently).
@@ -302,16 +302,17 @@ class SQLiteIndexedTar:
         self.__version__ = '0.2.0'
 
         # stores which parent folders were last tried to add to database and therefore do exist
-        self.parentFolderCache = []
+        self.parentFolderCache: List[Tuple[str, str]] = []
         self.mountRecursively = recursive
-        self.sqlConnection = None
+        self.sqlConnection: Optional[sqlite3.Connection] = None
         self.encoding = encoding
         self.stripRecursiveTarExtension = stripRecursiveTarExtension
         self.ignoreZeros = ignoreZeros
         self.verifyModificationTime = verifyModificationTime
 
-        assert tarFileName or fileObject
         if not tarFileName:
+            if not fileObject:
+                raise ValueError( "At least one of tarFileName and fileObject arguments should be set!" )
             self.tarFileName = '<file object>'
             self.createIndex( fileObject )
             # return here because we can't find a save location without any identifying name
@@ -404,14 +405,15 @@ class SQLiteIndexedTar:
         self.createIndex( self.tarFileObject )
         self._loadOrStoreCompressionOffsets()
 
-        self._storeTarMetadata()
+        self._storeTarMetadata( self.sqlConnection, self.tarFileName )
 
         if printDebug >= 1 and writeIndex:
             # The 0-time is legacy for the automated tests
             print( "Writing out TAR index to", self.indexFileName, "took 0s",
                    "and is sized", os.stat( self.indexFileName ).st_size, "B" )
 
-    def _storeTarMetadata( self ):
+    @staticmethod
+    def _storeTarMetadata( connection: Any, tarPath: AnyStr ) -> None:
         """Adds some consistency meta information to recognize the need to update the cached TAR index"""
 
         metadataTable = """
@@ -423,12 +425,12 @@ class SQLiteIndexedTar:
         """
 
         try:
-            tarStats = os.stat( self.tarFileName )
-            self.sqlConnection.executescript( metadataTable )
+            tarStats = os.stat( tarPath )
+            connection.executescript( metadataTable )
             serializedTarStats = json.dumps( { attr : getattr( tarStats, attr )
                                                for attr in dir( tarStats ) if attr.startswith( 'st_' ) } )
-            self.sqlConnection.execute( 'INSERT INTO "metadata" VALUES (?,?)', ( "tarstats", serializedTarStats ) )
-            self.sqlConnection.commit()
+            connection.execute( 'INSERT INTO "metadata" VALUES (?,?)', ( "tarstats", serializedTarStats ) )
+            connection.commit()
         except Exception as exception:
             if printDebug >= 2:
                 print( exception )
@@ -436,7 +438,7 @@ class SQLiteIndexedTar:
             print( "[Warning] Automatic detection of changed TAR files during index loading might not work." )
 
     @staticmethod
-    def _pathIsWritable( path ):
+    def _pathIsWritable( path: AnyStr ) -> bool:
         try:
             folder = os.path.dirname( path )
             if folder:
@@ -457,7 +459,7 @@ class SQLiteIndexedTar:
         return False
 
     @staticmethod
-    def _pathCanBeUsedForSqlite( path ):
+    def _pathCanBeUsedForSqlite( path: AnyStr ) -> bool:
         try:
             folder = os.path.dirname( path )
             if folder:
@@ -479,7 +481,7 @@ class SQLiteIndexedTar:
         return False
 
     @staticmethod
-    def _openSqlDb( path ):
+    def _openSqlDb( path: AnyStr ) -> sqlite3.Connection:
         sqlConnection = sqlite3.connect( path )
         sqlConnection.row_factory = sqlite3.Row
         sqlConnection.executescript( """
@@ -490,31 +492,29 @@ class SQLiteIndexedTar:
         """ )
         return sqlConnection
 
-    def _updateProgressBar( self, progressBar, fileobj ):
+    def _updateProgressBar( self, progressBar, fileobj: Any ) -> None:
         try:
             if hasattr( fileobj, 'tell_compressed' ) and self.compression == 'bz2':
                 # Note that because bz2 works on a bitstream the tell_compressed returns the offset in bits
                 progressBar.update( fileobj.tell_compressed() // 8 )
-                return
-
-            if hasattr( fileobj, 'tell_compressed' ):
+            elif hasattr( fileobj, 'tell_compressed' ):
                 progressBar.update( fileobj.tell_compressed() )
-                return
-
-            if hasattr( fileobj, 'fileobj' ):
+            elif hasattr( fileobj, 'fileobj' ):
                 progressBar.update( fileobj.fileobj().tell() )
-                return
-
-            if self.rawFileObject and hasattr( self.rawFileObject, 'tell' ):
+            elif self.rawFileObject and hasattr( self.rawFileObject, 'tell' ):
                 progressBar.update( self.rawFileObject.tell() )
-                return
-
-            progressBar.update( fileobj.tell() )
-
+            else:
+                progressBar.update( fileobj.tell() )
         except:
             pass
 
-    def createIndex( self, fileObject, progressBar = None, pathPrefix = '', streamOffset = 0 ):
+    def createIndex(
+        self,
+        fileObject  : Any,
+        progressBar : Any = None,
+        pathPrefix  : str = '',
+        streamOffset: int = 0
+    ) -> None:
         if printDebug >= 1:
             print( "Creating offset dictionary for",
                    "<file object>" if self.tarFileName is None else self.tarFileName, "..." )
@@ -522,7 +522,7 @@ class SQLiteIndexedTar:
 
         # 1. If no SQL connection was given (by recursive call), open a new database file
         openedConnection = False
-        if not self.indexIsLoaded():
+        if not self.indexIsLoaded() or not self.sqlConnection:
             if printDebug >= 1:
                 print( "Creating new SQLite index database at", self.indexFileName )
 
@@ -568,7 +568,7 @@ class SQLiteIndexedTar:
             self.sqlConnection.executescript( createTables )
 
         # 2. Open TAR file reader
-        loadedTarFile = [] # Feign an empty TAR file if anything goes wrong
+        loadedTarFile: Any = [] # Feign an empty TAR file if anything goes wrong
         try:
             streamed = bool( self.compression )
             # r: uses seeks to skip to the next file inside the TAR while r| doesn't do any seeks.
@@ -762,7 +762,10 @@ class SQLiteIndexedTar:
             print( "[Warning] There was an error when adding metadata information. Index loading might not work." )
 
         try:
-            def makeVersionRow( versionName, version ):
+            def makeVersionRow(
+                versionName: str,
+                version: str
+            ) -> Tuple[str, str, Optional[str], Optional[str], Optional[str]]:
                 versionNumbers = [ re.sub( '[^0-9]', '', x ) for x in version.split( '.' ) ]
                 return ( versionName,
                          version,
@@ -791,8 +794,9 @@ class SQLiteIndexedTar:
                    "<file object>" if self.tarFileName is None else self.tarFileName,
                    "took {:.2f}s".format( t1 - t0 ) )
 
-    def _rowToFileInfo( self, row ):
-        return self.FileInfo(
+    @staticmethod
+    def _rowToFileInfo( row: Dict[str, Any] ) -> FileInfo:
+        return FileInfo(
             offset       = row['offset'],
             offsetheader = row['offsetheader'] if 'offsetheader' in row.keys() else 0,
             size         = row['size'],
@@ -806,7 +810,13 @@ class SQLiteIndexedTar:
             issparse     = row['issparse'] if 'issparse' in row.keys() else False
         )
 
-    def getFileInfo( self, fullPath, listDir = False, listVersions = False, fileVersion = 0 ):
+    def getFileInfo(
+        self,
+        fullPath     : str,
+        listDir      : bool = False,
+        listVersions : bool = False,
+        fileVersion  : int  = 0
+    ) -> Optional[Union[FileInfo, Dict[str, FileInfo]]]:
         """
         This is the heart of this class' public interface!
 
@@ -831,7 +841,11 @@ class SQLiteIndexedTar:
         """
         # @todo cache last listDir as most often a stat over all entries will soon follow
 
-        assert isinstance( fileVersion, int )
+        if not isinstance( fileVersion, int ):
+            raise TypeError( "The specified file version must be an integer!" )
+        if not self.sqlConnection:
+            raise RuntimeError( "This method can not be called without an opened index database!" )
+
         # also strips trailing '/' except for a single '/' and leading '/'
         fullPath = '/' + os.path.normpath( fullPath ).lstrip( '/' )
 
@@ -869,17 +883,21 @@ class SQLiteIndexedTar:
         ).fetchone()
         return self._rowToFileInfo( row ) if row else None
 
-    def isDir( self, path ):
+    def isDir( self, path: str ) -> bool:
         return isinstance( self.getFileInfo( path, listDir = True ), dict )
 
-    def _tryAddParentFolders( self, path ):
+    def _tryAddParentFolders( self, path: str ) -> None:
         # Add parent folders if they do not exist.
         # E.g.: path = '/a/b/c' -> paths = [('', 'a'), ('/a', 'b'), ('/a/b', 'c')]
         # Without the parentFolderCache, the additional INSERT statements increase the creation time
         # from 8.5s to 12s, so almost 50% slowdown for the 8MiB test TAR!
-        paths = path.split( "/" )
-        paths = [ p for p in ( ( "/".join( paths[:i] ), paths[i] ) for i in range( 1, len( paths ) ) )
-                 if p not in self.parentFolderCache ]
+        pathParts = path.split( "/" )
+        paths = [ p
+                  for p in (
+                    ( "/".join( pathParts[:i] ), pathParts[i] )
+                    for i in range( 1, len( pathParts ) )
+                  )
+                  if p not in self.parentFolderCache ]
         if not paths:
             return
 
@@ -888,11 +906,16 @@ class SQLiteIndexedTar:
         # gives the maximum cacheable file nesting depth. High numbers lead to higher memory usage and lookup times.
         if len( self.parentFolderCache ) > 16:
             self.parentFolderCache = self.parentFolderCache[-8:]
+
+        if not self.sqlConnection:
+            raise RuntimeError( "This method can not be called without an opened index database!" )
         self.sqlConnection.executemany( 'INSERT OR IGNORE INTO "parentfolders" VALUES (?,?)',
                                         [ ( p[0], p[1] ) for p in paths ] )
 
-    def _setFileInfo( self, row ):
-        assert isinstance( row, tuple )
+    def _setFileInfo( self, row: tuple ) -> None:
+        if not self.sqlConnection:
+            raise RuntimeError( "This method can not be called without an opened index database!" )
+
         try:
             self.sqlConnection.execute( 'INSERT OR REPLACE INTO "files" VALUES (' +
                                         ','.join( '?' * len( row ) ) + ');', row )
@@ -923,13 +946,13 @@ class SQLiteIndexedTar:
 
         self._tryAddParentFolders( row[0] )
 
-    def setFileInfo( self, fullPath, fileInfo ):
+    def setFileInfo( self, fullPath: str, fileInfo: FileInfo ) -> None:
         """
         fullPath : the full path to the file with leading slash (/) for which to set the file info
         """
-        assert self.sqlConnection
+        if not self.sqlConnection:
+            raise RuntimeError( "This method can not be called without an opened index database!" )
         assert fullPath[0] == "/"
-        assert isinstance( fileInfo, self.FileInfo )
 
         # os.normpath does not delete duplicate '/' at beginning of string!
         path, name = fullPath.rsplit( "/", 1 )
@@ -950,7 +973,7 @@ class SQLiteIndexedTar:
         )
         self._setFileInfo( row )
 
-    def indexIsLoaded( self ):
+    def indexIsLoaded( self ) -> bool:
         """Returns true if the SQLite database has been opened for reading and a "files" table exists."""
         if not self.sqlConnection:
             return False
@@ -963,7 +986,7 @@ class SQLiteIndexedTar:
 
         return True
 
-    def loadIndex( self, indexFileName ):
+    def loadIndex( self, indexFileName: AnyStr ) -> None:
         """Loads the given index SQLite database and checks it for validity."""
         if self.indexIsLoaded():
             return
@@ -1037,7 +1060,7 @@ class SQLiteIndexedTar:
             # Legacy output for automated tests
             print( "Loading offset dictionary from", indexFileName, "took {:.2f}s".format( time.time() - t0 ) )
 
-    def _tryLoadIndex( self, indexFileName ):
+    def _tryLoadIndex( self, indexFileName: AnyStr ) -> bool:
         """calls loadIndex if index is not loaded already and provides extensive error handling"""
 
         if self.indexIsLoaded():
@@ -1052,7 +1075,7 @@ class SQLiteIndexedTar:
             if printDebug >= 3:
                 traceback.print_exc()
 
-            print( "[Warning] Could not load file '" + indexFileName  )
+            print( "[Warning] Could not load file:", indexFileName )
             print( "[Info] Exception:", exception )
             print( "[Info] Some likely reasons for not being able to load the index file:" )
             print( "[Info]   - The index file has incorrect read permissions" )
@@ -1080,7 +1103,7 @@ class SQLiteIndexedTar:
         return self.indexIsLoaded()
 
     @staticmethod
-    def _detectCompression( fileobj ):
+    def _detectCompression( fileobj : BinaryIO ) -> Optional[str]:
         if not isinstance( fileobj, io.IOBase ) or not fileobj.seekable():
             return None
 
@@ -1110,7 +1133,7 @@ class SQLiteIndexedTar:
         return None
 
     @staticmethod
-    def _detectTar( fileobj, encoding ):
+    def _detectTar( fileobj : BinaryIO, encoding : str ) -> bool:
         if not isinstance( fileobj, io.IOBase ) or not fileobj.seekable():
             return False
 
@@ -1126,7 +1149,7 @@ class SQLiteIndexedTar:
         return isTar
 
     @staticmethod
-    def _openCompressedFile( fileobj, gzipSeekPointSpacing, encoding ):
+    def _openCompressedFile( fileobj: BinaryIO, gzipSeekPointSpacing: int, encoding: str ) -> Any:
         """
         Opens a file possibly undoing the compression.
         Returns (tar_file_obj, raw_file_obj, compression, isTar).
@@ -1155,6 +1178,8 @@ class SQLiteIndexedTar:
         # This should be called after the TAR file index is complete (loaded or created).
         # If the TAR file index was created, then tarfile has iterated over the whole file once
         # and therefore completed the implicit compression offset creation.
+        if not self.sqlConnection:
+            raise RuntimeError( "This method can not be called without an opened index database!" )
         db = self.sqlConnection
         fileObject = self.tarFileObject
 
@@ -1205,7 +1230,8 @@ class SQLiteIndexedTar:
                         file.write( db.execute( 'SELECT data FROM gzipindex' ).fetchone()[0] )
                 except:
                     try:
-                        os.remove( gzindex )
+                        if gzindex:
+                            os.remove( gzindex )
                     except:
                         pass
                     gzindex = None
@@ -1217,7 +1243,8 @@ class SQLiteIndexedTar:
                 pass
 
             try:
-                os.remove( gzindex )
+                if gzindex:
+                    os.remove( gzindex )
             except:
                 pass
 
@@ -1293,21 +1320,30 @@ class TarMount( fuse.Operations ):
         'encoding',
     )
 
-    def __init__( self, pathToMount, mountPoint = None, encoding = tarfile.ENCODING, **sqliteIndexedTarOptions ):
+    def __init__(
+        self,
+        pathToMount : Union[str, List[str]],
+        mountPoint  : str,
+        encoding    : str = tarfile.ENCODING,
+        **sqliteIndexedTarOptions
+    ) -> None:
         self.encoding = encoding
 
-        try:
-            os.fspath( pathToMount )
-            pathToMount = [ pathToMount ]
-        except:
-            pass
+        if not isinstance( pathToMount, list ):
+            try:
+                os.fspath( pathToMount )
+                pathToMount = [ pathToMount ]
+            except:
+                pass
 
-        self.mountSources = [ SQLiteIndexedTar( tarFile,
-                                                writeIndex = True,
-                                                encoding = self.encoding,
-                                                **sqliteIndexedTarOptions )
-                              if not os.path.isdir( tarFile ) else os.path.realpath( tarFile )
-                              for tarFile in pathToMount ]
+        self.mountSources: List[Any] = [
+            SQLiteIndexedTar( tarFile,
+                              writeIndex = True,
+                              encoding = self.encoding,
+                              **sqliteIndexedTarOptions )
+            if not os.path.isdir( tarFile ) else os.path.realpath( tarFile )
+            for tarFile in pathToMount
+        ]
 
         # make the mount point read only and executable if readable, i.e., allow directory listing
         tarStats = os.stat( pathToMount[0] )
@@ -1320,7 +1356,7 @@ class TarMount( fuse.Operations ):
             | ( stat.S_IXOTH if tarStats.st_mode & stat.S_IROTH != 0 else 0 )
         )
 
-        self.rootFileInfo = SQLiteIndexedTar.FileInfo(
+        self.rootFileInfo = FileInfo(
             offset       = None             ,
             offsetheader = None             ,
             size         = tarStats.st_size ,
@@ -1342,7 +1378,7 @@ class TarMount( fuse.Operations ):
         self.mountPoint = os.path.realpath( mountPoint )
         self.mountPointFd = os.open( self.mountPoint, os.O_RDONLY )
 
-    def __del__( self ):
+    def __del__( self ) -> None:
         try:
             if self.mountPointWasCreated:
                 os.rmdir( self.mountPoint )
@@ -1355,9 +1391,9 @@ class TarMount( fuse.Operations ):
             pass
 
     @staticmethod
-    def _getFileInfoFromRealFile( filePath ):
+    def _getFileInfoFromRealFile( filePath: AnyStr ) -> FileInfo:
         stats = os.lstat( filePath )
-        return SQLiteIndexedTar.FileInfo(
+        return FileInfo(
             offset       = None          ,
             offsetheader = None          ,
             size         = stats.st_size ,
@@ -1371,8 +1407,14 @@ class TarMount( fuse.Operations ):
             issparse     = False
         )
 
-    def _getUnionMountFileInfo( self, filePath, fileVersion = 0 ):
-        """Returns the file info from the last (most recent) mount source in mountSources, which contains that file"""
+    def _getUnionMountFileInfo(
+        self,
+        filePath    : str,
+        fileVersion : int = 0
+    ) -> Optional[Tuple[FileInfo, Optional[str]]]:
+        """Returns the file info from the last (most recent) mount source in mountSources,
+           which contains that file and that mountSource itself. mountSource might be None
+           if it is the root folder."""
 
         if filePath == '/':
             return self.rootFileInfo, None
@@ -1392,7 +1434,7 @@ class TarMount( fuse.Operations ):
 
                 else:
                     fileInfo = mountSource.getFileInfo( filePath, listDir = False, fileVersion = fileVersion )
-                    if isinstance( fileInfo, SQLiteIndexedTar.FileInfo ):
+                    if isinstance( fileInfo, FileInfo ):
                         return fileInfo, mountSource
                     fileVersion += len( mountSource.getFileInfo( filePath, listVersions = True ) )
 
@@ -1413,7 +1455,7 @@ class TarMount( fuse.Operations ):
 
             else:
                 fileInfo = mountSource.getFileInfo( filePath, listDir = False, fileVersion = fileVersion )
-                if isinstance( fileInfo, SQLiteIndexedTar.FileInfo ):
+                if isinstance( fileInfo, FileInfo ):
                     return fileInfo, mountSource
                 fileVersion -= len( mountSource.getFileInfo( filePath, listVersions = True ) )
 
@@ -1422,7 +1464,7 @@ class TarMount( fuse.Operations ):
 
         return None
 
-    def _decodeVersionsPathAPI( self, filePath ):
+    def _decodeVersionsPathAPI( self, filePath: str ) -> Optional[Tuple[str, bool, Optional[int]]]:
         """
         Do a loop over the parent path parts to resolve possible versions in parent folders.
         Note that multiple versions of a folder always are union mounted. So, for the path to a file
@@ -1449,17 +1491,17 @@ class TarMount( fuse.Operations ):
 
         filePathParts = filePath.lstrip( '/' ).split( '/' )
         filePath = ''
-        pathIsVersions = False
+        pathIsSpecialVersionsFolder = False
         fileVersion = None # Not valid if None or parentIsVersions is True
         for part in filePathParts:
             # Skip over the exact version specified
-            if pathIsVersions:
+            if pathIsSpecialVersionsFolder:
                 try:
                     fileVersion = int( part )
                     assert str( fileVersion ) == part
                 except:
                     return None
-                pathIsVersions = False
+                pathIsSpecialVersionsFolder = False
                 continue
 
             # Simply append normal existing folders
@@ -1471,32 +1513,34 @@ class TarMount( fuse.Operations ):
 
             # If current path does not exist, check if it is a special versions path
             if part.endswith( '.versions' ) and len( part ) > len( '.versions' ):
-                pathIsVersions = True
+                pathIsSpecialVersionsFolder = True
                 filePath = tmpFilePath[:-len( '.versions' )]
                 continue
 
             # Parent path does not exist and is not a versions path, so any subpaths also won't exist either
             return None
 
-        return filePath, pathIsVersions, ( None if pathIsVersions else fileVersion )
+        return filePath, pathIsSpecialVersionsFolder, ( None if pathIsSpecialVersionsFolder else fileVersion )
 
-    def _getFileInfo( self, filePath ):
+    def _getFileInfo( self, filePath: str ) -> Tuple[FileInfo, Optional[str]]:
         """Wrapper for _getUnionMountFileInfo, which also resolves special file version specifications in the path."""
         result = self._getUnionMountFileInfo( filePath )
         if result:
             return result
 
         # If no file was found, check if a special .versions folder to an existing file/folder was queried.
-        result = self._decodeVersionsPathAPI( filePath )
-        if not result:
+        versionsInfo = self._decodeVersionsPathAPI( filePath )
+        if not versionsInfo:
             raise fuse.FuseOSError( fuse.errno.ENOENT )
-        filePath, pathIsVersions, fileVersion = result
+        filePath, pathIsSpecialVersionsFolder, fileVersion = versionsInfo
 
         # 2.) Check if the request was for the special .versions folder and return its contents or stats
         # At this point, filePath is assured to actually exist!
-        if pathIsVersions:
-            parentFileInfo, mountSource = self._getUnionMountFileInfo( filePath )
-            return SQLiteIndexedTar.FileInfo(
+        if pathIsSpecialVersionsFolder:
+            pathInfo = self._getUnionMountFileInfo( filePath )
+            assert pathInfo
+            parentFileInfo, mountSource = pathInfo
+            return FileInfo(
                 offset       = None                ,
                 offsetheader = None                ,
                 size         = 0                   ,
@@ -1511,18 +1555,21 @@ class TarMount( fuse.Operations ):
             ), mountSource
 
         # 3.) At this point the request is for an actual version of a file or folder
+        if fileVersion is None:
+            print( "[Error] fileVersion should not be None!" )
+            raise fuse.FuseOSError( fuse.errno.ENOENT )
         result = self._getUnionMountFileInfo( filePath, fileVersion = fileVersion )
         if result:
             return result
 
         raise fuse.FuseOSError( fuse.errno.ENOENT )
 
-    def _getUnionMountListDir( self, folderPath ):
+    def _getUnionMountListDir( self, folderPath: str ) -> Optional[Set[str]]:
         """
         Returns the set of all folder contents over all mount sources or None if the path was found in none of them.
         """
 
-        files = set()
+        files: Set[str] = set()
         folderExists = False
 
         for mountSource in self.mountSources:
@@ -1540,14 +1587,14 @@ class TarMount( fuse.Operations ):
         return files if folderExists else None
 
     @overrides( fuse.Operations )
-    def init( self, connection ):
+    def init( self, connection ) -> None:
         os.fchdir( self.mountPointFd )
         for i in range( len( self.mountSources ) ):
             if self.mountSources[i] == self.mountPoint:
                 self.mountSources[i] = '.'
 
     @overrides( fuse.Operations )
-    def getattr( self, path, fh = None ):
+    def getattr( self, path: str, fh = None ) -> Dict[str, Any]:
         fileInfo, _ = self._getFileInfo( path )
 
         # Dereference hard links
@@ -1572,7 +1619,7 @@ class TarMount( fuse.Operations ):
         return statDict
 
     @overrides( fuse.Operations )
-    def readdir( self, path, fh ):
+    def readdir( self, path: str, fh ):
         # we only need to return these special directories. FUSE automatically expands these and will not ask
         # for paths like /../foo/./../bar, so we don't need to worry about cleaning such paths
         yield '.'
@@ -1588,9 +1635,9 @@ class TarMount( fuse.Operations ):
         result = self._decodeVersionsPathAPI( path )
         if not result:
             return
-        path, pathIsVersions, fileVersion = result
+        path, pathIsSpecialVersionsFolder, fileVersion = result
 
-        if not pathIsVersions:
+        if not pathIsSpecialVersionsFolder:
             files = self._getUnionMountListDir( path )
             if files is not None:
                 for key in files:
@@ -1606,19 +1653,25 @@ class TarMount( fuse.Operations ):
                     version += 1
                     yield str( version )
             else:
-                result = mountSource.getFileInfo( path, listVersions = True )
-                for x in result.keys():
-                    version += 1
-                    yield str( version )
+                fileVersions = mountSource.getFileInfo( path, listVersions = True )
+                if isinstance( fileVersions, dict ):
+                    for x in fileVersions.keys():
+                        version += 1
+                        yield str( version )
 
     @overrides( fuse.Operations )
-    def readlink( self, path ):
+    def readlink( self, path: str ) -> str:
         fileInfo, _ = self._getFileInfo( path )
         return fileInfo.linkname
 
     @overrides( fuse.Operations )
-    def read( self, path, size, offset, fh ):
+    def read( self, path: str, size: int, offset: int, fh ) -> bytes:
         fileInfo, mountSource = self._getFileInfo( path )
+        # mountSource may only be None for the root folder. However, this read method
+        # should  only ever be called on files, so mountSource shoult never be None.
+        if mountSource is None:
+            print( "[Error] Trying to read data from non-file root folder!" )
+            raise fuse.FuseOSError( fuse.errno.EIO )
 
         # Dereference hard links
         if not stat.S_ISREG( fileInfo.mode ) and not stat.S_ISLNK( fileInfo.mode ) and fileInfo.linkname:
@@ -1659,10 +1712,10 @@ class TarFileType:
     Similar to argparse.FileType but raises an exception if it is not a valid TAR file.
     """
 
-    def __init__( self, encoding = tarfile.ENCODING ):
+    def __init__( self, encoding: str = tarfile.ENCODING ) -> None:
         self.encoding = encoding
 
-    def __call__( self, tarFile ):
+    def __call__( self, tarFile: str ) -> Tuple[str, Optional[str]]:
         if not os.path.exists( tarFile ):
             raise argparse.ArgumentTypeError( "File '{}' does not exist!" )
 
@@ -1685,7 +1738,7 @@ class TarFileType:
 class CustomFormatter( argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter ):
     pass
 
-def parseArgs( args = None ):
+def parseArgs( rawArgs: Optional[List[str]] = None ):
     parser = argparse.ArgumentParser(
         formatter_class = CustomFormatter,
         description = '''\
@@ -1887,7 +1940,7 @@ seeking capabilities when opening that file.
                'If no mount path is specified, the TAR will be mounted to a folder of the same name '
                'but without a file extension.' )
 
-    args = parser.parse_args( args )
+    args = parser.parse_args( rawArgs )
 
     args.gzipSeekPointSpacing = args.gzip_seek_point_spacing * 1024 * 1024
 
@@ -1907,7 +1960,7 @@ seeking capabilities when opening that file.
                           for tarFile in args.mount_source ]
 
     # Automatically generate a default mount path
-    if args.mount_point is None:
+    if not args.mount_point:
         tarPath = args.mount_source[0]
         for compression in [ s for c in supportedCompressions.values() for s in c.suffixes ]:
             if not compression:
@@ -1929,10 +1982,10 @@ seeking capabilities when opening that file.
 
     return args
 
-def cli( args = None ):
+def cli( rawArgs : Optional[List[str]] = None ) -> None:
     """Command line interface for ratarmount. Call with args = [ '--help' ] for a description."""
 
-    tmpArgs = sys.argv if args is None else args
+    tmpArgs = sys.argv if rawArgs is None else rawArgs
     if '--version' in tmpArgs or '-v' in tmpArgs:
         print( "ratarmount", __version__ )
         return

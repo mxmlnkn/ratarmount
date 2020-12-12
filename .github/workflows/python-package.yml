@@ -27,19 +27,9 @@ jobs:
       run: |
         sudo apt-get -y install bzip2 pbzip2 pixz zstd # necessary for tests
         python3 -m pip install --upgrade pip
-        python3 -m pip install --upgrade-strategy eager --upgrade cython twine pylint wheel
-    - name: Pylint
-      run: |
-        pylint *.py | tee pylint.log
-        ! 'egrep' ': E[0-9]{4}: ' pylint.log
-    - name: Test Startup Without Compression Dependencies
-      run: |
-        python3 -m pip install --upgrade fusepy
-        # Segfaults (139) are not allowed but other exit codes are valid!
-        python3 ratarmount.py tests/simple.bz2 || [ $? != 139 ]
+        python3 -m pip install --upgrade-strategy eager --upgrade cython mypy twine pylint wheel
     - name: Test Startup With Only One Compression Dependency
       run: |
-        python3 -m pip install --upgrade fusepy
         for module in indexed_bzip2 indexed_gzip indexed_zstd lzmaffi; do
           python3 -m pip install --upgrade "$module"
           # Segfaults (139) are not allowed but other exit codes are valid!
@@ -56,6 +46,17 @@ jobs:
       run: |
         ratarmount --help
         ratarmount --version
+    - name: Pylint
+      run: |
+        pylint *.py | tee pylint.log
+        ! 'egrep' ': E[0-9]{4}: ' pylint.log
+      if: matrix.python-version != '3.9' # because of this bug https://github.com/PyCQA/pylint/issues/3882
+    - name: Mypy
+      run: mypy *.py
+    - name: Test Startup Without Compression Dependencies
+      run: |
+        # Segfaults (139) are not allowed but other exit codes are valid!
+        python3 ratarmount.py tests/simple.bz2 || [ $? != 139 ]
     - name: Regression Tests
       run: |
         bash tests/runtests.sh
