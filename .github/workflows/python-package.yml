@@ -46,6 +46,7 @@ jobs:
       run: |
         ratarmount --help
         ratarmount --version
+        ratarmount tests/single-file.tar mimi; sleep 1s; fusermount -u mimi
     - name: Pylint
       run: |
         pylint *.py | tee pylint.log

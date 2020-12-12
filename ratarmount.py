@@ -2058,12 +2058,16 @@ seeking capabilities when opening that file.
 def cli( rawArgs : Optional[List[str]] = None ) -> None:
     """Command line interface for ratarmount. Call with args = [ '--help' ] for a description."""
 
-    tmpArgs = sys.argv if rawArgs is None else rawArgs
+    # The first argument, is the path to the script and should be ignored
+    tmpArgs = sys.argv[1:] if rawArgs is None else rawArgs
     if '--version' in tmpArgs or '-v' in tmpArgs:
         print( "ratarmount", __version__ )
         return
 
-    args = parseArgs( args )
+    # tmpArgs are only for the manual parsing. In general, rawArgs is None, meaning it reads sys.argv,
+    # and maybe sometimes contains arguments when used programmatically. In that case the first argument
+    # should not be the path to the script!
+    args = parseArgs( rawArgs )
 
     # Convert the comma separated list of key[=value] options into a dictionary for fusepy
     fusekwargs = dict( [ option.split( '=', 1 ) if '=' in option else ( option, True )

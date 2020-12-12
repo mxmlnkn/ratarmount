@@ -1,11 +1,14 @@
 
-# Version 0.7.0 built on 2020-12-xx
+# Version 0.7.0 built on 2020-12-13
 
  - Add CLI options --index-file and --index-folder to specify an index location or folder.
  - Add support for zstd compressed TARs.
  - Add support for xz compressed TARs when compressed with pixz or pxz or similar tools
    limiting the block size.
  - Fix index location check not accounting for SQLite special requirements.
+ - Add warnings for when the existing index was created with different arguments,
+   e.g., without --recursive, even though --recursive was requested.
+ - Add specialized exceptions used by ratarmount.
 
 # Version 0.6.1 built on 2020-10-02
 
