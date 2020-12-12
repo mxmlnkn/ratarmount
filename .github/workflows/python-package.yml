@@ -32,6 +32,21 @@ jobs:
       run: |
         pylint *.py | tee pylint.log
         ! 'egrep' ': E[0-9]{4}: '
+    - name: Test Startup Without Compression Dependencies
+      run: |
+        python3 -m pip install --upgrade fusepy
+        # Segfaults (139) are not allowed but other exit codes are valid!
+        python3 ratarmount.py tests/simple.bz2 || [ $? != 139 ]
+    - name: Test Startup With Only One Compression Dependency
+      run: |
+        python3 -m pip install --upgrade fusepy
+        for module in indexed_bzip2 indexed_gzip indexed_zstd lzmaffi; do
+          python3 -m pip install --upgrade "$module"
+          # Segfaults (139) are not allowed but other exit codes are valid!
+          # indexed_zstd=1.2.0 did segfault here!
+          python3 ratarmount.py README.md || [ $? != 139 ]
+          python3 -m pip uninstall --yes "$module"
+        done
     - name: Test Installation From Tarball
       run: |
         python3 setup.py sdist bdist_wheel
