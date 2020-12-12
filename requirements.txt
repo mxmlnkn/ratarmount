@@ -1,4 +1,4 @@
 fusepy
 indexed_gzip
 indexed_bzip2>=1.1.2
-indexed_zstd>=1.2.0
+indexed_zstd>=1.2.1
