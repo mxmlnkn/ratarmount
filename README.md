@@ -51,7 +51,7 @@ Or, if you want to test the latest version:
 pip install git+https://github.com/mxmlnkn/ratarmount.git@develop#egginfo=ratarmount
 ```
 
-You can also simply download [ratarmount.py](https://github.com/mxmlnkn/ratarmount/raw/master/ratarmount.py) and call it directly after installing the dependencies manually with: `pip3 install --user fusepy indexed_bzip2 indexed_gzip indexed_zstd`.
+You can also simply download [ratarmount.py](https://github.com/mxmlnkn/ratarmount/raw/master/ratarmount.py) and call it directly after installing the dependencies manually with: `pip3 install --requirement https://raw.githubusercontent.com/mxmlnkn/ratarmount/master/requirements.txt`.
 
 In order to use, the xz backend, you currently have to do more manual setup because [lzmaffi](https://github.com/r3m0t/backports.lzma) does not provide wheels.
 On Ubuntu 20.10 or similar systems, the setup would look like this:

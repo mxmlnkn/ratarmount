@@ -1,5 +1,6 @@
 include LICENSE
 include README.md
+include requirements.txt
 include ratarmount.py
 include bzip2.cpp
 include bzip2.h
