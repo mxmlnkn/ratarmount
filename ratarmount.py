@@ -592,8 +592,9 @@ class SQLiteIndexedTar:
             if hasattr( fileobj, 'tell_compressed' ) and self.compression == 'bz2':
                 # Note that because bz2 works on a bitstream the tell_compressed returns the offset in bits
                 progressBar.update( fileobj.tell_compressed() // 8 )
-            elif hasattr( fileobj, 'tell_compressed' ):
-                progressBar.update( fileobj.tell_compressed() )
+            # TODO: Currently, this would only match zstd and there it does not seem to work correctly.
+            #elif hasattr( fileobj, 'tell_compressed' ):
+            #    progressBar.update( fileobj.tell_compressed() )
             elif hasattr( fileobj, 'fileobj' ):
                 progressBar.update( fileobj.fileobj().tell() )
             elif self.rawFileObject and hasattr( self.rawFileObject, 'tell' ):
