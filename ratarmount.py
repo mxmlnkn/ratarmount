@@ -264,6 +264,15 @@ class SQLiteIndexedTar:
     for all contained files in an index to support fast seeking to a given file.
     """
 
+    # Version 0.1.0:
+    #   - Initial version
+    # Version 0.2.0:
+    #   - Add sparse support and 'offsetheader' and 'issparse' columns to the SQLite database
+    #   - Add TAR file size metadata in order to quickly check whether the TAR changed
+    #   - Add 'offsetheader' to the primary key of the 'files' table so that files which were
+    #     updated in the TAR can still be accessed if necessary.
+    __version__ = '0.2.0'
+
     def __init__(
         self,
         tarFileName                : Optional[str]       = None,
@@ -292,15 +301,6 @@ class SQLiteIndexedTar:
         stripRecursiveTarExtension : If true and if recursive is also true, then a <file>.tar inside the current
                                      tar will be mounted at <file>/ instead of <file>.tar/.
         """
-        # Version 0.1.0:
-        #   - Initial version
-        # Version 0.2.0:
-        #   - Add sparse support and 'offsetheader' and 'issparse' columns to the SQLite database
-        #   - Add TAR file size metadata in order to quickly check whether the TAR changed
-        #   - Add 'offsetheader' to the primary key of the 'files' table so that files which were
-        #     updated in the TAR can still be accessed if necessary.
-        self.__version__ = '0.2.0'
-
         # stores which parent folders were last tried to add to database and therefore do exist
         self.parentFolderCache: List[Tuple[str, str]] = []
         self.mountRecursively = recursive
@@ -309,6 +309,7 @@ class SQLiteIndexedTar:
         self.stripRecursiveTarExtension = stripRecursiveTarExtension
         self.ignoreZeros = ignoreZeros
         self.verifyModificationTime = verifyModificationTime
+        self.gzipSeekPointSpacing = gzipSeekPointSpacing
 
         if not tarFileName:
             if not fileObject:
@@ -403,18 +404,17 @@ class SQLiteIndexedTar:
 
 
         self.createIndex( self.tarFileObject )
-        self._loadOrStoreCompressionOffsets()
-
-        self._storeTarMetadata( self.sqlConnection, self.tarFileName )
+        self._loadOrStoreCompressionOffsets() # store
+        if ( self.sqlConnection ):
+            self._storeMetadata( self.sqlConnection )
 
         if printDebug >= 1 and writeIndex:
             # The 0-time is legacy for the automated tests
             print( "Writing out TAR index to", self.indexFileName, "took 0s",
                    "and is sized", os.stat( self.indexFileName ).st_size, "B" )
 
-    @staticmethod
-    def _storeTarMetadata( connection: Any, tarPath: AnyStr ) -> None:
-        """Adds some consistency meta information to recognize the need to update the cached TAR index"""
+    def _storeMetadata( self, connection: sqlite3.Connection ) -> None:
+        self._storeVersionsMetadata( connection )
 
         metadataTable = """
             /* empty table whose sole existence specifies that we finished iterating the tar */
@@ -424,18 +424,96 @@ class SQLiteIndexedTar:
             );
         """
 
+        connection.executescript( metadataTable )
+
+        # All of these require the generic "metadata" table.
+        self._storeTarMetadata( connection, self.tarFileName )
+        self._storeArgumentsMetadata( connection )
+        connection.commit()
+
+    @staticmethod
+    def _storeVersionsMetadata( connection: sqlite3.Connection ) -> None:
+        versionsTable = """
+            /* This table's sole existence specifies that we finished iterating the tar for older ratarmount versions */
+            CREATE TABLE "versions" (
+                "name"     VARCHAR(65535) NOT NULL, /* which component the version belongs to */
+                "version"  VARCHAR(65535) NOT NULL, /* free form version string */
+                /* Semantic Versioning 2.0.0 (semver.org) parts if they can be specified:
+                 *   MAJOR version when you make incompatible API changes,
+                 *   MINOR version when you add functionality in a backwards compatible manner, and
+                 *   PATCH version when you make backwards compatible bug fixes. */
+                "major"    INTEGER,
+                "minor"    INTEGER,
+                "patch"    INTEGER
+            );
+        """
         try:
-            tarStats = os.stat( tarPath )
-            connection.executescript( metadataTable )
-            serializedTarStats = json.dumps( { attr : getattr( tarStats, attr )
-                                               for attr in dir( tarStats ) if attr.startswith( 'st_' ) } )
-            connection.execute( 'INSERT INTO "metadata" VALUES (?,?)', ( "tarstats", serializedTarStats ) )
-            connection.commit()
+            connection.executescript( versionsTable )
         except Exception as exception:
             if printDebug >= 2:
                 print( exception )
-            print( "[Warning] There was an error when adding file metadata information." )
+            print( "[Warning] There was an error when adding metadata information. Index loading might not work." )
+
+        try:
+            def makeVersionRow(
+                versionName: str,
+                version: str
+            ) -> Tuple[str, str, Optional[str], Optional[str], Optional[str]]:
+                versionNumbers = [ re.sub( '[^0-9]', '', x ) for x in version.split( '.' ) ]
+                return ( versionName,
+                         version,
+                         versionNumbers[0] if len( versionNumbers ) > 0 else None,
+                         versionNumbers[1] if len( versionNumbers ) > 1 else None,
+                         versionNumbers[2] if len( versionNumbers ) > 2 else None, )
+
+            versions = [ makeVersionRow( 'ratarmount', __version__ ),
+                         makeVersionRow( 'index', SQLiteIndexedTar.__version__ ) ]
+
+            for _, cinfo in supportedCompressions.items():
+                if cinfo.moduleName in globals():
+                    versions += [ makeVersionRow( cinfo.moduleName, globals()[cinfo.moduleName].__version__ ) ]
+
+            connection.executemany( 'INSERT OR REPLACE INTO "versions" VALUES (?,?,?,?,?)', versions )
+
+            # TODO Add more metadata, e.g., for recursive argument! Move to _addMetadata method
+            # @see https://github.com/mxmlnkn/ratarmount/issues/37
+        except Exception as exception:
+            print( "[Warning] There was an error when adding version information." )
+            if printDebug >= 3:
+                print( exception )
+
+    @staticmethod
+    def _storeTarMetadata( connection: sqlite3.Connection, tarPath: AnyStr ) -> None:
+        """Adds some consistency meta information to recognize the need to update the cached TAR index"""
+        try:
+            tarStats = os.stat( tarPath )
+            serializedTarStats = json.dumps( { attr : getattr( tarStats, attr )
+                                               for attr in dir( tarStats ) if attr.startswith( 'st_' ) } )
+            connection.execute( 'INSERT INTO "metadata" VALUES (?,?)', ( "tarstats", serializedTarStats ) )
+        except Exception as exception:
+            if printDebug >= 2:
+                print( exception )
+            print( "[Warning] There was an error when adding file metadata." )
             print( "[Warning] Automatic detection of changed TAR files during index loading might not work." )
+
+    def _storeArgumentsMetadata( self, connection: sqlite3.Connection ) -> None:
+        argumentsToSave = [
+            'mountRecursively',
+            'gzipSeekPointSpacing',
+            'encoding',
+            'stripRecursiveTarExtension',
+            'ignoreZeros'
+        ]
+
+        argumentsMetadata = json.dumps( { argument : getattr( self, argument ) for argument in argumentsToSave } )
+
+        try:
+            connection.execute( 'INSERT INTO "metadata" VALUES (?,?)', ( "arguments", argumentsMetadata ) )
+        except Exception as exception:
+            if printDebug >= 2:
+                print( exception )
+            print( "[Warning] There was an error when adding argument metadata." )
+            print( "[Warning] Automatic detection of changed arguments files during index loading might not work." )
 
     @staticmethod
     def _pathIsWritable( path: AnyStr ) -> bool:
@@ -739,53 +817,6 @@ class SQLiteIndexedTar:
         """.format( int( 0o555 | stat.S_IFDIR ), int( tarfile.DIRTYPE ) )
         self.sqlConnection.executescript( cleanupDatabase )
 
-        # 6. Add Metadata
-        metadataTables = """
-            /* This table's sole existence specifies that we finished iterating the tar for older ratarmount versions */
-            CREATE TABLE "versions" (
-                "name"     VARCHAR(65535) NOT NULL, /* which component the version belongs to */
-                "version"  VARCHAR(65535) NOT NULL, /* free form version string */
-                /* Semantic Versioning 2.0.0 (semver.org) parts if they can be specified:
-                 *   MAJOR version when you make incompatible API changes,
-                 *   MINOR version when you add functionality in a backwards compatible manner, and
-                 *   PATCH version when you make backwards compatible bug fixes. */
-                "major"    INTEGER,
-                "minor"    INTEGER,
-                "patch"    INTEGER
-            );
-        """
-        try:
-            self.sqlConnection.executescript( metadataTables )
-        except Exception as exception:
-            if printDebug >= 2:
-                print( exception )
-            print( "[Warning] There was an error when adding metadata information. Index loading might not work." )
-
-        try:
-            def makeVersionRow(
-                versionName: str,
-                version: str
-            ) -> Tuple[str, str, Optional[str], Optional[str], Optional[str]]:
-                versionNumbers = [ re.sub( '[^0-9]', '', x ) for x in version.split( '.' ) ]
-                return ( versionName,
-                         version,
-                         versionNumbers[0] if len( versionNumbers ) > 0 else None,
-                         versionNumbers[1] if len( versionNumbers ) > 1 else None,
-                         versionNumbers[2] if len( versionNumbers ) > 2 else None, )
-
-            versions = [ makeVersionRow( 'ratarmount', __version__ ),
-                         makeVersionRow( 'index', self.__version__ ) ]
-
-            for _, cinfo in supportedCompressions.items():
-                if cinfo.moduleName in globals():
-                    versions += [ makeVersionRow( cinfo.moduleName, globals()[cinfo.moduleName].__version__ ) ]
-
-            self.sqlConnection.executemany( 'INSERT OR REPLACE INTO "versions" VALUES (?,?,?,?,?)', versions )
-        except Exception as exception:
-            print( "[Warning] There was an error when adding version information." )
-            if printDebug >= 3:
-                print( exception )
-
         self.sqlConnection.commit()
 
         t1 = timer()
@@ -1010,7 +1041,8 @@ class SQLiteIndexedTar:
                                  "are very likely to be wrong because of a bzip2 decoder bug.\n"
                                  "Please delete the index or call ratarmount with the --recreate-index option!" )
 
-            # Check for empty or incomplete indexes
+            # Check for empty or incomplete indexes. Pretty safe to rebuild the index for these as they
+            # are so invalid, noone should miss them. So, recreate index by default for these cases.
             if 'files' not in tables:
                 raise Exception( "SQLite index is empty" )
 
@@ -1045,6 +1077,30 @@ class SQLiteIndexedTar:
                 ):
                     raise Exception( "The modification date for the TAR file", values['st_mtime'],
                                      "to this SQLite index has changed (" + str( tarStats.st_mtime ) + ")" )
+
+                # Check arguments used to create the found index. These are only warnings and not forcing a rebuild
+                # by default. ToDo: Add --force options?
+                if 'arguments' in values:
+                    indexArgs = json.loads( values['arguments'] )
+                    argumentsToCheck = [
+                        'mountRecursively',
+                        'gzipSeekPointSpacing',
+                        'encoding',
+                        'stripRecursiveTarExtension',
+                        'ignoreZeros'
+                    ]
+                    differingArgs = []
+                    for arg in argumentsToCheck:
+                        if (
+                            arg in indexArgs
+                            and hasattr( self, arg )
+                            and indexArgs[arg] != getattr( self, arg )
+                        ):
+                            differingArgs.append( ( indexArgs[arg], getattr( self, arg ) ) )
+                    if differingArgs:
+                        print( "[Warning] The arguments used for creating the found index differ from the arguments " )
+                        print( "[Warning] given for mounting the archive now. In order to apply these changes, " )
+                        print( "[Warning] recreate the index using the --recreate-index option!" )
 
         except Exception as e:
             # indexIsLoaded checks self.sqlConnection, so close it before returning because it was found to be faulty
