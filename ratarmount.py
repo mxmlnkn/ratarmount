@@ -68,28 +68,51 @@ zstdMultiFrameCompressorBashFunction = """
 function createMultiFrameZstd()
 {
     local file frameSize fileSize offset frameFile
-    file=$1
-    frameSize=$2
+    # Detect being piped into
+    if [ -t 0 ]; then
+        file=$1
+        frameSize=$2
+        if [[ ! -f "$file" ]]; then echo "Could not find file '$file'." 1>&2; return 1; fi
+        fileSize=$( stat -c %s -- "$file" )
+    else
+        if [ -t 1 ]; then echo 'You should pipe the output to somewhere!' 1>&2; return 1; fi
+        echo 'Will compress from stdin...' 1>&2
+        frameSize=$1
+    fi
+    if [[ ! $frameSize =~ ^[0-9]+$ ]]; then
+        echo "Frame size '$frameSize' is not a valid number." 1>&2
+    fi
 
-    if [[ ! -f "$file" ]]; then echo "Could not find file '$file'." 1>&2; return 1; fi
-    if [[ ! $frameSize =~ ^[0-9]+$ ]]; then echo "Frame size '$frameSize' is not a valid number." 1>&2; fi
-
-    fileSize=$( stat -c %s -- "$file" )
-
+    # Create a temporary file. I avoid simply piping to zstd
+    # because it wouldn't store the uncompressed size.
     if [[ -d --tmpdir=/dev/shm ]]; then frameFile=$( mktemp --tmpdir=/dev/shm ); fi
     if [[ -z $frameFile ]]; then frameFile=$( mktemp ); fi
-    if [[ -z $frameFile ]]; then echo "Could not create a temporary file for the frames." 1>2; return 1; fi
+    if [[ -z $frameFile ]]; then
+        echo "Could not create a temporary file for the frames." 1>2
+        return 1
+    fi
     trap "'rm' -- '$frameFile'" EXIT
 
-    > "$file.zst"
-    for (( offset = 0; offset < fileSize; offset += frameSize )); do
-        dd if="$file" of="$frameFile" bs=$(( 1024*1024 )) \
-           iflag=skip_bytes,count_bytes skip="$offset" count="$frameSize" 2>/dev/null
-        zstd -c -q -f --no-progress -- "$frameFile" >> "$file.zst"
-    done
+    if [ -t 0 ]; then
+        > "$file.zst"
+        for (( offset = 0; offset < fileSize; offset += frameSize )); do
+            dd if="$file" of="$frameFile" bs=$(( 1024*1024 )) \
+               iflag=skip_bytes,count_bytes skip="$offset" count="$frameSize" 2>/dev/null
+            zstd -c -q -f --no-progress -- "$frameFile" >> "$file.zst"
+        done
+    else
+        while true; do
+            dd of="$frameFile" bs=$(( 1024*1024 )) \
+               iflag=count_bytes count="$frameSize" 2>/dev/null
+            # pipe is finished when reading it yields no further data
+            if [[ ! -s "$frameFile" ]]; then break; fi
+            zstd -c -q -f --no-progress -- "$frameFile"
+        done
+    fi
 }
 
 createMultiFrameZstd <path-to-file-to-compress> $(( 4*1024*1024 ))
+lbzip2 -cd well-compressed-file.bz2 | createMultiFrameZstd $(( 4*1024*1024 )) > recompressed.zst
 """
 
 
