@@ -488,6 +488,23 @@ checkTarEncoding()
     return 0
 }
 
+checkAutomaticMountPointCreation()
+{
+    # By default, the mount point should the filename without the extension.
+    # The folder should be created on mount if it does not exist and if done so removed on unmount.
+    local fname folder
+    fname=$1
+    folder=$2
+
+    [[ ! -d "$folder" ]] || returnError 'Mount point already exists for some reason!'
+    python3 ratarmount.py "$fname" || returnError 'Mounting failed!'
+    [[ -d "$folder" ]] || returnError 'Expected automatic mount point does not exist!'
+    sleep 0.2s
+    funmount "$folder"
+    sleep 0.2s
+    [[ ! -d "$folder" ]] || 'Automatic mount point was not cleaned up on unmount!'
+}
+
 
 python3 tests/tests.py || returnError "tests/tests.py"
 
@@ -545,6 +562,8 @@ tests=(
     19696f24a91fc4e8950026f9c801a0d0 tests/simple.gz                              simple
 )
 
+checkAutomaticMountPointCreation 'tests/2k-recursive-tars.tar.bz2' 'tests/2k-recursive-tars'
+checkAutomaticMountPointCreation 'tests/single-file.tar' 'tests/single-file'
 checkTarEncoding tests/single-file.tar utf-8 bar d3b07384d113edec49eaa6238ad5ff00
 checkTarEncoding tests/single-file.tar latin1 bar d3b07384d113edec49eaa6238ad5ff00
 checkTarEncoding tests/special-char.tar latin1 'Datei-mit-dämlicher-Kodierung.txt' 2709a3348eb2c52302a7606ecf5860bc
