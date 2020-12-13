@@ -1,23 +1,43 @@
 # Random Access Read-Only Tar Mount (Ratarmount)
 
 [![PyPI version](https://badge.fury.io/py/ratarmount.svg)](https://badge.fury.io/py/ratarmount)
-[![Downloads](https://pepy.tech/badge/ratarmount/month)](https://pepy.tech/project/ratarmount/month)
+[![Downloads](https://pepy.tech/badge/ratarmount/month)](https://pepy.tech/project/ratarmount)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](http://opensource.org/licenses/MIT)
 [![Build Status](https://github.com/mxmlnkn/ratarmount/workflows/tests/badge.svg)](https://github.com/mxmlnkn/ratarmount/actions)
 [![Discord](https://img.shields.io/discord/783411320354766878?label=discord)](https://discord.gg/Wra6t6akh2)
 [![Telegram](https://img.shields.io/badge/Chat-Telegram-%2330A3E6)](https://t.me/joinchat/FUdXxkXIv6c4Ib8bgaSxNg)
 
 Combines the random access indexing idea from [tarindexer](https://github.com/devsnd/tarindexer) and then **mounts** the **TAR** using [fusepy](https://github.com/fusepy/fusepy) for easy read-only access just like [archivemount](https://github.com/cybernoid/archivemount/).
-It also will mount TARs inside TARs inside TARs, ... **recursively** into folders of the same name, which is useful for the ImageNet data set.
-Furthermore, it now has support for **BZip2** compressed TAR archives provided by [indexed_bzip2](https://github.com/mxmlnkn/indexed_bzip2), a refactored and extended version of [bzcat](https://github.com/landley/toybox/blob/c77b66455762f42bb824c1aa8cc60e7f4d44bdab/toys/other/bzcat.c) from [toybox](https://landley.net/code/toybox/), and support for **Gzip** compressed TAR archives provided by the [indexed_gzip](https://github.com/pauldmccarthy/indexed_gzip) dependency.
+In [contrast](https://github.com/libarchive/libarchive#notes-about-the-library-design) to [libarchive](https://github.com/libarchive/libarchive), on which archivemount is based, random access and true seeking is supported.
+
+*Other capabilities:*
+
+ - **Recursive Mounting:** Ratarmount will also mount TARs inside TARs inside TARs, ... recursively into folders of the same name, which is useful for the 1.31TB ImageNet data set.
+ - **Mount Compressed Files:** You may also mount files with one of the supported compression schemes. Even if these files do not contain a TAR, you can leverage ratarmount's true seeking capabilities when opening the mounted uncompressed view of such a file.
+ - **Read-Only Bind Mounting:** Folders may be mounted read-only to other folders for usecases like merging a backup TAR with newer versions of those files residing in a normal folder.
+ - **Union Mounting:** Multiple TARs, compressed files, and bind mounted folders can be mounted under the same mountpoint.
+
+*Compressions supported for random access:*
+
+ - **BZip2** as provided by [indexed_bzip2](https://github.com/mxmlnkn/indexed_bzip2) as a backend, which is a refactored and extended version of [bzcat](https://github.com/landley/toybox/blob/c77b66455762f42bb824c1aa8cc60e7f4d44bdab/toys/other/bzcat.c) from [toybox](https://landley.net/code/toybox/). See also the [reverse engineered specification](https://github.com/dsnet/compress/blob/master/doc/bzip2-format.pdf).
+ - **Gzip** as provided by [indexed_gzip](https://github.com/pauldmccarthy/indexed_gzip) by Paul McCarthy. See also [RFC1952](https://tools.ietf.org/html/rfc1952).
+ - **Xz** as provided by [lzmaffi](https://github.com/r3m0t/backports.lzma) by Tomer Chachamu. See also [The .xz File Format](https://tukaani.org/xz/xz-file-format.txt).
+ - **Zstd** as provided by [indexed_zstd](https://github.com/martinellimarco/indexed_zstd) by Marco Martinelli. See also [Zstandard Compression Format](https://github.com/facebook/zstd/blob/master/doc/zstd_compression_format.md).
 
 
 # Table of Contents
 1. [Installation](#installation)
 2. [Usage](#usage)
+    1. [Metadata Index Cache](#metadata-index-cache)
+    2. [Bind Mounting](#bind-mounting)
+    3. [Union Mounting](#union-mounting)
+    4. [File versions](#file-versions)
+    5. [Compressed non-TAR files](#compressed-non-tar-files)
+    6. [Xz and Zst Files](#xz-and-zst-files)
 3. [The Problem](#the-problem)
 4. [The Solution](#the-solution)
 5. [Benchmarks](benchmarks/BENCHMARKS.md)
+
 
 # Installation
 
@@ -31,142 +51,254 @@ Or, if you want to test the latest version:
 pip install git+https://github.com/mxmlnkn/ratarmount.git@develop#egginfo=ratarmount
 ```
 
-You can also simply download [ratarmount.py](https://github.com/mxmlnkn/ratarmount/raw/master/ratarmount.py) and call it directly after installing the dependencies manually with: `pip3 install --user fusepy indexed_bzip2 indexed_gzip lzmaffi`.
+You can also simply download [ratarmount.py](https://github.com/mxmlnkn/ratarmount/raw/master/ratarmount.py) and call it directly after installing the dependencies manually with: `pip3 install --user fusepy indexed_bzip2 indexed_gzip indexed_zstd`.
 
-If you want to use other serialization backends instead of the default SQLite one, e.g., because you still have indexes lying around created with those backends and don't want to spend time recreating them, then you'll have to install a version older than 0.5.0 with the optional `legacy-serializers` feature:
+In order to use, the xz backend, you currently have to do more manual setup because [lzmaffi](https://github.com/r3m0t/backports.lzma) does not provide wheels.
+On Ubuntu 20.10 or similar systems, the setup would look like this:
 
+```bash
+sudo apt install liblzma-dev
+pip3 install --user cffi # Necessary because of a bug(?) in the lzmaffi setup.py
+pip3 install --user lzmaffi
 ```
-pip install ratarmount[legacy-serializers]==0.4.1
-```
+
 
 # Usage
 
 ```
-usage: ratarmount [-h] [-f] [-d DEBUG] [-c] [-r] [-gs GZIP_SEEK_POINT_SPACING] [-p PREFIX]
-                  [-e ENCODING] [-i] [--verify-mtime] [-s] [-o FUSE] [-v]
+usage: ratarmount [-h] [-f] [-d DEBUG] [-c] [-r] [-gs GZIP_SEEK_POINT_SPACING]
+                  [-p PREFIX] [-e ENCODING] [-i] [--verify-mtime] [-s]
+                  [--index-file INDEX_FILE] [--index-folders INDEX_FOLDERS]
+                  [-o FUSE] [-v]
                   mount_source [mount_source ...] [mount_point]
 
 With ratarmount, you can:
-  - Mount a TAR file to a folder for read-only access
+  - Mount a (compressed) TAR file to a folder for read-only access
+  - Mount a compressed file to `<mountpoint>/<filename>`
   - Bind mount a folder to another folder for read-only access
-  - Union mount a list of TARs and folders to a folder for read-only access
+  - Union mount a list of TARs, compressed files, and folders to a mount point
+    for read-only access
 
 positional arguments:
-  mount_source          The path to the TAR archive to be mounted. If multiple archives and/or
-                        folders are specified, then they will be mounted as if the arguments
-                        coming first were updated with the contents of the archives or folders
-                        specified thereafter, i.e., the list of TARs and folders will be union
-                        mounted.
-  mount_point           The path to a folder to mount the TAR contents into. If no mount path is
-                        specified, the TAR will be mounted to a folder of the same name but
-                        without a file extension. (default: None)
+  mount_source          The path to the TAR archive to be mounted. If multiple
+                        archives and/or folders are specified, then they will
+                        be mounted as if the arguments coming first were
+                        updated with the contents of the archives or folders
+                        specified thereafter, i.e., the list of TARs and
+                        folders will be union mounted.
+  mount_point           The path to a folder to mount the TAR contents into.
+                        If no mount path is specified, the TAR will be mounted
+                        to a folder of the same name but without a file
+                        extension. (default: None)
 
 optional arguments:
   -h, --help            show this help message and exit
-  -f, --foreground      Keeps the python program in foreground so it can print debug output when
-                        the mounted path is accessed. (default: False)
-  -d DEBUG, --debug DEBUG
-                        Sets the debugging level. Higher means more output. Currently, 3 is the
-                        highest. (default: 1)
-  -c, --recreate-index  If specified, pre-existing .index files will be deleted and newly created.
+  -f, --foreground      Keeps the python program in foreground so it can print
+                        debug output when the mounted path is accessed.
                         (default: False)
-  -r, --recursive       Mount TAR archives inside the mounted TAR recursively. Note that this only
-                        has an effect when creating an index. If an index already exists, then
-                        this option will be effectively ignored. Recreate the index if you want
-                        change the recursive mounting policy anyways. (default: False)
+  -d DEBUG, --debug DEBUG
+                        Sets the debugging level. Higher means more output.
+                        Currently, 3 is the highest. (default: 1)
+  -c, --recreate-index  If specified, pre-existing .index files will be
+                        deleted and newly created. (default: False)
+  -r, --recursive       Mount TAR archives inside the mounted TAR recursively.
+                        Note that this only has an effect when creating an
+                        index. If an index already exists, then this option
+                        will be effectively ignored. Recreate the index if you
+                        want change the recursive mounting policy anyways.
+                        (default: False)
   -gs GZIP_SEEK_POINT_SPACING, --gzip-seek-point-spacing GZIP_SEEK_POINT_SPACING
-                        This only is applied when the index is first created or recreated with the
-                        -c option. The spacing given in MiB specifies the seek point distance in
-                        the uncompressed data. A distance of 16MiB means that archives smaller
-                        than 16MiB in uncompressed size will not benefit from faster seek times. A
-                        seek point takes roughly 32kiB. So, smaller distances lead to more
-                        responsive seeking but may explode the index size! (default: 16)
+                        This only is applied when the index is first created
+                        or recreated with the -c option. The spacing given in
+                        MiB specifies the seek point distance in the
+                        uncompressed data. A distance of 16MiB means that
+                        archives smaller than 16MiB in uncompressed size will
+                        not benefit from faster seek times. A seek point takes
+                        roughly 32kiB. So, smaller distances lead to more
+                        responsive seeking but may explode the index size!
+                        (default: 16)
   -p PREFIX, --prefix PREFIX
-                        [deprecated] Use "-o modules=subdir,subdir=<prefix>" instead. This
-                        standard way utilizes FUSE itself and will also work for other FUSE
-                        applications. So, it is preferable even if a bit more verbose.The
-                        specified path to the folder inside the TAR will be mounted to root. This
-                        can be useful when the archive as created with absolute paths. E.g., for
-                        an archive created with `tar -P cf /var/log/apt/history.log`, -p
-                        /var/log/apt/ can be specified so that the mount target directory
+                        [deprecated] Use "-o modules=subdir,subdir=<prefix>"
+                        instead. This standard way utilizes FUSE itself and
+                        will also work for other FUSE applications. So, it is
+                        preferable even if a bit more verbose.The specified
+                        path to the folder inside the TAR will be mounted to
+                        root. This can be useful when the archive as created
+                        with absolute paths. E.g., for an archive created with
+                        `tar -P cf /var/log/apt/history.log`, -p /var/log/apt/
+                        can be specified so that the mount target directory
                         >directly< contains history.log. (default: )
   -e ENCODING, --encoding ENCODING
-                        Specify an input encoding used for file names among others in the TAR.
-                        This must be used when, e.g., trying to open a latin1 encoded TAR on an
-                        UTF-8 system. Possible encodings:
-                        https://docs.python.org/3/library/codecs.html#standard-encodings (default:
+                        Specify an input encoding used for file names among
+                        others in the TAR. This must be used when, e.g.,
+                        trying to open a latin1 encoded TAR on an UTF-8
+                        system. Possible encodings: https://docs.python.org/3/
+                        library/codecs.html#standard-encodings (default:
                         utf-8)
-  -i, --ignore-zeros    Ignore zeroed blocks in archive. Normally, two consecutive 512-blocks
-                        filled with zeroes mean EOF and ratarmount stops reading after
-                        encountering them. This option instructs it to read further and is useful
-                        when reading archives created with the -A option. (default: False)
-  --verify-mtime        By default, only the TAR file size is checked to match the one in the
-                        found existing ratarmount index. If this option is specified, then also
-                        check the modification timestamp. But beware that the mtime might change
-                        during copying or downloading without the contents changing. So, this
-                        check might cause false positives. (default: False)
+  -i, --ignore-zeros    Ignore zeroed blocks in archive. Normally, two
+                        consecutive 512-blocks filled with zeroes mean EOF and
+                        ratarmount stops reading after encountering them. This
+                        option instructs it to read further and is useful when
+                        reading archives created with the -A option. (default:
+                        False)
+  --verify-mtime        By default, only the TAR file size is checked to match
+                        the one in the found existing ratarmount index. If
+                        this option is specified, then also check the
+                        modification timestamp. But beware that the mtime
+                        might change during copying or downloading without the
+                        contents changing. So, this check might cause false
+                        positives. (default: False)
   -s, --strip-recursive-tar-extension
-                        If true, then recursively mounted TARs named <file>.tar will be mounted at
-                        <file>/. This might lead to folders of the same name being overwritten, so
-                        use with care. The index needs to be (re)created to apply this option!
-                        (default: False)
-  -o FUSE, --fuse FUSE  Comma separated FUSE options. See "man mount.fuse" for help. Example:
-                        --fuse "allow_other,entry_timeout=2.8,gid=0". (default: )
+                        If true, then recursively mounted TARs named
+                        <file>.tar will be mounted at <file>/. This might lead
+                        to folders of the same name being overwritten, so use
+                        with care. The index needs to be (re)created to apply
+                        this option! (default: False)
+  --index-file INDEX_FILE
+                        Specify a path to the .index.sqlite file. Setting this
+                        will disable fallback index folders. (default: None)
+  --index-folders INDEX_FOLDERS
+                        Specify one or multiple paths for storing
+                        .index.sqlite files. Paths will be tested for
+                        suitability in the given order. An empty path will be
+                        interpreted as the location in which the TAR resides.
+                        If the argument begins with a bracket "[", then it
+                        will be interpreted as a JSON-formatted list. If the
+                        argument contains a comma ",", it will be interpreted
+                        as a comma-separated list of folders. Else, the whole
+                        string will be interpreted as one folder path.
+                        Examples: --index-folders ",~/.foo" will try to save
+                        besides the TAR and if that does not work, in ~/.foo.
+                        --index-folders '["~/.ratarmount", "foo,9000"]' will
+                        never try to save besides the TAR. --index-folder
+                        ~/.ratarmount will only test ~/.ratarmount as a
+                        storage location and nothing else. Instead, it will
+                        first try ~/.ratarmount and the folder "foo,9000".
+                        (default: ,~/.ratarmount)
+  -o FUSE, --fuse FUSE  Comma separated FUSE options. See "man mount.fuse" for
+                        help. Example: --fuse
+                        "allow_other,entry_timeout=2.8,gid=0". (default: )
   -v, --version         Print version string. (default: False)
+```
 
-# Metadata Index Cache
+## Metadata Index Cache
 
 In order to reduce the mounting time, the created index for random access
-to files inside the tar will be saved to these locations in order. A lower
-location will only be used if all upper locations can't be written to.
+to files inside the tar will be saved to one of these locations. These
+locations are checked in order and the first, which works sufficiently, will
+be used. This is the default location order:
 
-    1. <path to tar>.index.sqlite
-    2. ~/.ratarmount/<path to tar: '/' -> '_'>.index.sqlite
-       E.g., ~/.ratarmount/_media_cdrom_programm.tar.index.sqlite
+  1. <path to tar>.index.sqlite
+  2. ~/.ratarmount/<path to tar: '/' -> '_'>.index.sqlite
+     E.g., ~/.ratarmount/_media_cdrom_programm.tar.index.sqlite
 
-# Bind Mounting
+This list of fallback folders can be overwritten using the `--index-folders`
+option. Furthermore, an explicitly named index file may be specified using
+the `--index-file` option. If `--index-file` is used, then the fallback
+folders, including the default ones, will be ignored!
+
+## Bind Mounting
 
 The mount sources can be TARs and/or folders.  Because of that, ratarmount
 can also be used to bind mount folders read-only to another path similar to
-"bindfs" and "mount --bind". So, for:
-    ratarmount folder mountpoint
-all files in folder will now be visible in mountpoint.
+`bindfs` and `mount --bind`. So, for:
 
-# Union Mounting
+    ratarmount folder mountpoint
+
+all files in `folder` will now be visible in mountpoint.
+
+## Union Mounting
 
 If multiple mount sources are specified, the sources on the right side will be
 added to or update existing files from a mount source left of it. For example:
+
     ratarmount folder1 folder2 mountpoint
+
 will make both, the files from folder1 and folder2, visible in mountpoint.
 If a file exists in both multiple source, then the file from the rightmost
-mount source will be used, which in the above example would be "folder2".
+mount source will be used, which in the above example would be `folder2`.
 
 If you want to update / overwrite a folder with the contents of a given TAR,
 you can specify the folder both as a mount source and as the mount point:
+
     ratarmount folder file.tar folder
+
 The FUSE option -o nonempty will be automatically added if such a usage is
 detected. If you instead want to update a TAR with a folder, you only have to
 swap the two mount sources:
+
     ratarmount file.tar folder folder
 
-# File versions
+## File versions
 
 If a file exists multiple times in a TAR or in multiple mount sources, then
 the hidden versions can be accessed through special <file>.versions folders.
 For example, consider:
+
     ratarmount folder updated.tar mountpoint
-and the file "foo" exists both in the folder and in two different versions
-in "updated.tar". Then, you can list all three versions using:
+
+and the file `foo` exists both in the folder and as two different versions
+in `updated.tar`. Then, you can list all three versions using:
+
     ls -la mountpoint/foo.versions/
         dr-xr-xr-x 2 user group     0 Apr 25 21:41 .
         dr-x------ 2 user group 10240 Apr 26 15:59 ..
         -r-x------ 2 user group   123 Apr 25 21:41 1
         -r-x------ 2 user group   256 Apr 25 21:53 2
         -r-x------ 2 user group  1024 Apr 25 22:13 3
+
 In this example, the oldest version has only 123 bytes while the newest and
 by default shown version has 1024 bytes. So, in order to look at the oldest
 version, you can simply do:
     cat mountpoint/foo.versions/1
+
+## Compressed non-TAR files
+
+If you want a compressed file not containing a TAR, e.g., `foo.bz2`, then
+you can also use ratarmount for that. The uncompressed view will then be
+mounted to `<mountpoint>/foo` and you will be able to leverage ratarmount's
+seeking capabilities when opening that file.
+
+## Xz and Zst Files
+
+In contrast to bzip2 and gzip compressed files, true seeking on xz and zst files is only possible at block or frame boundaries.
+This wouldn't be noteworthy, if both standard compressors for [xz](https://tukaani.org/xz/) and [zstd](https://github.com/facebook/zstd) were not by default creating unsuited files.
+Even though both file formats do support multiple frames and xz even contains a frame table at the end for easy seeking, both compressors write only a single frame and/or block out, making this feature unusable.
+In order to generate truly seekable compressed files, you'll have to use [pixz](https://github.com/vasi/pixz) for xz files.
+For zstd compressed files, no easily solution seems to exist although an [issue](https://github.com/facebook/zstd/issues/2121) does exist.
+The easiest solution is to simply split the original file into parts, compress those parts, and then concatenate those parts together to get a suitable multiframe zst file.
+Here is a bash function, which can be used for that:
+
+```bash
+function createMultiFrameZstd()
+{
+    local file frameSize fileSize offset frameFile
+    file=$1
+    frameSize=$2
+
+    if [[ ! -f "$file" ]]; then echo "Could not find file '$file'." 1>&2; return 1; fi
+    if [[ ! $frameSize =~ ^[0-9]+$ ]]; then echo "Frame size '$frameSize' is not a valid number." 1>&2; fi
+
+    fileSize=$( stat -c %s -- "$file" )
+
+    if [[ -d --tmpdir=/dev/shm ]]; then frameFile=$( mktemp --tmpdir=/dev/shm ); fi
+    if [[ -z $frameFile ]]; then frameFile=$( mktemp ); fi
+    if [[ -z $frameFile ]]; then echo "Could not create a temporary file for the frames." 1>2; return 1; fi
+    trap "'rm' -- '$frameFile'" EXIT
+
+    > "$file.zst"
+    for (( offset = 0; offset < fileSize; offset += frameSize )); do
+        dd if="$file" of="$frameFile" bs=$(( 1024*1024 )) \
+           iflag=skip_bytes,count_bytes skip="$offset" count="$frameSize" 2>/dev/null
+        zstd -c -q -f --no-progress -- "$frameFile" >> "$file.zst"
+    done
+}
+```
+
+In order to compress a file named `foo` into a multiframe zst file called `foo.zst`, which contains frames sized 4MiB of uncompressed ata, you would call it like this:
+
+```bash
+createMultiFrameZstd foo  $(( 4*1024*1024 ))
 ```
 
 
@@ -201,6 +333,7 @@ I didn't find out about [TAR Browser](https://github.com/tomorrow-nf/tar-as-file
   - Hard to find. I don't seem to be the only one who has trouble finding it as it has zero stars on Github after 4 years compared to 29 stars for tarindexer after roughly the same amount of time.
   - Hassle to set up. Needs compilation and I gave up when I was instructed to set up a MySQL database for it to use. Confusingly, the setup instructions are not on its Github but [here](https://web.wpi.edu/Pubs/E-project/Available/E-project-030615-133259/unrestricted/TARBrowserFinal.pdf).
   - Doesn't seem to support recursive TAR mounting. I didn't test it because of the MysQL dependency but the code does not seem to have logic for recursive mounting.
+  - Xz compression also is only block or frame based, i.e., only works faster with files created by [pixz](https://github.com/vasi/pixz) or [pxz](https://github.com/jnovy/pxz).
 
 Pros:
   - supports bz2- and xz-compressed TAR archives
