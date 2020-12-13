@@ -1790,7 +1790,7 @@ class TarFileType:
 
     def __call__( self, tarFile: str ) -> Tuple[str, Optional[str]]:
         if not os.path.exists( tarFile ):
-            raise argparse.ArgumentTypeError( "File '{}' does not exist!" )
+            raise argparse.ArgumentTypeError( "File '{}' does not exist!".format( tarFile ) )
 
         with open( tarFile, 'rb' ) as fileobj:
             compression = SQLiteIndexedTar._detectCompression( fileobj )
