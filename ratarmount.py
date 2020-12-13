@@ -378,23 +378,6 @@ class SQLiteIndexedTar:
             except:
                 pass
 
-        # Determining if there are many frames in zstd is O(1) with is_multiframe
-        if self.compression == 'zst':
-            try:
-                if not self.tarFileObject.is_multiframe():
-                    print( "[Warning] The specified file '{}'".format( self.tarFileName ) )
-                    print( "[Warning] is compressed using zstd but only contains one zstd frame. This makes it " )
-                    print( "[Warning] impossible to use true seeking! Please (re)compress your TAR using multiple " )
-                    print( "[Warning] frames in order for ratarmount to do be able to do fast seeking to requested " )
-                    print( "[Warning] files. Else, each file access will decompress the whole TAR from the beginning!" )
-                    print( "[Warning] Here is a simple bash script demonstrating how to do this:" )
-                    print( zstdMultiFrameCompressorBashFunction )
-                    print( "[Warning] The zstd command line tool does not support an option to do this automatically." )
-                    print( "[Warning] See https://github.com/facebook/zstd/issues/2121" )
-                    print()
-            except:
-                pass
-
         # will be used for storing indexes if current path is read-only
         possibleIndexFilePaths = [ self.tarFileName + ".index.sqlite" ]
         indexPathAsName = self.tarFileName.replace( "/", "_" ) + ".index.sqlite"
@@ -1219,7 +1202,11 @@ class SQLiteIndexedTar:
 
             try:
                 compressedFileobj = compression.open( fileobj )
-                compressedFileobj.read( 1 )
+                # Reading 1B from a single-frame zst file might require decompressing it fully in order
+                # to get uncompressed file size! Avoid that. The magic bytes should suffice mostly.
+                # TODO: Make indexed_zstd not require the uncompressed size for the read call.
+                if compressionId != 'zst':
+                    compressedFileobj.read( 1 )
                 compressedFileobj.close()
                 fileobj.seek( oldOffset )
                 return compressionId
@@ -1817,6 +1804,31 @@ class TarFileType:
 
         with open( tarFile, 'rb' ) as fileobj:
             compression = SQLiteIndexedTar._detectCompression( fileobj )
+
+            try:
+                # Determining if there are many frames in zstd is O(1) with is_multiframe
+                if (
+                    compression != 'zst'
+                    or supportedCompressions[compression].moduleName not in globals()
+                ):
+                    raise Exception() # early exit because we catch it ourself anyways
+
+                zstdFile = supportedCompressions[compression].open( fileobj )
+
+                if not zstdFile.is_multiframe():
+                    print( "[Warning] The specified file '{}'".format( tarFile ) )
+                    print( "[Warning] is compressed using zstd but only contains one zstd frame. This makes it " )
+                    print( "[Warning] impossible to use true seeking! Please (re)compress your TAR using multiple " )
+                    print( "[Warning] frames in order for ratarmount to do be able to do fast seeking to requested " )
+                    print( "[Warning] files. Else, each file access will decompress the whole TAR from the beginning!" )
+                    print( "[Warning] Here is a simple bash script demonstrating how to do this:" )
+                    print( zstdMultiFrameCompressorBashFunction )
+                    print( "[Warning] The zstd command line tool does not support an option to do this automatically." )
+                    print( "[Warning] See https://github.com/facebook/zstd/issues/2121" )
+                    print()
+            except:
+                pass
+
             if compression not in supportedCompressions:
                 if SQLiteIndexedTar._detectTar( fileobj, self.encoding ):
                     return tarFile, compression
