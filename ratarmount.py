@@ -555,6 +555,7 @@ class SQLiteIndexedTar:
 
     @staticmethod
     def _pathCanBeUsedForSqlite( path: AnyStr ) -> bool:
+        fileExisted = os.path.isfile( path )
         try:
             folder = os.path.dirname( path )
             if folder:
@@ -572,6 +573,11 @@ class SQLiteIndexedTar:
             if printDebug >= 2:
                 traceback.print_exc()
                 print( "Could not create SQLite database at:", path )
+            if not fileExisted and os.path.isfile( path ):
+                try:
+                    os.remove( path )
+                except:
+                    pass
 
         return False
 
