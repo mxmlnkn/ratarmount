@@ -92,6 +92,16 @@ function createMultiFrameZstd()
 createMultiFrameZstd <path-to-file-to-compress> $(( 4*1024*1024 ))
 """
 
+
+class RatarmountError(Exception):
+    """Base exception for ratarmount module."""
+class IndexNotOpenError(RatarmountError):
+    """Exception for operations executed on a closed index database."""
+class InvalidIndexError(RatarmountError):
+    """Exception for indexes being invalid, outdated, or created with different arguments."""
+class CompressionError(RatarmountError):
+    """Exception for trying to open files with unsupported compression or unavailable decompression module."""
+
 def overrides( parentClass ):
     """Simple decorator that checks that a method with the same name exists in the parent class"""
     def overrider( method ):
@@ -99,6 +109,7 @@ def overrides( parentClass ):
         assert callable( getattr( parentClass, method.__name__ ) )
         return method
     return overrider
+
 
 class ProgressBar:
     """Simple progress bar which keeps track of changes and prints the progress and a time estimate."""
@@ -238,7 +249,7 @@ class StenciledFile(io.BufferedIOBase):
             self.offset = offset
 
         if self.offset < 0:
-            raise Exception("Trying to seek before the start of the file!")
+            raise ValueError("Trying to seek before the start of the file!")
         if self.offset >= self.cumsizes[-1]:
             return self.offset
 
@@ -399,13 +410,13 @@ class SQLiteIndexedTar:
                     break
 
         if not self.indexFileName:
-            raise Exception( "[Error] Could not find any existing index or writable location for an index in "
-                             + str( possibleIndexFilePaths ) )
+            raise InvalidIndexError( "Could not find any existing index or writable location for an index in "
+                                     + str( possibleIndexFilePaths ) )
 
 
         self.createIndex( self.tarFileObject )
         self._loadOrStoreCompressionOffsets() # store
-        if ( self.sqlConnection ):
+        if self.sqlConnection:
             self._storeMetadata( self.sqlConnection )
 
         if printDebug >= 1 and writeIndex:
@@ -641,8 +652,8 @@ class SQLiteIndexedTar:
             self.sqlConnection = self._openSqlDb( self.indexFileName if self.indexFileName else ':memory:' )
             tables = self.sqlConnection.execute( 'SELECT name FROM sqlite_master WHERE type = "table";' )
             if { "files", "filestmp", "parentfolders" }.intersection( { t[0] for t in tables } ):
-                raise Exception( "[Error] The index file {} already seems to contain a table. "
-                                 "Please specify --recreate-index." )
+                raise InvalidIndexError( "The index file {} already seems to contain a table. "
+                                         "Please specify --recreate-index.".format( self.indexFileName ) )
             self.sqlConnection.executescript( createTables )
 
         # 2. Open TAR file reader
@@ -662,7 +673,7 @@ class SQLiteIndexedTar:
                                               mode         = 'r|' if streamed else 'r:',
                                               ignore_zeros = self.ignoreZeros,
                                               encoding     = self.encoding )
-        except tarfile.ReadError as exception:
+        except tarfile.ReadError:
             pass
 
         if progressBar is None:
@@ -875,7 +886,7 @@ class SQLiteIndexedTar:
         if not isinstance( fileVersion, int ):
             raise TypeError( "The specified file version must be an integer!" )
         if not self.sqlConnection:
-            raise RuntimeError( "This method can not be called without an opened index database!" )
+            raise IndexNotOpenError( "This method can not be called without an opened index database!" )
 
         # also strips trailing '/' except for a single '/' and leading '/'
         fullPath = '/' + os.path.normpath( fullPath ).lstrip( '/' )
@@ -939,13 +950,13 @@ class SQLiteIndexedTar:
             self.parentFolderCache = self.parentFolderCache[-8:]
 
         if not self.sqlConnection:
-            raise RuntimeError( "This method can not be called without an opened index database!" )
+            raise IndexNotOpenError( "This method can not be called without an opened index database!" )
         self.sqlConnection.executemany( 'INSERT OR IGNORE INTO "parentfolders" VALUES (?,?)',
                                         [ ( p[0], p[1] ) for p in paths ] )
 
     def _setFileInfo( self, row: tuple ) -> None:
         if not self.sqlConnection:
-            raise RuntimeError( "This method can not be called without an opened index database!" )
+            raise IndexNotOpenError( "This method can not be called without an opened index database!" )
 
         try:
             self.sqlConnection.execute( 'INSERT OR REPLACE INTO "files" VALUES (' +
@@ -982,7 +993,7 @@ class SQLiteIndexedTar:
         fullPath : the full path to the file with leading slash (/) for which to set the file info
         """
         if not self.sqlConnection:
-            raise RuntimeError( "This method can not be called without an opened index database!" )
+            raise IndexNotOpenError( "This method can not be called without an opened index database!" )
         assert fullPath[0] == "/"
 
         # os.normpath does not delete duplicate '/' at beginning of string!
@@ -1031,26 +1042,32 @@ class SQLiteIndexedTar:
             versions = {}
             for row in rows:
                 versions[row[0]] = ( row[2], row[3], row[4] )
-        except:
+        except sqlite3.OperationalError:
             pass
 
         try:
             # Check indexes created with bugged bz2 decoder (bug existed when I did not store versions yet)
             if 'bzip2blocks' in tables and 'versions' not in tables:
-                raise Exception( "The indexes created with version 0.3.0 through 0.3.3 for bzip2 compressed archives "
-                                 "are very likely to be wrong because of a bzip2 decoder bug.\n"
-                                 "Please delete the index or call ratarmount with the --recreate-index option!" )
+                raise InvalidIndexError(
+                    "The indexes created with version 0.3.0 through 0.3.3 for bzip2 compressed archives "
+                    "are very likely to be wrong because of a bzip2 decoder bug.\n"
+                    "Please delete the index or call ratarmount with the --recreate-index option!" )
 
             # Check for empty or incomplete indexes. Pretty safe to rebuild the index for these as they
             # are so invalid, noone should miss them. So, recreate index by default for these cases.
             if 'files' not in tables:
-                raise Exception( "SQLite index is empty" )
+                raise InvalidIndexError( "SQLite index is empty" )
 
             if 'filestmp' in tables or 'parentfolders' in tables:
-                raise Exception( "SQLite index is incomplete" )
+                raise InvalidIndexError( "SQLite index is incomplete" )
 
             # Check for pre-sparse support indexes
-            if 'versions' not in tables or 'index' not in versions or versions['index'][1] < 2:
+            if (
+                'versions' not in tables
+                or 'index' not in versions
+                or len(versions['index']) < 2
+                or versions['index'][1] < 2
+            ):
                 print( "[Warning] The found outdated index does not contain any sparse file information." )
                 print( "[Warning] The index will also miss data about multiple versions of a file." )
                 print( "[Warning] Please recreate the index if you have problems with those." )
@@ -1066,8 +1083,8 @@ class SQLiteIndexedTar:
                     and 'st_size' in values
                     and tarStats.st_size != values['st_size']
                 ):
-                    raise Exception( "TAR file for this SQLite index has changed size from",
-                                     values['st_size'], "to", tarStats.st_size)
+                    raise InvalidIndexError( "TAR file for this SQLite index has changed size from",
+                                             values['st_size'], "to", tarStats.st_size)
 
                 if (
                     self.verifyModificationTime
@@ -1075,8 +1092,8 @@ class SQLiteIndexedTar:
                     and 'st_mtime' in values
                     and tarStats.st_mtime != values['st_mtime']
                 ):
-                    raise Exception( "The modification date for the TAR file", values['st_mtime'],
-                                     "to this SQLite index has changed (" + str( tarStats.st_mtime ) + ")" )
+                    raise InvalidIndexError( "The modification date for the TAR file", values['st_mtime'],
+                                             "to this SQLite index has changed (" + str( tarStats.st_mtime ) + ")" )
 
                 # Check arguments used to create the found index. These are only warnings and not forcing a rebuild
                 # by default. ToDo: Add --force options?
@@ -1106,7 +1123,7 @@ class SQLiteIndexedTar:
             # indexIsLoaded checks self.sqlConnection, so close it before returning because it was found to be faulty
             try:
                 self.sqlConnection.close()
-            except:
+            except sqlite3.Error:
                 pass
             self.sqlConnection = None
 
@@ -1217,8 +1234,8 @@ class SQLiteIndexedTar:
 
         cinfo = supportedCompressions[compression]
         if cinfo.moduleName not in globals():
-            raise Exception( "Can't open a {} compressed file '{}' without {} module!"
-                             .format( compression, fileobj.name, cinfo.moduleName ) )
+            raise CompressionError( "Can't open a {} compressed file '{}' without {} module!"
+                                    .format( compression, fileobj.name, cinfo.moduleName ) )
 
         if compression == 'gz':
             # drop_handles keeps a file handle opening as is required to call tell() during decoding
@@ -1235,7 +1252,7 @@ class SQLiteIndexedTar:
         # If the TAR file index was created, then tarfile has iterated over the whole file once
         # and therefore completed the implicit compression offset creation.
         if not self.sqlConnection:
-            raise RuntimeError( "This method can not be called without an opened index database!" )
+            raise IndexNotOpenError( "This method can not be called without an opened index database!" )
         db = self.sqlConnection
         fileObject = self.tarFileObject
 
@@ -1332,7 +1349,7 @@ class SQLiteIndexedTar:
                 print( "[Info] This might happen when you are out of space in your temporary file and at the" )
                 print( "[Info] the index file location. The gzipindex size takes roughly 32kiB per 4MiB of" )
                 print( "[Info] uncompressed(!) bytes (0.8% of the uncompressed data) by default." )
-                raise Exception( "[Error] Could not initialize the GZip seek cache." )
+                raise RuntimeError( "Could not initialize the GZip seek cache." )
             if printDebug >= 2:
                 print( "Exported GZip index size:", os.stat( gzindex ).st_size )
 
@@ -1351,8 +1368,8 @@ class SQLiteIndexedTar:
         if self.compression in [ None, 'xz' ]:
             return
 
-        raise Exception( "Could not load or store block offsets for {} probably because adding support was forgotten!"
-                         .format( self.compression ) )
+        assert False, ( "Could not load or store block offsets for {} probably because adding support was forgotten!"
+                        .format( self.compression ) )
 
 class TarMount( fuse.Operations ):
     """
