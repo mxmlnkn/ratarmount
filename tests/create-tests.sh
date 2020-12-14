@@ -2,11 +2,11 @@
 
 recreateArchive()
 (
-    archive="$( pwd )/$( basename -- $1 )"
+    archive="$( pwd )/$( basename -- "$1" )"
     newArchive="${archive%.tar}.new.tar"
     shift
 
-    cd -- "$( mktemp -d )"
+    cd -- "$( mktemp -d )" || { echo 'Failed to create temporary directory!'; return 1; }
     tar -x -f "$archive"
 
     # run TAR command

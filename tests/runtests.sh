@@ -1,11 +1,13 @@
 #!/bin/bash
 
-cd -- "$( dirname -- "${BASH_SOURCE[0]}" )"
-cd ..
+cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." || { echo 'Failed to cd to ratarmount.py folder!'; exit 1; }
+
+if [[ -z "${RATARMOUNT_CMD[*]}" ]]; then
+    RATARMOUNT_CMD=( python3 "$( realpath -- ratarmount.py )" )
+    #RATARMOUNT_CMD=ratarmount
+fi
 
 echoerr() { echo "$@" 1>&2; }
-
-error=0
 
 checkStat()
 {
@@ -54,7 +56,8 @@ checkFileInTAR()
     local fileInTar="$1"; shift
     local correctChecksum="$1"
 
-    local mountFolder="$( mktemp -d )"
+    local mountFolder
+    mountFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
 
     funmount "$mountFolder"
 
@@ -88,7 +91,8 @@ checkFileInTARPrefix()
     local fileInTar="$1"; shift
     local correctChecksum="$1"
 
-    local mountFolder="$( mktemp -d )"
+    local mountFolder
+    mountFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
 
     funmount "$mountFolder"
 
@@ -113,7 +117,8 @@ checkLinkInTAR()
     local fileInTar="$1"; shift
     local correctLinkTarget="$1"
 
-    local mountFolder="$( mktemp -d )"
+    local mountFolder
+    mountFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
 
     funmount "$mountFolder"
 
@@ -122,7 +127,7 @@ checkLinkInTAR()
     "${cmd[@]}" >/dev/null || returnError "${cmd[*]}"
     checkStat "$mountFolder" || returnError "${cmd[*]}"
     checkStat "$mountFolder/$fileInTar" || returnError "${cmd[*]}"
-    if [[ $( readlink -- "$mountFolder/$fileInTar" ) != $correctLinkTarget ]]; then
+    if [[ $( readlink -- "$mountFolder/$fileInTar" ) != "$correctLinkTarget" ]]; then
         echoerr -e "\e[37mLink target of '$fileInTar' in mounted TAR '$archive' does not match"'!\e[0m'
         returnError "${cmd[*]}"
     fi
@@ -144,7 +149,7 @@ createLargeTar()
     #  -> some common file name limitations:
     #     . max 99 for GNU v7 (not the default tar archive)
     #     . Linux systems have 256 max file name length (and 4096 max path length)
-    fileNameDataSizeInMB="$1"
+    fileNameDataSizeInMB=$1
     if ! test "$fileNameDataSizeInMB" -eq "$fileNameDataSizeInMB"; then
         echoerr "Argument 1 must be number in 1MiB to be used but is: $fileNameDataSizeInMB"
         return 1
@@ -180,7 +185,7 @@ createLargeTar()
     # Now, instead of spamming the host system with billions of files, make use of the recursive mounting of ratarmount
     # to increase the memory footprint by copy-pasting the TAR with 1MiB metadata n times
 
-    largeTarFolder="$( mktemp -d )"
+    largeTarFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
 
     for (( i = 0; i < fileNameDataSizeInMB; ++i )); do
         cp "$tarFile1MiB" "$largeTarFolder/$( printf '%05d' "$i" ).tar"
@@ -220,11 +225,12 @@ testLargeTar()
 
     local largeTar="tests/large-tar-with-$fileNameDataSizeInMB-MiB-metadata.tar"
     if ! test -f "$largeTar"; then
-        largeTar="$( createLargeTar $fileNameDataSizeInMB )"
+        largeTar="$( createLargeTar "$fileNameDataSizeInMB" )"
     fi
 
     # clear up mount folder if already in use
-    local mountFolder="$( mktemp -d )"
+    local mountFolder
+    mountFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
     if mountpoint "$mountFolder" &>/dev/null; then
         fusermount -u "$mountFolder"
         while mountpoint "$mountFolder" &>/dev/null; do sleep 0.2s; done
@@ -296,19 +302,20 @@ benchmarkSerialization()
         # not nice but hard to do differently as the pipe opens testLargeTar in a subshell and tee
         # redirects it directly to tty, so we can't store an output!
         local timeSeriesFile="benchmark-memory-${mib}-MiB-saving.dat"
-        printf '%s %s ' $( getPeakMemoryFromFile "$timeSeriesFile" ) >> "$logFile"
+        printf '%s ' "$( getPeakMemoryFromFile "$timeSeriesFile" )" >> "$logFile"
         'mv' "$timeSeriesFile" "$benchmarksFolder/$timeSeriesFile"
 
         local timeSeriesFile="benchmark-memory-${mib}-MiB-loading.dat"
-        printf '%s %s ' $( getPeakMemoryFromFile "$timeSeriesFile" ) >> "$logFile"
+        printf '%s ' "$( getPeakMemoryFromFile "$timeSeriesFile" )" >> "$logFile"
         'mv' "$timeSeriesFile" "$benchmarksFolder/$timeSeriesFile"
+
+        echo >> "$logFile"
     done
 }
 
 checkAutomaticIndexRecreation()
 (
-    ratarmountScript=$( realpath -- ratarmount.py )
-    cd -- "$( mktemp -d )"
+    cd -- "$( mktemp -d )" || returnError 'Failed to create temporary directory'
 
     archive='momo.tar'
     mountFolder='momo'
@@ -319,7 +326,7 @@ checkAutomaticIndexRecreation()
     tar -cf "$archive" "$fileName"
 
     # 1. Check and create index
-    python3 "$ratarmountScript" "$archive"
+    "${RATARMOUNT_CMD[@]}" "$archive"
     diff -- "$fileName" "$mountFolder/$fileName" || returnError 'Files differ on simple mount!'
     funmount "$mountFolder"
 
@@ -328,7 +335,7 @@ checkAutomaticIndexRecreation()
     indexFile='momo.tar.index.sqlite'
     [[ -f $indexFile ]] || returnError 'Index file not found!'
     lastModification=$( stat -c %Y -- "$indexFile" )
-    python3 "$ratarmountScript" "$archive"
+    "${RATARMOUNT_CMD[@]}" "$archive"
     diff -- "$fileName" "$mountFolder/$fileName" || returnError 'Files differ on simple remount!'
     funmount "$mountFolder"
     [[ $lastModification -eq $( stat -c %Y -- "$indexFile" ) ]] || returnError 'Index changed even though TAR did not!'
@@ -342,11 +349,11 @@ checkAutomaticIndexRecreation()
 
     # modification timestamp detection is turned off for now by default to facilitate index sharing because
     # the mtime check can proove problematic as the mtime changes when downloading a file.
-    python3 "$ratarmountScript" "$archive"
+    "${RATARMOUNT_CMD[@]}" "$archive"
     diff -- "$fileName" "$mountFolder/${fileName}" && returnError 'Index should not have been recreated!'
     funmount "$mountFolder"
 
-    python3 "$ratarmountScript" --verify-mtime "$archive"
+    "${RATARMOUNT_CMD[@]}" --verify-mtime "$archive"
     diff -- "$fileName" "$mountFolder/${fileName}" || returnError 'Files differ when trying to trigger index recreation!'
     funmount "$mountFolder"
 
@@ -361,7 +368,7 @@ checkAutomaticIndexRecreation()
     tar -cf "$archive" "$fileName"
     touch -d "@$lastModification" "$archive"
 
-    python3 "$ratarmountScript" "$archive"
+    "${RATARMOUNT_CMD[@]}" "$archive"
     diff -- "$fileName" "$mountFolder/${fileName}" || returnError 'Files differ!'
     funmount "$mountFolder"
     [[ $lastModification -ne $( stat -c %Y -- "$indexFile" ) ]] || \
@@ -370,9 +377,8 @@ checkAutomaticIndexRecreation()
 
 checkUnionMount()
 (
-    ratarmountScript=$( realpath -- ratarmount.py )
     testsFolder="$( pwd )/tests"
-    cd -- "$( mktemp -d )"
+    cd -- "$( mktemp -d )" || returnError 'Failed to create temporary directory'
     keyString='EXTRACTED VERSION'
 
     tarFiles=( 'hardlink' 'nested-symlinks' 'single-nested-file' 'symlinks' )
@@ -389,24 +395,24 @@ checkUnionMount()
     mountPoint=$( mktemp -d )
     for tarFile in "${tarFiles[@]}"; do
         # Check whether a simple bind mount works, which is now an officially supported perversion of ratarmount
-        python3 "$ratarmountScript" "$tarFile" "$mountPoint"
+        "${RATARMOUNT_CMD[@]}" "$tarFile" "$mountPoint"
         diff -r --no-dereference "$tarFile" "$mountPoint" || returnError 'Bind mounted folder differs!'
         funmount "$mountPoint"
 
         # Check that bind mount onto the mount point works
-        python3 "$ratarmountScript" "$tarFile" "$tarFile"
+        "${RATARMOUNT_CMD[@]}" "$tarFile" "$tarFile"
         [[ $( find "$tarFile" -mindepth 1 | wc -l ) -gt 0 ]] || returnError 'Bind mounted folder is empty!'
         funmount "$mountPoint"
 
         # Check whether updating a folder with a TAR works
-        python3 "$ratarmountScript" "$tarFile" "$testsFolder/$tarFile.tar" "$mountPoint"
+        "${RATARMOUNT_CMD[@]}" "$tarFile" "$testsFolder/$tarFile.tar" "$mountPoint"
         keyContainingFiles=$( find "$mountPoint" -type f -execdir bash -c '
             if command grep -q "$1" "$0"; then printf "%s\n" "$0"; fi' {} "$keyString" \; | wc -l )
         [[ $keyContainingFiles -eq 0 ]] || returnError 'Found file from updated folder even though all files are updated!'
         funmount "$mountPoint"
 
         # Check whether updating a TAR with a folder works
-        python3 "$ratarmountScript" "$testsFolder/$tarFile.tar" "$tarFile" "$mountPoint"
+        "${RATARMOUNT_CMD[@]}" "$testsFolder/$tarFile.tar" "$tarFile" "$mountPoint"
         keyNotContainingFiles=$( find "$mountPoint" -type f -execdir bash -c '
             if ! command grep -q "$1" "$0"; then printf "%s\n" "$0"; fi' {} "$keyString" \; | wc -l )
         [[ $keyNotContainingFiles -eq 0 ]] || returnError 'Found files from TAR even though it was updated with a folder!'
@@ -416,9 +422,8 @@ checkUnionMount()
 
 checkUnionMountFileVersions()
 (
-    ratarmountScript=$( realpath -- ratarmount.py )
     testsFolder="$( pwd )/tests"
-    cd -- "$( mktemp -d )"
+    cd -- "$( mktemp -d )" || returnError 'Failed to create temporary directory'
 
     tarFiles=( 'updated-file.tar' )
 
@@ -426,7 +431,7 @@ checkUnionMountFileVersions()
     echo 'untarred' > folder/foo/fighter/ufo
     mkdir emptyFolder
 
-    python3 "$ratarmountScript" emptyFolder folder "$testsFolder/updated-file.tar" emptyFolder folder mountPoint
+    "${RATARMOUNT_CMD[@]}" emptyFolder folder "$testsFolder/updated-file.tar" emptyFolder folder mountPoint
 
     untarredFileMd5=$( md5sum folder/foo/fighter/ufo 2>/dev/null | sed 's| .*||' )
     verifyCheckSum mountPoint foo/fighter/ufo updated-file.tar "$untarredFileMd5" \
@@ -447,12 +452,11 @@ checkUnionMountFileVersions()
 
 checkAutoMountPointCreation()
 (
-    ratarmountScript=$( realpath -- ratarmount.py )
     testsFolder="$( pwd )/tests"
-    cd -- "$( mktemp -d )"
+    cd -- "$( mktemp -d )" || returnError 'Failed to create temporary directory'
 
     cp "$testsFolder/single-nested-file.tar" .
-    python3 "$ratarmountScript" *.tar
+    "${RATARMOUNT_CMD[@]}" -- *.tar
     command grep -q 'iriya' single-nested-file/foo/fighter/ufo ||
     returnError 'Check for auto mount point creation failed!'
 
@@ -469,7 +473,8 @@ checkTarEncoding()
     local fileInTar="$1"; shift
     local correctChecksum="$1"
 
-    local mountFolder="$( mktemp -d )"
+    local mountFolder
+    mountFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
 
     funmount "$mountFolder"
 
@@ -502,21 +507,31 @@ checkAutomaticMountPointCreation()
     sleep 0.2s
     funmount "$folder"
     sleep 0.2s
-    [[ ! -d "$folder" ]] || 'Automatic mount point was not cleaned up on unmount!'
+    [[ ! -d "$folder" ]] || returnError 'Automatic mount point was not cleaned up on unmount!'
 }
+
+
+# Linting only to be done locally because in CI it is in separate steps
+if [[ -z "$CI" ]]; then
+    # Ignore Python 3.9. because of the Optiona[T] type hint bug in pylint: https://github.com/PyCQA/pylint/issues/3882
+    if [[ ! $( python3 --version ) =~ \ 3\.9\.* ]]; then
+        pylint ratarmount.py setup.py | tee pylint.log
+        if 'grep' -E -q ': E[0-9]{4}: ' pylint.log; then
+            echoerr 'There were warnings during the pylint run!'
+            exit 1
+        fi
+    fi
+    mypy ratarmount.py setup.py || returnError 'Mypy failed!'
+    pytype -d import-error ratarmount.py || returnError 'Pytype failed!'
+    black -q --line-length 120 --skip-string-normalization ratarmount.py
+
+    shellcheck tests/*.sh || returnError 'shellcheck failed!'
+fi
 
 
 python3 tests/tests.py || returnError "tests/tests.py"
 
-# Ignore Python 3.9. because of the Optiona[T] type hint bug in pylint: https://github.com/PyCQA/pylint/issues/3882
-if [[ ! $( python3 --version ) =~ \ 3\.9\.* ]]; then
-    pylint ratarmount.py setup.py | tee pylint.log
-    if 'egrep' -q ': E[0-9]{4}: ' pylint.log; then
-        echoerr 'There were warnings during the pylint run!'
-        exit 1
-    fi
-fi
-mypy ratarmount.py setup.py
+
 rm -f tests/*.index.*
 
 tests=(
@@ -663,5 +678,3 @@ rm -f tests/*.index.*
 rmdir tests/*/
 
 echo -e '\e[32mAll tests ran succesfully.\e[0m'
-
-exit $error

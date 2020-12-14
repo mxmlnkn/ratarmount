@@ -16,6 +16,7 @@ import tempfile
 import time
 import traceback
 from timeit import default_timer as timer
+import typing
 from typing import Any, AnyStr, BinaryIO, Dict, IO, List, Optional, Set, Tuple, Union
 
 import fuse
@@ -156,8 +157,8 @@ class ProgressBar:
         # fmt: off
         self.maxValue        = maxValue
         self.lastUpdateTime  = time.time()
-        self.lastUpdateValue = 0
-        self.updateInterval  = 2 # seconds
+        self.lastUpdateValue = 0.
+        self.updateInterval  = 2.  # seconds
         self.creationTime    = time.time()
         # fmt: on
 
@@ -409,7 +410,7 @@ class SQLiteIndexedTar:
                     print("[Warning] to do fast seeking to requested files.")
                     print("[Warning] As it is, each file access will decompress the whole TAR from the beginning!")
                     print()
-            except:
+            except Exception:
                 pass
 
         # will be used for storing indexes if current path is read-only
@@ -617,7 +618,7 @@ class SQLiteIndexedTar:
             if not fileExisted and os.path.isfile(path):
                 try:
                     os.remove(path)
-                except:
+                except Exception:
                     pass
 
         return False
@@ -649,7 +650,7 @@ class SQLiteIndexedTar:
                 progressBar.update(self.rawFileObject.tell())
             else:
                 progressBar.update(fileobj.tell())
-        except:
+        except Exception:
             pass
 
     def createIndex(
@@ -809,18 +810,18 @@ class SQLiteIndexedTar:
                 path, name = fullPath.rsplit("/", 1)
                 fileInfo = (
                     # fmt: off
-                    path               , # 0
-                    name               , # 1
-                    globalOffsetHeader , # 2
-                    globalOffset       , # 3
-                    tarInfo.size       , # 4
-                    tarInfo.mtime      , # 5
-                    mode               , # 6
-                    tarInfo.type       , # 7
-                    tarInfo.linkname   , # 8
-                    tarInfo.uid        , # 9
-                    tarInfo.gid        , # 10
-                    isTar              , # 11
+                    path               ,  # 0
+                    name               ,  # 1
+                    globalOffsetHeader ,  # 2
+                    globalOffset       ,  # 3
+                    tarInfo.size       ,  # 4
+                    tarInfo.mtime      ,  # 5
+                    mode               ,  # 6
+                    tarInfo.type       ,  # 7
+                    tarInfo.linkname   ,  # 8
+                    tarInfo.uid        ,  # 9
+                    tarInfo.gid        ,  # 10
+                    isTar              ,  # 11
                     tarInfo.issparse() ,
                     # 12
                     # fmt: on
@@ -865,18 +866,18 @@ class SQLiteIndexedTar:
 
             fileInfo = (
                 # fmt: off
-                ""                 , # 0 path
-                fname              , # 1
-                None               , # 2 header offset
-                0                  , # 3 data offset
-                fileSize           , # 4
-                tarInfo.st_mtime   , # 5
-                tarInfo.st_mode    , # 6
-                None               , # 7 TAR file type. Don't care because it curerntly is unused and overlaps with mode
-                None               , # 8 linkname
-                tarInfo.st_uid     , # 9
-                tarInfo.st_gid     , # 10
-                False              , # 11 isTar
+                ""                 ,  # 0 path
+                fname              ,  # 1
+                None               ,  # 2 header offset
+                0                  ,  # 3 data offset
+                fileSize           ,  # 4
+                tarInfo.st_mtime   ,  # 5
+                tarInfo.st_mode    ,  # 6
+                None               ,  # 7 TAR file type. Don't care because it curerntly is unused and overlaps with mode
+                None               ,  # 8 linkname
+                tarInfo.st_uid     ,  # 9
+                tarInfo.st_gid     ,  # 10
+                False              ,  # 11 isTar
                 False              ,
                 # 12 isSparse, don't care if it is actually sparse or not because it is not in TAR
                 # fmt: on
@@ -1063,7 +1064,7 @@ class SQLiteIndexedTar:
                     except UnicodeEncodeError:
                         # fmt: off
                         checkedRow += [
-                            x.encode( self.encoding, 'surrogateescape' ) \
+                            x.encode( self.encoding, 'surrogateescape' )
                              .decode( self.encoding, 'backslashreplace' )
                          ]
                         # fmt: on
@@ -1296,7 +1297,7 @@ class SQLiteIndexedTar:
                 compressedFileobj.close()
                 fileobj.seek(oldOffset)
                 return compressionId
-            except:
+            except Exception:
                 fileobj.seek(oldOffset)
 
         return None
@@ -1366,7 +1367,7 @@ class SQLiteIndexedTar:
             try:
                 offsets = dict(db.execute('SELECT blockoffset,dataoffset FROM {};'.format(table_name)))
                 fileObject.set_block_offsets(offsets)
-            except:
+            except Exception:
                 if printDebug >= 2:
                     print(
                         "[Info] Could not load {} block offset data. Will create it from scratch.".format(
@@ -1401,24 +1402,24 @@ class SQLiteIndexedTar:
                     gzindex = tempfile.mkstemp(dir=tmpDir)[1]
                     with open(gzindex, 'wb') as file:
                         file.write(db.execute('SELECT data FROM gzipindex').fetchone()[0])
-                except:
+                except Exception:
                     try:
                         if gzindex:
                             os.remove(gzindex)
-                    except:
+                    except Exception:
                         pass
                     gzindex = None
 
             try:
                 fileObject.import_index(filename=gzindex)
                 return
-            except:
+            except Exception:
                 pass
 
             try:
                 if gzindex:
                     os.remove(gzindex)
-            except:
+            except Exception:
                 pass
 
             # Store the offsets into a temporary file and then into the SQLite database
@@ -1440,7 +1441,7 @@ class SQLiteIndexedTar:
                 except indexed_gzip.ZranError:
                     try:
                         os.remove(gzindex)
-                    except:
+                    except Exception:
                         pass
                     gzindex = None
 
@@ -1512,10 +1513,10 @@ class TarMount(fuse.Operations):
             try:
                 os.fspath(pathToMount)
                 pathToMount = [pathToMount]
-            except:
+            except Exception:
                 pass
 
-        self.mountSources: List[Any] = [
+        self.mountSources: List[Union[SQLiteIndexedTar, str]] = [
             SQLiteIndexedTar(tarFile, writeIndex=True, encoding=self.encoding, **sqliteIndexedTarOptions)
             if not os.path.isdir(tarFile)
             else os.path.realpath(tarFile)
@@ -1561,12 +1562,12 @@ class TarMount(fuse.Operations):
         try:
             if self.mountPointWasCreated:
                 os.rmdir(self.mountPoint)
-        except:
+        except Exception:
             pass
 
         try:
             os.close(self.mountPointFd)
-        except:
+        except Exception:
             pass
 
     @staticmethod
@@ -1579,7 +1580,7 @@ class TarMount(fuse.Operations):
             size         = stats.st_size ,
             mtime        = stats.st_mtime,
             mode         = stats.st_mode ,
-            type         = None          , # I think this is completely unused and mostly contained in mode
+            type         = None          ,  # I think this is completely unused and mostly contained in mode
             linkname     = os.readlink( filePath ) if os.path.islink( filePath ) else None,
             uid          = stats.st_uid  ,
             gid          = stats.st_gid  ,
@@ -1588,7 +1589,9 @@ class TarMount(fuse.Operations):
             # fmt: on
         )
 
-    def _getUnionMountFileInfo(self, filePath: str, fileVersion: int = 0) -> Optional[Tuple[FileInfo, Optional[str]]]:
+    def _getUnionMountFileInfo(
+        self, filePath: str, fileVersion: int = 0
+    ) -> Optional[Tuple[FileInfo, Union[SQLiteIndexedTar, Optional[str]]]]:
         """Returns the file info from the last (most recent) mount source in mountSources,
         which contains that file and that mountSource itself. mountSource might be None
         if it is the root folder."""
@@ -1614,7 +1617,10 @@ class TarMount(fuse.Operations):
                     fileInfo = mountSource.getFileInfo(filePath, listDir=False, fileVersion=fileVersion)
                     if isinstance(fileInfo, FileInfo):
                         return fileInfo, mountSource
-                    fileVersion += len(mountSource.getFileInfo(filePath, listVersions=True))
+
+                    fileInfo = mountSource.getFileInfo(filePath, listVersions=True)
+                    assert isinstance(fileInfo, dict)  # listVersions=True only should return dict
+                    fileVersion += len(fileInfo)
 
                 if fileVersion > 0:
                     return None
@@ -1636,7 +1642,10 @@ class TarMount(fuse.Operations):
                 fileInfo = mountSource.getFileInfo(filePath, listDir=False, fileVersion=fileVersion)
                 if isinstance(fileInfo, FileInfo):
                     return fileInfo, mountSource
-                fileVersion -= len(mountSource.getFileInfo(filePath, listVersions=True))
+
+                fileInfo = mountSource.getFileInfo(filePath, listVersions=True)
+                assert isinstance(fileInfo, dict)  # listVersions=True only should return dict
+                fileVersion -= len(fileInfo)
 
             if fileVersion < 1:
                 return None
@@ -1678,7 +1687,7 @@ class TarMount(fuse.Operations):
                 try:
                     fileVersion = int(part)
                     assert str(fileVersion) == part
-                except:
+                except Exception:
                     return None
                 pathIsSpecialVersionsFolder = False
                 continue
@@ -1701,7 +1710,7 @@ class TarMount(fuse.Operations):
 
         return filePath, pathIsSpecialVersionsFolder, (None if pathIsSpecialVersionsFolder else fileVersion)
 
-    def _getFileInfo(self, filePath: str) -> Tuple[FileInfo, Optional[str]]:
+    def _getFileInfo(self, filePath: str) -> Tuple[FileInfo, Union[SQLiteIndexedTar, Optional[str]]]:
         """Wrapper for _getUnionMountFileInfo, which also resolves special file version specifications in the path."""
         result = self._getUnionMountFileInfo(filePath)
         if result:
@@ -1872,11 +1881,16 @@ class TarMount(fuse.Operations):
             # the sparse file using StenciledFile and then use tarfile on it to expand the sparse file correctly.
             tarBlockSize = fileInfo.offset - fileInfo.offsetheader + fileInfo.size
             tarSubFile = StenciledFile(mountSource.tarFileObject, [(fileInfo.offsetheader, tarBlockSize)])
-            tmpTarFile = tarfile.open(fileobj=tarSubFile, mode='r:', encoding=self.encoding)
-            tmpFileObject = tmpTarFile.extractfile(next(iter(tmpTarFile)))
-            tmpFileObject.seek(offset, os.SEEK_SET)
-            result = tmpFileObject.read(size)
-            tmpTarFile.close()
+            with tarfile.open(
+                fileobj=typing.cast(BinaryIO, tarSubFile), mode='r:', encoding=self.encoding
+            ) as tmpTarFile:
+                tmpFileObject = tmpTarFile.extractfile(next(iter(tmpTarFile)))
+                if tmpFileObject:
+                    tmpFileObject.seek(offset, os.SEEK_SET)
+                    result = tmpFileObject.read(size)
+                else:
+                    print("tarfile.extractfile returned nothing!")
+                    raise fuse.FuseOSError(fuse.errno.EIO)
             return result
 
         try:
@@ -1921,7 +1935,7 @@ class TarFileType:
                     print("[Warning] The zstd command line tool does not support an option to do this automatically.")
                     print("[Warning] See https://github.com/facebook/zstd/issues/2121")
                     print()
-            except:
+            except Exception:
                 pass
 
             if compression not in supportedCompressions:

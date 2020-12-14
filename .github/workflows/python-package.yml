@@ -25,9 +25,9 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install Dependencies
       run: |
-        sudo apt-get -y install bzip2 pbzip2 pixz zstd # necessary for tests
+        sudo apt-get -y install bzip2 pbzip2 pixz zstd shellcheck # necessary for tests
         python3 -m pip install --upgrade pip
-        python3 -m pip install --upgrade-strategy eager --upgrade cython mypy twine pylint wheel
+        python3 -m pip install --upgrade-strategy eager --upgrade black cython flake8 mypy twine pylint pytype wheel
     - name: Test Startup With Only One Compression Dependency
       run: |
         for module in indexed_bzip2 indexed_gzip indexed_zstd lzmaffi; do
@@ -47,13 +47,24 @@ jobs:
         ratarmount --help
         ratarmount --version
         ratarmount tests/single-file.tar mimi; sleep 1s; fusermount -u mimi
-    - name: Pylint
+    - name: Style Check With Black
+      run: |
+        black -q --diff --line-length 120 --skip-string-normalization ratarmount.py > black.diff
+        ! [ -s black.diff ]
+    - name: Lint With Flake8
+      run: flake8 *.py
+    - name: Lint With Pylint
       run: |
         pylint *.py | tee pylint.log
         ! 'egrep' ': E[0-9]{4}: ' pylint.log
       if: matrix.python-version != '3.9' # because of this bug https://github.com/PyCQA/pylint/issues/3882
-    - name: Mypy
+    - name: Lint With Pytype
+      run: pytype -d import-error ratarmount.py
+      if: matrix.python-version != '3.9' # "Python versions > 3.7 are not yet supported."
+    - name: Lint With Mypy
       run: mypy *.py
+    - name: Lint With ShellCheck
+      run: shellcheck -e SC2064 tests/*.sh
     - name: Test Startup Without Compression Dependencies
       run: |
         # Segfaults (139) are not allowed but other exit codes are valid!
