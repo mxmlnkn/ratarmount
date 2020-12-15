@@ -271,9 +271,8 @@ Alternatively, you can simply split the original file into parts, compress those
 Here is a bash function, which can be used for that:
 
 ```bash
-function createMultiFrameZstd()
-{
-    local file frameSize fileSize offset frameFile
+createMultiFrameZstd()
+(
     # Detect being piped into
     if [ -t 0 ]; then
         file=$1
@@ -298,7 +297,6 @@ function createMultiFrameZstd()
         echo "Could not create a temporary file for the frames." 1>&2
         return 1
     fi
-    trap "'rm' -- '$frameFile'" EXIT
 
     if [ -t 0 ]; then
         true > "$file.zst"
@@ -316,7 +314,9 @@ function createMultiFrameZstd()
             zstd -c -q -- "$frameFile"
         done
     fi
-}
+
+    'rm' -f -- "$frameFile"
+)
 ```
 
 In order to compress a file named `foo` into a multiframe zst file called `foo.zst`, which contains frames sized 4MiB of uncompressed ata, you would call it like this:
