@@ -265,8 +265,9 @@ In contrast to bzip2 and gzip compressed files, true seeking on xz and zst files
 This wouldn't be noteworthy, if both standard compressors for [xz](https://tukaani.org/xz/) and [zstd](https://github.com/facebook/zstd) were not by default creating unsuited files.
 Even though both file formats do support multiple frames and xz even contains a frame table at the end for easy seeking, both compressors write only a single frame and/or block out, making this feature unusable.
 In order to generate truly seekable compressed files, you'll have to use [pixz](https://github.com/vasi/pixz) for xz files.
-For zstd compressed files, no easily solution seems to exist although an [issue](https://github.com/facebook/zstd/issues/2121) does exist.
-The easiest solution is to simply split the original file into parts, compress those parts, and then concatenate those parts together to get a suitable multiframe zst file.
+For zstd compressed, you can try with [t2sz](https://github.com/martinellimarco/t2sz).
+The standard zstd tool does not support setting smaller block sizes yet although an [issue](https://github.com/facebook/zstd/issues/2121) does exist.
+Alternatively, you can simply split the original file into parts, compress those parts, and then concatenate those parts together to get a suitable multiframe zst file.
 Here is a bash function, which can be used for that:
 
 ```bash
@@ -286,6 +287,7 @@ function createMultiFrameZstd()
     fi
     if [[ ! $frameSize =~ ^[0-9]+$ ]]; then
         echo "Frame size '$frameSize' is not a valid number." 1>&2
+        return 1
     fi
 
     # Create a temporary file. I avoid simply piping to zstd
@@ -293,17 +295,17 @@ function createMultiFrameZstd()
     if [[ -d --tmpdir=/dev/shm ]]; then frameFile=$( mktemp --tmpdir=/dev/shm ); fi
     if [[ -z $frameFile ]]; then frameFile=$( mktemp ); fi
     if [[ -z $frameFile ]]; then
-        echo "Could not create a temporary file for the frames." 1>2
+        echo "Could not create a temporary file for the frames." 1>&2
         return 1
     fi
     trap "'rm' -- '$frameFile'" EXIT
 
     if [ -t 0 ]; then
-        > "$file.zst"
+        true > "$file.zst"
         for (( offset = 0; offset < fileSize; offset += frameSize )); do
             dd if="$file" of="$frameFile" bs=$(( 1024*1024 )) \
                iflag=skip_bytes,count_bytes skip="$offset" count="$frameSize" 2>/dev/null
-            zstd -c -q -f --no-progress -- "$frameFile" >> "$file.zst"
+            zstd -c -q -- "$frameFile" >> "$file.zst"
         done
     else
         while true; do
@@ -311,7 +313,7 @@ function createMultiFrameZstd()
                iflag=count_bytes count="$frameSize" 2>/dev/null
             # pipe is finished when reading it yields no further data
             if [[ ! -s "$frameFile" ]]; then break; fi
-            zstd -c -q -f --no-progress -- "$frameFile"
+            zstd -c -q -- "$frameFile"
         done
     fi
 }
