@@ -599,6 +599,85 @@ checkTarEncoding()
 }
 
 
+recompressFile()
+{
+    # Given a file it returns paths to all variants of (uncompressed, bz2, gzip, xz, zst).
+
+    local recompressedFiles=()
+    local tmpFolder
+    tmpFolder=$( mktemp -d )
+
+    local file=$1
+    cp -- "$file" "$tmpFolder"
+    file="$tmpFolder/$( basename -- "$file" )"
+
+    local uncompressedFile=
+    uncompressedFile=${file%.*}
+    [[ "$uncompressedFile" != "$file" ]] || returnError 'Given file seems to have no extension!'
+
+    # 1. Extract if necessary
+    local fileCompression
+    # Deleting all i,p,d is a fun trick to get the shorthand suffixes from the longhand compression names!
+    fileCompression=$( file --mime-type -- "$file" | sed 's|.*[/-]||; s|[ipd]||g' )
+    case "$fileCompression" in
+        bz2)
+            bzip2 --keep --stdout --decompress -- "$file" > "$uncompressedFile"
+            ;;
+        gz)
+            gzip --keep --stdout --decompress -- "$file" > "$uncompressedFile"
+            ;;
+        xz)
+            pixz -d "$file" "$uncompressedFile"
+            ;;
+        zst)
+            zstd --keep --stdout --decompress -- "$file" > "$uncompressedFile"
+            ;;
+        *)
+            uncompressedFile=$file
+            ;;
+    esac
+
+    # 2. Compress into all supported formats
+    for compression in bz2 gz xz zst; do
+        if [[ "$compression" == "$fileCompression" ]]; then
+            recompressedFiles+=( "$file" )
+            continue
+        fi
+
+        recompressedFile="$tmpFolder/$( basename -- "$uncompressedFile" ).$compression"
+        recompressedFiles+=( "$recompressedFile" )
+
+        case "$compression" in
+            bz2)
+                bzip2 --keep --stdout "$uncompressedFile" > "$recompressedFile"
+                ;;
+            gz)
+                gzip --keep --stdout "$uncompressedFile" > "$recompressedFile"
+                ;;
+            xz)
+                pixz "$uncompressedFile" "$recompressedFile"
+                ;;
+            zst)
+                # Use block size < 10kiB in order to get multiframe zst files for all test TARs no matter how small
+                createMultiFrameZstd $(( 8*1024 )) < "$uncompressedFile" > "$recompressedFile"
+                ;;
+        esac
+
+        [ -s "$recompressedFile" ] ||
+            returnError "Something went wrong during ${compression} compression of ${uncompressedFile} into ${recompressedFile}."
+    done
+
+    if [[ "$( file --mime-type -- "$uncompressedFile" )" =~ tar$ ]]; then
+        printf '%s\n' "$uncompressedFile"
+    else
+        # Do not return non-TAR uncompressed files and cleanup if they were created by us.
+        rm -- "$uncompressedFile"
+    fi
+
+    printf '%s\n'  "${recompressedFiles[@]}"
+}
+
+
 checkTarEncoding tests/single-file.tar utf-8 bar d3b07384d113edec49eaa6238ad5ff00
 
 # Linting only to be done locally because in CI it is in separate steps
@@ -679,86 +758,21 @@ for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
     tarPath=${tests[iTest+1]}
     fileName=${tests[iTest+2]}
 
-    tbz2Path=
-    tgzPath=
-    txzPath=
-    tzstPath=
-    isSingleArchive=0
+    readarray -t files < <( recompressFile "$tarPath" )
+    TMP_FILES_TO_CLEANUP+=( "${files[@]}" )
+    [[ ${#files[@]} -gt 3 ]] || returnError 'Something went wrong during recompression.'
 
-    case "$tarPath" in
-        *.tar.bz2|*.tbz2)
-            tbz2Path=$tarPath
-            tarPath=$( mktemp --suffix='.tar' )
-            TMP_FILES_TO_CLEANUP+=( "$tarPath" )
-            bzip2 --keep --stdout --decompress -- "$tbz2Path" > "$tarPath"
-            ;;
-        *.tar.gz|*.tgz)
-            tgzPath=$tarPath
-            tarPath=$( mktemp --suffix='.tar' )
-            TMP_FILES_TO_CLEANUP+=( "$tarPath" )
-            gzip --keep --stdout --decompress -- "$tgzPath" > "$tarPath"
-            ;;
-        *.tar.xz|*.txz)
-            txzPath=$tarPath
-            tarPath=$( mktemp --suffix='.tar' )
-            TMP_FILES_TO_CLEANUP+=( "$tarPath" )
-            pixz -d "$txzPath" "$tarPath"
-            ;;
-        *.tar.zst|*.tzst)
-            tzstPath=$tarPath
-            tarPath=$( mktemp --suffix='.tar' )
-            TMP_FILES_TO_CLEANUP+=( "$tarPath" )
-            zstd --keep --stdout --decompress -- "$tzstPath" > "$tarPath"
-            ;;
-        *.bz2|*.gz|*.xz|*.zst)
-            isSingleArchive=1
-            ;;
-    esac
-
-    if [[ -z "$tbz2Path" && "$isSingleArchive" -ne 1 ]]; then
-        tbz2Path=$( mktemp --suffix='.tar.bz2' )
-        TMP_FILES_TO_CLEANUP+=( "$tbz2Path" )
-        bzip2 --keep --stdout "$tarPath" > "$tbz2Path"
-    fi
-
-    if [[ -z "$tgzPath" && "$isSingleArchive" -ne 1 ]]; then
-        tgzPath=$( mktemp --suffix='.tar.gz' )
-        TMP_FILES_TO_CLEANUP+=( "$tgzPath" )
-        gzip --keep --stdout "$tarPath" > "$tgzPath"
-    fi
-
-    if [[ -z "$txzPath" && "$isSingleArchive" -ne 1 ]]; then
-        txzPath=$( mktemp --suffix='.tar.xz' )
-        TMP_FILES_TO_CLEANUP+=( "$txzPath" )
-        pixz "$tarPath" "$txzPath"
-    fi
-
-    if [[ -z "$tzstPath" && "$isSingleArchive" -ne 1 ]]; then
-        tzstPath=$( mktemp --suffix='.tar.zst' )
-        TMP_FILES_TO_CLEANUP+=( "$tzstPath" )
-        # Use block size < 10kiB in order to get multiframe zst files for all test TARs no matter how small
-        createMultiFrameZstd $(( 8*1024 )) < "$tarPath" > "$tzstPath"
-        [ -s "$tzstPath" ] || returnError 'Something wen wrong during compression!'
-    fi
-
-    TMP_FILES_TO_CLEANUP+=(
-        "${tarPath}.index.sqlite"
-        "${tbz2Path}.index.sqlite"
-        "${tgzPath}.index.sqlite"
-        "${txzPath}.index.sqlite"
-        "${tzstPath}.index.sqlite"
-    )
-
-    checkFileInTAR "$tarPath" "$fileName" "$checksum"
-    if [[ -f "$tbz2Path" ]]; then checkFileInTAR "$tbz2Path" "$fileName" "$checksum"; fi
-    if [[ -f "$tgzPath"  ]]; then checkFileInTAR "$tgzPath"  "$fileName" "$checksum"; fi
-    if [[ -f "$txzPath"  ]]; then checkFileInTAR "$txzPath"  "$fileName" "$checksum"; fi
-    if [[ -f "$tzstPath" ]]; then checkFileInTAR "$tzstPath" "$fileName" "$checksum"; fi
-
-    for tmpFile in "${TMP_FILES_TO_CLEANUP[@]}"; do
-        command rm -f -- "$tmpFile"
-    done
-    TMP_FILES_TO_CLEANUP=()
+    for file in "${files[@]}"; do
+        case "$( file --mime-type -- "$file" | sed 's|.*[/-]||' )" in
+            bzip2|gzip|xz|zstd|tar)
+                TMP_FILES_TO_CLEANUP+=( "${file}.index.sqlite" )
+                checkFileInTAR "$file" "$fileName" "$checksum"
+                ;;
+        esac
+        (( ++nFiles ))
+    done < <( recompressFile "$tarPath" )
+    cleanup
+    rmdir -- "$( dirname -- "$file" )"
 done
 
 checkFileInTARPrefix '' tests/single-nested-file.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
