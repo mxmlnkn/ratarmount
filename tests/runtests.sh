@@ -163,7 +163,9 @@ checkFileInTAR()
 
     rmdir "$mountFolder"
 
-    echoerr "[${FUNCNAME[0]}] Tested succesfully '$fileInTar' in '$archive' for checksum $correctChecksum"
+    local duration
+    duration=$(( $( date +%s ) - startTime ))
+    echoerr "Tested successfully '$fileInTar' in '$archive' for checksum $correctChecksum in ${duration}s"
 
     return 0
 }
@@ -192,7 +194,7 @@ checkFileInTARPrefix()
 
     rmdir "$mountFolder"
 
-    echoerr "[${FUNCNAME[0]}] Tested succesfully '$fileInTar' in '$archive' for checksum $correctChecksum"
+    echoerr "[${FUNCNAME[0]}] Tested successfully '$fileInTar' in '$archive' for checksum $correctChecksum"
 
     return 0
 }
@@ -223,7 +225,7 @@ checkLinkInTAR()
 
     rmdir "$mountFolder"
 
-    echoerr "[${FUNCNAME[0]}] Tested succesfully '$fileInTar' in '$archive' for link target $correctLinkTarget"
+    echoerr "[${FUNCNAME[0]}] Tested successfully '$fileInTar' in '$archive' for link target $correctLinkTarget"
 
     return 0
 }
@@ -591,7 +593,7 @@ checkTarEncoding()
 
     rmdir "$mountFolder"
 
-    echoerr "[${FUNCNAME[0]}] Tested succesfully '$fileInTar' in '$archive' for encoding $encoding"
+    echoerr "[${FUNCNAME[0]}] Tested successfully '$fileInTar' in '$archive' for encoding $encoding"
 
     return 0
 }
@@ -773,4 +775,4 @@ checkUnionMountFileVersions || returnError 'Union mount file version access test
 rm -f tests/*.index.*
 rmdir tests/*/
 
-echo -e '\e[32mAll tests ran succesfully.\e[0m'
+echo -e '\e[32mAll tests ran successfully.\e[0m'
