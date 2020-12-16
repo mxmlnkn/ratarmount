@@ -1351,6 +1351,7 @@ class SQLiteIndexedTar:
                     gzindex = tempfile.mkstemp(dir=tmpDir)[1]
                     with open(gzindex, 'wb') as file:
                         file.write(db.execute('SELECT data FROM gzipindex').fetchone()[0])
+                    break
                 except Exception:
                     try:
                         if gzindex:
@@ -1361,6 +1362,7 @@ class SQLiteIndexedTar:
 
             try:
                 fileObject.import_index(filename=gzindex)
+                os.remove(gzindex)
                 return
             except Exception:
                 pass
@@ -1387,6 +1389,7 @@ class SQLiteIndexedTar:
                 gzindex = tempfile.mkstemp(dir=tmpDir)[1]
                 try:
                     fileObject.export_index(filename=gzindex)
+                    break
                 except indexed_gzip.ZranError:
                     try:
                         os.remove(gzindex)

@@ -8,6 +8,25 @@ if [[ -z "$RATARMOUNT_CMD" ]]; then
     export RATARMOUNT_CMD
 fi
 
+TMP_FILES_TO_CLEANUP=()
+MOUNT_POINTS_TO_CLEANUP=()
+cleanup()
+{
+    sleep 0.2s # Give a bit of time for the mount points to become stable before trying to unmount them
+    for folder in "${MOUNT_POINTS_TO_CLEANUP[@]}"; do
+        if [[ -d "$folder" ]]; then funmount -- "$folder"; fi
+        if [[ -d "$folder" ]]; then rmdir -- "$folder"; fi
+    done
+    MOUNT_POINTS_TO_CLEANUP=()
+
+    for file in "${TMP_FILES_TO_CLEANUP[@]}"; do
+        'rm' -f -- "$file"
+    done
+    TMP_FILES_TO_CLEANUP=()
+}
+
+trap 'cleanup' EXIT
+
 echoerr() { echo "$@" 1>&2; }
 
 createMultiFrameZstd()
@@ -102,7 +121,7 @@ returnError()
 
 runAndCheckRatarmount()
 {
-    trap "funmount ${*: -1}" EXIT
+    MOUNT_POINTS_TO_CLEANUP+=( "${*: -1}" )
     $RATARMOUNT_CMD "$@" >ratarmount.stdout.log 2>ratarmount.stderr.log &&
     checkStat "${@: -1}" # mount folder must exist and be stat-able after mounting
 }
@@ -113,8 +132,12 @@ checkFileInTAR()
     local fileInTar="$1"; shift
     local correctChecksum="$1"
 
+    local startTime
+    startTime=$( date +%s )
+
     local mountFolder
     mountFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # try with index recreation
     local args=( -c --ignore-zeros --recursive "$archive" "$mountFolder" )
@@ -154,6 +177,7 @@ checkFileInTARPrefix()
 
     local mountFolder
     mountFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # try with index recreation
     local args=( -c --ignore-zeros --recursive --prefix "$prefix" "$archive" "$mountFolder" )
@@ -181,6 +205,7 @@ checkLinkInTAR()
 
     local mountFolder
     mountFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # try with index recreation
     local args=( -c --recursive "$archive" "$mountFolder" )
@@ -294,10 +319,7 @@ testLargeTar()
     # clear up mount folder if already in use
     local mountFolder
     mountFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
-    if mountpoint "$mountFolder" &>/dev/null; then
-        fusermount -u "$mountFolder"
-        while mountpoint "$mountFolder" &>/dev/null; do sleep 0.2s; done
-    fi
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # benchmark creating the index
 
@@ -378,7 +400,8 @@ benchmarkSerialization()
 
 checkAutomaticIndexRecreation()
 (
-    cd -- "$( mktemp -d )" || returnError 'Failed to create temporary directory'
+    tmpFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
+    cd -- "$tmpFolder" || returnError 'Failed to cd into temporary directory'
 
     archive='momo.tar'
     mountFolder='momo'
@@ -436,12 +459,16 @@ checkAutomaticIndexRecreation()
     funmount "$mountFolder"
     [[ $lastModification -ne $( stat -c %Y -- "$indexFile" ) ]] || \
         returnError 'Index did not change even though TAR filesize did!'
+
+    cd .. || returnError 'Could not cd to parent in order to clean up!'
+    rm -rf -- "$tmpFolder"
 )
 
 checkUnionMount()
 (
     testsFolder="$( pwd )/tests"
-    cd -- "$( mktemp -d )" || returnError 'Failed to create temporary directory'
+    tmpFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
+    cd -- "$tmpFolder" || returnError 'Failed to cd into temporary directory'
     keyString='EXTRACTED VERSION'
 
     tarFiles=( 'hardlink' 'nested-symlinks' 'single-nested-file' 'symlinks' )
@@ -465,7 +492,7 @@ checkUnionMount()
         # Check that bind mount onto the mount point works
         $RATARMOUNT_CMD "$tarFile" "$tarFile"
         [[ $( find "$tarFile" -mindepth 1 | wc -l ) -gt 0 ]] || returnError 'Bind mounted folder is empty!'
-        funmount "$mountPoint"
+        funmount "$tarFile"
 
         # Check whether updating a folder with a TAR works
         $RATARMOUNT_CMD "$tarFile" "$testsFolder/$tarFile.tar" "$mountPoint"
@@ -481,12 +508,17 @@ checkUnionMount()
         [[ $keyNotContainingFiles -eq 0 ]] || returnError 'Found files from TAR even though it was updated with a folder!'
         funmount "$mountPoint"
     done
+
+    rmdir -- "$mountPoint"
+    cd .. || returnError 'Could not cd to parent in order to clean up!'
+    rm -rf -- "$tmpFolder"
 )
 
 checkUnionMountFileVersions()
 (
     testsFolder="$( pwd )/tests"
-    cd -- "$( mktemp -d )" || returnError 'Failed to create temporary directory'
+    tmpFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
+    cd -- "$tmpFolder" || returnError 'Failed to cd into temporary directory'
 
     tarFiles=( 'updated-file.tar' )
 
@@ -511,12 +543,15 @@ checkUnionMountFileVersions()
         || returnError "File check failed"
 
     funmount mountPoint
+    cd .. || returnError 'Could not cd to parent in order to clean up!'
+    rm -rf -- "$tmpFolder"
 )
 
 checkAutoMountPointCreation()
 (
     testsFolder="$( pwd )/tests"
-    cd -- "$( mktemp -d )" || returnError 'Failed to create temporary directory'
+    tmpFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
+    cd -- "$tmpFolder" || returnError 'Failed to cd into temporary directory'
 
     cp "$testsFolder/single-nested-file.tar" .
     $RATARMOUNT_CMD -- *.tar
@@ -526,6 +561,9 @@ checkAutoMountPointCreation()
     funmount 'single-nested-file'
     sleep 1s
     [[ ! -d 'single-nested-file' ]] || returnError 'Automatically created mount point was not removed after unmount!'
+
+    cd .. || returnError 'Could not cd to parent in order to clean up!'
+    rm -rf -- "$tmpFolder"
 )
 
 
@@ -538,6 +576,7 @@ checkTarEncoding()
 
     local mountFolder
     mountFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # try with index recreation
     local args=( -c --encoding "$encoding" --recursive "$archive" "$mountFolder" )
@@ -574,7 +613,7 @@ if [[ -z "$CI" ]]; then
     pytype -d import-error ratarmount.py || returnError 'Pytype failed!'
     black -q --line-length 120 --skip-string-normalization ratarmount.py
 
-    shellcheck -e SC2064 tests/*.sh || returnError 'shellcheck failed!'
+    shellcheck tests/*.sh || returnError 'shellcheck failed!'
 fi
 
 
@@ -638,7 +677,6 @@ for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
     tarPath=${tests[iTest+1]}
     fileName=${tests[iTest+2]}
 
-    toCleanUp=()
     tbz2Path=
     tgzPath=
     txzPath=
@@ -649,25 +687,25 @@ for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
         *.tar.bz2|*.tbz2)
             tbz2Path=$tarPath
             tarPath=$( mktemp --suffix='.tar' )
-            toCleanUp+=( "$tarPath" )
+            TMP_FILES_TO_CLEANUP+=( "$tarPath" )
             bzip2 --keep --stdout --decompress -- "$tbz2Path" > "$tarPath"
             ;;
         *.tar.gz|*.tgz)
             tgzPath=$tarPath
             tarPath=$( mktemp --suffix='.tar' )
-            toCleanUp+=( "$tarPath" )
+            TMP_FILES_TO_CLEANUP+=( "$tarPath" )
             gzip --keep --stdout --decompress -- "$tgzPath" > "$tarPath"
             ;;
         *.tar.xz|*.txz)
             txzPath=$tarPath
             tarPath=$( mktemp --suffix='.tar' )
-            toCleanUp+=( "$tarPath" )
+            TMP_FILES_TO_CLEANUP+=( "$tarPath" )
             pixz -d "$txzPath" "$tarPath"
             ;;
         *.tar.zst|*.tzst)
             tzstPath=$tarPath
             tarPath=$( mktemp --suffix='.tar' )
-            toCleanUp+=( "$tarPath" )
+            TMP_FILES_TO_CLEANUP+=( "$tarPath" )
             zstd --keep --stdout --decompress -- "$tzstPath" > "$tarPath"
             ;;
         *.bz2|*.gz|*.xz|*.zst)
@@ -677,29 +715,37 @@ for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
 
     if [[ -z "$tbz2Path" && "$isSingleArchive" -ne 1 ]]; then
         tbz2Path=$( mktemp --suffix='.tar.bz2' )
-        toCleanUp+=( "$tbz2Path" )
+        TMP_FILES_TO_CLEANUP+=( "$tbz2Path" )
         bzip2 --keep --stdout "$tarPath" > "$tbz2Path"
     fi
 
     if [[ -z "$tgzPath" && "$isSingleArchive" -ne 1 ]]; then
         tgzPath=$( mktemp --suffix='.tar.gz' )
-        toCleanUp+=( "$tgzPath" )
+        TMP_FILES_TO_CLEANUP+=( "$tgzPath" )
         gzip --keep --stdout "$tarPath" > "$tgzPath"
     fi
 
     if [[ -z "$txzPath" && "$isSingleArchive" -ne 1 ]]; then
         txzPath=$( mktemp --suffix='.tar.xz' )
-        toCleanUp+=( "$txzPath" )
+        TMP_FILES_TO_CLEANUP+=( "$txzPath" )
         pixz "$tarPath" "$txzPath"
     fi
 
     if [[ -z "$tzstPath" && "$isSingleArchive" -ne 1 ]]; then
         tzstPath=$( mktemp --suffix='.tar.zst' )
-        toCleanUp+=( "$tzstPath" )
+        TMP_FILES_TO_CLEANUP+=( "$tzstPath" )
         # Use block size < 10kiB in order to get multiframe zst files for all test TARs no matter how small
         createMultiFrameZstd $(( 8*1024 )) < "$tarPath" > "$tzstPath"
         [ -s "$tzstPath" ] || returnError 'Something wen wrong during compression!'
     fi
+
+    TMP_FILES_TO_CLEANUP+=(
+        "${tarPath}.index.sqlite"
+        "${tbz2Path}.index.sqlite"
+        "${tgzPath}.index.sqlite"
+        "${txzPath}.index.sqlite"
+        "${tzstPath}.index.sqlite"
+    )
 
     checkFileInTAR "$tarPath" "$fileName" "$checksum"
     if [[ -f "$tbz2Path" ]]; then checkFileInTAR "$tbz2Path" "$fileName" "$checksum"; fi
@@ -707,9 +753,10 @@ for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
     if [[ -f "$txzPath"  ]]; then checkFileInTAR "$txzPath"  "$fileName" "$checksum"; fi
     if [[ -f "$tzstPath" ]]; then checkFileInTAR "$tzstPath" "$fileName" "$checksum"; fi
 
-    for tmpFile in "${toCleanUp[@]}"; do
-        command rm -- "$tmpFile"
+    for tmpFile in "${TMP_FILES_TO_CLEANUP[@]}"; do
+        command rm -f -- "$tmpFile"
     done
+    TMP_FILES_TO_CLEANUP=()
 done
 
 checkFileInTARPrefix '' tests/single-nested-file.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
