@@ -124,6 +124,8 @@ runAndCheckRatarmount()
     MOUNT_POINTS_TO_CLEANUP+=( "${*: -1}" )
     $RATARMOUNT_CMD "$@" >ratarmount.stdout.log 2>ratarmount.stderr.log &&
     checkStat "${@: -1}" # mount folder must exist and be stat-able after mounting
+    ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
+        returnError "Found warnings while executing: $RATARMOUNT_CMD $*"
 }
 
 checkFileInTAR()
@@ -147,8 +149,6 @@ checkFileInTAR()
         verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
     } || returnError "$RATARMOUNT_CMD ${args[*]}"
     funmount "$mountFolder"
-    ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "Found warnings while executing: $RATARMOUNT_CMD ${args[*]}"
 
     # retry without forcing index recreation
     local args=( --ignore-zeros --recursive "$archive" "$mountFolder" )
@@ -158,8 +158,6 @@ checkFileInTAR()
         verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
     } || returnError "$RATARMOUNT_CMD ${args[*]}"
     funmount "$mountFolder"
-    ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "Found warnings while executing: $RATARMOUNT_CMD ${args[*]}"
 
     rmdir "$mountFolder"
 
@@ -189,8 +187,6 @@ checkFileInTARPrefix()
         verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
     } || returnError "$RATARMOUNT_CMD ${args[*]}"
     funmount "$mountFolder"
-    ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "Found warnings while executing: $RATARMOUNT_CMD ${args[*]}"
 
     rmdir "$mountFolder"
 
@@ -220,8 +216,6 @@ checkLinkInTAR()
         returnError "$RATARMOUNT_CMD ${args[*]}"
     fi
     funmount "$mountFolder"
-    ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "Found warnings while executing: $RATARMOUNT_CMD ${args[*]}"
 
     rmdir "$mountFolder"
 
@@ -414,7 +408,9 @@ checkAutomaticIndexRecreation()
     tar -cf "$archive" "$fileName"
 
     # 1. Check and create index
-    $RATARMOUNT_CMD "$archive"
+    $RATARMOUNT_CMD "$archive" >ratarmount.stdout.log 2>ratarmount.stderr.log
+    ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
+        returnError "Found warnings while executing: $RATARMOUNT_CMD $archive"
     diff -- "$fileName" "$mountFolder/$fileName" || returnError 'Files differ on simple mount!'
     funmount "$mountFolder"
 
@@ -423,7 +419,9 @@ checkAutomaticIndexRecreation()
     indexFile='momo.tar.index.sqlite'
     [[ -f $indexFile ]] || returnError 'Index file not found!'
     lastModification=$( stat -c %Y -- "$indexFile" )
-    $RATARMOUNT_CMD "$archive"
+    $RATARMOUNT_CMD "$archive" >ratarmount.stdout.log 2>ratarmount.stderr.log
+    ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
+        returnError "Found warnings while executing: $RATARMOUNT_CMD $archive"
     diff -- "$fileName" "$mountFolder/$fileName" || returnError 'Files differ on simple remount!'
     funmount "$mountFolder"
     [[ $lastModification -eq $( stat -c %Y -- "$indexFile" ) ]] || returnError 'Index changed even though TAR did not!'
@@ -437,11 +435,16 @@ checkAutomaticIndexRecreation()
 
     # modification timestamp detection is turned off for now by default to facilitate index sharing because
     # the mtime check can proove problematic as the mtime changes when downloading a file.
-    $RATARMOUNT_CMD "$archive"
-    diff -- "$fileName" "$mountFolder/${fileName}" && returnError 'Index should not have been recreated!'
+    $RATARMOUNT_CMD "$archive" >ratarmount.stdout.log 2>ratarmount.stderr.log
+    ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
+        returnError "Found warnings while executing: $RATARMOUNT_CMD $archive"
+    ! [[ -f "$mountFolder/${fileName}" ]] ||
+        returnError 'Index should not have been recreated and therefore contain outdated file name!'
     funmount "$mountFolder"
 
-    $RATARMOUNT_CMD --verify-mtime "$archive"
+    $RATARMOUNT_CMD --verify-mtime "$archive" >ratarmount.stdout.log 2>ratarmount.stderr.log
+    'grep' -Eqi 'warn' ratarmount.stdout.log ratarmount.stderr.log ||
+        returnError "Found no warnings while executing: $RATARMOUNT_CMD --verify-mtime $archive"
     diff -- "$fileName" "$mountFolder/${fileName}" || returnError 'Files differ when trying to trigger index recreation!'
     funmount "$mountFolder"
 
@@ -456,7 +459,9 @@ checkAutomaticIndexRecreation()
     tar -cf "$archive" "$fileName"
     touch -d "@$lastModification" "$archive"
 
-    $RATARMOUNT_CMD "$archive"
+    $RATARMOUNT_CMD "$archive" >ratarmount.stdout.log 2>ratarmount.stderr.log
+    'grep' -Eqi 'warn' ratarmount.stdout.log ratarmount.stderr.log ||
+        returnError "Found no warnings while executing: $RATARMOUNT_CMD $archive"
     diff -- "$fileName" "$mountFolder/${fileName}" || returnError 'Files differ!'
     funmount "$mountFolder"
     [[ $lastModification -ne $( stat -c %Y -- "$indexFile" ) ]] || \
@@ -464,6 +469,8 @@ checkAutomaticIndexRecreation()
 
     cd .. || returnError 'Could not cd to parent in order to clean up!'
     rm -rf -- "$tmpFolder"
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully"
 )
 
 checkUnionMount()
@@ -479,7 +486,7 @@ checkUnionMount()
     (
         mkdir "$tarFile" &&
         cd -- "$_" &&
-        tar -xf "$testsFolder/$tarFile.tar" &&
+        tar -xf "$testsFolder/$tarFile.tar" 2>/dev/null &&
         find . -type f -execdir bash -c 'echo "$1" >> "$0"' {} "$keyString" \;
     )
     done
@@ -487,24 +494,24 @@ checkUnionMount()
     mountPoint=$( mktemp -d )
     for tarFile in "${tarFiles[@]}"; do
         # Check whether a simple bind mount works, which is now an officially supported perversion of ratarmount
-        $RATARMOUNT_CMD "$tarFile" "$mountPoint"
+        runAndCheckRatarmount -c "$tarFile" "$mountPoint"
         diff -r --no-dereference "$tarFile" "$mountPoint" || returnError 'Bind mounted folder differs!'
         funmount "$mountPoint"
 
         # Check that bind mount onto the mount point works
-        $RATARMOUNT_CMD "$tarFile" "$tarFile"
+        runAndCheckRatarmount -c "$tarFile" "$tarFile"
         [[ $( find "$tarFile" -mindepth 1 | wc -l ) -gt 0 ]] || returnError 'Bind mounted folder is empty!'
         funmount "$tarFile"
 
         # Check whether updating a folder with a TAR works
-        $RATARMOUNT_CMD "$tarFile" "$testsFolder/$tarFile.tar" "$mountPoint"
+        runAndCheckRatarmount -c "$tarFile" "$testsFolder/$tarFile.tar" "$mountPoint"
         keyContainingFiles=$( find "$mountPoint" -type f -execdir bash -c '
             if command grep -q "$1" "$0"; then printf "%s\n" "$0"; fi' {} "$keyString" \; | wc -l )
         [[ $keyContainingFiles -eq 0 ]] || returnError 'Found file from updated folder even though all files are updated!'
         funmount "$mountPoint"
 
         # Check whether updating a TAR with a folder works
-        $RATARMOUNT_CMD "$testsFolder/$tarFile.tar" "$tarFile" "$mountPoint"
+        runAndCheckRatarmount -c "$testsFolder/$tarFile.tar" "$tarFile" "$mountPoint"
         keyNotContainingFiles=$( find "$mountPoint" -type f -execdir bash -c '
             if ! command grep -q "$1" "$0"; then printf "%s\n" "$0"; fi' {} "$keyString" \; | wc -l )
         [[ $keyNotContainingFiles -eq 0 ]] || returnError 'Found files from TAR even though it was updated with a folder!'
@@ -513,7 +520,9 @@ checkUnionMount()
 
     rmdir -- "$mountPoint"
     cd .. || returnError 'Could not cd to parent in order to clean up!'
-    rm -rf -- "$tmpFolder"
+    rm -rf -- "$tmpFolder" || returnError 'Something went wrong. Should have been able to clean up!'
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully"
 )
 
 checkUnionMountFileVersions()
@@ -528,7 +537,7 @@ checkUnionMountFileVersions()
     echo 'untarred' > folder/foo/fighter/ufo
     mkdir emptyFolder
 
-    $RATARMOUNT_CMD emptyFolder folder "$testsFolder/updated-file.tar" emptyFolder folder mountPoint
+    runAndCheckRatarmount -c emptyFolder folder "$testsFolder/updated-file.tar" emptyFolder folder mountPoint
 
     untarredFileMd5=$( md5sum folder/foo/fighter/ufo 2>/dev/null | sed 's| .*||' )
     verifyCheckSum mountPoint foo/fighter/ufo updated-file.tar "$untarredFileMd5" \
@@ -546,7 +555,9 @@ checkUnionMountFileVersions()
 
     funmount mountPoint
     cd .. || returnError 'Could not cd to parent in order to clean up!'
-    rm -rf -- "$tmpFolder"
+    rm -rf -- "$tmpFolder" || returnError 'Something went wrong. Should have been able to clean up!'
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully"
 )
 
 checkAutoMountPointCreation()
@@ -556,7 +567,9 @@ checkAutoMountPointCreation()
     cd -- "$tmpFolder" || returnError 'Failed to cd into temporary directory'
 
     cp "$testsFolder/single-nested-file.tar" .
-    $RATARMOUNT_CMD -- *.tar
+    $RATARMOUNT_CMD -- *.tar >ratarmount.stdout.log 2>ratarmount.stderr.log
+    ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
+        returnError "Found warnings while executing: $RATARMOUNT_CMD -- *.tar"
     command grep -q 'iriya' single-nested-file/foo/fighter/ufo ||
     returnError 'Check for auto mount point creation failed!'
 
@@ -565,7 +578,9 @@ checkAutoMountPointCreation()
     [[ ! -d 'single-nested-file' ]] || returnError 'Automatically created mount point was not removed after unmount!'
 
     cd .. || returnError 'Could not cd to parent in order to clean up!'
-    rm -rf -- "$tmpFolder"
+    rm -rf -- "$tmpFolder" || returnError 'Something went wrong. Should have been able to clean up!'
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully"
 )
 
 
@@ -588,8 +603,6 @@ checkTarEncoding()
         verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
     } || returnError "$RATARMOUNT_CMD ${args[*]}"
     funmount "$mountFolder"
-    ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "Found warnings while executing: $RATARMOUNT_CMD ${args[*]}"
 
     rmdir "$mountFolder"
 
@@ -784,6 +797,15 @@ checkTarEncoding tests/special-char.tar latin1 'Datei-mit-dämlicher-Kodierung.t
 checkLinkInTAR tests/symlinks.tar foo ../foo
 checkLinkInTAR tests/symlinks.tar python /usr/bin/python
 
+checkFileInTARPrefix '' tests/single-nested-file.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
+checkFileInTARPrefix foo tests/single-nested-file.tar fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
+checkFileInTARPrefix foo/fighter tests/single-nested-file.tar ufo 2709a3348eb2c52302a7606ecf5860bc
+
+checkAutomaticIndexRecreation || returnError 'Automatic index recreation test failed!'
+checkAutoMountPointCreation || returnError 'Automatic mount point creation test failed!'
+checkUnionMount || returnError 'Union mounting test failed!'
+checkUnionMountFileVersions || returnError 'Union mount file version access test failed!'
+
 for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
     checksum=${tests[iTest]}
     tarPath=${tests[iTest+1]}
@@ -805,15 +827,6 @@ for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
     cleanup
     rmdir -- "$( dirname -- "$file" )"
 done
-
-checkFileInTARPrefix '' tests/single-nested-file.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
-checkFileInTARPrefix foo tests/single-nested-file.tar fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
-checkFileInTARPrefix foo/fighter tests/single-nested-file.tar ufo 2709a3348eb2c52302a7606ecf5860bc
-
-checkAutomaticIndexRecreation || returnError 'Automatic index recreation test failed!'
-checkAutoMountPointCreation || returnError 'Automatic mount point creation test failed!'
-checkUnionMount || returnError 'Union mounting test failed!'
-checkUnionMountFileVersions || returnError 'Union mount file version access test failed!'
 
 benchmarkDecoderBackends
 #benchmarkSerialization # takes quite long, and a benchmark is not a test ...
