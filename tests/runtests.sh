@@ -678,6 +678,37 @@ recompressFile()
 }
 
 
+benchmarkDecoderBackends()
+{
+    local tmpFolder
+    while read -r file; do
+        TMP_FILES_TO_CLEANUP+=( "$file" )
+        tmpFolder=$( dirname -- "$file" )
+        compression=$( file --mime-type -- "$file" | sed 's|.*[/-]||;' )
+        if [[ "$compression" == tar ]]; then continue; fi
+
+        printf '% 5s : ' "$compression"
+        case "$compression" in
+            bzip2)
+                python3 -m timeit 'from indexed_bzip2 import IndexedBzip2File as IBF; IBF( '"'$file'"' ).read();'
+                ;;
+            gzip)
+                python3 -m timeit 'from indexed_gzip import IndexedGzipFile as IBF; IBF( '"'$file'"' ).read();'
+                ;;
+            xz)
+                python3 -m timeit 'import lzmaffi; lzmaffi.open( '"'$file'"' ).read();'
+                ;;
+            zstd)
+                python3 -m timeit 'from indexed_zstd import IndexedZstdFile as IBF; IBF( '"'$file'"' ).read();'
+                ;;
+        esac
+    done < <( recompressFile 'tests/2k-recursive-tars.tar.bz2' )
+
+    cleanup
+    rmdir -- "$tmpFolder"
+}
+
+
 checkTarEncoding tests/single-file.tar utf-8 bar d3b07384d113edec49eaa6238ad5ff00
 
 # Linting only to be done locally because in CI it is in separate steps
@@ -784,6 +815,7 @@ checkAutoMountPointCreation || returnError 'Automatic mount point creation test 
 checkUnionMount || returnError 'Union mounting test failed!'
 checkUnionMountFileVersions || returnError 'Union mount file version access test failed!'
 
+benchmarkDecoderBackends
 #benchmarkSerialization # takes quite long, and a benchmark is not a test ...
 
 rm -f tests/*.index.*
