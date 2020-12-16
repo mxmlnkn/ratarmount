@@ -337,8 +337,12 @@ class SQLiteIndexedTar:
             return
 
         self.tarFileName = os.path.abspath(tarFileName)
+        fileSize = None
         if not fileObject:
             fileObject = open(self.tarFileName, 'rb')
+            fileObject.seek(0, io.SEEK_END)
+            fileSize = fileObject.tell()
+            fileObject.seek(0)
 
         # rawFileObject : Only set when opening a compressed file and only kept to keep the
         #                 compressed file handle from being closed by the garbage collector.
@@ -351,7 +355,7 @@ class SQLiteIndexedTar:
 
         if self.compression == 'xz':
             try:
-                if len(self.tarFileObject.block_boundaries) <= 1:
+                if len(self.tarFileObject.block_boundaries) <= 1 and (fileSize is None or fileSize > 1024 * 1024):
                     print("[Warning] The specified file '{}'".format(self.tarFileName))
                     print("[Warning] is compressed using xz but only contains one xz block. This makes it ")
                     print("[Warning] impossible to use true seeking! Please (re)compress your TAR using pixz")
@@ -1867,6 +1871,7 @@ class TarFileType:
             raise argparse.ArgumentTypeError("File '{}' does not exist!".format(tarFile))
 
         with open(tarFile, 'rb') as fileobj:
+            fileSize = os.stat(tarFile).st_size
             compression = SQLiteIndexedTar._detectCompression(fileobj)
 
             try:
@@ -1876,7 +1881,7 @@ class TarFileType:
 
                 zstdFile = supportedCompressions[compression].open(fileobj)
 
-                if not zstdFile.is_multiframe():
+                if not zstdFile.is_multiframe() and fileSize > 1024 * 1024:
                     print("[Warning] The specified file '{}'".format(tarFile))
                     print("[Warning] is compressed using zstd but only contains one zstd frame. This makes it ")
                     print("[Warning] impossible to use true seeking! Please (re)compress your TAR using multiple ")
