@@ -726,9 +726,15 @@ class SQLiteIndexedTar:
                 # 4. Open contained TARs for recursive mounting
                 tarExtension = '.tar'
                 isTar = False
-                if self.mountRecursively and tarInfo.isfile() and tarInfo.name.endswith(tarExtension):
-                    if self.stripRecursiveTarExtension and len(tarExtension) > 0 and fullPath.endswith(tarExtension):
-                        fullPath = fullPath[: -len(tarExtension)]
+                if self.mountRecursively and tarInfo.isfile() and tarInfo.name.lower().endswith(tarExtension.lower()):
+                    if (
+                        self.stripRecursiveTarExtension
+                        and len(tarExtension) > 0
+                        and fullPath.lower().endswith(tarExtension.lower())
+                    ):
+                        modifiedFullPath = fullPath[: -len(tarExtension)]
+                    else:
+                        modifiedFullPath = fullPath
 
                     oldPos = fileObject.tell()
                     fileObject.seek(globalOffset)
@@ -740,7 +746,7 @@ class SQLiteIndexedTar:
                         # so we have to always communicate the offset of this chunk to the recursive call no matter
                         # whether tarfile has streaming access or seeking access!
                         tarFileObject = StenciledFile(fileObject, [(globalOffset, tarInfo.size)])
-                        self.createIndex(tarFileObject, progressBar, fullPath, globalOffset)
+                        self.createIndex(tarFileObject, progressBar, modifiedFullPath, globalOffset)
 
                         # if the TAR file contents could be read, we need to adjust the actual
                         # TAR file's metadata to be a directory instead of a file
@@ -752,6 +758,7 @@ class SQLiteIndexedTar:
                             | (stat.S_IXOTH if mode & stat.S_IROTH != 0 else 0)
                         )
                         isTar = True
+                        fullPath = modifiedFullPath
 
                     except tarfile.ReadError:
                         pass
