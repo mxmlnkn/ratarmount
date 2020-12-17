@@ -590,6 +590,54 @@ class SQLiteIndexedTar:
         )
         return sqlConnection
 
+    @staticmethod
+    def _initializeSqlDb(indexFileName: Optional[str]) -> sqlite3.Connection:
+        if printDebug >= 1:
+            print("Creating new SQLite index database at", indexFileName)
+
+        createTables = """
+            CREATE TABLE "files" (
+                "path"          VARCHAR(65535) NOT NULL,
+                "name"          VARCHAR(65535) NOT NULL,
+                "offsetheader"  INTEGER,  /* seek offset from TAR file where these file's contents resides */
+                "offset"        INTEGER,  /* seek offset from TAR file where these file's contents resides */
+                "size"          INTEGER,
+                "mtime"         INTEGER,
+                "mode"          INTEGER,
+                "type"          INTEGER,
+                "linkname"      VARCHAR(65535),
+                "uid"           INTEGER,
+                "gid"           INTEGER,
+                /* True for valid TAR files. Internally used to determine where to mount recursive TAR files. */
+                "istar"         BOOL   ,
+                "issparse"      BOOL   ,  /* for sparse files the file size refers to the expanded size! */
+                /* See SQL benchmarks for decision on the primary key.
+                 * See also https://www.sqlite.org/optoverview.html
+                 * (path,name) tuples might appear multiple times in a TAR if it got updated.
+                 * In order to also be able to show older versions, we need to add
+                 * the offsetheader column to the primary key. */
+                PRIMARY KEY (path,name,offsetheader)
+            );
+            /* "A table created using CREATE TABLE AS has no PRIMARY KEY and no constraints of any kind"
+             * Therefore, it will not be sorted and inserting will be faster! */
+            CREATE TABLE "filestmp" AS SELECT * FROM "files" WHERE 0;
+            CREATE TABLE "parentfolders" (
+                "path"     VARCHAR(65535) NOT NULL,
+                "name"     VARCHAR(65535) NOT NULL,
+                PRIMARY KEY (path,name)
+            );
+        """
+
+        sqlConnection = SQLiteIndexedTar._openSqlDb(indexFileName if indexFileName else ':memory:')
+        tables = sqlConnection.execute('SELECT name FROM sqlite_master WHERE type = "table";')
+        if {"files", "filestmp", "parentfolders"}.intersection({t[0] for t in tables}):
+            raise InvalidIndexError(
+                "The index file {} already seems to contain a table. "
+                "Please specify --recreate-index.".format(indexFileName)
+            )
+        sqlConnection.executescript(createTables)
+        return sqlConnection
+
     def _updateProgressBar(self, progressBar, fileobj: Any) -> None:
         try:
             if hasattr(fileobj, 'tell_compressed') and self.compression == 'bz2':
@@ -626,75 +674,27 @@ class SQLiteIndexedTar:
         # 1. If no SQL connection was given (by recursive call), open a new database file
         openedConnection = False
         if not self.indexIsLoaded() or not self.sqlConnection:
-            if printDebug >= 1:
-                print("Creating new SQLite index database at", self.indexFileName)
-
-            createTables = """
-                CREATE TABLE "files" (
-                    "path"          VARCHAR(65535) NOT NULL,
-                    "name"          VARCHAR(65535) NOT NULL,
-                    "offsetheader"  INTEGER,  /* seek offset from TAR file where these file's contents resides */
-                    "offset"        INTEGER,  /* seek offset from TAR file where these file's contents resides */
-                    "size"          INTEGER,
-                    "mtime"         INTEGER,
-                    "mode"          INTEGER,
-                    "type"          INTEGER,
-                    "linkname"      VARCHAR(65535),
-                    "uid"           INTEGER,
-                    "gid"           INTEGER,
-                    /* True for valid TAR files. Internally used to determine where to mount recursive TAR files. */
-                    "istar"         BOOL   ,
-                    "issparse"      BOOL   ,  /* for sparse files the file size refers to the expanded size! */
-                    /* See SQL benchmarks for decision on the primary key.
-                     * See also https://www.sqlite.org/optoverview.html
-                     * (path,name) tuples might appear multiple times in a TAR if it got updated.
-                     * In order to also be able to show older versions, we need to add
-                     * the offsetheader column to the primary key. */
-                    PRIMARY KEY (path,name,offsetheader)
-                );
-                /* "A table created using CREATE TABLE AS has no PRIMARY KEY and no constraints of any kind"
-                 * Therefore, it will not be sorted and inserting will be faster! */
-                CREATE TABLE "filestmp" AS SELECT * FROM "files" WHERE 0;
-                CREATE TABLE "parentfolders" (
-                    "path"     VARCHAR(65535) NOT NULL,
-                    "name"     VARCHAR(65535) NOT NULL,
-                    PRIMARY KEY (path,name)
-                );
-            """
-
             openedConnection = True
-            self.sqlConnection = self._openSqlDb(self.indexFileName if self.indexFileName else ':memory:')
-            tables = self.sqlConnection.execute('SELECT name FROM sqlite_master WHERE type = "table";')
-            if {"files", "filestmp", "parentfolders"}.intersection({t[0] for t in tables}):
-                raise InvalidIndexError(
-                    "The index file {} already seems to contain a table. "
-                    "Please specify --recreate-index.".format(self.indexFileName)
-                )
-            self.sqlConnection.executescript(createTables)
+            self.sqlConnection = self._initializeSqlDb(self.indexFileName)
 
         # 2. Open TAR file reader
         loadedTarFile: Any = []  # Feign an empty TAR file if anything goes wrong
-        try:
-            streamed = bool(self.compression)
-            # r: uses seeks to skip to the next file inside the TAR while r| doesn't do any seeks.
-            # r| might be slower but for compressed files we have to go over all the data once anyways
-            # and I had problems with seeks at this stage. Maybe they are gone now after the bz2 bugfix though.
-            # Note that with ignore_zeros = True, no invalid header issues or similar will be raised even for
-            # non TAR files!?
-            # Using r: is buggy because the bz2 readers tell() is buggy and returns the number of total decoded bytes.
-            # In seeking mode, tell() is used to initialize offset and offset_data so those are also bugged then!
-            # This has been fixed starting from indexed_bzip2 1.1.2.
-            if self.isTar:
+        if self.isTar:
+            try:
+                # r: uses seeks to skip to the next file inside the TAR while r| doesn't do any seeks.
+                # r| might be slower but for compressed files we have to go over all the data once anyways.
+                # Note that with ignore_zeros = True, no invalid header issues or similar will be raised even for
+                # non TAR files!?
                 loadedTarFile = tarfile.open(
                     # fmt:off
                     fileobj      = fileObject,
-                    mode         = 'r|' if streamed else 'r:',
+                    mode         = 'r|' if self.compression else 'r:',
                     ignore_zeros = self.ignoreZeros,
                     encoding     = self.encoding,
                     # fmt:on
                 )
-        except tarfile.ReadError:
-            pass
+            except tarfile.ReadError:
+                pass
 
         if progressBar is None:
             progressBar = ProgressBar(os.fstat(fileObject.fileno()).st_size)
