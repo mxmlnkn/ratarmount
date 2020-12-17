@@ -113,8 +113,15 @@ funmount()
 
 returnError()
 {
-    echoerr -e "\e[37m${FUNCNAME[*]}\e[0m"
-    echoerr -e "\e[37m$*\e[0m"
+    local lineNumber message
+    if [ $# -eq 2 ]; then
+        lineNumber=:$1
+        message=$2
+    else
+        message=$*
+    fi
+    echoerr -e "\e[37m${FUNCNAME[1]}$lineNumber <- ${FUNCNAME[*]:2}\e[0m"
+    echoerr -e "\e[37m$message\e[0m"
     echoerr -e '\e[31mTEST FAILED!\e[0m'
     exit 1
 }
@@ -125,7 +132,7 @@ runAndCheckRatarmount()
     $RATARMOUNT_CMD "$@" >ratarmount.stdout.log 2>ratarmount.stderr.log &&
     checkStat "${@: -1}" # mount folder must exist and be stat-able after mounting
     ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "Found warnings while executing: $RATARMOUNT_CMD $*"
+        returnError "$LINENO" "Found warnings while executing: $RATARMOUNT_CMD $*"
 }
 
 checkFileInTAR()
@@ -138,7 +145,7 @@ checkFileInTAR()
     startTime=$( date +%s )
 
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # try with index recreation
@@ -147,7 +154,7 @@ checkFileInTAR()
         runAndCheckRatarmount "${args[@]}" &&
         checkStat "$mountFolder/$fileInTar" &&
         verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
-    } || returnError "$RATARMOUNT_CMD ${args[*]}"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
     funmount "$mountFolder"
 
     # retry without forcing index recreation
@@ -156,7 +163,7 @@ checkFileInTAR()
         runAndCheckRatarmount "${args[@]}" &&
         checkStat "$mountFolder/$fileInTar" &&
         verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
-    } || returnError "$RATARMOUNT_CMD ${args[*]}"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
     funmount "$mountFolder"
 
     rmdir "$mountFolder"
@@ -176,7 +183,7 @@ checkFileInTARPrefix()
     local correctChecksum="$1"
 
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # try with index recreation
@@ -185,7 +192,7 @@ checkFileInTARPrefix()
         runAndCheckRatarmount "${args[@]}" &&
         checkStat "$mountFolder/$fileInTar" &&
         verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
-    } || returnError "$RATARMOUNT_CMD ${args[*]}"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
     funmount "$mountFolder"
 
     rmdir "$mountFolder"
@@ -202,7 +209,7 @@ checkLinkInTAR()
     local correctLinkTarget="$1"
 
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # try with index recreation
@@ -210,10 +217,10 @@ checkLinkInTAR()
     {
         runAndCheckRatarmount "${args[@]}" &&
         checkStat "$mountFolder/$fileInTar"
-    } || returnError "$RATARMOUNT_CMD ${args[*]}"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
     if [[ $( readlink -- "$mountFolder/$fileInTar" ) != "$correctLinkTarget" ]]; then
         echoerr -e "\e[37mLink target of '$fileInTar' in mounted TAR '$archive' does not match"'!\e[0m'
-        returnError "$RATARMOUNT_CMD ${args[*]}"
+        returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
     fi
     funmount "$mountFolder"
 
@@ -314,7 +321,7 @@ testLargeTar()
 
     # clear up mount folder if already in use
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # benchmark creating the index
@@ -396,8 +403,8 @@ benchmarkSerialization()
 
 checkAutomaticIndexRecreation()
 (
-    tmpFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
-    cd -- "$tmpFolder" || returnError 'Failed to cd into temporary directory'
+    tmpFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    cd -- "$tmpFolder" || returnError "$LINENO" 'Failed to cd into temporary directory'
 
     archive='momo.tar'
     mountFolder='momo'
@@ -410,21 +417,22 @@ checkAutomaticIndexRecreation()
     # 1. Check and create index
     $RATARMOUNT_CMD "$archive" >ratarmount.stdout.log 2>ratarmount.stderr.log
     ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "Found warnings while executing: $RATARMOUNT_CMD $archive"
-    diff -- "$fileName" "$mountFolder/$fileName" || returnError 'Files differ on simple mount!'
+        returnError "$LINENO" "Found warnings while executing: $RATARMOUNT_CMD $archive"
+    diff -- "$fileName" "$mountFolder/$fileName" || returnError "$LINENO" 'Files differ on simple mount!'
     funmount "$mountFolder"
 
     # 2. Check that index does not get recreated normally
     sleep 1 # because we are comparing timestamps with seconds precision ...
     indexFile='momo.tar.index.sqlite'
-    [[ -f $indexFile ]] || returnError 'Index file not found!'
+    [[ -f $indexFile ]] || returnError "$LINENO" 'Index file not found!'
     lastModification=$( stat -c %Y -- "$indexFile" )
     $RATARMOUNT_CMD "$archive" >ratarmount.stdout.log 2>ratarmount.stderr.log
     ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "Found warnings while executing: $RATARMOUNT_CMD $archive"
-    diff -- "$fileName" "$mountFolder/$fileName" || returnError 'Files differ on simple remount!'
+        returnError "$LINENO" "Found warnings while executing: $RATARMOUNT_CMD $archive"
+    diff -- "$fileName" "$mountFolder/$fileName" || returnError "$LINENO" 'Files differ on simple remount!'
     funmount "$mountFolder"
-    [[ $lastModification -eq $( stat -c %Y -- "$indexFile" ) ]] || returnError 'Index changed even though TAR did not!'
+    [[ $lastModification -eq $( stat -c %Y -- "$indexFile" ) ]] ||
+        returnError "$LINENO" 'Index changed even though TAR did not!'
 
     # 3. Change contents (and timestamp) without changing the size
     #    (Luckily TAR is filled to 10240 Bytes anyways for very small files)
@@ -437,19 +445,20 @@ checkAutomaticIndexRecreation()
     # the mtime check can proove problematic as the mtime changes when downloading a file.
     $RATARMOUNT_CMD "$archive" >ratarmount.stdout.log 2>ratarmount.stderr.log
     ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "Found warnings while executing: $RATARMOUNT_CMD $archive"
+        returnError "$LINENO" "Found warnings while executing: $RATARMOUNT_CMD $archive"
     ! [[ -f "$mountFolder/${fileName}" ]] ||
-        returnError 'Index should not have been recreated and therefore contain outdated file name!'
+        returnError "$LINENO" 'Index should not have been recreated and therefore contain outdated file name!'
     funmount "$mountFolder"
 
     $RATARMOUNT_CMD --verify-mtime "$archive" >ratarmount.stdout.log 2>ratarmount.stderr.log
     'grep' -Eqi 'warn' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "Found no warnings while executing: $RATARMOUNT_CMD --verify-mtime $archive"
-    diff -- "$fileName" "$mountFolder/${fileName}" || returnError 'Files differ when trying to trigger index recreation!'
+        returnError "$LINENO" "Found no warnings while executing: $RATARMOUNT_CMD --verify-mtime $archive"
+    diff -- "$fileName" "$mountFolder/${fileName}" ||
+        returnError "$LINENO" 'Files differ when trying to trigger index recreation!'
     funmount "$mountFolder"
 
     [[ $lastModification -ne $( stat -c %Y -- "$indexFile" ) ]] || \
-        returnError 'Index did not change even though TAR did!'
+        returnError "$LINENO" 'Index did not change even though TAR did!'
     lastModification=$( stat -c %Y -- "$indexFile" )
 
     # 4. Check that index changes if size changes but modification timestamp does not
@@ -461,13 +470,13 @@ checkAutomaticIndexRecreation()
 
     $RATARMOUNT_CMD "$archive" >ratarmount.stdout.log 2>ratarmount.stderr.log
     'grep' -Eqi 'warn' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "Found no warnings while executing: $RATARMOUNT_CMD $archive"
-    diff -- "$fileName" "$mountFolder/${fileName}" || returnError 'Files differ!'
+        returnError "$LINENO" "Found no warnings while executing: $RATARMOUNT_CMD $archive"
+    diff -- "$fileName" "$mountFolder/${fileName}" || returnError "$LINENO" 'Files differ!'
     funmount "$mountFolder"
     [[ $lastModification -ne $( stat -c %Y -- "$indexFile" ) ]] || \
-        returnError 'Index did not change even though TAR filesize did!'
+        returnError "$LINENO" 'Index did not change even though TAR filesize did!'
 
-    cd .. || returnError 'Could not cd to parent in order to clean up!'
+    cd .. || returnError "$LINENO" 'Could not cd to parent in order to clean up!'
     rm -rf -- "$tmpFolder"
 
     echoerr "[${FUNCNAME[0]}] Tested successfully"
@@ -476,8 +485,8 @@ checkAutomaticIndexRecreation()
 checkUnionMount()
 (
     testsFolder="$( pwd )/tests"
-    tmpFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
-    cd -- "$tmpFolder" || returnError 'Failed to cd into temporary directory'
+    tmpFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    cd -- "$tmpFolder" || returnError "$LINENO" 'Failed to cd into temporary directory'
     keyString='EXTRACTED VERSION'
 
     tarFiles=( 'hardlink' 'nested-symlinks' 'single-nested-file' 'symlinks' )
@@ -495,32 +504,34 @@ checkUnionMount()
     for tarFile in "${tarFiles[@]}"; do
         # Check whether a simple bind mount works, which is now an officially supported perversion of ratarmount
         runAndCheckRatarmount -c "$tarFile" "$mountPoint"
-        diff -r --no-dereference "$tarFile" "$mountPoint" || returnError 'Bind mounted folder differs!'
+        diff -r --no-dereference "$tarFile" "$mountPoint" || returnError "$LINENO" 'Bind mounted folder differs!'
         funmount "$mountPoint"
 
         # Check that bind mount onto the mount point works
         runAndCheckRatarmount -c "$tarFile" "$tarFile"
-        [[ $( find "$tarFile" -mindepth 1 | wc -l ) -gt 0 ]] || returnError 'Bind mounted folder is empty!'
+        [[ $( find "$tarFile" -mindepth 1 | wc -l ) -gt 0 ]] || returnError "$LINENO" 'Bind mounted folder is empty!'
         funmount "$tarFile"
 
         # Check whether updating a folder with a TAR works
         runAndCheckRatarmount -c "$tarFile" "$testsFolder/$tarFile.tar" "$mountPoint"
         keyContainingFiles=$( find "$mountPoint" -type f -execdir bash -c '
             if command grep -q "$1" "$0"; then printf "%s\n" "$0"; fi' {} "$keyString" \; | wc -l )
-        [[ $keyContainingFiles -eq 0 ]] || returnError 'Found file from updated folder even though all files are updated!'
+        [[ $keyContainingFiles -eq 0 ]] ||
+            returnError "$LINENO" 'Found file from updated folder even though all files are updated!'
         funmount "$mountPoint"
 
         # Check whether updating a TAR with a folder works
         runAndCheckRatarmount -c "$testsFolder/$tarFile.tar" "$tarFile" "$mountPoint"
         keyNotContainingFiles=$( find "$mountPoint" -type f -execdir bash -c '
             if ! command grep -q "$1" "$0"; then printf "%s\n" "$0"; fi' {} "$keyString" \; | wc -l )
-        [[ $keyNotContainingFiles -eq 0 ]] || returnError 'Found files from TAR even though it was updated with a folder!'
+        [[ $keyNotContainingFiles -eq 0 ]] ||
+            returnError "$LINENO" 'Found files from TAR even though it was updated with a folder!'
         funmount "$mountPoint"
     done
 
     rmdir -- "$mountPoint"
-    cd .. || returnError 'Could not cd to parent in order to clean up!'
-    rm -rf -- "$tmpFolder" || returnError 'Something went wrong. Should have been able to clean up!'
+    cd .. || returnError "$LINENO" 'Could not cd to parent in order to clean up!'
+    rm -rf -- "$tmpFolder" || returnError "$LINENO" 'Something went wrong. Should have been able to clean up!'
 
     echoerr "[${FUNCNAME[0]}] Tested successfully"
 )
@@ -528,8 +539,8 @@ checkUnionMount()
 checkUnionMountFileVersions()
 (
     testsFolder="$( pwd )/tests"
-    tmpFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
-    cd -- "$tmpFolder" || returnError 'Failed to cd into temporary directory'
+    tmpFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    cd -- "$tmpFolder" || returnError "$LINENO" 'Failed to cd into temporary directory'
 
     tarFiles=( 'updated-file.tar' )
 
@@ -541,21 +552,21 @@ checkUnionMountFileVersions()
 
     untarredFileMd5=$( md5sum folder/foo/fighter/ufo 2>/dev/null | sed 's| .*||' )
     verifyCheckSum mountPoint foo/fighter/ufo updated-file.tar "$untarredFileMd5" \
-        || returnError "File check failed"
+        || returnError "$LINENO" "File check failed"
     verifyCheckSum mountPoint foo/fighter/ufo.versions/1 "$( pwd )" "$untarredFileMd5" \
-        || returnError "File check failed"
+        || returnError "$LINENO" "File check failed"
     verifyCheckSum mountPoint foo/fighter/ufo.versions/2 "$( pwd )" 2709a3348eb2c52302a7606ecf5860bc \
-        || returnError "File check failed"
+        || returnError "$LINENO" "File check failed"
     verifyCheckSum mountPoint foo/fighter/ufo.versions/3 "$( pwd )" 9a12be5ebb21d497bd1024d159f2cc5f \
-        || returnError "File check failed"
+        || returnError "$LINENO" "File check failed"
     verifyCheckSum mountPoint foo/fighter/ufo.versions/4 "$( pwd )" b3de7534cbc8b8a7270c996235d0c2da \
-        || returnError "File check failed"
+        || returnError "$LINENO" "File check failed"
     verifyCheckSum mountPoint foo/fighter/ufo.versions/5 "$( pwd )" "$untarredFileMd5" \
-        || returnError "File check failed"
+        || returnError "$LINENO" "File check failed"
 
     funmount mountPoint
-    cd .. || returnError 'Could not cd to parent in order to clean up!'
-    rm -rf -- "$tmpFolder" || returnError 'Something went wrong. Should have been able to clean up!'
+    cd .. || returnError "$LINENO" 'Could not cd to parent in order to clean up!'
+    rm -rf -- "$tmpFolder" || returnError "$LINENO" 'Something went wrong. Should have been able to clean up!'
 
     echoerr "[${FUNCNAME[0]}] Tested successfully"
 )
@@ -563,22 +574,23 @@ checkUnionMountFileVersions()
 checkAutoMountPointCreation()
 (
     testsFolder="$( pwd )/tests"
-    tmpFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
-    cd -- "$tmpFolder" || returnError 'Failed to cd into temporary directory'
+    tmpFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    cd -- "$tmpFolder" || returnError "$LINENO" 'Failed to cd into temporary directory'
 
     cp "$testsFolder/single-nested-file.tar" .
     $RATARMOUNT_CMD -- *.tar >ratarmount.stdout.log 2>ratarmount.stderr.log
     ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "Found warnings while executing: $RATARMOUNT_CMD -- *.tar"
+        returnError "$LINENO" "Found warnings while executing: $RATARMOUNT_CMD -- *.tar"
     command grep -q 'iriya' single-nested-file/foo/fighter/ufo ||
-    returnError 'Check for auto mount point creation failed!'
+    returnError "$LINENO" 'Check for auto mount point creation failed!'
 
     funmount 'single-nested-file'
     sleep 1s
-    [[ ! -d 'single-nested-file' ]] || returnError 'Automatically created mount point was not removed after unmount!'
+    [[ ! -d 'single-nested-file' ]] ||
+        returnError "$LINENO" 'Automatically created mount point was not removed after unmount!'
 
-    cd .. || returnError 'Could not cd to parent in order to clean up!'
-    rm -rf -- "$tmpFolder" || returnError 'Something went wrong. Should have been able to clean up!'
+    cd .. || returnError "$LINENO" 'Could not cd to parent in order to clean up!'
+    rm -rf -- "$tmpFolder" || returnError "$LINENO" 'Something went wrong. Should have been able to clean up!'
 
     echoerr "[${FUNCNAME[0]}] Tested successfully"
 )
@@ -592,7 +604,7 @@ checkTarEncoding()
     local correctChecksum="$1"
 
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # try with index recreation
@@ -601,7 +613,7 @@ checkTarEncoding()
         runAndCheckRatarmount "${args[@]}" &&
         checkStat "$mountFolder/$fileInTar" &&
         verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
-    } || returnError "$RATARMOUNT_CMD ${args[*]}"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
     funmount "$mountFolder"
 
     rmdir "$mountFolder"
@@ -626,7 +638,7 @@ recompressFile()
 
     local uncompressedFile=
     uncompressedFile=${file%.*}
-    [[ "$uncompressedFile" != "$file" ]] || returnError 'Given file seems to have no extension!'
+    [[ "$uncompressedFile" != "$file" ]] || returnError "$LINENO" 'Given file seems to have no extension!'
 
     # 1. Extract if necessary
     local fileCompression
@@ -677,7 +689,7 @@ recompressFile()
         esac
 
         [ -s "$recompressedFile" ] ||
-            returnError "Something went wrong during ${compression} compression of ${uncompressedFile} into ${recompressedFile}."
+            returnError "$LINENO" "Something went wrong during ${compression} compression of ${uncompressedFile} into ${recompressedFile}."
     done
 
     if [[ "$( file --mime-type -- "$uncompressedFile" )" =~ tar$ ]]; then
@@ -734,15 +746,15 @@ if [[ -z "$CI" ]]; then
             exit 1
         fi
     fi
-    mypy ratarmount.py setup.py || returnError 'Mypy failed!'
-    pytype -d import-error ratarmount.py || returnError 'Pytype failed!'
+    mypy ratarmount.py setup.py || returnError "$LINENO" 'Mypy failed!'
+    pytype -d import-error ratarmount.py || returnError "$LINENO" 'Pytype failed!'
     black -q --line-length 120 --skip-string-normalization ratarmount.py
 
-    shellcheck tests/*.sh || returnError 'shellcheck failed!'
+    shellcheck tests/*.sh || returnError "$LINENO" 'shellcheck failed!'
 fi
 
 
-python3 tests/tests.py || returnError "tests/tests.py"
+python3 tests/tests.py || returnError "$LINENO" "tests/tests.py"
 
 
 rm -f tests/*.index.*
@@ -801,10 +813,10 @@ checkFileInTARPrefix '' tests/single-nested-file.tar foo/fighter/ufo 2709a3348eb
 checkFileInTARPrefix foo tests/single-nested-file.tar fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
 checkFileInTARPrefix foo/fighter tests/single-nested-file.tar ufo 2709a3348eb2c52302a7606ecf5860bc
 
-checkAutomaticIndexRecreation || returnError 'Automatic index recreation test failed!'
-checkAutoMountPointCreation || returnError 'Automatic mount point creation test failed!'
-checkUnionMount || returnError 'Union mounting test failed!'
-checkUnionMountFileVersions || returnError 'Union mount file version access test failed!'
+checkAutomaticIndexRecreation || returnError "$LINENO" 'Automatic index recreation test failed!'
+checkAutoMountPointCreation || returnError "$LINENO" 'Automatic mount point creation test failed!'
+checkUnionMount || returnError "$LINENO" 'Union mounting test failed!'
+checkUnionMountFileVersions || returnError "$LINENO" 'Union mount file version access test failed!'
 
 for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
     checksum=${tests[iTest]}
@@ -813,7 +825,7 @@ for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
 
     readarray -t files < <( recompressFile "$tarPath" )
     TMP_FILES_TO_CLEANUP+=( "${files[@]}" )
-    [[ ${#files[@]} -gt 3 ]] || returnError 'Something went wrong during recompression.'
+    [[ ${#files[@]} -gt 3 ]] || returnError "$LINENO" 'Something went wrong during recompression.'
 
     for file in "${files[@]}"; do
         case "$( file --mime-type -- "$file" | sed 's|.*[/-]||' )" in
