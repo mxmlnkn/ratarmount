@@ -20,7 +20,8 @@ cleanup()
     MOUNT_POINTS_TO_CLEANUP=()
 
     for file in "${TMP_FILES_TO_CLEANUP[@]}"; do
-        'rm' -f -- "$file"
+        if [ -d "$file" ]; then rmdir -- "$file"; fi
+        if [ -f "$file" ]; then rm -- "$file"; fi
     done
     TMP_FILES_TO_CLEANUP=()
 }
@@ -131,7 +132,7 @@ runAndCheckRatarmount()
     MOUNT_POINTS_TO_CLEANUP+=( "${*: -1}" )
     $RATARMOUNT_CMD "$@" >ratarmount.stdout.log 2>ratarmount.stderr.log &&
     checkStat "${@: -1}" # mount folder must exist and be stat-able after mounting
-    ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
+    ! 'grep' -C 5 -Ei '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
         returnError "$LINENO" "Found warnings while executing: $RATARMOUNT_CMD $*"
 }
 
@@ -734,7 +735,112 @@ benchmarkDecoderBackends()
 }
 
 
-checkTarEncoding tests/single-file.tar utf-8 bar d3b07384d113edec49eaa6238ad5ff00
+checkIndexPathOption()
+{
+    # The --index-path should have highest priority, overwriting all --index-folders and default locations
+    local archive="$1"; shift
+    local fileInTar="$1"; shift
+    local correctChecksum="$1"
+
+    local mountFolder indexFolder indexFile
+    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    indexFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    indexFile="$indexFolder/ratarmount.index"
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+    TMP_FILES_TO_CLEANUP+=( "$indexFile" "$indexFolder" )
+
+    # Check that index gets created at the specified location
+    [ ! -f "$indexFile" ] || returnError "$LINENO" 'Index should not exist before test!'
+    local args=( --index-file "$indexFile" "$archive" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}" &&
+        checkStat "$mountFolder/$fileInTar" &&
+        verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+    funmount "$mountFolder"
+    [ -s "$indexFile" ] || returnError "$LINENO" 'Index was not created!'
+    cleanup
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully '$fileInTar' in '$archive'"
+
+    return 0
+}
+
+
+checkIndexFolderFallback()
+{
+    # The --index-folders should overwrite the default index locations and also give fallbacks in order
+    local archive="$1"; shift
+    local fileInTar="$1"; shift
+    local correctChecksum="$1"
+
+    local args mountFolder indexFolder
+    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    indexFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+
+    # Check that index gets created in the specified folder
+    [ -z "$( find "$indexFolder" -type f -size +0c )" ] || returnError "$LINENO" 'Index should not exist before test!'
+    args=( --index-folders "$indexFolder" "$archive" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}" &&
+        checkStat "$mountFolder/$fileInTar" &&
+        verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+    funmount "$mountFolder"
+    [ -z "$( find "$indexFolder" -type f -size +0c )" ] || returnError "$LINENO" 'Index was not created!'
+    find "$indexFolder" -type f -size +0c -delete
+
+    # Check that the special "empty" folder works signaling to store alongside the TAR
+    local indexFile=${archive}.index.sqlite
+    rm -f -- "$indexFile"
+    args=( --index-folders '' "$archive" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}" &&
+        checkStat "$mountFolder/$fileInTar" &&
+        verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+    funmount "$mountFolder"
+    [ -f "$indexFile" ] || returnError "$LINENO" "Index '$indexFile' was not created."
+    rm -- "$indexFile"
+
+    # Check that the multiple folders can be specified and the fallback is used if locations before it are not writable
+    [ ! -d /SHOULD_NOT_EXIST ] || returnError "$LINENO" 'Location should not exist!'
+    [ -z "$( find "$indexFolder" -type f -size +0c )" ] || returnError "$LINENO" 'Index should not exist before test!'
+    args=( --index-folders "/SHOULD_NOT_EXIST,$indexFolder" "$archive" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}" &&
+        checkStat "$mountFolder/$fileInTar" &&
+        verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+    funmount "$mountFolder"
+    [ ! -d /SHOULD_NOT_EXIST ] || returnError "$LINENO" 'Location should not exist!'
+    [ -n "$( find "$indexFolder" -type f -size +0c )" ] ||
+        returnError "$LINENO" "Index was not created in '$indexFolder'"
+    find "$indexFolder" -type f -size +0c -delete
+
+    # Check that the multiple folders can be specified using JSON
+    [ ! -d /SHOULD_NOT_EXIST ] || returnError "$LINENO" 'Location should not exist!'
+    [ -z "$( find "$indexFolder" -type f -size +0c )" ] ||
+        returnError "$LINENO" "Index location '$indexFolder' should be empty before test."
+    args=( --index-folders '["'"$indexFolder"'", "/SHOULD_NOT_EXIST"]' "$archive" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}" &&
+        checkStat "$mountFolder/$fileInTar" &&
+        verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+    funmount "$mountFolder"
+    [ ! -d /SHOULD_NOT_EXIST ] || returnError "$LINENO" 'Location should not exist!'
+    [ -n "$( find "$indexFolder" -type f -size +0c )" ] || returnError "$LINENO" 'Index was not created!'
+    find "$indexFolder" -type f -size +0c -delete
+
+
+    cleanup
+    echoerr "[${FUNCNAME[0]}] Tested successfully '$fileInTar' in '$archive'"
+
+    return 0
+}
+
 
 # Linting only to be done locally because in CI it is in separate steps
 if [[ -z "$CI" ]]; then
@@ -801,6 +907,9 @@ tests=(
     19696f24a91fc4e8950026f9c801a0d0 tests/simple.bz2                             simple
     19696f24a91fc4e8950026f9c801a0d0 tests/simple.gz                              simple
 )
+
+checkIndexPathOption tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
+checkIndexFolderFallback tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
 
 checkTarEncoding tests/single-file.tar utf-8 bar d3b07384d113edec49eaa6238ad5ff00
 checkTarEncoding tests/single-file.tar latin1 bar d3b07384d113edec49eaa6238ad5ff00
