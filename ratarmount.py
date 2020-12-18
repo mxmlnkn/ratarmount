@@ -45,28 +45,62 @@ __version__ = '0.7.0'
 
 
 # Defining lambdas does not yet check the names of entities used inside the lambda!
-CompressionInfo = collections.namedtuple('CompressionInfo', ['suffixes', 'moduleName', 'checkHeader', 'open'])
+CompressionInfo = collections.namedtuple(
+    'CompressionInfo', ['suffixes', 'doubleSuffixes', 'moduleName', 'checkHeader', 'open']
+)
 supportedCompressions = {
     'bz2': CompressionInfo(
         ['bz2', 'bzip2'],
+        ['tb2', 'tbz', 'tbz2', 'tz2'],
         'indexed_bzip2',
         lambda x: (x.read(4)[:3] == b'BZh' and x.read(6) == (0x314159265359).to_bytes(6, 'big')),
         lambda x: indexed_bzip2.IndexedBzip2File(x.fileno()),
     ),
     'gz': CompressionInfo(
         ['gz', 'gzip'],
+        ['taz', 'tgz'],
         'indexed_gzip',
         lambda x: x.read(2) == b'\x1F\x8B',
         lambda x: indexed_gzip.IndexedGzipFile(fileobj=x),
     ),
-    'xz': CompressionInfo(['xz'], 'lzmaffi', lambda x: x.read(6) == b"\xFD7zXZ\x00", lambda x: lzmaffi.open(x)),
+    'xz': CompressionInfo(
+        ['xz'], ['txz'], 'lzmaffi', lambda x: x.read(6) == b"\xFD7zXZ\x00", lambda x: lzmaffi.open(x)
+    ),
     'zst': CompressionInfo(
         ['zst', 'zstd'],
+        ['tzst'],
         'indexed_zstd',
         lambda x: x.read(4) == (0xFD2FB528).to_bytes(4, 'little'),
         lambda x: indexed_zstd.IndexedZstdFile(x.fileno()),
     ),
 }
+
+
+def stripSuffixFromCompressedFile(path: str) -> str:
+    """Strips compression suffixes like .bz2, .gz, ..."""
+    for compression in supportedCompressions.values():
+        for suffix in compression.suffixes:
+            if path.lower().endswith('.' + suffix.lower()):
+                return path[: -(len(suffix) + 1)]
+    return path
+
+
+def stripSuffixFromTarFile(path: str) -> str:
+    """Strips extensions like .tar.gz or .gz or .tgz, ..."""
+    # 1. Try for conflated suffixes first
+    for compression in supportedCompressions.values():
+        for suffix in compression.doubleSuffixes + ['t' + s for s in compression.suffixes]:
+            if path.lower().endswith('.' + suffix.lower()):
+                return path[: -(len(suffix) + 1)]
+
+    # 2. Remove compression suffixes
+    path = stripSuffixFromCompressedFile(path)
+
+    # 3. Remove .tar if we are left with it after the compression suffix removal
+    if path.lower().endswith('.tar'):
+        path = path[:-4]
+
+    return path
 
 
 printDebug = 1
@@ -1522,6 +1556,34 @@ class SQLiteIndexedTar:
         )
 
 
+def _makeMountPointFileInfoFromStats(stats: os.stat_result) -> FileInfo:
+    # make the mount point read only and executable if readable, i.e., allow directory listing
+    # clear higher bits like S_IFREG and set the directory bit instead
+    mountMode = (
+        (stats.st_mode & 0o777)
+        | stat.S_IFDIR
+        | (stat.S_IXUSR if stats.st_mode & stat.S_IRUSR != 0 else 0)
+        | (stat.S_IXGRP if stats.st_mode & stat.S_IRGRP != 0 else 0)
+        | (stat.S_IXOTH if stats.st_mode & stat.S_IROTH != 0 else 0)
+    )
+
+    return FileInfo(
+        # fmt: off
+        offset       = None           ,
+        offsetheader = None           ,
+        size         = stats.st_size  ,
+        mtime        = stats.st_mtime ,
+        mode         = mountMode      ,
+        type         = tarfile.DIRTYPE,
+        linkname     = ""             ,
+        uid          = stats.st_uid   ,
+        gid          = stats.st_gid   ,
+        istar        = True           ,
+        issparse     = False
+        # fmt: on
+    )
+
+
 class FolderMountSource:
     """
     This class manages one folder as mount source offering methods for listing folders, reading files, and others.
@@ -1645,32 +1707,7 @@ class TarMount(fuse.Operations):
             for tarFile in pathToMount
         ]
 
-        # make the mount point read only and executable if readable, i.e., allow directory listing
-        tarStats = os.stat(pathToMount[0])
-        # clear higher bits like S_IFREG and set the directory bit instead
-        mountMode = (
-            (tarStats.st_mode & 0o777)
-            | stat.S_IFDIR
-            | (stat.S_IXUSR if tarStats.st_mode & stat.S_IRUSR != 0 else 0)
-            | (stat.S_IXGRP if tarStats.st_mode & stat.S_IRGRP != 0 else 0)
-            | (stat.S_IXOTH if tarStats.st_mode & stat.S_IROTH != 0 else 0)
-        )
-
-        self.rootFileInfo = FileInfo(
-            # fmt: off
-            offset       = None             ,
-            offsetheader = None             ,
-            size         = tarStats.st_size ,
-            mtime        = tarStats.st_mtime,
-            mode         = mountMode        ,
-            type         = tarfile.DIRTYPE  ,
-            linkname     = ""               ,
-            uid          = tarStats.st_uid  ,
-            gid          = tarStats.st_gid  ,
-            istar        = True             ,
-            issparse     = False
-            # fmt: on
-        )
+        self.rootFileInfo = _makeMountPointFileInfoFromStats(os.stat(pathToMount[0]))
 
         # Create mount point if it does not exist
         self.mountPointWasCreated = False
@@ -1889,7 +1926,7 @@ class TarMount(fuse.Operations):
         result = self._decodeVersionsPathAPI(path)
         if not result:
             return
-        path, pathIsSpecialVersionsFolder, fileVersion = result
+        path, pathIsSpecialVersionsFolder, _ = result
 
         if not pathIsSpecialVersionsFolder:
             files = self._getUnionMountListDir(path)
@@ -2212,16 +2249,11 @@ seeking capabilities when opening that file.
 
     # Automatically generate a default mount path
     if not args.mount_point:
-        tarPath = args.mount_source[0]
-        for compression in [s for c in supportedCompressions.values() for s in c.suffixes]:
-            if not compression:
-                continue
-            doubleExtension = '.tar.' + compression
-            if tarPath[-len(doubleExtension) :].lower() == doubleExtension.lower():
-                args.mount_point = tarPath[: -len(doubleExtension)]
-                break
-        if not args.mount_point:
-            args.mount_point = os.path.splitext(tarPath)[0]
+        autoMountPoint = stripSuffixFromTarFile(args.mount_source[0])
+        if args.mount_point == autoMountPoint:
+            args.mount_point = os.path.splitext(args.mount_source[0])[0]
+        else:
+            args.mount_point = autoMountPoint
     args.mount_point = os.path.abspath(args.mount_point)
 
     # Preprocess the --index-folders list as a string argument
