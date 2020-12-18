@@ -157,6 +157,8 @@ checkFileInTAR()
         verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
     funmount "$mountFolder"
+    'grep' -q 'Creating offset dictionary' ratarmount.stdout.log ratarmount.stderr.log ||
+        returnError "$LINENO" "Looks like index was not created while executing: $RATARMOUNT_CMD $*"
 
     # retry without forcing index recreation
     local args=( --ignore-zeros --recursive "$archive" "$mountFolder" )
@@ -166,6 +168,8 @@ checkFileInTAR()
         verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
     funmount "$mountFolder"
+    'grep' -q 'Loading offset dictionary' ratarmount.stdout.log ratarmount.stderr.log ||
+        returnError "$LINENO" "Looks like index was not loaded while executing: $RATARMOUNT_CMD $*"
 
     rmdir "$mountFolder"
 
