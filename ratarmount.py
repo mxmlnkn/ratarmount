@@ -637,6 +637,23 @@ class SQLiteIndexedTar:
         sqlConnection.executescript(createTables)
         return sqlConnection
 
+    @staticmethod
+    def _tarInfoFullMode(tarInfo: tarfile.TarInfo) -> int:
+        """
+        Returns the full mode for a TarInfo object. Note that TarInfo.mode only contains the permission bits
+        and not other bits like set for directory, symbolic links, and other special files.
+        """
+        return (
+            tarInfo.mode
+            # fmt: off
+            | ( stat.S_IFDIR if tarInfo.isdir () else 0 )
+            | ( stat.S_IFREG if tarInfo.isfile() else 0 )
+            | ( stat.S_IFLNK if tarInfo.issym () else 0 )
+            | ( stat.S_IFCHR if tarInfo.ischr () else 0 )
+            | ( stat.S_IFIFO if tarInfo.isfifo() else 0 )
+            # fmt: on
+        )
+
     def _updateProgressBar(self, progressBar, fileobj: Any) -> None:
         try:
             if hasattr(fileobj, 'tell_compressed') and self.compression == 'bz2':
@@ -700,98 +717,107 @@ class SQLiteIndexedTar:
 
         # 3. Iterate over files inside TAR and add them to the database
         try:
-            for tarInfo in loadedTarFile:
-                loadedTarFile.members = []
-                globalOffset = streamOffset + tarInfo.offset_data
-                globalOffsetHeader = streamOffset + tarInfo.offset
-                self._updateProgressBar(progressBar, fileObject)
+            filesToMountRecursively = []
 
-                mode = (
-                    tarInfo.mode
-                    # fmt: off
-                    | ( stat.S_IFDIR if tarInfo.isdir () else 0 )
-                    | ( stat.S_IFREG if tarInfo.isfile() else 0 )
-                    | ( stat.S_IFLNK if tarInfo.issym () else 0 )
-                    | ( stat.S_IFCHR if tarInfo.ischr () else 0 )
-                    | ( stat.S_IFIFO if tarInfo.isfifo() else 0 )
-                    # fmt: on
-                )
+            for tarInfo in loadedTarFile:
+                loadedTarFile.members = []  # Clear this in order to limit memory usage by tarfile
+                self._updateProgressBar(progressBar, fileObject)
 
                 # Add a leading '/' as a convention where '/' represents the TAR root folder
                 # Partly, done because fusepy specifies paths in a mounted directory like this
                 # os.normpath does not delete duplicate '/' at beginning of string!
                 fullPath = pathPrefix + "/" + os.path.normpath(tarInfo.name).lstrip('/')
 
-                # 4. Open contained TARs for recursive mounting
-                tarExtension = '.tar'
-                isTar = False
-                if self.mountRecursively and tarInfo.isfile() and tarInfo.name.lower().endswith(tarExtension.lower()):
-                    if (
-                        self.stripRecursiveTarExtension
-                        and len(tarExtension) > 0
-                        and fullPath.lower().endswith(tarExtension.lower())
-                    ):
-                        modifiedFullPath = fullPath[: -len(tarExtension)]
-                    else:
-                        modifiedFullPath = fullPath
-
-                    oldPos = fileObject.tell()
-                    fileObject.seek(globalOffset)
-                    oldPrintName = self.tarFileName
-
-                    try:
-                        self.tarFileName = tarInfo.name.lstrip('/')  # This is for output of the recursive call
-                        # StenciledFile's tell returns the offset inside the file chunk instead of the global one,
-                        # so we have to always communicate the offset of this chunk to the recursive call no matter
-                        # whether tarfile has streaming access or seeking access!
-                        tarFileObject = StenciledFile(fileObject, [(globalOffset, tarInfo.size)])
-                        self.createIndex(tarFileObject, progressBar, modifiedFullPath, globalOffset)
-
-                        # if the TAR file contents could be read, we need to adjust the actual
-                        # TAR file's metadata to be a directory instead of a file
-                        mode = (
-                            (mode & 0o777)
-                            | stat.S_IFDIR
-                            | (stat.S_IXUSR if mode & stat.S_IRUSR != 0 else 0)
-                            | (stat.S_IXGRP if mode & stat.S_IRGRP != 0 else 0)
-                            | (stat.S_IXOTH if mode & stat.S_IROTH != 0 else 0)
-                        )
-                        isTar = True
-                        fullPath = modifiedFullPath
-
-                    except tarfile.ReadError:
-                        pass
-
-                    self.tarFileName = oldPrintName
-                    del tarFileObject
-                    fileObject.seek(oldPos)
-
                 path, name = fullPath.rsplit("/", 1)
+                # fmt: off
                 fileInfo = (
-                    # fmt: off
-                    path               ,  # 0
-                    name               ,  # 1
-                    globalOffsetHeader ,  # 2
-                    globalOffset       ,  # 3
-                    tarInfo.size       ,  # 4
-                    tarInfo.mtime      ,  # 5
-                    mode               ,  # 6
-                    tarInfo.type       ,  # 7
-                    tarInfo.linkname   ,  # 8
-                    tarInfo.uid        ,  # 9
-                    tarInfo.gid        ,  # 10
-                    isTar              ,  # 11
-                    tarInfo.issparse() ,
-                    # 12
-                    # fmt: on
+                    path                              ,  # 0
+                    name                              ,  # 1
+                    streamOffset + tarInfo.offset     ,  # 2
+                    streamOffset + tarInfo.offset_data,  # 3
+                    tarInfo.size                      ,  # 4
+                    tarInfo.mtime                     ,  # 5
+                    self._tarInfoFullMode(tarInfo)    ,  # 6
+                    tarInfo.type                      ,  # 7
+                    tarInfo.linkname                  ,  # 8
+                    tarInfo.uid                       ,  # 9
+                    tarInfo.gid                       ,  # 10
+                    False                             ,  # 11 (isTar)
+                    tarInfo.issparse()                ,  # 12
                 )
-                self._setFileInfo(fileInfo)
+                # fmt: on
+
+                if self.mountRecursively and tarInfo.isfile() and tarInfo.name.lower().endswith('.tar'):
+                    filesToMountRecursively.append(fileInfo)
+                else:
+                    self._setFileInfo(fileInfo)
         except tarfile.ReadError as e:
             if 'unexpected end of data' in str(e):
                 print(
                     "[Warning] The TAR file is incomplete. Ratarmount will work but some files might be cut off. "
                     "If the TAR file size changes, ratarmount will recreate the index during the next mounting."
                 )
+
+        # 4. Open contained TARs for recursive mounting
+        oldPos = fileObject.tell()
+        oldPrintName = self.tarFileName
+        for fileInfo in filesToMountRecursively:
+            tarExtension = '.tar'
+            fullPath = os.path.join(fileInfo[0], fileInfo[1])
+            if (
+                self.stripRecursiveTarExtension
+                and len(tarExtension) > 0
+                and fullPath.lower().endswith(tarExtension.lower())
+            ):
+                modifiedFullPath = fullPath[: -len(tarExtension)]
+            else:
+                modifiedFullPath = fullPath
+
+            # Temporarily change tarFileName for the info output of the recursive call
+            self.tarFileName = fullPath
+
+            # StenciledFile's tell returns the offset inside the file chunk instead of the global one,
+            # so we have to always communicate the offset of this chunk to the recursive call no matter
+            # whether tarfile has streaming access or seeking access!
+            globalOffset = fileInfo[3]
+            size = fileInfo[4]
+            tarFileObject = StenciledFile(fileObject, [(globalOffset, size)])
+
+            isTar = False
+            try:
+                self.createIndex(tarFileObject, progressBar, modifiedFullPath, globalOffset)
+                isTar = True
+            except tarfile.ReadError:
+                pass
+            finally:
+                del tarFileObject
+
+            if isTar:
+                modifiedFileInfo = list(fileInfo)
+
+                # if the TAR file contents could be read, we need to adjust the actual
+                # TAR file's metadata to be a directory instead of a file
+                mode = modifiedFileInfo[6]
+                mode = (
+                    (mode & 0o777)
+                    | stat.S_IFDIR
+                    | (stat.S_IXUSR if mode & stat.S_IRUSR != 0 else 0)
+                    | (stat.S_IXGRP if mode & stat.S_IRGRP != 0 else 0)
+                    | (stat.S_IXOTH if mode & stat.S_IROTH != 0 else 0)
+                )
+
+                path, name = modifiedFullPath.rsplit("/", 1)
+                modifiedFileInfo[0] = path
+                modifiedFileInfo[1] = name
+                modifiedFileInfo[6] = mode
+                modifiedFileInfo[11] = isTar
+
+                self._setFileInfo(tuple(modifiedFileInfo))
+            else:
+                self._setFileInfo(fileInfo)
+
+        fileObject.seek(oldPos)
+        self.tarFileName = oldPrintName
 
         # Everything below should not be done in a recursive call of createIndex
         if streamOffset > 0:
@@ -823,8 +849,8 @@ class SQLiteIndexedTar:
                 self._updateProgressBar(progressBar, fileObject)
             fileSize = fileObject.tell()
 
+            # fmt: off
             fileInfo = (
-                # fmt: off
                 ""                 ,  # 0 path
                 fname              ,  # 1
                 None               ,  # 2 header offset
@@ -832,15 +858,14 @@ class SQLiteIndexedTar:
                 fileSize           ,  # 4
                 tarInfo.st_mtime   ,  # 5
                 tarInfo.st_mode    ,  # 6
-                None               ,  # 7 TAR file type. Currently unused but would overlap with mode, I think
+                None               ,  # 7 TAR file type. Currently unused but overlaps with mode anyways
                 None               ,  # 8 linkname
                 tarInfo.st_uid     ,  # 9
                 tarInfo.st_gid     ,  # 10
                 False              ,  # 11 isTar
-                False              ,
-                # 12 isSparse, don't care if it is actually sparse or not because it is not in TAR
-                # fmt: on
+                False              ,  # 12 isSparse, don't care if it is actually sparse or not because it is not in TAR
             )
+            # fmt: on
             self._setFileInfo(fileInfo)
 
         # All the code below is for database finalizing which should not be done in a recursive call of createIndex!
@@ -1047,8 +1072,6 @@ class SQLiteIndexedTar:
         """
         fullPath : the full path to the file with leading slash (/) for which to set the file info
         """
-        if not self.sqlConnection:
-            raise IndexNotOpenError("This method can not be called without an opened index database!")
         assert fullPath[0] == "/"
 
         # os.normpath does not delete duplicate '/' at beginning of string!
