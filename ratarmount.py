@@ -1587,13 +1587,44 @@ def _makeMountPointFileInfoFromStats(stats: os.stat_result) -> FileInfo:
 class FolderMountSource:
     """
     This class manages one folder as mount source offering methods for listing folders, reading files, and others.
-    TODO: Add a recursive argument, which makes this class open and manage TARs inside the given folder!
     """
 
-    __slots__ = ('root',)
+    __slots__ = ('root', 'mountedTars', 'rootFileInfos')
 
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: str, **sqliteIndexedTarOptions) -> None:
         self.root: str = os.path.realpath(path)
+        # stores mounted TARs per mount point relative (without leading '/') to self.root.
+        self.mountedTars: Dict[str, SQLiteIndexedTar] = {}
+        self.rootFileInfos: Dict[str, FileInfo] = {}
+
+        # Find TAR files in this folder and mount them recursively if so requested
+        if sqliteIndexedTarOptions.get('recursive', False) and os.path.isdir(self.root):
+            stripSuffix = sqliteIndexedTarOptions.get('stripRecursiveTarExtension', False)
+            encoding = sqliteIndexedTarOptions.get('encoding', tarfile.ENCODING)
+
+            for folder, _, files in os.walk(self.root):
+                assert folder.startswith(self.root)
+                folder = folder[len(self.root) + 1 :]
+
+                for filePath in files:
+                    fileName = stripSuffixFromTarFile(filePath)
+                    if fileName == filePath:
+                        continue
+
+                    fullPath = os.path.realpath(os.path.join(self.root, folder, filePath))
+                    try:
+                        TarFileType(encoding=encoding)(fullPath)
+                    except argparse.ArgumentTypeError:
+                        continue
+
+                    try:
+                        indexedTar = SQLiteIndexedTar(fullPath, writeIndex=True, **sqliteIndexedTarOptions)
+                    except Exception:
+                        continue
+
+                    mountPoint = os.path.join(folder, fileName if stripSuffix else filePath)
+                    self.mountedTars[mountPoint] = indexedTar
+                    self.rootFileInfos[mountPoint] = _makeMountPointFileInfoFromStats(os.stat(fullPath))
 
     def setFolderDescriptor(self, fd: int) -> None:
         """
@@ -1603,6 +1634,24 @@ class FolderMountSource:
         """
         os.fchdir(fd)
         self.root = '.'
+
+    def _findMountedTar(self, path: str) -> Optional[Tuple[str, str]]:
+        """
+        Returns the mount point, which can be found in self.mountedTars, and the rest of the path.
+        Basically, it splits path at the appropriate mount point boundary.
+        """
+        if not self.mountedTars:
+            return None
+
+        # TODO Not sure how performance-critical this can turn out, but maybe do something like bisection instead?
+        parts = path.lstrip(os.path.sep).split(os.path.sep)
+        subPath = ""
+        for i, part in enumerate(parts):
+            subPath = os.path.join(subPath, part)
+            if subPath in self.mountedTars:
+                pathInsideTar = os.path.join(*parts[i + 1 :]) if i + 1 < len(parts) else "/"
+                return subPath, pathInsideTar
+        return None
 
     def _realpath(self, path: str) -> str:
         """Path given relative to folder root. Leading '/' is acceptable"""
@@ -1633,6 +1682,25 @@ class FolderMountSource:
 
     def getFileInfo(self, filePath: str, fileVersion: int = 0) -> Optional[FileInfo]:
         """Return file info for given path."""
+        # TODO: Add support for the .versions API in order to access the underlying TARs if stripRecursiveTarExtension
+        #       is false? Then again, SQLiteIndexedTar is not able to do this either, so it might be inconsistent.
+
+        pathSplitAtMountPoint = self._findMountedTar(filePath)
+        if pathSplitAtMountPoint:
+            mountPoint, pathInMountPoint = pathSplitAtMountPoint
+            if pathInMountPoint and pathInMountPoint != '/':
+                fileInfo = self.mountedTars[mountPoint].getFileInfo(pathInMountPoint, fileVersion=fileVersion)
+
+                if isinstance(fileInfo, FileInfo):
+                    # Dereference hard links
+                    if not stat.S_ISREG(fileInfo.mode) and not stat.S_ISLNK(fileInfo.mode) and fileInfo.linkname:
+                        targetLink = fileInfo.linkname.lstrip('/')
+                        if targetLink != filePath:
+                            return self.getFileInfo(os.path.join(mountPoint, targetLink), fileVersion)
+                    return fileInfo
+                return None
+            return self.rootFileInfos[mountPoint]
+
         # This is a bit of problematic design, however, the fileVersions count from 1 for the user.
         # And as -1 means the last version, 0 should also mean the first version ...
         # Basically, I did accidentally mix user-visible versions 1+ versinos with API 0+ versions,
@@ -1646,6 +1714,11 @@ class FolderMountSource:
         This method is different from SQLiteIndexedTar.getFileInfo(listDir=True) because stat'ing each file
         does not come for free here, in contrast to SQLiteIndexedTar.
         """
+        pathSplitAtMountPoint = self._findMountedTar(path)
+        if pathSplitAtMountPoint:
+            mountPoint, pathInMountPoint = pathSplitAtMountPoint
+            return self.mountedTars[mountPoint].listDir(pathInMountPoint)
+
         realpath = self._realpath(path)
         if os.path.isdir(realpath):
             return os.listdir(realpath)
@@ -1653,12 +1726,21 @@ class FolderMountSource:
 
     def fileVersions(self, path: str) -> int:
         """Returns available versions for a file."""
+        pathSplitAtMountPoint = self._findMountedTar(path)
+        if pathSplitAtMountPoint:
+            mountPoint, pathInMountPoint = pathSplitAtMountPoint
+            return self.mountedTars[mountPoint].fileVersions(pathInMountPoint)
         return 1 if self._exists(path) else 0
 
     def read(self, path: str, size: int, offset: int, fileInfo: Optional[FileInfo] = None) -> bytes:
         """
         fileInfo: This argument can be specified for performance reasons. It must be the FileInfo object for path!
         """
+        pathSplitAtMountPoint = self._findMountedTar(path)
+        if pathSplitAtMountPoint:
+            mountPoint, pathInMountPoint = pathSplitAtMountPoint
+            return self.mountedTars[mountPoint].read(pathInMountPoint, size, offset, fileInfo)
+
         realpath = self._realpath(path)
         if not self._exists(path):
             raise ValueError("Specified path '{}' is not a file that can be read!".format(realpath))
@@ -1703,7 +1785,7 @@ class TarMount(fuse.Operations):
         self.mountSources: List[Union[SQLiteIndexedTar, FolderMountSource]] = [
             SQLiteIndexedTar(tarFile, writeIndex=True, **sqliteIndexedTarOptions)
             if not os.path.isdir(tarFile)
-            else FolderMountSource(tarFile)
+            else FolderMountSource(tarFile, **sqliteIndexedTarOptions)
             for tarFile in pathToMount
         ]
 

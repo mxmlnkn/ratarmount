@@ -1,5 +1,5 @@
 
-# Version 0.7.0 built on 2020-12-13
+# Version 0.7.0 built on 2020-12-20
 
  - Add CLI options --index-file and --index-folder to specify an index location or folder.
  - Add support for zstd compressed TARs.
@@ -9,6 +9,7 @@
  - Add warnings for when the existing index was created with different arguments,
    e.g., without --recursive, even though --recursive was requested.
  - Add specialized exceptions used by ratarmount.
+ - Add recursive mounting for folders in order to mount all contained TARs.
 
 # Version 0.6.1 built on 2020-10-02
 
