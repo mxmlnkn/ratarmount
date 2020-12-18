@@ -842,6 +842,50 @@ checkIndexFolderFallback()
 }
 
 
+checkIndexArgumentChangeDetection()
+{
+    # Ratarmount should warn when an index created without the --recursive option is loaded with --recursive
+
+    # The --index-folders should overwrite the default index locations and also give fallbacks in order
+    local archive="$1"; shift
+    local fileInTar="$1"; shift
+    local correctChecksum="$1"
+
+    local args mountFolder indexFolder
+    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    indexFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    indexFile="$indexFolder/ratarmount.index"
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+    TMP_FILES_TO_CLEANUP+=( "$indexFile" "$indexFolder" )
+
+    # Create an index with default configuration
+    args=( --index-file "$indexFile" "$archive" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}" &&
+        checkStat "$mountFolder/$fileInTar" &&
+        verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+    funmount "$mountFolder"
+    [ -s "$indexFile" ] || returnError "$LINENO" "Index '$indexFile' was not created."
+
+    # Check for warnings when loading that index with different index-influencing arguments
+    args=( --recursive --ignore-zeros --index-file "$indexFile" "$archive" "$mountFolder" )
+    {
+        $RATARMOUNT_CMD "${args[@]}" >ratarmount.stdout.log 2>ratarmount.stderr.log &&
+        checkStat "$mountFolder/$fileInTar" &&
+        verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+    funmount "$mountFolder"
+    'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
+        returnError "$LINENO" "Expected warnings while executing: $RATARMOUNT_CMD ${args[*]}"
+
+    cleanup
+    echoerr "[${FUNCNAME[0]}] Tested successfully '$fileInTar' in '$archive'"
+
+    return 0
+}
+
+
 # Linting only to be done locally because in CI it is in separate steps
 if [[ -z "$CI" ]]; then
     # Ignore Python 3.9. because of the Optiona[T] type hint bug in pylint: https://github.com/PyCQA/pylint/issues/3882
@@ -910,6 +954,7 @@ tests=(
 
 checkIndexPathOption tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
 checkIndexFolderFallback tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
+checkIndexArgumentChangeDetection tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
 
 checkTarEncoding tests/single-file.tar utf-8 bar d3b07384d113edec49eaa6238ad5ff00
 checkTarEncoding tests/single-file.tar latin1 bar d3b07384d113edec49eaa6238ad5ff00

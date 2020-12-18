@@ -282,7 +282,9 @@ class SQLiteIndexedTar:
     #   - Add TAR file size metadata in order to quickly check whether the TAR changed
     #   - Add 'offsetheader' to the primary key of the 'files' table so that files which were
     #     updated in the TAR can still be accessed if necessary.
-    __version__ = '0.2.0'
+    # Version 0.3.0:
+    #   - Add arguments influencing the created index to metadata (ignore-zeros, recursive, ...)
+    __version__ = '0.3.0'
 
     def __init__(
         # fmt: off
@@ -485,9 +487,6 @@ class SQLiteIndexedTar:
                     versions += [makeVersionRow(cinfo.moduleName, globals()[cinfo.moduleName].__version__)]
 
             connection.executemany('INSERT OR REPLACE INTO "versions" VALUES (?,?,?,?,?)', versions)
-
-            # TODO Add more metadata, e.g., for recursive argument! Move to _addMetadata method
-            # @see https://github.com/mxmlnkn/ratarmount/issues/37
         except Exception as exception:
             print("[Warning] There was an error when adding version information.")
             if printDebug >= 3:
@@ -833,7 +832,7 @@ class SQLiteIndexedTar:
                 fileSize           ,  # 4
                 tarInfo.st_mtime   ,  # 5
                 tarInfo.st_mode    ,  # 6
-                None               ,  # 7 TAR file type. Don't care because it curerntly is unused and overlaps with mode
+                None               ,  # 7 TAR file type. Currently unused but would overlap with mode, I think
                 None               ,  # 8 linkname
                 tarInfo.st_uid     ,  # 9
                 tarInfo.st_gid     ,  # 10
@@ -960,7 +959,12 @@ class SQLiteIndexedTar:
 
         path, name = fullPath.rsplit('/', 1)
         row = self.sqlConnection.execute(
-            'SELECT * FROM "files" WHERE "path" == (?) AND "name" == (?) ORDER BY "offsetheader" {} LIMIT 1 OFFSET (?)'.format(
+            """
+            SELECT * FROM "files"
+            WHERE "path" == (?) AND "name" == (?)
+            ORDER BY "offsetheader" {}
+            LIMIT 1 OFFSET (?);
+            """.format(
                 'DESC' if fileVersion is None or fileVersion <= 0 else 'ASC'
             ),
             (path, name, 0 if fileVersion is None else fileVersion - 1 if fileVersion > 0 else fileVersion),
@@ -1125,37 +1129,38 @@ class SQLiteIndexedTar:
                 print("[Warning] Please recreate the index if you have problems with those.")
 
             if 'metadata' in tables:
-                values = dict(self.sqlConnection.execute('SELECT * FROM metadata;'))
-                if 'tarstats' in values:
-                    values = json.loads(values['tarstats'])
-                tarStats = os.stat(self.tarFileName)
+                metadata = dict(self.sqlConnection.execute('SELECT * FROM metadata;'))
 
-                # fmt: off
-                if (
-                    hasattr( tarStats, "st_size" )
-                    and 'st_size' in values
-                    and tarStats.st_size != values['st_size']
-                ):
-                    raise InvalidIndexError( "TAR file for this SQLite index has changed size from",
-                                             values['st_size'], "to", tarStats.st_size)
-                # fmt: on
+                if 'tarstats' in metadata:
+                    values = json.loads(metadata['tarstats'])
+                    tarStats = os.stat(self.tarFileName)
 
-                if (
-                    self.verifyModificationTime
-                    and hasattr(tarStats, "st_mtime")
-                    and 'st_mtime' in values
-                    and tarStats.st_mtime != values['st_mtime']
-                ):
-                    raise InvalidIndexError(
-                        "The modification date for the TAR file",
-                        values['st_mtime'],
-                        "to this SQLite index has changed (" + str(tarStats.st_mtime) + ")",
-                    )
+                    # fmt: off
+                    if (
+                        hasattr( tarStats, "st_size" )
+                        and 'st_size' in values
+                        and tarStats.st_size != values['st_size']
+                    ):
+                        raise InvalidIndexError( "TAR file for this SQLite index has changed size from",
+                                                 values['st_size'], "to", tarStats.st_size)
+                    # fmt: on
+
+                    if (
+                        self.verifyModificationTime
+                        and hasattr(tarStats, "st_mtime")
+                        and 'st_mtime' in values
+                        and tarStats.st_mtime != values['st_mtime']
+                    ):
+                        raise InvalidIndexError(
+                            "The modification date for the TAR file",
+                            values['st_mtime'],
+                            "to this SQLite index has changed (" + str(tarStats.st_mtime) + ")",
+                        )
 
                 # Check arguments used to create the found index. These are only warnings and not forcing a rebuild
                 # by default. ToDo: Add --force options?
-                if 'arguments' in values:
-                    indexArgs = json.loads(values['arguments'])
+                if 'arguments' in metadata:
+                    indexArgs = json.loads(metadata['arguments'])
                     argumentsToCheck = [
                         'mountRecursively',
                         'gzipSeekPointSpacing',
@@ -1166,11 +1171,13 @@ class SQLiteIndexedTar:
                     differingArgs = []
                     for arg in argumentsToCheck:
                         if arg in indexArgs and hasattr(self, arg) and indexArgs[arg] != getattr(self, arg):
-                            differingArgs.append((indexArgs[arg], getattr(self, arg)))
+                            differingArgs.append((arg, indexArgs[arg], getattr(self, arg)))
                     if differingArgs:
                         print("[Warning] The arguments used for creating the found index differ from the arguments ")
                         print("[Warning] given for mounting the archive now. In order to apply these changes, ")
                         print("[Warning] recreate the index using the --recreate-index option!")
+                        for arg, oldState, newState in differingArgs:
+                            print("[Warning] {}: index: {}, current: {}".format(arg, oldState, newState))
 
         except Exception as e:
             # indexIsLoaded checks self.sqlConnection, so close it before returning because it was found to be faulty
