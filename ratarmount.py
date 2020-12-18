@@ -559,19 +559,14 @@ class SQLiteIndexedTar:
             connection.executescript('CREATE TABLE "files" ( "path" VARCHAR(65535) NOT NULL );')
             connection.commit()
             connection.close()
-            os.remove(path)
-
             return True
-
         except sqlite3.OperationalError:
             if printDebug >= 2:
                 traceback.print_exc()
                 print("Could not create SQLite database at:", path)
+        finally:
             if not fileExisted and os.path.isfile(path):
-                try:
-                    os.remove(path)
-                except Exception:
-                    pass
+                SQLiteIndexedTar._uncheckedRemove(path)
 
         return False
 
@@ -1335,6 +1330,19 @@ class SQLiteIndexedTar:
 
         return tar_file, fileobj, compression, SQLiteIndexedTar._detectTar(tar_file, encoding)
 
+    @staticmethod
+    def _uncheckedRemove(path: Optional[AnyStr]):
+        """
+        Often cleanup is good manners but it would only be obnoxious if ratarmount crashed on unnecessary cleanup.
+        """
+        if not path or not os.path.exists(path):
+            return
+
+        try:
+            os.remove(path)
+        except Exception:
+            print("[Warning] Could not remove:", path)
+
     def _loadOrStoreCompressionOffsets(self):
         # This should be called after the TAR file index is complete (loaded or created).
         # If the TAR file index was created, then tarfile has iterated over the whole file once
@@ -1394,25 +1402,17 @@ class SQLiteIndexedTar:
                         file.write(db.execute('SELECT data FROM gzipindex').fetchone()[0])
                     break
                 except Exception:
-                    try:
-                        if gzindex:
-                            os.remove(gzindex)
-                    except Exception:
-                        pass
+                    self._uncheckedRemove(gzindex)
                     gzindex = None
 
-            try:
-                fileObject.import_index(filename=gzindex)
-                os.remove(gzindex)
-                return
-            except Exception:
-                pass
-
-            try:
-                if gzindex:
-                    os.remove(gzindex)
-            except Exception:
-                pass
+            if gzindex:
+                try:
+                    fileObject.import_index(filename=gzindex)
+                    return
+                except Exception:
+                    pass
+                finally:
+                    self._uncheckedRemove(gzindex)
 
             # Store the offsets into a temporary file and then into the SQLite database
             if printDebug >= 2:
@@ -1432,10 +1432,7 @@ class SQLiteIndexedTar:
                     fileObject.export_index(filename=gzindex)
                     break
                 except indexed_gzip.ZranError:
-                    try:
-                        os.remove(gzindex)
-                    except Exception:
-                        pass
+                    self._uncheckedRemove(gzindex)
                     gzindex = None
 
             if not gzindex or not os.path.isfile(gzindex):
