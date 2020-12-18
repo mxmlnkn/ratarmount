@@ -62,7 +62,6 @@ confidence=
 # --disable=W".
 disable=invalid-name,
         not-an-iterable,
-        bare-except,
         broad-except,
         too-many-branches,
         too-many-statements,
