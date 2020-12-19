@@ -797,7 +797,7 @@ checkIndexFolderFallback()
         verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
     funmount "$mountFolder"
-    [ -z "$( find "$indexFolder" -type f -size +0c )" ] || returnError "$LINENO" 'Index was not created!'
+    [ -n "$( find "$indexFolder" -type f -size +0c )" ] || returnError "$LINENO" 'Index was not created!'
     find "$indexFolder" -type f -size +0c -delete
 
     # Check that the special "empty" folder works signaling to store alongside the TAR

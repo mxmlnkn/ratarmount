@@ -406,6 +406,8 @@ class SQLiteIndexedTar:
         # will be used for storing indexes if current path is read-only
         possibleIndexFilePaths = [self.tarFileName + ".index.sqlite"]
         indexPathAsName = self.tarFileName.replace("/", "_") + ".index.sqlite"
+        if isinstance(indexFolders, str):
+            indexFolders = [indexFolders]
         if indexFileName:
             # A given index file name takes precedence and there should be no implicit fallback
             possibleIndexFilePaths = [os.path.abspath(os.path.expanduser(indexFileName))]
