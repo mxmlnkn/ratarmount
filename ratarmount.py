@@ -2100,13 +2100,13 @@ class TarFileType:
         return tarFile, compression
 
 
-class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):
+class _CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):
     pass
 
 
-def parseArgs(rawArgs: Optional[List[str]] = None):
+def _parseArgs(rawArgs: Optional[List[str]] = None):
     parser = argparse.ArgumentParser(
-        formatter_class=CustomFormatter,
+        formatter_class=_CustomFormatter,
         description='''\
 With ratarmount, you can:
   - Mount a (compressed) TAR file to a folder for read-only access
@@ -2360,7 +2360,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
     # tmpArgs are only for the manual parsing. In general, rawArgs is None, meaning it reads sys.argv,
     # and maybe sometimes contains arguments when used programmatically. In that case the first argument
     # should not be the path to the script!
-    args = parseArgs(rawArgs)
+    args = _parseArgs(rawArgs)
 
     # Convert the comma separated list of key[=value] options into a dictionary for fusepy
     fusekwargs = (
