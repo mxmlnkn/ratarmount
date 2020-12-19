@@ -408,3 +408,15 @@ These are some of the things benchmarked and compared there:
   - Mounting and file access time comparison between archivemount and ratarmount
 
 ![Benchmark comparison between ratarmount and archivemount](benchmarks/plots/archivemount-comparison.png)
+
+
+## Donations
+
+If ratarmount helped you out and satisfied you so much that you can't help but want to donate, you can toss a coin to your programmer through one of these addresses:
+
+| Type | Address                                    |
+|------|--------------------------------------------|
+| BTC  | bc1qkc7stljxazpkk5lzcj4gqu2tvh0dh4exz4563t |
+| ETH  | 0xb049e3aC04f08c85A1A12e0e199adECb045C76C8 |
+| LTC  | LTRbWdUY576MNkhXhXEXNpt3NuY2ecR9F9         |
+| XMR  | 44DcWgDNxvUJav5zKHprJLJyKx11RyMgEfv3yuuqeUGGec26jRqA9UnaKc2uoKf5TyCVx3CmfZhyQiXtZP1kbdYCRCXNyJS |
