@@ -12,9 +12,14 @@ TMP_FILES_TO_CLEANUP=()
 MOUNT_POINTS_TO_CLEANUP=()
 cleanup()
 {
-    sleep 0.2s # Give a bit of time for the mount points to become stable before trying to unmount them
+    sleep 0.5s # Give a bit of time for the mount points to become stable before trying to unmount them
     for folder in "${MOUNT_POINTS_TO_CLEANUP[@]}"; do
-        if [[ -d "$folder" ]]; then funmount -- "$folder"; fi
+        if [[ -d "$folder" ]] && mountpoint -- "$folder" &>/dev/null; then
+            fusermount -u -- "$folder"
+        fi
+    done
+    sleep 0.5s
+    for folder in "${MOUNT_POINTS_TO_CLEANUP[@]}"; do
         if [[ -d "$folder" ]]; then rmdir -- "$folder"; fi
     done
     MOUNT_POINTS_TO_CLEANUP=()
@@ -914,6 +919,67 @@ checkSuffixStripping()
     return 0
 }
 
+checkRecursiveFolderMounting()
+{
+    # Do all test archive checks at once by copying them to temporary folder and recursively mounting that folder
+
+    local archiveFolder mountFolder
+    archiveFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+
+    for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
+        'cp' --no-clobber -- "${tests[iTest+1]}" "$archiveFolder"
+    done
+    runAndCheckRatarmount -c --ignore-zeros --recursive "$archiveFolder" "$mountFolder"
+
+    local nChecks=0
+    for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
+        checksum=${tests[iTest]}
+        archive=${tests[iTest+1]}
+        fileInTar=${tests[iTest+2]}
+
+        recursiveMountFolder="$mountFolder/$( basename -- "$archive" )"
+        checkStat "$recursiveMountFolder/$fileInTar" || returnError "stat failed for: $recursiveMountFolder/$fileInTar"
+        verifyCheckSum "$recursiveMountFolder" "$fileInTar" "$archive" "$checksum" || returnError 'checksum mismatch!'
+        (( ++nChecks ))
+    done
+
+    cleanup
+    rm -rf -- "$archiveFolder"
+
+    echoerr "[${FUNCNAME[0]}] Tested $nChecks files successfully"
+}
+
+checkNestedRecursiveFolderMounting()
+{
+    local archive="$1"; shift
+    local fileInTar="$1"; shift
+    local correctChecksum="$1"
+
+    local mountFolder archiveFolder
+    archiveFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+
+    mkdir -- "$archiveFolder/nested-folder"
+    cp -- "$archive" "$archiveFolder/nested-folder"
+    local args=( -c --ignore-zeros --recursive --strip-recursive-tar-extension "$archiveFolder" "$mountFolder" )
+    {
+        recursiveMountFolder="$mountFolder/nested-folder/$( basename -- "${archive%.tar}" )"
+        runAndCheckRatarmount "${args[@]}" &&
+        checkStat "$recursiveMountFolder/$fileInTar" &&
+        verifyCheckSum "$recursiveMountFolder" "$fileInTar" "$archive" "$correctChecksum"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+
+    cleanup
+    rm -rf -- "$archiveFolder"
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully '$fileInTar' in '$archive'"
+
+    return 0
+}
+
 
 # Linting only to be done locally because in CI it is in separate steps
 if [[ -z "$CI" ]]; then
@@ -985,6 +1051,7 @@ checkIndexPathOption tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
 checkIndexFolderFallback tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
 checkIndexArgumentChangeDetection tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
 checkSuffixStripping tests/2k-recursive-tars.tar.bz2 mimi/00001/foo b026324c6904b2a9cb4b88d6d61c81d1
+checkNestedRecursiveFolderMounting tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
 
 checkTarEncoding tests/single-file.tar utf-8 bar d3b07384d113edec49eaa6238ad5ff00
 checkTarEncoding tests/single-file.tar latin1 bar d3b07384d113edec49eaa6238ad5ff00
@@ -1001,6 +1068,8 @@ checkAutomaticIndexRecreation || returnError "$LINENO" 'Automatic index recreati
 checkAutoMountPointCreation || returnError "$LINENO" 'Automatic mount point creation test failed!'
 checkUnionMount || returnError "$LINENO" 'Union mounting test failed!'
 checkUnionMountFileVersions || returnError "$LINENO" 'Union mount file version access test failed!'
+
+checkRecursiveFolderMounting
 
 for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
     checksum=${tests[iTest]}
