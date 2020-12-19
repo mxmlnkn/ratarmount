@@ -890,6 +890,31 @@ checkIndexArgumentChangeDetection()
 }
 
 
+checkSuffixStripping()
+{
+    local archive="$1"; shift
+    local fileInTar="$1"; shift
+    local correctChecksum="$1"
+
+    local mountFolder
+    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+
+    # try with index recreation
+    local args=( -c --ignore-zeros --recursive --strip-recursive-tar-extension "$archive" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}" &&
+        checkStat "$mountFolder/$fileInTar" &&
+        verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+    funmount "$mountFolder"
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully '$fileInTar' in '$archive' for checksum $correctChecksum"
+
+    return 0
+}
+
+
 # Linting only to be done locally because in CI it is in separate steps
 if [[ -z "$CI" ]]; then
     # Ignore Python 3.9. because of the Optiona[T] type hint bug in pylint: https://github.com/PyCQA/pylint/issues/3882
@@ -959,6 +984,7 @@ tests=(
 checkIndexPathOption tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
 checkIndexFolderFallback tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
 checkIndexArgumentChangeDetection tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
+checkSuffixStripping tests/2k-recursive-tars.tar.bz2 mimi/00001/foo b026324c6904b2a9cb4b88d6d61c81d1
 
 checkTarEncoding tests/single-file.tar utf-8 bar d3b07384d113edec49eaa6238ad5ff00
 checkTarEncoding tests/single-file.tar latin1 bar d3b07384d113edec49eaa6238ad5ff00
