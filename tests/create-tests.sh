@@ -25,3 +25,13 @@ recreateArchive 'folder-with-leading-dot-slash.tar' ./
 recreateArchive 'single-nested-file.tar' foo/fighter/ufo
 recreateArchive 'single-nested-folder.tar' foo/fighter/
 recreateArchive 'file-existing-as-non-link-and-link.tar' foo/fighter/ foo/fighter/ufo
+
+echo foo > bar
+tar -c --owner=user --group=group --numeric -f 'single-self-link.tar' bar bar
+tar --delete --occurrence=1 --file 'single-self-link.tar' bar
+
+tar -c --owner=user --group=group --numeric -f 'two-self-links.tar' bar bar bar
+tar --delete --occurrence=1 --file 'two-self-links.tar' bar
+
+cp 'single-file.tar' 'empty.tar'
+tar --delete --file 'empty.tar' bar

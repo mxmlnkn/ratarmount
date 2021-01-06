@@ -988,6 +988,30 @@ checkNestedRecursiveFolderMounting()
     return 0
 }
 
+checkSelfReferencingHardLinks()
+{
+    # This tests self-referencing hardlinks with no actual file in the tar.
+    # The tar should mount and list the files but neither their contents nor stats have to be available.
+    local archive=$1
+
+    local mountFolder
+    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+
+    local args=( -P "$parallelization" -c "$archive" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}"
+        if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then returnError "$LINENO" 'Expected files in mount point'; fi
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+
+    cleanup
+    rm -rf -- "$archiveFolder"
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully '$archive'"
+
+    return 0
+}
+
 
 # Linting only to be done locally because in CI it is in separate steps
 if [[ -z "$CI" ]]; then
@@ -1053,6 +1077,8 @@ tests=(
     c157a79031e1c40f85931829bc5fc552 tests/2k-recursive-tars.tar.bz2              mimi/foo
     19696f24a91fc4e8950026f9c801a0d0 tests/simple.bz2                             simple
     19696f24a91fc4e8950026f9c801a0d0 tests/simple.gz                              simple
+    2709a3348eb2c52302a7606ecf5860bc tests/file-existing-as-non-link-and-link.tar foo/fighter/ufo
+    d3b07384d113edec49eaa6238ad5ff00 tests/two-self-links-to-existing-file.tar    bar
 )
 
 
@@ -1082,6 +1108,11 @@ checkAutomaticIndexRecreation || returnError "$LINENO" 'Automatic index recreati
 checkAutoMountPointCreation || returnError "$LINENO" 'Automatic mount point creation test failed!'
 checkUnionMount || returnError "$LINENO" 'Union mounting test failed!'
 checkUnionMountFileVersions || returnError "$LINENO" 'Union mount file version access test failed!'
+
+checkSelfReferencingHardLinks tests/single-self-link.tar ||
+    returnError "$LINENO" 'Self-referencing hardlinks test failed!'
+checkSelfReferencingHardLinks tests/two-self-links.tar ||
+    returnError "$LINENO" 'Self-referencing hardlinks test failed!'
 
 checkRecursiveFolderMounting
 

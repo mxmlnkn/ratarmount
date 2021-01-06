@@ -1773,7 +1773,12 @@ class FolderMountSource:
                     # Dereference hard links
                     if not stat.S_ISREG(fileInfo.mode) and not stat.S_ISLNK(fileInfo.mode) and fileInfo.linkname:
                         targetLink = fileInfo.linkname.lstrip('/')
-                        if targetLink != filePath:
+                        if targetLink == pathInMountPoint:
+                            return self.getFileInfo(
+                                os.path.join(mountPoint, targetLink),
+                                fileVersion + 1 if fileVersion >= 0 else fileVersion - 1,
+                            )
+                        else:
                             return self.getFileInfo(os.path.join(mountPoint, targetLink), fileVersion)
                     return fileInfo
                 return None
@@ -2015,11 +2020,13 @@ class TarMount(FuseOperations):  # type: ignore
 
         return filePath, pathIsSpecialVersionsFolder, (None if pathIsSpecialVersionsFolder else fileVersion)
 
-    def _getFileInfo(self, filePath: str) -> Tuple[FileInfo, Optional[Union[SQLiteIndexedTar, FolderMountSource]], str]:
+    def _getFileInfo(
+        self, filePath: str
+    ) -> Tuple[FileInfo, Optional[Union[SQLiteIndexedTar, FolderMountSource]], str, int]:
         """Wrapper for _getUnionMountFileInfo, which also resolves special file version specifications in the path."""
         result = self._getUnionMountFileInfo(filePath)
         if result:
-            return result[0], result[1], filePath
+            return result[0], result[1], filePath, 0
 
         # If no file was found, check if a special .versions folder to an existing file/folder was queried.
         versionsInfo = self._decodeVersionsPathAPI(filePath)
@@ -2046,7 +2053,7 @@ class TarMount(FuseOperations):  # type: ignore
                 gid          = parentFileInfo.gid  ,
                 istar        = False               ,
                 issparse     = False
-            ), mountSource, filePath
+            ), mountSource, filePath, 0
             # fmt: on
 
         # 3.) At this point the request is for an actual version of a file or folder
@@ -2055,7 +2062,7 @@ class TarMount(FuseOperations):  # type: ignore
             raise fuse.FuseOSError(fuse.errno.ENOENT)
         result = self._getUnionMountFileInfo(filePath, fileVersion=fileVersion)
         if result:
-            return result[0], result[1], filePath
+            return result[0], result[1], filePath, fileVersion
 
         raise fuse.FuseOSError(fuse.errno.ENOENT)
 
@@ -2075,6 +2082,25 @@ class TarMount(FuseOperations):  # type: ignore
 
         return files if folderExists else None
 
+    @staticmethod
+    def _resolveHardLinks(fileInfo: FileInfo, filePath: str, fileVersion: int) -> Optional[str]:
+        """
+        The input to this file is the output of _getFileInfo, meaning filePath is already decoded and contains no
+        versioning information.
+        """
+
+        if stat.S_ISREG(fileInfo.mode) or stat.S_ISLNK(fileInfo.mode) or not fileInfo.linkname:
+            return None
+
+        targetLink = '/' + fileInfo.linkname.lstrip('/')
+        if targetLink != filePath:
+            return targetLink
+
+        # If file is referencing itself, try to access earlier version of it.
+        # The check for fileVersion against the total number of available file versions is omitted because
+        # that check is done implicitly inside the mount sources getFileInfo method!
+        return filePath + '.versions/' + str(fileVersion + 1 if fileVersion >= 0 else fileVersion - 1)
+
     @overrides(FuseOperations)
     def init(self, connection) -> None:
         for mountSource in self.mountSources:
@@ -2083,13 +2109,11 @@ class TarMount(FuseOperations):  # type: ignore
 
     @overrides(FuseOperations)
     def getattr(self, path: str, fh=None) -> Dict[str, Any]:
-        fileInfo, filePath, _ = self._getFileInfo(path)
+        fileInfo, mountSource, filePath, fileVersion = self._getFileInfo(path)
 
-        # Dereference hard links
-        if not stat.S_ISREG(fileInfo.mode) and not stat.S_ISLNK(fileInfo.mode) and fileInfo.linkname:
-            targetLink = '/' + fileInfo.linkname.lstrip('/')
-            if targetLink != filePath:
-                return self.getattr(targetLink, fh)
+        linkedPath = TarMount._resolveHardLinks(fileInfo, filePath, fileVersion)
+        if linkedPath:
+            return self.getattr(linkedPath, fh)
 
         # dictionary keys: https://pubs.opengroup.org/onlinepubs/007904875/basedefs/sys/stat.h.html
         statDict = {"st_" + key: getattr(fileInfo, key) for key in ('size', 'mtime', 'mode', 'uid', 'gid')}
@@ -2141,12 +2165,16 @@ class TarMount(FuseOperations):  # type: ignore
 
     @overrides(FuseOperations)
     def readlink(self, path: str) -> str:
-        fileInfo, _, _ = self._getFileInfo(path)
+        fileInfo, _, _, _ = self._getFileInfo(path)
         return fileInfo.linkname
 
     @overrides(FuseOperations)
     def read(self, path: str, size: int, offset: int, fh: int) -> bytes:
-        fileInfo, mountSource, filePath = self._getFileInfo(path)
+        fileInfo, mountSource, filePath, fileVersion = self._getFileInfo(path)
+
+        linkedPath = TarMount._resolveHardLinks(fileInfo, filePath, fileVersion)
+        if linkedPath:
+            return self.read(linkedPath, size, offset, fh)
 
         # mountSource may only be None for the root folder. However, this read method
         # should  only ever be called on files, so mountSource shoult never be None.
