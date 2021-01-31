@@ -355,6 +355,7 @@ class SQLiteIndexedTar:
         # stores which parent folders were last tried to add to database and therefore do exist
         self.parentFolderCache: List[Tuple[str, str]] = []
         self.sqlConnection: Optional[sqlite3.Connection] = None
+        self.indexFileName = None
 
         # fmt: off
         self.mountRecursively           = recursive
@@ -365,21 +366,15 @@ class SQLiteIndexedTar:
         self.gzipSeekPointSpacing       = gzipSeekPointSpacing
         # fmt: on
 
-        if not tarFileName:
-            if not fileObject:
-                raise ValueError("At least one of tarFileName and fileObject arguments should be set!")
-            self.tarFileName = '<file object>'
-            self._createIndex(fileObject)
-            # return here because we can't find a save location without any identifying name
-            return
-
-        self.tarFileName = os.path.abspath(tarFileName)
-        fileSize = None
         if not fileObject:
+            if not tarFileName:
+                raise ValueError("At least one of tarFileName and fileObject arguments should be set!")
+            self.tarFileName = os.path.abspath(tarFileName) if tarFileName else '<file object>'
             fileObject = open(self.tarFileName, 'rb')
-            fileObject.seek(0, io.SEEK_END)
-            fileSize = fileObject.tell()
-            fileObject.seek(0)
+
+        fileObject.seek(0, io.SEEK_END)
+        fileSize = fileObject.tell()
+        fileObject.seek(0)
 
         # rawFileObject : Only set when opening a compressed file and only kept to keep the
         #                 compressed file handle from being closed by the garbage collector.
@@ -403,6 +398,12 @@ class SQLiteIndexedTar:
             except Exception:
                 pass
 
+        if not tarFileName:
+            self.tarFileName = '<file object>'
+            self._createIndex(fileObject)
+            # return here because we can't find a save location without any identifying name
+            return
+
         # will be used for storing indexes if current path is read-only
         possibleIndexFilePaths = [self.tarFileName + ".index.sqlite"]
         indexPathAsName = self.tarFileName.replace("/", "_") + ".index.sqlite"
@@ -420,7 +421,6 @@ class SQLiteIndexedTar:
                     indexPath = os.path.join(folder, indexPathAsName)
                     possibleIndexFilePaths.append(os.path.abspath(os.path.expanduser(indexPath)))
 
-        self.indexFileName = None
         if clearIndexCache:
             for indexPath in possibleIndexFilePaths:
                 if os.path.isfile(indexPath):
