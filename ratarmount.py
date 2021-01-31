@@ -403,6 +403,7 @@ class SQLiteIndexedTar:
             self._createIndex(fileObject)
             # return here because we can't find a save location without any identifying name
             return
+        self.tarFileName = tarFileName
 
         # will be used for storing indexes if current path is read-only
         possibleIndexFilePaths = [self.tarFileName + ".index.sqlite"]
