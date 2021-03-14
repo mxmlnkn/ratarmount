@@ -1752,9 +1752,21 @@ class FolderMountSource:
             return recursiveTarFileInfo.mountedTar.listDir(pathInMountPoint)
 
         realpath = self._realpath(path)
-        if os.path.isdir(realpath):
-            return os.listdir(realpath)
-        return None
+        if not os.path.isdir(realpath):
+            return None
+
+        files = list(os.listdir(realpath))
+
+        # Check whether we need to add recursive mount points to this directory listing
+        if self.sqliteIndexedTarOptions.get('recursive', False) and self.sqliteIndexedTarOptions.get(
+            'stripRecursiveTarExtension', False
+        ):
+            for mountPoint in self.mountedTars.keys():
+                folder, folderName = os.path.split('/' + mountPoint)
+                if folder == path and folderName not in files:
+                    files.append(folderName)
+
+        return files
 
     def fileVersions(self, path: str) -> int:
         """Returns available versions for a file."""
