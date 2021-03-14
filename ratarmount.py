@@ -18,6 +18,7 @@ import traceback
 from timeit import default_timer as timer
 import typing
 from typing import Any, AnyStr, BinaryIO, Dict, IO, Iterable, List, Optional, Set, Tuple, Union
+from dataclasses import dataclass
 
 # Can't do this dynamically with importlib.import_module and using supportedCompressions
 # because then the static checkers like mypy and pylint won't recognize the modules!
@@ -1667,42 +1668,59 @@ class FolderMountSource:
     This class manages one folder as mount source offering methods for listing folders, reading files, and others.
     """
 
-    __slots__ = ('root', 'mountedTars', 'rootFileInfos')
+    __slots__ = ('root', 'mountedTars', 'lazyMounting', 'sqliteIndexedTarOptions')
 
-    def __init__(self, path: str, **sqliteIndexedTarOptions) -> None:
+    @dataclass
+    class RecursiveTarFileInfo:
+        fullPath: str  # full access path in the original file system
+        # mount point of this recursively mounted TAR is relative root and might have the suffix stripped
+        mountPoint: str
+        rootFileInfo: FileInfo
+        mountedTar: SQLiteIndexedTar
+
+    def __init__(self, path: str, lazyMounting: bool, **sqliteIndexedTarOptions) -> None:
         self.root: str = os.path.realpath(path)
+        self.lazyMounting: bool = lazyMounting
+        self.sqliteIndexedTarOptions = sqliteIndexedTarOptions
         # stores mounted TARs per mount point relative (without leading '/') to self.root.
-        self.mountedTars: Dict[str, SQLiteIndexedTar] = {}
-        self.rootFileInfos: Dict[str, FileInfo] = {}
+        self.mountedTars: Dict[str, FolderMountSource.RecursiveTarFileInfo] = {}
 
         # Find TAR files in this folder and mount them recursively if so requested
-        if sqliteIndexedTarOptions.get('recursive', False) and os.path.isdir(self.root):
-            stripSuffix = sqliteIndexedTarOptions.get('stripRecursiveTarExtension', False)
-            encoding = sqliteIndexedTarOptions.get('encoding', tarfile.ENCODING)
-
+        if sqliteIndexedTarOptions.get('recursive', False) and os.path.isdir(self.root) and not self.lazyMounting:
             for folder, _, files in os.walk(self.root):
                 assert folder.startswith(self.root)
                 folder = folder[len(self.root) + 1 :]
 
-                for filePath in files:
-                    fileName = stripSuffixFromTarFile(filePath)
-                    if fileName == filePath:
-                        continue
+                for fileName in files:
+                    info = self._tryToMountFile(os.path.join(folder, fileName))
+                    if info:
+                        self.mountedTars[info.mountPoint] = info
 
-                    fullPath = os.path.realpath(os.path.join(self.root, folder, filePath))
-                    try:
-                        TarFileType(encoding=encoding)(fullPath)
-                    except argparse.ArgumentTypeError:
-                        continue
+    def _tryToMountFile(self, filePath: str) -> Optional[RecursiveTarFileInfo]:
+        """filePath : relative to self.root"""
 
-                    try:
-                        indexedTar = SQLiteIndexedTar(fullPath, writeIndex=True, **sqliteIndexedTarOptions)
-                    except Exception:
-                        continue
+        # For better performance, only looking at the suffix not at the magic bytes.
+        strippedFilePath = stripSuffixFromTarFile(filePath)
+        if strippedFilePath == filePath:
+            return None
 
-                    mountPoint = os.path.join(folder, fileName if stripSuffix else filePath)
-                    self.mountedTars[mountPoint] = indexedTar
-                    self.rootFileInfos[mountPoint] = _makeMountPointFileInfoFromStats(os.stat(fullPath))
+        # TODO Accessing the old full path will be problematic when lazy mounting over one of its parent folders
+        fullPath = os.path.realpath(os.path.join(self.root, filePath))
+        try:
+            TarFileType(encoding=self.sqliteIndexedTarOptions.get('encoding', tarfile.ENCODING))(fullPath)
+        except argparse.ArgumentTypeError:
+            return None
+
+        try:
+            indexedTar = SQLiteIndexedTar(fullPath, writeIndex=True, **self.sqliteIndexedTarOptions)
+        except Exception:
+            return None
+
+        stripSuffix = self.sqliteIndexedTarOptions.get('stripRecursiveTarExtension', False)
+        mountPoint = strippedFilePath if stripSuffix else filePath
+
+        rootFileInfo = _makeMountPointFileInfoFromStats(os.stat(fullPath))
+        return FolderMountSource.RecursiveTarFileInfo(fullPath, mountPoint, rootFileInfo, indexedTar)
 
     def setFolderDescriptor(self, fd: int) -> None:
         """
@@ -1713,12 +1731,13 @@ class FolderMountSource:
         os.fchdir(fd)
         self.root = '.'
 
-    def _findMountedTar(self, path: str) -> Optional[Tuple[str, str]]:
+    def _findMountedTar(self, path: str) -> Optional[Tuple[str, RecursiveTarFileInfo]]:
         """
         Returns the mount point, which can be found in self.mountedTars, and the rest of the path.
         Basically, it splits path at the appropriate mount point boundary.
         """
-        if not self.mountedTars:
+
+        if not self.sqliteIndexedTarOptions.get('recursive', False) or not os.path.isdir(self.root):
             return None
 
         # TODO Not sure how performance-critical this can turn out, but maybe do something like bisection instead?
@@ -1727,8 +1746,18 @@ class FolderMountSource:
         for i, part in enumerate(parts):
             subPath = os.path.join(subPath, part)
             if subPath in self.mountedTars:
+                assert self.mountedTars[subPath]
                 pathInsideTar = os.path.join(*parts[i + 1 :]) if i + 1 < len(parts) else "/"
-                return subPath, pathInsideTar
+                return pathInsideTar, self.mountedTars[subPath]
+
+            # Try to dynamically mount TAR files
+            if self.lazyMounting:
+                recursiveTarFileInfo = self._tryToMountFile(subPath)
+                if recursiveTarFileInfo:
+                    pathInsideTar = os.path.join(*parts[i + 1 :]) if i + 1 < len(parts) else "/"
+                    self.mountedTars[recursiveTarFileInfo.mountPoint] = recursiveTarFileInfo
+                    return pathInsideTar, recursiveTarFileInfo
+
         return None
 
     def _realpath(self, path: str) -> str:
@@ -1765,24 +1794,26 @@ class FolderMountSource:
 
         pathSplitAtMountPoint = self._findMountedTar(filePath)
         if pathSplitAtMountPoint:
-            mountPoint, pathInMountPoint = pathSplitAtMountPoint
+            pathInMountPoint, recursiveTarFileInfo = pathSplitAtMountPoint
             if pathInMountPoint and pathInMountPoint != '/':
-                fileInfo = self.mountedTars[mountPoint].getFileInfo(pathInMountPoint, fileVersion=fileVersion)
+                fileInfo = recursiveTarFileInfo.mountedTar.getFileInfo(pathInMountPoint, fileVersion=fileVersion)
 
                 if isinstance(fileInfo, FileInfo):
                     # Dereference hard links
                     if not stat.S_ISREG(fileInfo.mode) and not stat.S_ISLNK(fileInfo.mode) and fileInfo.linkname:
                         targetLink = fileInfo.linkname.lstrip('/')
+
+                        # For self-referencing hard links return older versions of that file
                         if targetLink == pathInMountPoint:
                             return self.getFileInfo(
-                                os.path.join(mountPoint, targetLink),
+                                os.path.join(recursiveTarFileInfo.mountPoint, targetLink),
                                 fileVersion + 1 if fileVersion >= 0 else fileVersion - 1,
                             )
-                        else:
-                            return self.getFileInfo(os.path.join(mountPoint, targetLink), fileVersion)
+
+                        return self.getFileInfo(os.path.join(recursiveTarFileInfo.mountPoint, targetLink), fileVersion)
                     return fileInfo
                 return None
-            return self.rootFileInfos[mountPoint]
+            return recursiveTarFileInfo.rootFileInfo
 
         # This is a bit of problematic design, however, the fileVersions count from 1 for the user.
         # And as -1 means the last version, 0 should also mean the first version ...
@@ -1799,20 +1830,32 @@ class FolderMountSource:
         """
         pathSplitAtMountPoint = self._findMountedTar(path)
         if pathSplitAtMountPoint:
-            mountPoint, pathInMountPoint = pathSplitAtMountPoint
-            return self.mountedTars[mountPoint].listDir(pathInMountPoint)
+            pathInMountPoint, recursiveTarFileInfo = pathSplitAtMountPoint
+            return recursiveTarFileInfo.mountedTar.listDir(pathInMountPoint)
 
         realpath = self._realpath(path)
-        if os.path.isdir(realpath):
-            return os.listdir(realpath)
-        return None
+        if not os.path.isdir(realpath):
+            return None
+
+        files = list(os.listdir(realpath))
+
+        # Check whether we need to add recursive mount points to this directory listing
+        if self.sqliteIndexedTarOptions.get('recursive', False) and self.sqliteIndexedTarOptions.get(
+            'stripRecursiveTarExtension', False
+        ):
+            for mountPoint in self.mountedTars.keys():
+                folder, folderName = os.path.split('/' + mountPoint)
+                if folder == path and folderName not in files:
+                    files.append(folderName)
+
+        return files
 
     def fileVersions(self, path: str) -> int:
         """Returns available versions for a file."""
         pathSplitAtMountPoint = self._findMountedTar(path)
         if pathSplitAtMountPoint:
-            mountPoint, pathInMountPoint = pathSplitAtMountPoint
-            return self.mountedTars[mountPoint].fileVersions(pathInMountPoint)
+            pathInMountPoint, recursiveTarFileInfo = pathSplitAtMountPoint
+            return recursiveTarFileInfo.mountedTar.fileVersions(pathInMountPoint)
         return 1 if self._exists(path) else 0
 
     def read(self, path: str, size: int, offset: int, fileInfo: Optional[FileInfo] = None) -> bytes:
@@ -1821,8 +1864,8 @@ class FolderMountSource:
         """
         pathSplitAtMountPoint = self._findMountedTar(path)
         if pathSplitAtMountPoint:
-            mountPoint, pathInMountPoint = pathSplitAtMountPoint
-            return self.mountedTars[mountPoint].read(pathInMountPoint, size, offset, fileInfo)
+            pathInMountPoint, recursiveTarFileInfo = pathSplitAtMountPoint
+            return recursiveTarFileInfo.mountedTar.read(pathInMountPoint, size, offset, fileInfo)
 
         realpath = self._realpath(path)
         if not self._exists(path):
@@ -1880,7 +1923,9 @@ class TarMount(FuseOperations):  # type: ignore
         'mountPointWasCreated',
     )
 
-    def __init__(self, pathToMount: Union[str, List[str]], mountPoint: str, **sqliteIndexedTarOptions) -> None:
+    def __init__(
+        self, pathToMount: Union[str, List[str]], mountPoint: str, lazyMounting: bool, **sqliteIndexedTarOptions
+    ) -> None:
         if not isinstance(pathToMount, list):
             try:
                 os.fspath(pathToMount)
@@ -1892,7 +1937,7 @@ class TarMount(FuseOperations):  # type: ignore
         self.mountSources: List[Union[SQLiteIndexedTar, FolderMountSource]] = [
             SQLiteIndexedTar(tarFile, writeIndex=True, **sqliteIndexedTarOptions)
             if not os.path.isdir(tarFile)
-            else FolderMountSource(tarFile, **sqliteIndexedTarOptions)
+            else FolderMountSource(tarFile, lazyMounting=lazyMounting, **sqliteIndexedTarOptions)
             for tarFile in pathToMount
         ]
 
@@ -2109,7 +2154,7 @@ class TarMount(FuseOperations):  # type: ignore
 
     @overrides(FuseOperations)
     def getattr(self, path: str, fh=None) -> Dict[str, Any]:
-        fileInfo, mountSource, filePath, fileVersion = self._getFileInfo(path)
+        fileInfo, _, filePath, fileVersion = self._getFileInfo(path)
 
         linkedPath = TarMount._resolveHardLinks(fileInfo, filePath, fileVersion)
         if linkedPath:
@@ -2246,7 +2291,7 @@ class TarFileType:
 class _CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):
     def add_arguments(self, actions):
         actions = sorted(actions, key=lambda x: getattr(x, 'option_strings'))
-        super(_CustomFormatter, self).add_arguments(actions)
+        super().add_arguments(actions)
 
 
 def _parseArgs(rawArgs: Optional[List[str]] = None):
@@ -2375,6 +2420,11 @@ seeking capabilities when opening that file.
                'Note that this only has an effect when creating an index. '
                'If an index already exists, then this option will be effectively ignored. '
                'Recreate the index if you want change the recursive mounting policy anyways.' )
+
+    parser.add_argument(
+        '-l', '--lazy', action='store_true', default = False,
+        help = 'When used with recursively bind-mounted folders, TAR files inside the mounted folder will only be '
+               'mounted on first access to it.' )
 
     # Considerations for the default value:
     #   - seek times for the bz2 backend are between 0.01s and 0.1s
@@ -2564,6 +2614,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         stripRecursiveTarExtension = args.strip_recursive_tar_extension,
         indexFileName              = args.index_file,
         indexFolders               = args.index_folders,
+        lazyMounting               = args.lazy,
         # fmt: on
     )
 

@@ -3,6 +3,10 @@
 
  - Fix SQLiteIndexedTar class when being called with a file object.
  - Add -P argument option to activate the parallel BZ2 decoder of indexed_bzip2 1.2.0.
+ - Add --lazy option, which works in tandem with --recursive, and bind mounted folders.
+   TARs inside the source folder will be mounted only after the first access to it through the mount point.
+ - TARs containing hard links to files with exactly the same name will be interpreted as referring
+   to a prior version of that file.
 
 # Version 0.7.0 built on 2020-12-20
 

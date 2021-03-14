@@ -258,6 +258,9 @@ optional arguments:
                         option instructs it to read further and is useful when
                         reading archives created with the -A option. (default:
                         False)
+  -l, --lazy            When used with recursively bind-mounted folders, TAR
+                        files inside the mounted folder will only be mounted
+                        on first access to it. (default: False)
   -o FUSE, --fuse FUSE  Comma separated FUSE options. See "man mount.fuse" for
                         help. Example: --fuse
                         "allow_other,entry_timeout=2.8,gid=0". (default: )

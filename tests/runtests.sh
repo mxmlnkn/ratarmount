@@ -969,7 +969,7 @@ checkRecursiveFolderMounting()
     for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
         'cp' --no-clobber -- "${tests[iTest+1]}" "$archiveFolder"
     done
-    runAndCheckRatarmount -c --ignore-zeros --recursive "$archiveFolder" "$mountFolder"
+    runAndCheckRatarmount -c --ignore-zeros --recursive "$@" "$archiveFolder" "$mountFolder"
 
     local nChecks=0
     for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
@@ -1152,6 +1152,7 @@ checkSelfReferencingHardLinks tests/two-self-links.tar ||
     returnError "$LINENO" 'Self-referencing hardlinks test failed!'
 
 checkRecursiveFolderMounting
+checkRecursiveFolderMounting --lazy
 
 for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
     checksum=${tests[iTest]}
