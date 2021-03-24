@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     strategy:
       matrix:
         # Oldest and newest versions should be enough. Python versions are supported 5 years from release date.
