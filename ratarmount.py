@@ -374,6 +374,9 @@ class SQLiteIndexedTar:
                 raise ValueError("At least one of tarFileName and fileObject arguments should be set!")
             self.tarFileName = os.path.abspath(tarFileName) if tarFileName else '<file object>'
             fileObject = open(self.tarFileName, 'rb')
+        elif tarFileName:
+            # If tarFileName was specified for a file object, set self.tarFileName accordingly.
+            self.tarFileName = tarFileName
 
         fileObject.seek(0, io.SEEK_END)
         fileSize = fileObject.tell()
@@ -748,7 +751,10 @@ class SQLiteIndexedTar:
                 pass
 
         if progressBar is None:
-            progressBar = ProgressBar(os.fstat(fileObject.fileno()).st_size)
+            try:
+                progressBar = ProgressBar(os.fstat(fileObject.fileno()).st_size)
+            except io.UnsupportedOperation:
+                pass
 
         # 3. Iterate over files inside TAR and add them to the database
         try:
@@ -870,7 +876,12 @@ class SQLiteIndexedTar:
         # so check stream offset.
         fileCount = self.sqlConnection.execute('SELECT COUNT(*) FROM "files";').fetchone()[0]
         if fileCount == 0:
-            tarInfo = os.fstat(fileObject.fileno())
+            try:
+                tarInfo = os.fstat(fileObject.fileno())
+            except io.UnsupportedOperation:
+                # If fileObject doesn't have a fileno, we set tarInfo to None
+                # and set the relevant statistics (such as st_mtime) to sensible defaults.
+                tarInfo = None
             fname = os.path.basename(self.tarFileName)
             for suffix in ['.gz', '.bz2', '.bzip2', '.gzip', '.xz', '.zst', '.zstd']:
                 if fname.lower().endswith(suffix) and len(fname) > len(suffix):
@@ -886,17 +897,17 @@ class SQLiteIndexedTar:
 
             # fmt: off
             fileInfo = (
-                ""                 ,  # 0 path
-                fname              ,  # 1
-                None               ,  # 2 header offset
-                0                  ,  # 3 data offset
-                fileSize           ,  # 4
-                tarInfo.st_mtime   ,  # 5
-                tarInfo.st_mode    ,  # 6
-                None               ,  # 7 TAR file type. Currently unused but overlaps with mode anyways
-                None               ,  # 8 linkname
-                tarInfo.st_uid     ,  # 9
-                tarInfo.st_gid     ,  # 10
+                ""                                          ,  # 0 path
+                fname                                       ,  # 1
+                None                                        ,  # 2 header offset
+                0                                           ,  # 3 data offset
+                fileSize                                    ,  # 4
+                tarInfo.st_mtime if tarInfo else 0          ,  # 5
+                tarInfo.st_mode if tarInfo else 0o444       ,  # 6
+                None                                        ,  # 7 TAR file type. Currently unused but overlaps with mode anyways
+                None                                        ,  # 8 linkname
+                tarInfo.st_uid if tarInfo else 0            ,  # 9
+                tarInfo.st_gid if tarInfo else 0            ,  # 10
                 False              ,  # 11 isTar
                 False              ,  # 12 isSparse, don't care if it is actually sparse or not because it is not in TAR
             )
