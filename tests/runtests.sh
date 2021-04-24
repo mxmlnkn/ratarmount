@@ -126,9 +126,17 @@ returnError()
     else
         message=$*
     fi
+
     echoerr -e "\e[37m${FUNCNAME[1]}$lineNumber <- ${FUNCNAME[*]:2}\e[0m"
     echoerr -e "\e[37m$message\e[0m"
     echoerr -e '\e[31mTEST FAILED!\e[0m'
+
+    echo "==> ratarmount.stdout.log <=="
+    cat ratarmount.stdout.log
+    echo
+    echo "==> ratarmount.stderr.log <=="
+    cat ratarmount.stderr.log
+
     exit 1
 }
 
