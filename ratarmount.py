@@ -20,10 +20,12 @@ import typing
 from typing import Any, AnyStr, BinaryIO, Dict, IO, Iterable, List, Optional, Set, Tuple, Union
 from dataclasses import dataclass
 
-import fuse
-
 # Can't do this dynamically with importlib.import_module and using supportedCompressions
 # because then the static checkers like mypy and pylint won't recognize the modules!
+try:
+    import fuse
+except ImportError:
+    pass
 try:
     import indexed_bzip2
 except ImportError:
@@ -1083,7 +1085,9 @@ class SQLiteIndexedTar:
                 result = tmpFileObject.read(size)
             else:
                 print("tarfile.extractfile returned nothing!")
-                raise fuse.FuseOSError(fuse.errno.EIO)
+                raise fuse.FuseOSError(fuse.errno.EIO) if "fuse" in sys.modules else Exception(
+                    "tarfile.extractfile returned nothing!"
+                )
         return result
 
     def _tryAddParentFolders(self, path: str) -> None:
@@ -1797,7 +1801,30 @@ class FolderMountSource:
             return file.read(size)
 
 
-class TarMount(fuse.Operations):
+class DummyFuseOperations:
+    """A dummy class that is used to replace
+    fuse.Operations if fusepy is not installed."""
+
+    def init(self):
+        pass
+
+    def getattr(self):
+        pass
+
+    def read(self):
+        pass
+
+    def readdir(self):
+        pass
+
+    def readlink(self):
+        pass
+
+
+FuseOperations = fuse.Operations if 'fuse' in sys.modules else DummyFuseOperations
+
+
+class TarMount(FuseOperations):  # type: ignore
     """
     This class implements the fusepy interface in order to create a mounted file system view
     to a TAR archive.
@@ -2006,13 +2033,13 @@ class TarMount(fuse.Operations):
 
         return files if folderExists else None
 
-    @overrides(fuse.Operations)
+    @overrides(FuseOperations)
     def init(self, connection) -> None:
         for mountSource in self.mountSources:
             if isinstance(mountSource, FolderMountSource) and mountSource.root == self.mountPoint:
                 mountSource.setFolderDescriptor(self.mountPointFd)
 
-    @overrides(fuse.Operations)
+    @overrides(FuseOperations)
     def getattr(self, path: str, fh=None) -> Dict[str, Any]:
         fileInfo, _, filePath = self._getFileInfo(path)
 
@@ -2045,7 +2072,7 @@ class TarMount(fuse.Operations):
 
         return statDict
 
-    @overrides(fuse.Operations)
+    @overrides(FuseOperations)
     def readdir(self, path: str, fh):
         # we only need to return these special directories. FUSE automatically expands these and will not ask
         # for paths like /../foo/./../bar, so we don't need to worry about cleaning such paths
@@ -2078,12 +2105,12 @@ class TarMount(fuse.Operations):
                 version += 1
                 yield str(version)
 
-    @overrides(fuse.Operations)
+    @overrides(FuseOperations)
     def readlink(self, path: str) -> str:
         fileInfo, _, _ = self._getFileInfo(path)
         return fileInfo.linkname
 
-    @overrides(fuse.Operations)
+    @overrides(FuseOperations)
     def read(self, path: str, size: int, offset: int, fh: int) -> bytes:
         fileInfo, mountSource, filePath = self._getFileInfo(path)
 

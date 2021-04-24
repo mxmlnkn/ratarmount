@@ -72,3 +72,7 @@ jobs:
     - name: Regression Tests
       run: |
         bash tests/runtests.sh
+    - name: Module tests without fusepy
+      run: |
+        python3 -m pip uninstall -y fusepy
+        python3 tests/tests.py
