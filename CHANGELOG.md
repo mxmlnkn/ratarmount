@@ -1,4 +1,8 @@
 
+# Version 0.8.0 built on 2021-06-xx
+
+ - Fix SQLiteIndexedTar class when being called with a file object
+
 # Version 0.7.0 built on 2020-12-20
 
  - Add CLI options --index-file and --index-folder to specify an index location or folder.
