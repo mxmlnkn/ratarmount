@@ -1001,7 +1001,7 @@ if [[ -z "$CI" ]]; then
     fi
     mypy ratarmount.py setup.py || returnError "$LINENO" 'Mypy failed!'
     pytype -d import-error ratarmount.py || returnError "$LINENO" 'Pytype failed!'
-    black -q --line-length 120 --skip-string-normalization ratarmount.py
+    black -q --line-length 120 --skip-string-normalization ratarmount.py tests/tests.py
 
     shellcheck tests/*.sh || returnError "$LINENO" 'shellcheck failed!'
 fi
