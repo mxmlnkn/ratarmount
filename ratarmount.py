@@ -46,6 +46,25 @@ except ImportError:
 __version__ = '0.7.0'
 
 
+parallelization = 1
+
+
+def openBzip2Reader(fileobj):
+    if (
+        'indexed_bzip2' in sys.modules
+        and len(indexed_bzip2.__version__.split('.')) >= 2
+        and int(indexed_bzip2.__version__.split('.')[0]) >= 1
+        and int(indexed_bzip2.__version__.split('.')[1]) >= 2
+    ):
+        return indexed_bzip2.IndexedBzip2File(fileobj.fileno(), parallelization=parallelization)
+
+    if parallelization != 1:
+        print("[Warning] The specified parallelization degree of '{}' can only be applied".format(parallelization))
+        print("[Warning] for the bzip2 decoder with indexed_bzip2 >= 1.2.0 available but no such thing was not found!")
+
+    return indexed_bzip2.IndexedBzip2File(fileobj.fileno())
+
+
 # Defining lambdas does not yet check the names of entities used inside the lambda!
 CompressionInfo = collections.namedtuple(
     'CompressionInfo', ['suffixes', 'doubleSuffixes', 'moduleName', 'checkHeader', 'open']
@@ -56,7 +75,7 @@ supportedCompressions = {
         ['tb2', 'tbz', 'tbz2', 'tz2'],
         'indexed_bzip2',
         lambda x: (x.read(4)[:3] == b'BZh' and x.read(6) == (0x314159265359).to_bytes(6, 'big')),
-        lambda x: indexed_bzip2.IndexedBzip2File(x.fileno()),
+        openBzip2Reader,
     ),
     'gz': CompressionInfo(
         ['gz', 'gzip'],
@@ -1837,12 +1856,26 @@ class TarMount(FuseOperations):  # type: ignore
             except Exception:
                 pass
 
+        # This also will create or load the block offsets for compressed formats
         self.mountSources: List[Union[SQLiteIndexedTar, FolderMountSource]] = [
             SQLiteIndexedTar(tarFile, writeIndex=True, **sqliteIndexedTarOptions)
             if not os.path.isdir(tarFile)
             else FolderMountSource(tarFile, **sqliteIndexedTarOptions)
             for tarFile in pathToMount
         ]
+
+        # No threads should be created and still be open before FUSE forks.
+        # Instead, they should be created in 'init'.
+        # Therefore, close threads opened by the ParallelBZ2Reader for creating the block offsets.
+        # Those threads will be automatically recreated again on the next read call.
+        # Without this, the ratarmount background process won't quit even after unmounting!
+        for mountSource in self.mountSources:
+            if (
+                isinstance(mountSource, SQLiteIndexedTar)
+                and hasattr(mountSource, 'tarFileObject')
+                and hasattr(mountSource.tarFileObject, 'join_threads')
+            ):
+                mountSource.tarFileObject.join_threads()
 
         self.rootFileInfo = _makeMountPointFileInfoFromStats(os.stat(pathToMount[0]))
 
@@ -2156,7 +2189,9 @@ class TarFileType:
 
 
 class _CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):
-    pass
+    def add_arguments(self, actions):
+        actions = sorted(actions, key=lambda x: getattr(x, 'option_strings'))
+        super(_CustomFormatter, self).add_arguments(actions)
 
 
 def _parseArgs(rawArgs: Optional[List[str]] = None):
@@ -2363,6 +2398,12 @@ seeking capabilities when opening that file.
                'Example: --fuse "allow_other,entry_timeout=2.8,gid=0". ' )
 
     parser.add_argument(
+        '-P', '--parallelization', type = int, default = 1,
+        help = 'If an integer other than 1 is specified, then the threaded parallel bzip2 decoder will be used '
+               'specified amount of block decoder threads. Further threads with lighter work may be started. '
+               'A value of 0 will use all the available cores ({}).'.format(os.cpu_count()))
+
+    parser.add_argument(
         '-v', '--version', action='store_true', help = 'Print version string.' )
 
     parser.add_argument(
@@ -2413,6 +2454,12 @@ seeking capabilities when opening that file.
             args.index_folders = json.loads(args.index_folders)
         elif ',' in args.index_folders:
             args.index_folders = args.index_folders.split(',')
+
+    # Check the parallelization argument and move to global variable
+    if args.parallelization < 0:
+        raise argparse.ArgumentTypeError("Argument for parallelization must be non-negative!")
+    global parallelization
+    parallelization = args.parallelization if args.parallelization > 0 else os.cpu_count()
 
     return args
 

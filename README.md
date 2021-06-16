@@ -155,10 +155,11 @@ Here is a more recent test for version 0.2.0 with the new default SQLite backend
 # Usage
 
 ```
-usage: ratarmount [-h] [-f] [-d DEBUG] [-c] [-r] [-gs GZIP_SEEK_POINT_SPACING]
-                  [-p PREFIX] [-e ENCODING] [-i] [--verify-mtime] [-s]
-                  [--index-file INDEX_FILE] [--index-folders INDEX_FOLDERS]
-                  [-o FUSE] [-v]
+usage: ratarmount [-h] [-f] [-d DEBUG] [-c] [-r] [-l]
+                  [-gs GZIP_SEEK_POINT_SPACING] [-p PREFIX] [-e ENCODING]
+                  [-i] [--verify-mtime] [-s] [--index-file INDEX_FILE]
+                  [--index-folders INDEX_FOLDERS] [-o FUSE]
+                  [-P PARALLELISM] [-v]
                   mount_source [mount_source ...] [mount_point]
 
 With ratarmount, you can:
@@ -209,6 +210,12 @@ optional arguments:
                         might change during copying or downloading without the
                         contents changing. So, this check might cause false
                         positives. (default: False)
+  -P PARALLELISM, --parallelism PARALLELISM
+                        If an integer other than 1 is specified, then the
+                        threaded parallel bzip2 decoder will be used specified
+                        amount of block decoder threads. Further threads with
+                        lighter work may be started. A value of 0 will use all
+                        the available cores (24). (default: 1)
   -c, --recreate-index  If specified, pre-existing .index files will be
                         deleted and newly created. (default: False)
   -d DEBUG, --debug DEBUG

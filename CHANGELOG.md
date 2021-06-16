@@ -1,7 +1,8 @@
 
-# Version 0.8.0 built on 2021-06-xx
+# Version 0.8.0 built on 2021-06-27
 
- - Fix SQLiteIndexedTar class when being called with a file object
+ - Fix SQLiteIndexedTar class when being called with a file object.
+ - Add -P argument option to activate the parallel BZ2 decoder of indexed_bzip2 1.2.0.
 
 # Version 0.7.0 built on 2020-12-20
 

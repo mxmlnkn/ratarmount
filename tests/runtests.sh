@@ -163,7 +163,7 @@ checkFileInTAR()
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # try with index recreation
-    local args=( -c --ignore-zeros --recursive "$archive" "$mountFolder" )
+    local args=( -P "$parallelization" -c --ignore-zeros --recursive "$archive" "$mountFolder" )
     {
         runAndCheckRatarmount "${args[@]}" &&
         checkStat "$mountFolder/$fileInTar" &&
@@ -174,7 +174,7 @@ checkFileInTAR()
         returnError "$LINENO" "Looks like index was not created while executing: $RATARMOUNT_CMD $*"
 
     # retry without forcing index recreation
-    local args=( --ignore-zeros --recursive "$archive" "$mountFolder" )
+    local args=( -P "$parallelization" --ignore-zeros --recursive "$archive" "$mountFolder" )
     {
         runAndCheckRatarmount "${args[@]}" &&
         checkStat "$mountFolder/$fileInTar" &&
@@ -205,7 +205,7 @@ checkFileInTARPrefix()
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # try with index recreation
-    local args=( -c --ignore-zeros --recursive --prefix "$prefix" "$archive" "$mountFolder" )
+    local args=( -P "$parallelization" -c --ignore-zeros --recursive --prefix "$prefix" "$archive" "$mountFolder" )
     {
         runAndCheckRatarmount "${args[@]}" &&
         checkStat "$mountFolder/$fileInTar" &&
@@ -231,7 +231,7 @@ checkLinkInTAR()
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # try with index recreation
-    local args=( -c --recursive "$archive" "$mountFolder" )
+    local args=( -P "$parallelization" -c --recursive "$archive" "$mountFolder" )
     {
         runAndCheckRatarmount "${args[@]}" &&
         checkStat "$mountFolder/$fileInTar"
@@ -344,7 +344,7 @@ testLargeTar()
 
     # benchmark creating the index
 
-    $RATARMOUNT_CMD -c -f --recursive "$largeTar" "$mountFolder" &
+    $RATARMOUNT_CMD -P "$parallelization" -c -f --recursive "$largeTar" "$mountFolder" &
     local ratarmountPid="$!"
     #trap "kill $ratarmountPid" SIGINT SIGTERM # for some reason makes the program unclosable ...
 
@@ -359,7 +359,7 @@ testLargeTar()
 
     # do again but this time benchmark loading the created index
 
-    $RATARMOUNT_CMD -f --recursive "$largeTar" "$mountFolder" &
+    $RATARMOUNT_CMD -P "$parallelization" -f --recursive "$largeTar" "$mountFolder" &
     local ratarmountPid="$!"
 
     local timeSeriesFile="benchmark-memory-${fileNameDataSizeInMB}-MiB-loading.dat"
@@ -1055,6 +1055,12 @@ tests=(
     19696f24a91fc4e8950026f9c801a0d0 tests/simple.gz                              simple
 )
 
+
+for parallelization in 1 2 0; do
+
+export parallelization
+
+
 checkIndexPathOption tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
 checkIndexFolderFallback tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
 checkIndexArgumentChangeDetection tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
@@ -1106,5 +1112,8 @@ benchmarkDecoderBackends
 
 rm -f tests/*.index.*
 rmdir tests/*/
+
+done  # for parallelization
+
 
 echo -e '\e[32mAll tests ran successfully.\e[0m'
