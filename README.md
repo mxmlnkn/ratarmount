@@ -380,7 +380,7 @@ createMultiFrameZstd()
 
     # Create a temporary file. I avoid simply piping to zstd
     # because it wouldn't store the uncompressed size.
-    if [[ -d --tmpdir=/dev/shm ]]; then frameFile=$( mktemp --tmpdir=/dev/shm ); fi
+    if [[ -d /dev/shm ]]; then frameFile=$( mktemp --tmpdir=/dev/shm ); fi
     if [[ -z $frameFile ]]; then frameFile=$( mktemp ); fi
     if [[ -z $frameFile ]]; then
         echo "Could not create a temporary file for the frames." 1>&2
