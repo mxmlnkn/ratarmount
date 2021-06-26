@@ -1098,7 +1098,7 @@ class SQLiteIndexedTar:
             """.format(
                 'DESC' if fileVersion is None or fileVersion <= 0 else 'ASC'
             ),
-            (path, name, 0 if fileVersion is None else fileVersion - 1 if fileVersion > 0 else fileVersion),
+            (path, name, 0 if fileVersion is None else fileVersion - 1 if fileVersion > 0 else -fileVersion),
         ).fetchone()
         return self._rowToFileInfo(row) if row else None
 
