@@ -341,6 +341,20 @@ by default shown version has 1024 bytes. So, in order to look at the oldest
 version, you can simply do:
     cat mountpoint/foo.versions/1
 
+## Prefix Removal
+
+Use `ratarmount -o modules=subdir,subdir=<prefix>` to remove path prefixes
+using the FUSE `subdir` module. Because it is a standard FUSE feature, the
+`-o ...` argument should also work for other FUSE applications.
+
+When mounting an archive created with absolute paths, e.g.,
+`tar -P cf /var/log/apt/history.log`, you would see the whole `var/log/apt`
+hierarchy under the mount point. To avoid that, specified prefixes can be
+stripped from paths so that the mount target directory **directly** contains
+`history.log`. Use `ratarmount -o modules=subdir,subdir=/var/log/apt/` to do
+so. The specified path to the folder inside the TAR will be mounted to root,
+i.e., the mount point.
+
 ## Compressed non-TAR files
 
 If you want a compressed file not containing a TAR, e.g., `foo.bz2`, then
