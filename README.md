@@ -41,8 +41,15 @@ In [contrast](https://github.com/libarchive/libarchive#notes-about-the-library-d
 
 # Installation
 
-You can simply install it from PyPI:
+Python 3.6 or higher and preferably pip 19.0 or higher are required.
+On Debian-like systems like Ubuntu, you can install both using:
+
+```bash
+sudo apt install python3 python3-pip
 ```
+
+Then, you can simply install ratarmount from PyPI:
+```bash
 pip install ratarmount
 ```
 
