@@ -73,14 +73,24 @@ pip3 install --user lzmaffi
 
 ## Benchmarks
 
-During the making of this project several benchmarks were created. These can be viewed [here](benchmarks/BENCHMARKS.md).
-These are some of the things benchmarked and compared there:
-
-  - Memory and runtime comparisons of backends for saving the index with offsets
-  - Comparison of SQLite table designs
-  - Mounting and file access time comparison between archivemount and ratarmount
-
 ![Benchmark comparison between ratarmount and archivemount](benchmarks/plots/archivemount-comparison.png)
+
+
+ - Not shown in the benchmarks, but ratarmount can mount files with **preexisting index sidecar files** in under a second making it **vastly more efficient** compared to archivemount for every **subsequent mounts**.
+   Also archivemount has no progress indicator making it very unlikely the user will wait hours for the mounting to finish.
+ - **Getting file contents** of a mounted archive is generally **vastly faster** than archivemount and, in contrast to archivemount, does not increase with the archive size or file count resulting in the largest observed speedups to be around 5 orders of magnitudes!
+ - **Memory consumption** of ratarmount is mostly **less** than archivemount and mostly does not grow with the archive size.
+   The gzip backend grows linearly with the archive size because the data for seeking is thousands of times larger than the simple two 64-bit offsets required for bzip2.
+   The memory usage of the zstd backend only seems humungous because it uses `mmap` to open.
+   The memory used by `mmap` is not even counted as used memory when showing the memory usage with `free` or `htop`.
+ - For empty files, mounting with ratarmount and archivemount does not seem be bounded by decompression nor I/O bandwidths but instead by the algorithm for creating the internal file index.
+   This algorithm scales linear for ratarmount but seems to scale worse than even quadratically for archives >100GB when using archivemount.
+ - Mounting **bzip2** archives has actually become **faster** than archivemount with `ratarmount -P 0` on most modern processors because archivemount only uses one core for decoding bzip2. `indexed_bzip2` supports block **parallel decoding** since version 1.2.0.
+ - **Gzip** compressed TAR files are roughly one order of magnitude **slower** with ratarmount than archivemount during first time mounting.
+ - For the other cases, mounting times become roughly the same compared to archivemount for archives with 2M files in an approximately 100GB archive.
+ - **Getting a lot of metadata** for archive contents as demonstrated by calling `find` on the mount point is generally more than an order of magnitude **slower** compared to archivemount, probably because of the Python and SQLite layer in contrast to a pure C implementation.
+
+Further benchmarks can be viewed [here](benchmarks/BENCHMARKS.md).
 
 
 # The Problem

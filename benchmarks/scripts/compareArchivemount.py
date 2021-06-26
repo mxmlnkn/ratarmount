@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
 
+import fnmatch
+import os
+import re
+import sys
+from itertools import cycle
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-import sys, os, fnmatch, re
-from itertools import cycle
+import pandas as pd
 
 
 lineStyles = [ '-', '--', ':', '-.' ]
 colors = [ '#1f77b4', '#d62728', 'g' ] # https://matplotlib.org/3.1.1/_images/dflt_style_changes-1.png
-markers = [ '*', '+', 'o', 'x' ]
+markers = [ '+', 'o', '*', 'x' ]
+
 
 def axisValueReduction( ax, axis, reduction, init ):
     import numpy as np
@@ -39,6 +45,13 @@ def axisValueReduction( ax, axis, reduction, init ):
     return result
 
 
+def readLabelsFromFirstComment( fileName ):
+    with open( fileName ) as file:
+        for line in file:
+            line = line.strip()
+            if line[0] == '#':
+                return line[1:].strip().split( ' ' )
+
 def loadData( fileName ):
     labels = None
     data = {}
@@ -57,9 +70,16 @@ def loadData( fileName ):
                     data[tool] = {}
 
                 # Not interested in command arguments like cat <file>
-                command = row[1].strip( '"' ).split( ' ' )[0]
-                if command == tool:
+                # This assumed that all "tools" are devoid of spaces but now I added "ratarmount -P 24" as a "tool"
+                command = row[1].strip( '"' )
+                if command.startswith( "ratarmount -P" ):
+                    command = ' '.join( command.split( ' ' )[:3] )
+                else:
+                    command = command.split( ' ' )[0]
+
+                if command.startswith( tool ):
                     command = "mount"
+
                 if command not in data[tool]:
                     data[tool][command] = {}
 
@@ -67,7 +87,10 @@ def loadData( fileName ):
                 if compression not in data[tool][command]:
                     data[tool][command][compression] = []
 
-                data[tool][command][compression] += [ np.array( row[3:], dtype = 'float' ) ]
+                if labels[-1] == 'startTime':
+                    data[tool][command][compression] += [ np.array( row[3:-1], dtype = 'float' ) ]
+                else:
+                    data[tool][command][compression] += [ np.array( row[3], dtype = 'float' ) ]
 
     for key, value in data.items():
         for command, values in value.items():
@@ -76,9 +99,8 @@ def loadData( fileName ):
 
     return labels[3:], data
 
-def plotBenchmark( fileName, ax, command, metric ):
-    labels, data = loadData( fileName )
-    tools = [ 'archivemount', 'ratarmount' ]
+
+def plotBenchmark( labels, data, ax, command, metric, tools ):
     compressions = None
     fileSizes = None
     xs = np.array( [] )
@@ -115,20 +137,30 @@ def plotBenchmark( fileName, ax, command, metric ):
                 if len( xu ) == len( x ):
                     ax.plot( x, y, linestyle = lineStyles[j], color = colors[i], marker = markers[k] )
                 else:
-                    ymean = np.array( [ np.mean( y[x == xi] ) for xi in xu ] )
-                    ymin  = np.array( [ np.min ( y[x == xi] ) for xi in xu ] )
-                    ymax  = np.array( [ np.max ( y[x == xi] ) for xi in xu ] )
-                    lines = ax.errorbar( xu, ymean, [ ymean - ymin, ymax - ymean ],
-                                         linestyle = lineStyles[j], color = colors[i],
-                                         marker = markers[k], capsize = 3 )
-                    lines[-1][0].set_linestyle( lineStyles[j] )
+                    ymedian = np.array( [ np.median( y[x == xi] ) for xi in xu ] )
+                    ymean   = np.array( [ np.mean  ( y[x == xi] ) for xi in xu ] )
+                    ymin    = np.array( [ np.min   ( y[x == xi] ) for xi in xu ] )
+                    ymax    = np.array( [ np.max   ( y[x == xi] ) for xi in xu ] )
+
+                    if True:
+                        lines = ax.errorbar(
+                            xu, ymean, [ ymean - ymin, ymax - ymean ], capsize = 3 ,
+                            linestyle = lineStyles[j], color = colors[i], marker = markers[k]
+                        )
+                        lines[-1][0].set_linestyle( lineStyles[j] )
+                    else:
+                        # ymin? ymax? ymean?
+                        lines = ax.plot( xu, ymedian,
+                             linestyle = lineStyles[j], color = colors[i], marker = markers[k]
+                        )
+                        lines[0].set_linestyle( lineStyles[j] )
 
                 xs = np.append( xs, x )
                 ys = np.append( ys, y )
 
     x = 10 ** np.linspace( np.log10( np.min( xs ) ), np.log10( np.max( xs ) ) )
     y = x;
-    y = 2 * y / y[-1] * np.max( ys )
+    y = 5 * y / y[-1] * np.max( ys )
     ax.plot( x[y > np.min(ys)], y[y > np.min(ys)], color = 'k', label = "linear scaling" )
 
     for i, tool in enumerate( tools ):
@@ -138,7 +170,12 @@ def plotBenchmark( fileName, ax, command, metric ):
     for k, nBytesPerFile in enumerate( fileSizes ):
         ax.plot( [ None ], [ None ], linestyle = '', marker = markers[k], color = '0.5', label = "{}B per File".format( int( nBytesPerFile ) ) )
 
-def plotPeakMemory( fileName ):
+def plotComparison( fileName ):
+    labels, data = loadData( fileName )
+
+    availableTools = data.keys()
+    tools = [ 'archivemount', 'ratarmount -P 24' if 'ratarmount -P 24' in availableTools else 'ratarmount' ]
+
     fig = plt.figure( figsize = ( 10, 8 ) )
     ax = fig.add_subplot( 221,
         title = "Peak Resident Memory Usage During Mounting",
@@ -148,7 +185,7 @@ def plotPeakMemory( fileName ):
         yscale = 'log',
     )
 
-    plotBenchmark( fileName, ax, "mount", "peakRssMemory/kiB" )
+    plotBenchmark( labels, data, ax, "mount", "peakRssMemory/kiB", tools )
 
     ax.legend( loc = 'best' )
 
@@ -160,7 +197,7 @@ def plotPeakMemory( fileName ):
         yscale = 'log',
     )
 
-    plotBenchmark( fileName, ax, "mount", "duration/s" )
+    plotBenchmark( labels, data, ax, "mount", "duration/s", tools )
 
     xmin = axisValueReduction( ax, 'x', np.nanmin, float( '+inf' ) )
     xmax = axisValueReduction( ax, 'x', np.nanmax, float( '-inf' ) )
@@ -168,7 +205,7 @@ def plotPeakMemory( fileName ):
     ymax = axisValueReduction( ax, 'y', np.nanmax, float( '-inf' ) )
     x = 10 ** np.linspace( np.log10( xmin ), np.log10( xmax ) )
     y = x**2;
-    y = y / y[-1] * ymax / 100
+    y = y / y[-1] * ymax / 2000
     ax.plot( x[y > ymin], y[y > ymin], color = 'k', linestyle = '--', label = "quadratig scaling" )
 
     ax.legend( [ Line2D( [], [], linestyle = '--', color = 'k' ) ], [ 'quadratic scaling' ],  loc = 'best' )
@@ -181,7 +218,7 @@ def plotPeakMemory( fileName ):
         yscale = 'log',
     )
 
-    plotBenchmark( fileName, ax, "cat", "duration/s" )
+    plotBenchmark( labels, data, ax, "cat", "duration/s", tools )
 
     #ax = fig.add_subplot( 224,
     #    title = "Time Required for Getting Metadata of One File",
@@ -201,10 +238,60 @@ def plotPeakMemory( fileName ):
         yscale = 'log',
     )
 
-    plotBenchmark( fileName, ax, "find", "duration/s" )
+    plotBenchmark( labels, data, ax, "find", "duration/s", tools )
 
     fig.tight_layout()
     fig.savefig( 'archivemount-comparison.png', dpi = 150 )
+
+
+def plotRatarmountParallelBz2Comparison( fileName ):
+    fig = plt.figure( figsize = ( 6, 4 ) )
+
+    ax = fig.add_subplot( 111,
+        title = "Speedup for ratarmount -P 24 for Mounting tar.bz2",
+        xlabel = "Number of Files in Archive",
+        ylabel = "Speedup",
+        xscale = 'log',
+        yscale = 'linear',
+    )
+
+    df = pd.read_csv( fileName, comment='#', sep=';', names=readLabelsFromFirstComment(fileName) )
+
+    df = df.loc[( df.loc[:, 'tool'] == 'ratarmount' ) | ( df.loc[:, 'tool'] == 'ratarmount -P 24' )]
+    df = df.loc[( df.loc[:, 'compression'] == 'tar.bz2' ) & ( df.loc[:, 'nBytesPerFile'] != 4096 )]
+    df = df.loc[( df.loc[:, 'command'] == df.loc[:, 'tool'] )]
+
+
+    def getDurationPerFileCount( df, tool, nBytesPerFile ):
+        sdf = df.loc[( df.loc[:, 'nBytesPerFile'] == nBytesPerFile ) & ( df.loc[:, 'tool'] == tool )]
+
+        nFiles = sdf.apply( lambda row: row['nFolders'] * row['nFilesPerFolder'], axis = 1 )
+        sdf = sdf.assign( **{'nFiles' : nFiles} )
+
+        sdf = sdf.loc[:, ['nFiles', 'duration/s'] ]
+        sdf = sdf.groupby( 'nFiles' )
+        sdf = sdf.min().sort_values( 'nFiles' )
+
+        return sdf.index.to_numpy(), sdf.loc[:, 'duration/s'].to_numpy(),
+
+    for k, nBytesPerFile in enumerate( df.loc[:, 'nBytesPerFile'].unique() ):
+        nFilesSerial, durationSerial = getDurationPerFileCount( df, 'ratarmount', nBytesPerFile )
+        nFilesParallel, durationParallel = getDurationPerFileCount( df, 'ratarmount -P 24', nBytesPerFile )
+
+        assert np.all( nFilesSerial == nFilesParallel )
+        ax.plot(
+            nFilesSerial, durationSerial / durationParallel,
+            linestyle = '--', color = colors[1], marker = markers[k],
+            label = f"{nBytesPerFile}B per file"
+        )
+
+    ax.set_yticks( list( ax.get_yticks() ) + [ 1 ] )
+    ax.grid( axis = 'y' )
+
+    ax.legend( loc = 'best' )
+
+    fig.tight_layout()
+    fig.savefig( 'parallel-bz2-ratarmount-comparison.png', dpi = 150 )
 
 
 if __name__ == "__main__":
@@ -214,4 +301,5 @@ if __name__ == "__main__":
 
     dataFile = sys.argv[1]
 
-    plotPeakMemory( dataFile )
+    plotComparison( dataFile )
+    plotRatarmountParallelBz2Comparison( dataFile )
