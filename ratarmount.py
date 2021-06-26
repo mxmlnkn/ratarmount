@@ -346,12 +346,27 @@ class SQLiteIndexedTar:
         fileObject : A io.IOBase derived object. If not specified, tarFileName will be opened.
                      If it is an instance of IndexedBzip2File, IndexedGzipFile, or IndexedZstdFile, then the offset
                      loading and storing from and to the SQLite database is managed automatically by this class.
+        writeIndex : If true, then the sidecar index file will be written to a suitable location.
+        clearIndexCache : If true, then check all possible index file locations for the given tarFileName/fileObject
+                          combination and delete them. This also implicitly forces a recreation of the index.
+        indexFileName : Path to the index file for this TAR archive. This takes precedence over the automatically
+                        chosen locations.
+        indexFolders : Specify one or multiple paths for storing .index.sqlite files. Paths will be tested for
+                       suitability in the given order. An empty path will be interpreted as the location in which
+                       the TAR resides. This overrides the default index fallback folder in ~/.ratarmount.
+        recursive : If true, then TAR files inside this archive will be recursively analyzed and added to the SQLite
+                    index. Currently, this recursion can only break the outermost compression layer. I.e., a .tar.bz2
+                    file inside a tar.bz2 file can not be mounted recursively.
+        gzipSeekPointSpacing : This controls the frequency of gzip decoder seek points, see indexed_gzip documentation.
+                               Larger spacings lead to less memory usage but increase the constant seek overhead.
         encoding : Will be forwarded to tarfile. Specifies how filenames inside the TAR are encoded.
         ignoreZeros : Will be forwarded to tarfile. Specifies to not only skip zero blocks but also blocks with
                       invalid data. Setting this to true can lead to some problems but is required to correctly
                       read concatenated tars.
         stripRecursiveTarExtension : If true and if recursive is also true, then a <file>.tar inside the current
                                      tar will be mounted at <file>/ instead of <file>.tar/.
+        verifyModificationTime : If true, then the index will be recreated automatically if the TAR archive has a more
+                                 recent modification time than the index file.
         """
 
         # stores which parent folders were last tried to add to database and therefore do exist
