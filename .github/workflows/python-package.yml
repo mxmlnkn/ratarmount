@@ -30,13 +30,14 @@ jobs:
         python3 -m pip install --upgrade-strategy eager --upgrade black cython flake8 mypy twine pylint pytype wheel
     - name: Test Startup With Only One Compression Dependency
       run: |
-        for module in indexed_bzip2 indexed_gzip indexed_zstd lzmaffi; do
+        for module in indexed_gzip indexed_zstd lzmaffi; do
           python3 -m pip install --upgrade "$module"
           # Segfaults (139) are not allowed but other exit codes are valid!
           # indexed_zstd=1.2.0 did segfault here!
           python3 ratarmount.py README.md || [ $? != 139 ]
           python3 -m pip uninstall --yes "$module"
         done
+        python3 -m pip install --upgrade git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=indexed_bzip2
     - name: Test Installation From Tarball
       run: |
         python3 setup.py sdist bdist_wheel
