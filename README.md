@@ -26,17 +26,18 @@ In [contrast](https://github.com/libarchive/libarchive#notes-about-the-library-d
 
 
 # Table of Contents
+
 1. [Installation](#installation)
-2. [Usage](#usage)
+2. [Benchmarks](benchmarks/BENCHMARKS.md)
+3. [The Problem](#the-problem)
+4. [The Solution](#the-solution)
+5. [Usage](#usage)
     1. [Metadata Index Cache](#metadata-index-cache)
     2. [Bind Mounting](#bind-mounting)
     3. [Union Mounting](#union-mounting)
     4. [File versions](#file-versions)
     5. [Compressed non-TAR files](#compressed-non-tar-files)
     6. [Xz and Zst Files](#xz-and-zst-files)
-3. [The Problem](#the-problem)
-4. [The Solution](#the-solution)
-5. [Benchmarks](benchmarks/BENCHMARKS.md)
 
 
 # Installation
@@ -68,6 +69,87 @@ sudo apt install liblzma-dev
 pip3 install --user cffi # Necessary because of a bug(?) in the lzmaffi setup.py
 pip3 install --user lzmaffi
 ```
+
+
+## Benchmarks
+
+During the making of this project several benchmarks were created. These can be viewed [here](benchmarks/BENCHMARKS.md).
+These are some of the things benchmarked and compared there:
+
+  - Memory and runtime comparisons of backends for saving the index with offsets
+  - Comparison of SQLite table designs
+  - Mounting and file access time comparison between archivemount and ratarmount
+
+![Benchmark comparison between ratarmount and archivemount](benchmarks/plots/archivemount-comparison.png)
+
+
+# The Problem
+
+You downloaded a large TAR file from the internet, for example the [1.31TB](http://academictorrents.com/details/564a77c1e1119da199ff32622a1609431b9f1c47) large [ImageNet](http://image-net.org/), and you now want to use it but lack the space, time, or a file system fast enough to extract all the 14.2 million image files.
+
+
+## Partial Solutions
+
+### Archivemount
+
+[Archivemount](https://github.com/cybernoid/archivemount/) seems to have large performance issues for too many files and large archive for both mounting and file access in version 0.8.7. A more in-depth comparison benchmark can be found [here](benchmarks/BENCHMARKS.md).
+
+  - Mounting the 6.5GB ImageNet Large-Scale Visual Recognition Challenge 2012 validation data set, and then testing the speed with: `time cat mounted/ILSVRC2012_val_00049975.JPEG | wc -c` takes 250ms for archivemount and 2ms for ratarmount.
+  - Trying to mount the 150GB [ILSVRC object localization data set](https://www.kaggle.com/c/imagenet-object-localization-challenge) containing 2 million images was given up upon after 2 hours. Ratarmount takes ~15min to create a ~150MB index and <1ms for opening an already created index (SQLite database) and mounting the TAR. In contrast, archivemount will take the same amount of time even for subsequent mounts.
+  - Does not support recursive mounting. Although, you could write a script to stack archivemount on top of archivemount for all contained TAR files.
+
+### Tarindexer
+
+[Tarindex](https://github.com/devsnd/tarindexer) is a command line to tool written in Python which can create index files and then use the index file to extract single files from the tar fast. However, it also has some caveats which ratarmount tries to solve:
+
+  - It only works with single files, meaning it would be necessary to loop over the extract-call. But this would require loading the possibly quite large tar index file into memory each time. For example for ImageNet, the resulting index file is hundreds of MB large. Also, extracting directories will be a hassle.
+  - It's difficult to integrate tarindexer into other production environments. Ratarmount instead uses FUSE to mount the TAR as a folder readable by any other programs requiring access to the contained data.
+  - Can't handle TARs recursively. In order to extract files inside a TAR which itself is inside a TAR, the packed TAR first needs to be extracted.
+
+
+### TAR Browser
+
+I didn't find out about [TAR Browser](https://github.com/tomorrow-nf/tar-as-filesystem/) before I finished the ratarmount script. That's also one of it's cons:
+
+  - Hard to find. I don't seem to be the only one who has trouble finding it as it has onr star on Github after 7 years compared to 45 stars for tarindexer after roughly the same amount of time.
+  - Hassle to set up. Needs compilation and I gave up when I was instructed to set up a MySQL database for it to use. Confusingly, the setup instructions are not on its Github but [here](https://web.wpi.edu/Pubs/E-project/Available/E-project-030615-133259/unrestricted/TARBrowserFinal.pdf).
+  - Doesn't seem to support recursive TAR mounting. I didn't test it because of the MysQL dependency but the code does not seem to have logic for recursive mounting.
+  - Xz compression also is only block or frame based, i.e., only works faster with files created by [pixz](https://github.com/vasi/pixz) or [pxz](https://github.com/jnovy/pxz).
+
+Pros:
+  - supports bz2- and xz-compressed TAR archives
+
+
+## The Solution
+
+Ratarmount creates an index file with file names, ownership, permission flags, and offset information.
+This sidecar is stored at the TAR file's location or in `~/.ratarmount/`.
+Ratarmount can load that index file in under a second if it exists and then offsers FUSE mount integration for easy access to the files inside the archive.
+
+The test with the first version (50e8dbb), which used the removed pickle backend for serializing the metadata index, for the ImageNet data set is promising:
+
+  - TAR size: 1.31TB
+  - Contains TARs: yes
+  - Files in TAR: ~26 000
+  - Files in TAR (including recursively in contained TARs): 14.2 million
+  - Index creation (first mounting): 4 hours
+  - Index size: 1GB
+  - Index loading (subsequent mounting): 80s
+  - Reading a 40kB file: 100ms (first time) and 4ms (subsequent times)
+
+The reading time for a small file simply verifies the random access by using file seek to be working. The difference between the first read and subsequent reads is not because of ratarmount but because of operating system and file system caches.
+
+Here is a more recent test for version 0.2.0 with the new default SQLite backend:
+
+  - TAR size: 124GB
+  - Contains TARs: yes
+  - Files in TAR: 1000
+  - Files in TAR (including recursively in contained TARs): 1.26 million
+  - Index creation (first mounting): 15m 39s
+  - Index size: 146MB
+  - Index loading (subsequent mounting): 0.000s
+  - Reading a 64kB file: ~4ms
+  - Running 'find mountPoint -type f | wc -l' (1.26M stat calls): 1m 50s
 
 
 # Usage
@@ -337,84 +419,6 @@ It also works when being piped to. This can be useful for recompressing files to
 ```bash
 lbzip2 -cd well-compressed-file.bz2 | createMultiFrameZstd $(( 4*1024*1024 )) > recompressed.zst
 ```
-
-# The Problem
-
-You downloaded a large TAR file from the internet, for example the [1.31TB](http://academictorrents.com/details/564a77c1e1119da199ff32622a1609431b9f1c47) large [ImageNet](http://image-net.org/), and you now want to use it but lack the space, time, or a file system fast enough to extract all the 14.2 million image files.
-
-
-## Partial Solutions
-
-### Archivemount
-
-[Archivemount](https://github.com/cybernoid/archivemount/) seems to have large performance issues for too many files for both mounting and file access in version 0.8.7. A more in-depth comparison benchmark can be found [here](benchmarks/BENCHMARKS.md).
-
-  - Mounting the 6.5GB ImageNet Large-Scale Visual Recognition Challenge 2012 validation data set, and then testing the speed with: `time cat mounted/ILSVRC2012_val_00049975.JPEG | wc -c` takes 250ms for archivemount and 2ms for ratarmount.
-  - Trying to mount the 150GB [ILSVRC object localization data set](https://www.kaggle.com/c/imagenet-object-localization-challenge) containing 2 million images was given up upon after 2 hours. Ratarmount takes ~15min to create a ~150MB index and <1ms for opening an already created index (SQLite database) and mounting the TAR. In contrast, archivemount will take the same amount of time even for subsequent mounts.
-  - Does not support recursive mounting. Although, you could write a script to stack archivemount on top of archivemount for all contained TAR files.
-
-### Tarindexer
-
-[Tarindex](https://github.com/devsnd/tarindexer) is a command line to tool written in Python which can create index files and then use the index file to extract single files from the tar fast. However, it also has some caveats which ratarmount tries to solve:
-
-  - It only works with single files, meaning it would be necessary to loop over the extract-call. But this would require loading the possibly quite large tar index file into memory each time. For example for ImageNet, the resulting index file is hundreds of MB large. Also, extracting directories will be a hassle.
-  - It's difficult to integrate tarindexer into other production environments. Ratarmount instead uses FUSE to mount the TAR as a folder readable by any other programs requiring access to the contained data.
-  - Can't handle TARs recursively. In order to extract files inside a TAR which itself is inside a TAR, the packed TAR first needs to be extracted.
-
-
-### TAR Browser
-
-I didn't find out about [TAR Browser](https://github.com/tomorrow-nf/tar-as-filesystem/) before I finished the ratarmount script. That's also one of it's cons:
-
-  - Hard to find. I don't seem to be the only one who has trouble finding it as it has zero stars on Github after 4 years compared to 29 stars for tarindexer after roughly the same amount of time.
-  - Hassle to set up. Needs compilation and I gave up when I was instructed to set up a MySQL database for it to use. Confusingly, the setup instructions are not on its Github but [here](https://web.wpi.edu/Pubs/E-project/Available/E-project-030615-133259/unrestricted/TARBrowserFinal.pdf).
-  - Doesn't seem to support recursive TAR mounting. I didn't test it because of the MysQL dependency but the code does not seem to have logic for recursive mounting.
-  - Xz compression also is only block or frame based, i.e., only works faster with files created by [pixz](https://github.com/vasi/pixz) or [pxz](https://github.com/jnovy/pxz).
-
-Pros:
-  - supports bz2- and xz-compressed TAR archives
-
-
-## The Solution
-
-Ratarmount creates an index file with file names, ownership, permission flags, and offset information to be stored at the TAR file's location or inside `~/.ratarmount/` and then offers a FUSE mount integration for easy access to the files.
-
-The test with the first version (50e8dbb), which used the removed pickle backend for serializing the metadata index, for the ImageNet data set is promising:
-
-  - TAR size: 1.31TB
-  - Contains TARs: yes
-  - Files in TAR: ~26 000
-  - Files in TAR (including recursively in contained TARs): 14.2 million
-  - Index creation (first mounting): 4 hours
-  - Index size: 1GB
-  - Index loading (subsequent mounting): 80s
-  - Reading a 40kB file: 100ms (first time) and 4ms (subsequent times)
-
-The reading time for a small file simply verifies the random access by using file seek to be working. The difference between the first read and subsequent reads is not because of ratarmount but because of operating system and file system caches.
-
-Here is a more recent test for version 0.2.0 with the new default SQLite backend:
-
-  - TAR size: 124GB
-  - Contains TARs: yes
-  - Files in TAR: 1000
-  - Files in TAR (including recursively in contained TARs): 1.26 million
-  - Index creation (first mounting): 15m 39s
-  - Index size: 146MB
-  - Index loading (subsequent mounting): 0.000s
-  - Reading a 64kB file: ~4ms
-  - Running 'find mountPoint -type f | wc -l' (1.26M stat calls): 1m 50s
-
-
-## Benchmarks
-
-During the making of this project several benchmarks were created. These can be viewed [here](benchmarks/BENCHMARKS.md).
-These are some of the things benchmarked and compared there:
-
-  - Memory and runtime comparisons of backends for saving the index with offsets
-  - Comparison of SQLite table designs
-  - Mounting and file access time comparison between archivemount and ratarmount
-
-![Benchmark comparison between ratarmount and archivemount](benchmarks/plots/archivemount-comparison.png)
 
 
 ## Donations
