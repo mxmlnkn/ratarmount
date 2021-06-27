@@ -1120,6 +1120,7 @@ tests=(
 
 for parallelization in 1 2 0; do
 
+echo "== Testing with -P $parallelization =="
 export parallelization
 
 
