@@ -493,17 +493,18 @@ class SQLiteIndexedTar:
                     self.indexFileName = indexPath
                     break
 
-        if not self.indexFileName:
-            raise InvalidIndexError(
-                "Could not find any existing index or writable location for an index in " + str(possibleIndexFilePaths)
-            )
+            if not self.indexFileName:
+                raise InvalidIndexError(
+                    "Could not find any existing index or writable location for an index in "
+                    + str(possibleIndexFilePaths)
+                )
 
         self._createIndex(self.tarFileObject)
         self._loadOrStoreCompressionOffsets()  # store
         if self.sqlConnection:
             self._storeMetadata(self.sqlConnection)
 
-        if printDebug >= 1 and writeIndex:
+        if printDebug >= 1 and self.indexFileName and os.path.isfile(self.indexFileName):
             # The 0-time is legacy for the automated tests
             # fmt: off
             print("Writing out TAR index to", self.indexFileName, "took 0s",
