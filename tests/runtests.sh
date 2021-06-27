@@ -626,7 +626,7 @@ checkTarEncoding()
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # try with index recreation
-    local args=( -c --encoding "$encoding" --recursive "$archive" "$mountFolder" )
+    local args=( -P "$parallelization" -c --encoding "$encoding" --recursive "$archive" "$mountFolder" )
     {
         runAndCheckRatarmount "${args[@]}" &&
         checkStat "$mountFolder/$fileInTar" &&
@@ -914,7 +914,7 @@ checkSuffixStripping()
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # try with index recreation
-    local args=( -c --ignore-zeros --recursive --strip-recursive-tar-extension "$archive" "$mountFolder" )
+    local args=( -P "$parallelization" -c --ignore-zeros --recursive --strip-recursive-tar-extension "$archive" "$mountFolder" )
     {
         runAndCheckRatarmount "${args[@]}" &&
         checkStat "$mountFolder/$fileInTar" &&
@@ -972,7 +972,7 @@ checkNestedRecursiveFolderMounting()
 
     mkdir -- "$archiveFolder/nested-folder"
     cp -- "$archive" "$archiveFolder/nested-folder"
-    local args=( -c --ignore-zeros --recursive --strip-recursive-tar-extension "$archiveFolder" "$mountFolder" )
+    local args=( -P "$parallelization" -c --ignore-zeros --recursive --strip-recursive-tar-extension "$archiveFolder" "$mountFolder" )
     {
         recursiveMountFolder="$mountFolder/nested-folder/$( basename -- "${archive%.tar}" )"
         runAndCheckRatarmount "${args[@]}" &&
