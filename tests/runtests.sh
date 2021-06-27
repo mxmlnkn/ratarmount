@@ -158,6 +158,8 @@ checkFileInTAR()
     local startTime
     startTime=$( date +%s )
 
+    rm -f ratarmount.{stdout,stderr}.log
+
     local mountFolder
     mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
@@ -200,6 +202,8 @@ checkFileInTARPrefix()
     local fileInTar="$1"; shift
     local correctChecksum="$1"
 
+    rm -f ratarmount.{stdout,stderr}.log
+
     local mountFolder
     mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
@@ -225,6 +229,8 @@ checkLinkInTAR()
     local archive="$1"; shift
     local fileInTar="$1"; shift
     local correctLinkTarget="$1"
+
+    rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
     mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
@@ -337,6 +343,8 @@ testLargeTar()
         largeTar="$( createLargeTar "$fileNameDataSizeInMB" )"
     fi
 
+    rm -f ratarmount.{stdout,stderr}.log
+
     # clear up mount folder if already in use
     local mountFolder
     mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
@@ -421,6 +429,8 @@ benchmarkSerialization()
 
 checkAutomaticIndexRecreation()
 (
+    rm -f ratarmount.{stdout,stderr}.log
+
     tmpFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
     cd -- "$tmpFolder" || returnError "$LINENO" 'Failed to cd into temporary directory'
 
@@ -502,6 +512,8 @@ checkAutomaticIndexRecreation()
 
 checkUnionMount()
 (
+    rm -f ratarmount.{stdout,stderr}.log
+
     testsFolder="$( pwd )/tests"
     tmpFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
     cd -- "$tmpFolder" || returnError "$LINENO" 'Failed to cd into temporary directory'
@@ -556,6 +568,8 @@ checkUnionMount()
 
 checkUnionMountFileVersions()
 (
+    rm -f ratarmount.{stdout,stderr}.log
+
     testsFolder="$( pwd )/tests"
     tmpFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
     cd -- "$tmpFolder" || returnError "$LINENO" 'Failed to cd into temporary directory'
@@ -591,6 +605,8 @@ checkUnionMountFileVersions()
 
 checkAutoMountPointCreation()
 (
+    rm -f ratarmount.{stdout,stderr}.log
+
     testsFolder="$( pwd )/tests"
     tmpFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
     cd -- "$tmpFolder" || returnError "$LINENO" 'Failed to cd into temporary directory'
@@ -621,6 +637,8 @@ checkTarEncoding()
     local fileInTar="$1"; shift
     local correctChecksum="$1"
 
+    rm -f ratarmount.{stdout,stderr}.log
+
     local mountFolder
     mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
@@ -645,6 +663,8 @@ checkTarEncoding()
 recompressFile()
 {
     # Given a file it returns paths to all variants of (uncompressed, bz2, gzip, xz, zst).
+
+    rm -f ratarmount.{stdout,stderr}.log
 
     local recompressedFiles=()
     local tmpFolder
@@ -759,6 +779,8 @@ checkIndexPathOption()
     local fileInTar="$1"; shift
     local correctChecksum="$1"
 
+    rm -f ratarmount.{stdout,stderr}.log
+
     local mountFolder indexFolder indexFile
     mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
     indexFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
@@ -790,6 +812,8 @@ checkIndexFolderFallback()
     local archive="$1"; shift
     local fileInTar="$1"; shift
     local correctChecksum="$1"
+
+    rm -f ratarmount.{stdout,stderr}.log
 
     local args mountFolder indexFolder
     mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
@@ -868,6 +892,8 @@ checkIndexArgumentChangeDetection()
     local fileInTar="$1"; shift
     local correctChecksum="$1"
 
+    rm -f ratarmount.{stdout,stderr}.log
+
     local args mountFolder indexFolder
     mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
     indexFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
@@ -909,6 +935,8 @@ checkSuffixStripping()
     local fileInTar="$1"; shift
     local correctChecksum="$1"
 
+    rm -f ratarmount.{stdout,stderr}.log
+
     local mountFolder
     mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
@@ -930,6 +958,8 @@ checkSuffixStripping()
 checkRecursiveFolderMounting()
 {
     # Do all test archive checks at once by copying them to temporary folder and recursively mounting that folder
+
+    rm -f ratarmount.{stdout,stderr}.log
 
     local archiveFolder mountFolder
     archiveFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
@@ -965,6 +995,8 @@ checkNestedRecursiveFolderMounting()
     local fileInTar="$1"; shift
     local correctChecksum="$1"
 
+    rm -f ratarmount.{stdout,stderr}.log
+
     local mountFolder archiveFolder
     archiveFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
     mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
@@ -994,6 +1026,8 @@ checkSelfReferencingHardLinks()
     # The tar should mount and list the files but neither their contents nor stats have to be available.
     local archive=$1
 
+    rm -f ratarmount.{stdout,stderr}.log
+
     local mountFolder
     mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
@@ -1012,6 +1046,8 @@ checkSelfReferencingHardLinks()
     return 0
 }
 
+
+rm -f ratarmount.{stdout,stderr}.log
 
 # Linting only to be done locally because in CI it is in separate steps
 if [[ -z "$CI" ]]; then
