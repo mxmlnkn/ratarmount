@@ -65,6 +65,18 @@ def openBzip2Reader(fileobj):
     return indexed_bzip2.IndexedBzip2File(fileobj.fileno())
 
 
+def getFuseVersion() -> List[int]:
+    try:
+        with os.popen('fusermount -V') as pipe:
+            match = re.search(r'[0-9]+[.][0-9]+[.][0-9]+', pipe.read())
+            if match:
+                return [int(s) for s in match.group(0).split('.')]
+    except Exception:
+        pass
+
+    return []
+
+
 # Defining lambdas does not yet check the names of entities used inside the lambda!
 CompressionInfo = collections.namedtuple(
     'CompressionInfo', ['suffixes', 'doubleSuffixes', 'moduleName', 'checkHeader', 'open']
@@ -2488,8 +2500,10 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         fusekwargs['modules'] = 'subdir'
         fusekwargs['subdir'] = args.prefix
 
-    if args.mount_point in args.mount_source:
-        fusekwargs['nonempty'] = True
+    fuseVersion = getFuseVersion()
+    if args.mount_point in args.mount_source and os.path.isdir(args.mount_point) and os.listdir(args.mount_point):
+        if len(fuseVersion) == 3 and fuseVersion[0] < 3:
+            fusekwargs['nonempty'] = True
 
     global printDebug
     printDebug = args.debug

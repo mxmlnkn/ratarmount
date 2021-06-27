@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
 
   build:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         # Oldest and newest versions should be enough. Python versions are supported 5 years from release date.
@@ -25,7 +25,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install Dependencies
       run: |
-        sudo apt-get -y install bzip2 pbzip2 pixz zstd shellcheck # necessary for tests
+        sudo apt-get -y install fuse bzip2 pbzip2 pixz zstd shellcheck # necessary for tests
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade-strategy eager --upgrade black cython flake8 mypy twine pylint pytype wheel
     - name: Test Startup With Only One Compression Dependency
