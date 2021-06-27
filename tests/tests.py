@@ -80,6 +80,12 @@ assert stenciledFile.seek(-6, io.SEEK_END) == 0
 assert stenciledFile.read(1) == b"2"
 
 
+print("Test __enter__ and __exit__")
+
+with SQLiteIndexedTar(os.path.join(os.path.dirname(__file__), 'single-file.tar'), writeIndex=False) as indexedTar:
+    assert indexedTar.listDir('/')
+
+
 print("\nTest creating and using an index with .tar.gz files with SQLiteIndexedTar")
 
 

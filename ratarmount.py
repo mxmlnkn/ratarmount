@@ -510,6 +510,20 @@ class SQLiteIndexedTar:
                   "and is sized", os.stat( self.indexFileName ).st_size, "B")
             # fmt: on
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if self.sqlConnection:
+            self.sqlConnection.commit()
+            self.sqlConnection.close()
+
+        if self.tarFileObject:
+            self.tarFileObject.close()
+
+        if self.rawFileObject:
+            self.tarFileObject.close()
+
     def _storeMetadata(self, connection: sqlite3.Connection) -> None:
         self._storeVersionsMetadata(connection)
 
