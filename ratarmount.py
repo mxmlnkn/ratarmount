@@ -4,6 +4,7 @@
 import argparse
 import bisect
 import collections
+import datetime
 import io
 import json
 import os
@@ -15,6 +16,7 @@ import tarfile
 import tempfile
 import time
 import traceback
+import zipfile
 from abc import ABC, abstractmethod
 from timeit import default_timer as timer
 import typing
@@ -110,6 +112,13 @@ supportedCompressions = {
     'xz': CompressionInfo(
         ['xz'], ['txz'], 'lzmaffi', lambda x: x.read(6) == b"\xFD7zXZ\x00", lambda x: lzmaffi.open(x)
     ),
+    'zip': CompressionInfo(
+        ['zip'],
+        [],
+        'zipfile',
+        lambda x: x.read(2) == b'PK',
+        lambda x: zipfile.ZipFile(x),
+    ),
     'zst': CompressionInfo(
         ['zst', 'zstd'],
         ['tzst'],
@@ -126,6 +135,7 @@ def stripSuffixFromCompressedFile(path: str) -> str:
         for suffix in compression.suffixes:
             if path.lower().endswith('.' + suffix.lower()):
                 return path[: -(len(suffix) + 1)]
+
     return path
 
 
@@ -701,7 +711,13 @@ class SQLiteIndexedTar(MountSource):
 
             for _, cinfo in supportedCompressions.items():
                 if cinfo.moduleName in globals():
-                    versions += [makeVersionRow(cinfo.moduleName, globals()[cinfo.moduleName].__version__)]
+                    module = globals()[cinfo.moduleName]
+                    # zipfile has no __version__ attribute and PEP 396 ensuring that was rejected 2021-04-14
+                    # in favor of 'version' from importlib.metadata which does not even work with zipfile.
+                    # Probably, because zipfile is a built-in module whose version would be the Python version.
+                    # https://www.python.org/dev/peps/pep-0396/
+                    if hasattr(module, '__version__'):
+                        versions += [makeVersionRow(cinfo.moduleName, module.__version__)]
 
             connection.executemany('INSERT OR REPLACE INTO "versions" VALUES (?,?,?,?,?)', versions)
         except Exception as exception:
@@ -2147,6 +2163,99 @@ class AutoMountLayer(MountSource):
         return os.path.join(mountPoint, deeperMountPoint.lstrip('/')), deeperMountSource, deeperFileInfo
 
 
+class ZipMountSource(MountSource):
+    def __init__(self, fileOrPath: Union[str, IO[bytes]], **options) -> None:
+        # TODO pass through CLI password list and try to open encrypted zips
+        self.fileObject = zipfile.ZipFile(fileOrPath, 'r')
+        self.files = self.fileObject.infolist()
+        self.options = options
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        self.fileObject.close()
+
+    @staticmethod
+    def _convertToFileInfo(info: zipfile.ZipInfo) -> FileInfo:
+        mode = 0o555 | (stat.S_IFDIR if info.is_dir() else stat.S_IFREG)
+        mtime = datetime.datetime(*info.date_time, tzinfo=datetime.timezone.utc).timestamp() if info.date_time else 0
+
+        # According to section 4.5.7 in the .ZIP file format specification, links are supported:
+        # https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
+        # But the Python zipfile module does not even mention links anywhere,
+        # so we currently also can't or rather don't have to bother to support them.
+
+        fileInfo = FileInfo(
+            # fmt: off
+            size     = info.file_size,
+            mtime    = mtime,
+            mode     = mode,
+            linkname = "",
+            uid      = os.getuid(),
+            gid      = os.getgid(),
+            userdata = [info],
+            # fmt: on
+        )
+
+        return fileInfo
+
+    @overrides(MountSource)
+    def listDir(self, path: str) -> Optional[Iterable[str]]:
+        path = path.strip('/')
+        if path:
+            path += '/'
+
+        # TODO How to behave with files in zip with absolute paths? Currently, they would never be shown.
+        def getName(filePath):
+            if not filePath.startswith(path):
+                return None
+
+            filePath = filePath[len(path) :].strip('/')
+            if not filePath:
+                return None
+
+            # This effectively adds all parent paths as folders but theoretically parent folders should be in
+            # the zip separately but I'm not sure whether zip enforces that or not.
+            if '/' in filePath:
+                firstSlash = filePath.index('/')
+                filePath = filePath[:firstSlash]
+
+            return filePath
+
+        # ZipInfo.filename is wrongly named as it returns the full path inside the archive not just the name part
+        return set(getName(info.filename) for info in self.files if getName(info.filename))
+
+    def _getFileInfos(self, path: str) -> List[zipfile.ZipInfo]:
+        # TODO Generate dummy folder infos for parent folders which are not in the zip as a separate object?
+        return [info for info in self.files if info.filename.rstrip('/') == path.lstrip('/')]
+
+    def _getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[zipfile.ZipInfo]:
+        infos = self._getFileInfos(path)
+        return infos[fileVersion] if -len(infos) <= fileVersion < len(infos) else None
+
+    @overrides(MountSource)
+    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+        info = self._getFileInfo(path, fileVersion)
+        return ZipMountSource._convertToFileInfo(info) if info else None
+
+    @overrides(MountSource)
+    def fileVersions(self, path: str) -> int:
+        return len(self._getFileInfos(path))
+
+    @overrides(MountSource)
+    def open(self, fileInfo: FileInfo) -> IO[bytes]:
+        info = fileInfo.userdata[-1]
+        assert isinstance(info, zipfile.ZipInfo)
+        return self.fileObject.open(info, 'r')  # https://github.com/pauldmccarthy/indexed_gzip/issues/85
+
+    @overrides(MountSource)
+    def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
+        with self.open(fileInfo) as file:
+            file.seek(offset, os.SEEK_SET)
+            return file.read(size)
+
+
 class DummyFuseOperations:
     """A dummy class that is used to replace
     fuse.Operations if fusepy is not installed."""
@@ -2183,6 +2292,16 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
 
         if os.path.isdir(fileOrPath):
             return FolderMountSource('.' if fileOrPath == '.' else os.path.realpath(fileOrPath))
+
+    try:
+        if zipfile.is_zipfile(fileOrPath):
+            return ZipMountSource(fileOrPath, **options)
+    except Exception as e:
+        if printDebug >= 1:
+            print("[Info] Checking for zip file raised an exception:", e)
+    finally:
+        if hasattr(fileOrPath, 'seek'):
+            fileOrPath.seek(0)  # type: ignore
 
     if isinstance(fileOrPath, str):
         return SQLiteIndexedTar(fileOrPath, **options)
@@ -2707,7 +2826,17 @@ class TarFileType:
 
         with open(tarFile, 'rb') as fileobj:
             fileSize = os.stat(tarFile).st_size
-            compression = SQLiteIndexedTar._detectCompression(fileobj)
+
+            # Header checks are enough for this step.
+            oldOffset = fileobj.tell()
+            compression = None
+            for compressionId, compressionInfo in supportedCompressions.items():
+                try:
+                    if compressionInfo.checkHeader(fileobj):
+                        compression = compressionId
+                        break
+                finally:
+                    fileobj.seek(oldOffset)
 
             try:
                 # Determining if there are many frames in zstd is O(1) with is_multiframe
@@ -3006,10 +3135,12 @@ seeking capabilities when opening that file.
         sys.exit(1)
 
     # Manually check that all specified TARs and folders exist
-    args.mount_source = [
-        TarFileType(encoding=args.encoding)(tarFile)[0] if not os.path.isdir(tarFile) else os.path.realpath(tarFile)
-        for tarFile in args.mount_source
-    ]
+    def checkMountSource(path):
+        if os.path.isdir(path) or zipfile.is_zipfile(path):
+            return os.path.realpath(path)
+        return TarFileType(encoding=args.encoding)(path)[0]
+
+    args.mount_source = [checkMountSource(path) for path in args.mount_source]
 
     # Automatically generate a default mount path
     if not args.mount_point:

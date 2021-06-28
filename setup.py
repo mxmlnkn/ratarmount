@@ -38,7 +38,7 @@ setup(
     install_requires = [ 'fusepy',
                          'indexed_bzip2>=1.1.2; platform_system=="Linux"',
                          'indexed_bzip2>=1.3.0; platform_system!="Linux"',
-                         'indexed_gzip>=1.5.3',
+                         'indexed_gzip>=1.6.3',
                          'indexed_zstd>=1.3.1; sys_platform=="darwin"',
                          'indexed_zstd>=1.2.2; platform_system!="Windows"',
                          'dataclasses; python_version < "3.7.0"' ],
