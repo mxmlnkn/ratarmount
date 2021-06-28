@@ -15,6 +15,7 @@ import tarfile
 import tempfile
 import time
 import traceback
+from abc import ABC, abstractmethod
 from timeit import default_timer as timer
 import typing
 from typing import Any, AnyStr, BinaryIO, Dict, IO, Iterable, List, Optional, Set, Tuple, Union
@@ -338,7 +339,40 @@ FileInfo = collections.namedtuple(
 )
 
 
-class SQLiteIndexedTar:
+class MountSource(ABC):
+    """
+    Generic class representing a mount point. It's basically like the FUSE API but boiled down
+    to the necessary methods for ratarmount.
+
+    Similar, to FUSE, all paths should have a leading '/'.
+    If there is is no leading slash, behave as if there was one.
+    """
+
+    @abstractmethod
+    def listDir(self, path: str) -> Optional[Iterable[str]]:
+        pass
+
+    @abstractmethod
+    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+        pass
+
+    @abstractmethod
+    def fileVersions(self, path: str) -> int:
+        pass
+
+    @abstractmethod
+    def read(self, path: str, size: int, offset: int, fileInfo: Optional[FileInfo] = None) -> bytes:
+        pass
+
+    def exists(self, path: str):
+        return self.getFileInfo(path) is not None
+
+    def isdir(self, path: str):
+        fileInfo = self.getFileInfo(path)
+        return fileInfo is not None and stat.S_ISDIR(fileInfo.mode)
+
+
+class SQLiteIndexedTar(MountSource):
     """
     This class reads once through the whole TAR archive and stores TAR file offsets
     for all contained files in an index to support fast seeking to a given file.
@@ -1058,7 +1092,17 @@ class SQLiteIndexedTar:
             # fmt: on
         )
 
-    def getFileInfo(
+    @overrides(MountSource)
+    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+        fileInfo = self._getFileInfo(path, fileVersion=fileVersion)
+
+        if fileInfo is None:
+            return None
+
+        assert isinstance(fileInfo, FileInfo)
+        return fileInfo
+
+    def _getFileInfo(
         self,
         # fmt: off
         fullPath     : str,
@@ -1139,24 +1183,27 @@ class SQLiteIndexedTar:
 
     def isDir(self, path: str) -> bool:
         """Return true if path exists and is a folder."""
-        return isinstance(self.getFileInfo(path, listDir=True), dict)
+        return self.listDir(path) is not None
 
+    @overrides(MountSource)
     def listDir(self, path: str) -> Optional[Iterable[str]]:
         """
         Usability wrapper for getFileInfo(listDir=True) with FileInfo stripped if you are sure you don't need it.
         """
-        result = self.getFileInfo(path, listDir=True)
+        result = self._getFileInfo(path, listDir=True)
         if isinstance(result, dict):
             return result.keys()
         return None
 
+    @overrides(MountSource)
     def fileVersions(self, path: str) -> int:
         """
         Usability wrapper for getFileInfo(listVersions=True) with FileInfo stripped if you are sure you don't need it.
         """
-        fileVersions = self.getFileInfo(path, listVersions=True)
+        fileVersions = self._getFileInfo(path, listVersions=True)
         return len(fileVersions) if isinstance(fileVersions, dict) else 0
 
+    @overrides(MountSource)
     def read(self, path: str, size: int, offset: int, fileInfo: Optional[FileInfo] = None) -> bytes:
         """
         fileInfo: This argument can be specified for performance reasons. It must be the FileInfo object for path!
@@ -1506,7 +1553,6 @@ class SQLiteIndexedTar:
         except (tarfile.ReadError, tarfile.CompressionError):
             if printDebug >= 3:
                 print("[Info] File object", fileobj, "is not a TAR.")
-            pass
 
         fileobj.seek(oldOffset)
         return isTar
@@ -1753,7 +1799,7 @@ def _makeMountPointFileInfoFromStats(stats: os.stat_result) -> FileInfo:
     )
 
 
-class FolderMountSource:
+class FolderMountSource(MountSource):
     """
     This class manages one folder as mount source offering methods for listing folders, reading files, and others.
     """
@@ -1877,12 +1923,13 @@ class FolderMountSource:
             # fmt: on
         )
 
-    def getFileInfo(self, filePath: str, fileVersion: int = 0) -> Optional[FileInfo]:
+    @overrides(MountSource)
+    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         """Return file info for given path."""
         # TODO: Add support for the .versions API in order to access the underlying TARs if stripRecursiveTarExtension
         #       is false? Then again, SQLiteIndexedTar is not able to do this either, so it might be inconsistent.
 
-        pathSplitAtMountPoint = self._findMountedTar(filePath)
+        pathSplitAtMountPoint = self._findMountedTar(path)
         if pathSplitAtMountPoint:
             pathInMountPoint, recursiveTarFileInfo = pathSplitAtMountPoint
             if pathInMountPoint and pathInMountPoint != '/':
@@ -1909,10 +1956,11 @@ class FolderMountSource:
         # And as -1 means the last version, 0 should also mean the first version ...
         # Basically, I did accidentally mix user-visible versions 1+ versinos with API 0+ versions,
         # leading to this problematic clash of 0 and 1.
-        if fileVersion in [0, 1] and self._exists(filePath):
-            return self._getFileInfoFromRealFile(self._realpath(filePath))
+        if fileVersion in [0, 1] and self._exists(path):
+            return self._getFileInfoFromRealFile(self._realpath(path))
         return None
 
+    @overrides(MountSource)
     def listDir(self, path: str) -> Optional[Iterable[str]]:
         """
         This method is different from SQLiteIndexedTar.getFileInfo(listDir=True) because stat'ing each file
@@ -1940,6 +1988,7 @@ class FolderMountSource:
 
         return files
 
+    @overrides(MountSource)
     def fileVersions(self, path: str) -> int:
         """Returns available versions for a file."""
         pathSplitAtMountPoint = self._findMountedTar(path)
@@ -1948,6 +1997,7 @@ class FolderMountSource:
             return recursiveTarFileInfo.mountedTar.fileVersions(pathInMountPoint)
         return 1 if self._exists(path) else 0
 
+    @overrides(MountSource)
     def read(self, path: str, size: int, offset: int, fileInfo: Optional[FileInfo] = None) -> bytes:
         """
         fileInfo: This argument can be specified for performance reasons. It must be the FileInfo object for path!
@@ -2024,7 +2074,7 @@ class TarMount(FuseOperations):  # type: ignore
                 pass
 
         # This also will create or load the block offsets for compressed formats
-        self.mountSources: List[Union[SQLiteIndexedTar, FolderMountSource]] = [
+        self.mountSources: List[MountSource] = [
             SQLiteIndexedTar(tarFile, writeIndex=True, **sqliteIndexedTarOptions)
             if not os.path.isdir(tarFile)
             else FolderMountSource(tarFile, lazyMounting=lazyMounting, **sqliteIndexedTarOptions)
@@ -2068,7 +2118,7 @@ class TarMount(FuseOperations):  # type: ignore
 
     def _getUnionMountFileInfo(
         self, filePath: str, fileVersion: int = 0
-    ) -> Optional[Tuple[FileInfo, Optional[Union[SQLiteIndexedTar, FolderMountSource]]]]:
+    ) -> Optional[Tuple[FileInfo, Optional[MountSource]]]:
         """Returns the file info from the last (most recent) mount source in mountSources,
         which contains that file and that mountSource itself. mountSource might be None
         if it is the root folder."""
@@ -2155,9 +2205,7 @@ class TarMount(FuseOperations):  # type: ignore
 
         return filePath, pathIsSpecialVersionsFolder, (None if pathIsSpecialVersionsFolder else fileVersion)
 
-    def _getFileInfo(
-        self, filePath: str
-    ) -> Tuple[FileInfo, Optional[Union[SQLiteIndexedTar, FolderMountSource]], str, int]:
+    def _getFileInfo(self, filePath: str) -> Tuple[FileInfo, Optional[MountSource], str, int]:
         """Wrapper for _getUnionMountFileInfo, which also resolves special file version specifications in the path."""
         result = self._getUnionMountFileInfo(filePath)
         if result:

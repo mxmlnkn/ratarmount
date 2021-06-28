@@ -150,7 +150,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
 
         finfo = indexedFile.getFileInfo("/dist/a")
         assert finfo.type == tarfile.DIRTYPE
-        assert indexedFile.getFileInfo("/dist/a", listDir=True) == {
+        assert indexedFile._getFileInfo("/dist/a", listDir=True) == {
             'b': ratarmount.FileInfo(
                 offsetheader=3584,
                 offset=4096,
@@ -165,7 +165,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
                 issparse=0,
             )
         }
-        assert indexedFile.getFileInfo("/", listDir=True) == {
+        assert indexedFile._getFileInfo("/", listDir=True) == {
             'README.md': FileInfo(
                 offsetheader=0,
                 offset=512,
@@ -252,7 +252,7 @@ with tempfile.NamedTemporaryFile(suffix=".gz") as tmpTarFile, tempfile.NamedTemp
             os.path.basename(tmpTarFile.name).rsplit('.', 1)[0] if kwargs["fileObject"] is None else "tarFileName"
         )
 
-        finfo = indexedFile.getFileInfo("/", listDir=True)
+        finfo = indexedFile._getFileInfo("/", listDir=True)
         assert expected_name in finfo
         assert finfo[expected_name].size == 11
 
@@ -301,7 +301,7 @@ with tempfile.NamedTemporaryFile(suffix=".bz2") as tmpTarFile, tempfile.NamedTem
             os.path.basename(tmpTarFile.name).rsplit('.', 1)[0] if kwargs["fileObject"] is None else "tarFileName"
         )
 
-        finfo = indexedFile.getFileInfo("/", listDir=True)
+        finfo = indexedFile._getFileInfo("/", listDir=True)
         assert expected_name in finfo
         assert finfo[expected_name].size == 11
 
