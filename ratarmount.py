@@ -1804,7 +1804,7 @@ class FolderMountSource(MountSource):
     This class manages one folder as mount source offering methods for listing folders, reading files, and others.
     """
 
-    __slots__ = ('root', 'mountedTars', 'lazyMounting', 'sqliteIndexedTarOptions')
+    __slots__ = ('root', 'mountedTars', 'lazyMounting', 'options')
 
     @dataclass
     class RecursiveTarFileInfo:
@@ -1814,15 +1814,15 @@ class FolderMountSource(MountSource):
         rootFileInfo: FileInfo
         mountedTar: SQLiteIndexedTar
 
-    def __init__(self, path: str, lazyMounting: bool, **sqliteIndexedTarOptions) -> None:
+    def __init__(self, path: str, lazyMounting: bool, **options) -> None:
         self.root: str = os.path.realpath(path)
         self.lazyMounting: bool = lazyMounting
-        self.sqliteIndexedTarOptions = sqliteIndexedTarOptions
+        self.options = options
         # stores mounted TARs per mount point relative (without leading '/') to self.root.
         self.mountedTars: Dict[str, FolderMountSource.RecursiveTarFileInfo] = {}
 
         # Find TAR files in this folder and mount them recursively if so requested
-        if sqliteIndexedTarOptions.get('recursive', False) and os.path.isdir(self.root) and not self.lazyMounting:
+        if options.get('recursive', False) and os.path.isdir(self.root) and not self.lazyMounting:
             for folder, _, files in os.walk(self.root):
                 assert folder.startswith(self.root)
                 folder = folder[len(self.root) + 1 :]
@@ -1843,16 +1843,16 @@ class FolderMountSource(MountSource):
         # TODO Accessing the old full path will be problematic when lazy mounting over one of its parent folders
         fullPath = os.path.realpath(os.path.join(self.root, filePath))
         try:
-            TarFileType(encoding=self.sqliteIndexedTarOptions.get('encoding', tarfile.ENCODING))(fullPath)
+            TarFileType(encoding=self.options.get('encoding', tarfile.ENCODING))(fullPath)
         except argparse.ArgumentTypeError:
             return None
 
         try:
-            indexedTar = SQLiteIndexedTar(fullPath, writeIndex=True, **self.sqliteIndexedTarOptions)
+            indexedTar = SQLiteIndexedTar(fullPath, writeIndex=True, **self.options)
         except Exception:
             return None
 
-        stripSuffix = self.sqliteIndexedTarOptions.get('stripRecursiveTarExtension', False)
+        stripSuffix = self.options.get('stripRecursiveTarExtension', False)
         mountPoint = strippedFilePath if stripSuffix else filePath
 
         rootFileInfo = _makeMountPointFileInfoFromStats(os.stat(fullPath))
@@ -1873,7 +1873,7 @@ class FolderMountSource(MountSource):
         Basically, it splits path at the appropriate mount point boundary.
         """
 
-        if not self.sqliteIndexedTarOptions.get('recursive', False) or not os.path.isdir(self.root):
+        if not self.options.get('recursive', False) or not os.path.isdir(self.root):
             return None
 
         # TODO Not sure how performance-critical this can turn out, but maybe do something like bisection instead?
@@ -1978,9 +1978,7 @@ class FolderMountSource(MountSource):
         files = list(os.listdir(realpath))
 
         # Check whether we need to add recursive mount points to this directory listing
-        if self.sqliteIndexedTarOptions.get('recursive', False) and self.sqliteIndexedTarOptions.get(
-            'stripRecursiveTarExtension', False
-        ):
+        if self.options.get('recursive', False) and self.options.get('stripRecursiveTarExtension', False):
             for mountPoint in self.mountedTars.keys():
                 folder, folderName = os.path.split('/' + mountPoint)
                 if folder == path and folderName not in files:
