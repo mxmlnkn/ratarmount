@@ -333,10 +333,31 @@ class StenciledFile(io.BufferedIOBase):
         return self.offset
 
 
-# Names must be identical to the SQLite column headers!
-FileInfo = collections.namedtuple(
-    "FileInfo", "offsetheader offset size mtime mode type linkname uid gid istar issparse"
-)
+@dataclass
+class FileInfo:
+    # fmt: off
+    size     : int
+    mtime    : float
+    mode     : int
+    linkname : str
+    uid      : int
+    gid      : int
+    # By convention this is a list and MountSources should only read the last element and before forwarding the
+    # FileInfo to a possibly recursively "mounted" MountSource, remove that last element belonging to it.
+    # This way an arbitrary amount of userdata can be stored and it should be decidable which belongs to whom in
+    # a chain of MountSource objects.
+    userdata : List[Any]
+    # fmt: on
+
+
+@dataclass
+class SQLiteIndexedTarUserData:
+    # fmt: off
+    offset       : int
+    offsetheader : int
+    istar        : bool
+    issparse     : bool
+    # fmt: on
 
 
 class MountSource(ABC):
@@ -901,6 +922,10 @@ class SQLiteIndexedTar(MountSource):
                 # os.normpath does not delete duplicate '/' at beginning of string!
                 fullPath = pathPrefix + "/" + os.path.normpath(tarInfo.name).lstrip('/')
 
+                # TODO: As for the tarfile type SQLite expects int but it is generally bytes.
+                #       Most of them would be convertible to int like tarfile.SYMTYPE which is b'2',
+                #       but others should throw errors, like GNUTYPE_SPARSE which is b'S'.
+                #       When looking at the generated index, those values get silently converted to 0?
                 path, name = fullPath.rsplit("/", 1)
                 # fmt: off
                 fileInfo = (
@@ -1080,21 +1105,28 @@ class SQLiteIndexedTar(MountSource):
 
     @staticmethod
     def _rowToFileInfo(row: Dict[str, Any]) -> FileInfo:
-        return FileInfo(
+        userData = SQLiteIndexedTarUserData(
             # fmt: off
             offset       = row['offset'],
             offsetheader = row['offsetheader'] if 'offsetheader' in row.keys() else 0,
-            size         = row['size'],
-            mtime        = row['mtime'],
-            mode         = row['mode'],
-            type         = row['type'],
-            linkname     = row['linkname'],
-            uid          = row['uid'],
-            gid          = row['gid'],
             istar        = row['istar'],
-            issparse     = row['issparse'] if 'issparse' in row.keys() else False
+            issparse     = row['issparse'] if 'issparse' in row.keys() else False,
             # fmt: on
         )
+
+        fileInfo = FileInfo(
+            # fmt: off
+            size     = row['size'],
+            mtime    = row['mtime'],
+            mode     = row['mode'],
+            linkname = row['linkname'],
+            uid      = row['uid'],
+            gid      = row['gid'],
+            userdata = [userData],
+            # fmt: on
+        )
+
+        return fileInfo
 
     @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
@@ -1225,16 +1257,20 @@ class SQLiteIndexedTar(MountSource):
             if targetLink != path:
                 return self.read(targetLink, size, offset)
 
-        if not fileInfo.issparse:
+        assert fileInfo.userdata
+        tarFileInfo = fileInfo.userdata[-1]
+        assert isinstance(tarFileInfo, SQLiteIndexedTarUserData)
+
+        if not tarFileInfo.issparse:
             # For non-sparse files, we can simply seek to the offset and read from it.
-            self.tarFileObject.seek(fileInfo.offset + offset, os.SEEK_SET)
+            self.tarFileObject.seek(tarFileInfo.offset + offset, os.SEEK_SET)
             return self.tarFileObject.read(size)
 
         # The TAR file format is very simple. It's just a concatenation of TAR blocks. There is not even a
         # global header, only the TAR block headers. That's why we can simply cut out the TAR block for
         # the sparse file using StenciledFile and then use tarfile on it to expand the sparse file correctly.
-        tarBlockSize = fileInfo.offset - fileInfo.offsetheader + fileInfo.size
-        tarSubFile = StenciledFile(self.tarFileObject, [(fileInfo.offsetheader, tarBlockSize)])
+        tarBlockSize = tarFileInfo.offset - tarFileInfo.offsetheader + fileInfo.size
+        tarSubFile = StenciledFile(self.tarFileObject, [(tarFileInfo.offsetheader, tarBlockSize)])
         with tarfile.open(fileobj=typing.cast(BinaryIO, tarSubFile), mode='r:', encoding=self.encoding) as tmpTarFile:
             tmpFileObject = tmpTarFile.extractfile(next(iter(tmpTarFile)))
             if tmpFileObject:
@@ -1315,31 +1351,6 @@ class SQLiteIndexedTar(MountSource):
             print()
 
         self._tryAddParentFolders(row[0])
-
-    def setFileInfo(self, fullPath: str, fileInfo: FileInfo) -> None:
-        """
-        fullPath : the full path to the file with leading slash (/) for which to set the file info
-        """
-        assert fullPath[0] == "/"
-
-        # os.normpath does not delete duplicate '/' at beginning of string!
-        path, name = fullPath.rsplit("/", 1)
-        row = (
-            path,
-            name,
-            fileInfo.offsetheader,
-            fileInfo.offset,
-            fileInfo.size,
-            fileInfo.mtime,
-            fileInfo.mode,
-            fileInfo.type,
-            fileInfo.linkname,
-            fileInfo.uid,
-            fileInfo.gid,
-            fileInfo.istar,
-            fileInfo.issparse,
-        )
-        self._setFileInfo(row)
 
     def indexIsLoaded(self) -> bool:
         """Returns true if the SQLite database has been opened for reading and a "files" table exists."""
@@ -1786,21 +1797,19 @@ def _makeMountPointFileInfoFromStats(stats: os.stat_result) -> FileInfo:
         | (stat.S_IXOTH if stats.st_mode & stat.S_IROTH != 0 else 0)
     )
 
-    return FileInfo(
+    fileInfo = FileInfo(
         # fmt: off
-        offset       = None           ,
-        offsetheader = None           ,
-        size         = stats.st_size  ,
-        mtime        = stats.st_mtime ,
-        mode         = mountMode      ,
-        type         = tarfile.DIRTYPE,
-        linkname     = ""             ,
-        uid          = stats.st_uid   ,
-        gid          = stats.st_gid   ,
-        istar        = True           ,
-        issparse     = False
+        size     = stats.st_size,
+        mtime    = stats.st_mtime,
+        mode     = mountMode,
+        linkname = "",
+        uid      = stats.st_uid,
+        gid      = stats.st_gid,
+        userdata = [],
         # fmt: on
     )
+
+    return fileInfo
 
 
 class FolderMountSource(MountSource):
@@ -1911,21 +1920,20 @@ class FolderMountSource(MountSource):
     @staticmethod
     def _getFileInfoFromRealFile(filePath: str) -> FileInfo:
         stats = os.lstat(filePath)
-        return FileInfo(
+
+        fileInfo = FileInfo(
             # fmt: off
-            offset       = None          ,
-            offsetheader = None          ,
-            size         = stats.st_size ,
-            mtime        = stats.st_mtime,
-            mode         = stats.st_mode ,
-            type         = None          ,  # I think this is completely unused and mostly contained in mode
-            linkname     = os.readlink( filePath ) if os.path.islink( filePath ) else None,
-            uid          = stats.st_uid  ,
-            gid          = stats.st_gid  ,
-            istar        = False         ,
-            issparse     = False
+            size     = stats.st_size,
+            mtime    = stats.st_mtime,
+            mode     = stats.st_mode,
+            linkname = os.readlink( filePath ) if os.path.islink( filePath ) else "",
+            uid      = stats.st_uid,
+            gid      = stats.st_gid,
+            userdata = [],
             # fmt: on
         )
+
+        return fileInfo
 
     @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
@@ -2228,21 +2236,22 @@ class TarMount(FuseOperations):  # type: ignore
             pathInfo = self._getUnionMountFileInfo(filePath)
             assert pathInfo
             parentFileInfo, mountSource = pathInfo
-            # fmt: off
-            return FileInfo(
-                offset       = None                ,
-                offsetheader = None                ,
-                size         = 0                   ,
-                mtime        = parentFileInfo.mtime,
-                mode         = 0o777 | stat.S_IFDIR,
-                type         = tarfile.DIRTYPE     ,
-                linkname     = ""                  ,
-                uid          = parentFileInfo.uid  ,
-                gid          = parentFileInfo.gid  ,
-                istar        = False               ,
-                issparse     = False
-            ), mountSource, filePath, 0
-            # fmt: on
+
+            fileInfo = FileInfo(
+                # fmt: off
+                size     = 0,
+                mtime    = parentFileInfo.mtime,
+                mode     = 0o777 | stat.S_IFDIR,
+                linkname = "",
+                uid      = parentFileInfo.uid,
+                gid      = parentFileInfo.gid,
+                # I think this does not matter because currently userdata is only used in read calls,
+                # which should only be given non-directory files and this is a directory
+                userdata = [],
+                # fmt: on
+            )
+
+            return fileInfo, mountSource, filePath, 0
 
         # 3.) At this point the request is for an actual version of a file or folder
         if fileVersion is None:
