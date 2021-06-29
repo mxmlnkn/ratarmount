@@ -147,7 +147,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
 
         finfo = indexedFile.getFileInfo("/src/test.sh")
         assert stat.S_ISREG(finfo.mode)
-        assert indexedFile.read(path="/src/test.sh", size=finfo.size, offset=0) == b"echo hi"
+        assert indexedFile.read(finfo, size=finfo.size, offset=0) == b"echo hi"
 
         finfo = indexedFile.getFileInfo("/dist/a")
         assert stat.S_ISDIR(finfo.mode)
@@ -169,6 +169,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
                 ],
             )
         }
+
         assert indexedFile._getFileInfo("/", listDir=True) == {
             'README.md': FileInfo(
                 size=11,
@@ -222,8 +223,8 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
 
         finfo = indexedFile.getFileInfo("/README.md")
         assert finfo.size == 11
-        assert indexedFile.read("/README.md", size=11, offset=0) == b"hello world"
-        assert indexedFile.read("/README.md", size=3, offset=3) == b"lo "
+        assert indexedFile.read(finfo, size=11, offset=0) == b"hello world"
+        assert indexedFile.read(finfo, size=3, offset=3) == b"lo "
 
 
 print("\nTest creating and using an index with .gz files with SQLiteIndexedTar")
@@ -271,8 +272,8 @@ with tempfile.NamedTemporaryFile(suffix=".gz") as tmpTarFile, tempfile.NamedTemp
 
         finfo = indexedFile.getFileInfo("/" + expected_name)
         assert finfo.size == 11
-        assert indexedFile.read("/" + expected_name, size=11, offset=0) == b"hello world"
-        assert indexedFile.read("/" + expected_name, size=3, offset=3) == b"lo "
+        assert indexedFile.read(finfo, size=11, offset=0) == b"hello world"
+        assert indexedFile.read(finfo, size=3, offset=3) == b"lo "
 
 
 print("\nTest creating and using an index with .bz2 files with SQLiteIndexedTar")
@@ -320,8 +321,8 @@ with tempfile.NamedTemporaryFile(suffix=".bz2") as tmpTarFile, tempfile.NamedTem
 
         finfo = indexedFile.getFileInfo("/" + expected_name)
         assert finfo.size == 11
-        assert indexedFile.read("/" + expected_name, size=11, offset=0) == b"hello world"
-        assert indexedFile.read("/" + expected_name, size=3, offset=3) == b"lo "
+        assert indexedFile.read(finfo, size=11, offset=0) == b"hello world"
+        assert indexedFile.read(finfo, size=3, offset=3) == b"lo "
 
 
 print("\nTest reading recursive .bz2 file with SQLiteIndexedTar")
