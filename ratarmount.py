@@ -1930,35 +1930,38 @@ class FolderMountSource(MountSource):
         #       is false? Then again, SQLiteIndexedTar is not able to do this either, so it might be inconsistent.
 
         pathSplitAtMountPoint = self._findMountedTar(path)
-        if pathSplitAtMountPoint:
-            pathInMountPoint, mountInfo = pathSplitAtMountPoint
-            if pathInMountPoint and pathInMountPoint != '/':
-                fileInfo = mountInfo.mountSource.getFileInfo(pathInMountPoint, fileVersion=fileVersion)
+        if not pathSplitAtMountPoint:
+            # This is a bit of problematic design, however, the fileVersions count from 1 for the user.
+            # And as -1 means the last version, 0 should also mean the first version ...
+            # Basically, I did accidentally mix user-visible versions 1+ versinos with API 0+ versions,
+            # leading to this problematic clash of 0 and 1.
+            if fileVersion in [0, 1] and self._exists(path):
+                return self._getFileInfoFromRealFile(self._realpath(path))
+            return None
 
-                if isinstance(fileInfo, FileInfo):
-                    # Dereference hard links
-                    if not stat.S_ISREG(fileInfo.mode) and not stat.S_ISLNK(fileInfo.mode) and fileInfo.linkname:
-                        targetLink = fileInfo.linkname.lstrip('/')
-
-                        # For self-referencing hard links return older versions of that file
-                        if targetLink == pathInMountPoint:
-                            return self.getFileInfo(
-                                os.path.join(mountInfo.mountPoint, targetLink),
-                                fileVersion + 1 if fileVersion >= 0 else fileVersion - 1,
-                            )
-
-                        return self.getFileInfo(os.path.join(mountInfo.mountPoint, targetLink), fileVersion)
-                    return fileInfo
-                return None
+        pathInMountPoint, mountInfo = pathSplitAtMountPoint
+        if not pathInMountPoint or pathInMountPoint == '/':
             return mountInfo.rootFileInfo
 
-        # This is a bit of problematic design, however, the fileVersions count from 1 for the user.
-        # And as -1 means the last version, 0 should also mean the first version ...
-        # Basically, I did accidentally mix user-visible versions 1+ versinos with API 0+ versions,
-        # leading to this problematic clash of 0 and 1.
-        if fileVersion in [0, 1] and self._exists(path):
-            return self._getFileInfoFromRealFile(self._realpath(path))
-        return None
+        fileInfo = mountInfo.mountSource.getFileInfo(pathInMountPoint, fileVersion=fileVersion)
+
+        if not isinstance(fileInfo, FileInfo):
+            return None
+
+        if stat.S_ISREG(fileInfo.mode) or stat.S_ISLNK(fileInfo.mode) or not fileInfo.linkname:
+            return fileInfo
+
+        # Dereference hard links
+        targetLink = fileInfo.linkname.lstrip('/')
+
+        # For self-referencing hard links return older versions of that file
+        if targetLink == pathInMountPoint:
+            return self.getFileInfo(
+                os.path.join(mountInfo.mountPoint, targetLink),
+                fileVersion + 1 if fileVersion >= 0 else fileVersion - 1,
+            )
+
+        return self.getFileInfo(os.path.join(mountInfo.mountPoint, targetLink), fileVersion)
 
     @overrides(MountSource)
     def listDir(self, path: str) -> Optional[Iterable[str]]:
