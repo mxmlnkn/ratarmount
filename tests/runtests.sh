@@ -1063,6 +1063,10 @@ if [[ -z "$CI" ]]; then
     pytype -d import-error ratarmount.py || returnError "$LINENO" 'Pytype failed!'
     black -q --line-length 120 --skip-string-normalization ratarmount.py tests/tests.py
 
+    while read -r file; do
+        flake8 "$file" || returnError "$LINENO" 'Flake8 failed!'
+    done < <( git ls-tree --name-only HEAD '*.py' )
+
     shellcheck tests/*.sh || returnError "$LINENO" 'shellcheck failed!'
 fi
 
