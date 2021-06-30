@@ -2189,88 +2189,22 @@ class UnionMountSource(MountSource):
             fileInfo.userdata.append(mountSource)
 
 
-class TarMount(FuseOperations):  # type: ignore
+class FileVersionLayer(MountSource):
     """
-    This class implements the fusepy interface in order to create a mounted file system view
-    to a TAR archive.
-    Tasks of this class:
-       - Changes all file permissions to read-only
-       - Resolve hard links returned by SQLiteIndexedTar
-       - Get actual file contents either by directly reading from the TAR or by using StenciledFile and tarfile
-       - Provide hidden folders as an interface to get older versions of updated files
+    This bind mount like layer makes it possible to access older file versions if there multiple ones in the given
+    mount source. The interface provides for each file <file path> a hidden folder <file path.versions> containing
+    all available versions.
+
+    This class also resolves hardlinks. This functionality is mixed in here because self-referencing hardlinks
+    should be resolved by showing older versions of a file and only this layer knows about file versioning.
+
+    TODO If there already exists a file <file path.versions> then this special folder will not be available!
     """
 
-    __slots__ = (
-        'mountSource',
-        'rootFileInfo',
-        'mountPoint',
-        'mountPointFd',
-        'mountPointWasCreated',
-        'selfBindMount',
-    )
+    def __init__(self, mountSource: MountSource):
+        self.mountSource: MountSource = mountSource
 
-    def __init__(
-        self, pathToMount: Union[str, List[str]], mountPoint: str, lazyMounting: bool, **sqliteIndexedTarOptions
-    ) -> None:
-        if not isinstance(pathToMount, list):
-            try:
-                os.fspath(pathToMount)
-                pathToMount = [pathToMount]
-            except Exception:
-                pass
-
-        sqliteIndexedTarOptions['writeIndex'] = True
-        sqliteIndexedTarOptions['lazyMounting'] = lazyMounting
-
-        # This also will create or load the block offsets for compressed formats
-        mountSources = [openMountSource(path, **sqliteIndexedTarOptions) for path in pathToMount]
-
-        # No threads should be created and still be open before FUSE forks.
-        # Instead, they should be created in 'init'.
-        # Therefore, close threads opened by the ParallelBZ2Reader for creating the block offsets.
-        # Those threads will be automatically recreated again on the next read call.
-        # Without this, the ratarmount background process won't quit even after unmounting!
-        for mountSource in mountSources:
-            if (
-                isinstance(mountSource, SQLiteIndexedTar)
-                and hasattr(mountSource, 'tarFileObject')
-                and hasattr(mountSource.tarFileObject, 'join_threads')
-            ):
-                mountSource.tarFileObject.join_threads()
-
-        self.mountSource: MountSource = UnionMountSource(mountSources)
-
-        self.rootFileInfo = _makeMountPointFileInfoFromStats(os.stat(pathToMount[0]))
-
-        # Create mount point if it does not exist
-        self.mountPointWasCreated = False
-        if mountPoint and not os.path.exists(mountPoint):
-            os.mkdir(mountPoint)
-            self.mountPointWasCreated = True
-        self.mountPoint = os.path.realpath(mountPoint)
-
-        # Take care that bind-mounting folders to itself works
-        self.mountPointFd = None
-        self.selfBindMount: Optional[FolderMountSource] = None
-        for mountSource in mountSources:
-            if isinstance(mountSource, FolderMountSource) and mountSource.root == self.mountPoint:
-                self.selfBindMount = mountSource
-                self.mountPointFd = os.open(self.mountPoint, os.O_RDONLY)
-
-    def __del__(self) -> None:
-        try:
-            if self.mountPointWasCreated:
-                os.rmdir(self.mountPoint)
-        except Exception:
-            pass
-
-        try:
-            if self.mountPointFd is not None:
-                os.close(self.mountPointFd)
-        except Exception:
-            pass
-
-    def _decodeVersionsPathAPI(self, filePath: str) -> Optional[Tuple[str, bool, Optional[int]]]:
+    def _decodeVersionsPathAPI(self, filePath: str) -> Optional[Tuple[str, bool, int]]:
         """
         Do a loop over the parent path parts to resolve possible versions in parent folders.
         Note that multiple versions of a folder always are union mounted. So, for the path to a file
@@ -2320,30 +2254,100 @@ class TarMount(FuseOperations):  # type: ignore
             # If current path does not exist, check if it is a special versions path
             if part.endswith('.versions') and len(part) > len('.versions'):
                 pathIsSpecialVersionsFolder = True
+                fileVersion = 0
                 filePath = tmpFilePath[: -len('.versions')]
                 continue
 
             # Parent path does not exist and is not a versions path, so any subpaths also won't exist either
             return None
 
-        return filePath, pathIsSpecialVersionsFolder, (None if pathIsSpecialVersionsFolder else fileVersion)
+        if fileVersion is None:
+            raise Exception("No file version found in special versioning path specification!")
 
-    def _getFileInfo(self, filePath: str) -> Tuple[FileInfo, str, int]:
+        return filePath, pathIsSpecialVersionsFolder, (0 if pathIsSpecialVersionsFolder else fileVersion)
+
+    @staticmethod
+    def _resolveHardLinks(fileInfo: FileInfo, path: str, fileVersion: int) -> Optional[Tuple[str, int]]:
+        """path : Simple path. Should contain no special versioning folders!"""
+
+        # Note that S_ISLNK checks for symbolic links. Hardlinks (at least from tarfile) return false for
+        # S_ISLNK but still have a linkname!
+        if stat.S_ISREG(fileInfo.mode) or stat.S_ISLNK(fileInfo.mode) or not fileInfo.linkname:
+            return None
+
+        targetLink = '/' + fileInfo.linkname.lstrip('/')
+        if targetLink != path:
+            # The file version is only of importance to resolve self-references.
+            # It seems undecidable to me whether to return the given fileVersion or 0 here.
+            # Returning 0 would feel more correct because the we switched to another file and the version
+            # for that file is the most recent one.
+            # However, resetting the file version to 0 means that if there is a cycle, i.e., two hardlinks
+            # of different names referencing each other, than the file version will always be reset to 0
+            # and we have no break condition, entering an infinite loop.
+            # The most correct version would be to track the version of each path in a map and count up the
+            # version per path.
+            # TODO Is such a hardlink cycle even possible?!
+            return targetLink, 0
+
+        # If file is referencing itself, try to access earlier version of it.
+        # The check for fileVersion against the total number of available file versions is omitted because
+        # that check is done implicitly inside the mount sources getFileInfo method!
+        return path, (fileVersion + 1 if fileVersion >= 0 else fileVersion - 1)
+
+    @overrides(MountSource)
+    def listDir(self, path: str) -> Optional[Iterable[str]]:
+        files = self.mountSource.listDir(path)
+        if files is not None:
+            return files
+
+        # If no folder was found, check whether the special .versions folder was requested
+        try:
+            result = self._decodeVersionsPathAPI(path)
+        except Exception:
+            return None
+
+        if not result:
+            return None
+        path, pathIsSpecialVersionsFolder, _ = result
+
+        if not pathIsSpecialVersionsFolder:
+            return self.mountSource.listDir(path)
+
+        # Print all available versions of the file at filePath as the contents of the special '.versions' folder
+        return [str(version + 1) for version in range(self.mountSource.fileVersions(path))]
+
+    @overrides(MountSource)
+    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         """Resolves special file version specifications in the path."""
-        fileInfo = self.mountSource.getFileInfo(filePath)
+
+        assert fileVersion == 0
+
+        fileInfo = self.mountSource.getFileInfo(path)
         if fileInfo:
-            return fileInfo, filePath, 0
+            # Resolve hard links
+            resolved = FileVersionLayer._resolveHardLinks(fileInfo, path, fileVersion)
+            hardLinkCount = 0
+            while resolved and hardLinkCount < 128:  # For comparison, the maximum symbolic link chain in Linux is 40.
+                path, fileVersion = resolved
+                fileInfo = self.mountSource.getFileInfo(path, fileVersion)
+                if not fileInfo:
+                    return None
+                resolved = FileVersionLayer._resolveHardLinks(fileInfo, path, fileVersion)
+                hardLinkCount += 1
+
+            fileInfo.userdata.append((path, fileVersion))
+            return fileInfo
 
         # If no file was found, check if a special .versions folder to an existing file/folder was queried.
-        versionsInfo = self._decodeVersionsPathAPI(filePath)
+        versionsInfo = self._decodeVersionsPathAPI(path)
         if not versionsInfo:
             raise fuse.FuseOSError(fuse.errno.ENOENT)
-        filePath, pathIsSpecialVersionsFolder, fileVersion = versionsInfo
+        path, pathIsSpecialVersionsFolder, fileVersion = versionsInfo
 
         # 2.) Check if the request was for the special .versions folder and return its contents or stats
-        # At this point, filePath is assured to actually exist!
+        # At this point, path is assured to actually exist!
         if pathIsSpecialVersionsFolder:
-            parentFileInfo = self.mountSource.getFileInfo(filePath)
+            parentFileInfo = self.mountSource.getFileInfo(path)
             assert parentFileInfo
 
             fileInfo = FileInfo(
@@ -2360,36 +2364,119 @@ class TarMount(FuseOperations):  # type: ignore
                 # fmt: on
             )
 
-            return fileInfo, filePath, 0
+            fileInfo.userdata.append((path, 0))
+            return fileInfo
 
-        # 3.) At this point the request is for an actual version of a file or folder
-        if fileVersion is None:
-            print("[Error] fileVersion should not be None!")
-            raise fuse.FuseOSError(fuse.errno.ENOENT)
-        fileInfo = self.mountSource.getFileInfo(filePath, fileVersion=fileVersion)
+        # 3.) At this point the request is for an actually older version of a file or folder
+        fileInfo = self.mountSource.getFileInfo(path, fileVersion=fileVersion)
         if fileInfo:
-            return fileInfo, filePath, fileVersion
+            fileInfo.userdata.append((path, fileVersion))
+            return fileInfo
 
         raise fuse.FuseOSError(fuse.errno.ENOENT)
 
-    @staticmethod
-    def _resolveHardLinks(fileInfo: FileInfo, filePath: str, fileVersion: int) -> Optional[str]:
-        """
-        The input to this file is the output of _getFileInfo, meaning filePath is already decoded and contains no
-        versioning information.
-        """
+    @overrides(MountSource)
+    def fileVersions(self, path: str) -> int:
+        # TODO return 1 for special .versions folders and files contained in there?
+        return self.mountSource.fileVersions(path)
 
-        if stat.S_ISREG(fileInfo.mode) or stat.S_ISLNK(fileInfo.mode) or not fileInfo.linkname:
-            return None
+    @overrides(MountSource)
+    def open(self, fileInfo: FileInfo) -> IO[bytes]:
+        pathAndVersion = fileInfo.userdata.pop()
+        try:
+            return self.mountSource.open(fileInfo)
+        finally:
+            fileInfo.userdata.append(pathAndVersion)
 
-        targetLink = '/' + fileInfo.linkname.lstrip('/')
-        if targetLink != filePath:
-            return targetLink
+    @overrides(MountSource)
+    def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
+        pathAndVersion = fileInfo.userdata.pop()
+        try:
+            return self.mountSource.read(fileInfo, size, offset)
+        finally:
+            fileInfo.userdata.append(pathAndVersion)
 
-        # If file is referencing itself, try to access earlier version of it.
-        # The check for fileVersion against the total number of available file versions is omitted because
-        # that check is done implicitly inside the mount sources getFileInfo method!
-        return filePath + '.versions/' + str(fileVersion + 1 if fileVersion >= 0 else fileVersion - 1)
+
+class TarMount(FuseOperations):  # type: ignore
+    """
+    This class implements the fusepy interface in order to create a mounted file system view to a MountSource.
+    Tasks of this class itself:
+       - Changes all file permissions to read-only
+       - Get actual file contents either by directly reading from the TAR or by using StenciledFile and tarfile
+       - Enabling FolderMountSource to bind to the nonempty folder under the mountpoint itself.
+    Other functionalities like file versioning, hard link resolving, and union mounting are implemented by using
+    the respective MountSource derived classes.
+    """
+
+    __slots__ = (
+        'mountSource',
+        'rootFileInfo',
+        'mountPoint',
+        'mountPointFd',
+        'mountPointWasCreated',
+        'selfBindMount',
+    )
+
+    def __init__(
+        self, pathToMount: Union[str, List[str]], mountPoint: str, lazyMounting: bool, **sqliteIndexedTarOptions
+    ) -> None:
+        if not isinstance(pathToMount, list):
+            try:
+                os.fspath(pathToMount)
+                pathToMount = [pathToMount]
+            except Exception:
+                pass
+
+        sqliteIndexedTarOptions['writeIndex'] = True
+        sqliteIndexedTarOptions['lazyMounting'] = lazyMounting
+
+        # This also will create or load the block offsets for compressed formats
+        mountSources = [openMountSource(path, **sqliteIndexedTarOptions) for path in pathToMount]
+
+        # No threads should be created and still be open before FUSE forks.
+        # Instead, they should be created in 'init'.
+        # Therefore, close threads opened by the ParallelBZ2Reader for creating the block offsets.
+        # Those threads will be automatically recreated again on the next read call.
+        # Without this, the ratarmount background process won't quit even after unmounting!
+        for mountSource in mountSources:
+            if (
+                isinstance(mountSource, SQLiteIndexedTar)
+                and hasattr(mountSource, 'tarFileObject')
+                and hasattr(mountSource.tarFileObject, 'join_threads')
+            ):
+                mountSource.tarFileObject.join_threads()
+
+        self.mountSource: MountSource = FileVersionLayer(UnionMountSource(mountSources))
+
+        self.rootFileInfo = _makeMountPointFileInfoFromStats(os.stat(pathToMount[0]))
+
+        # Create mount point if it does not exist
+        self.mountPointWasCreated = False
+        if mountPoint and not os.path.exists(mountPoint):
+            os.mkdir(mountPoint)
+            self.mountPointWasCreated = True
+        self.mountPoint = os.path.realpath(mountPoint)
+
+        # Take care that bind-mounting folders to itself works
+        self.mountPointFd = None
+        self.selfBindMount: Optional[FolderMountSource] = None
+        for mountSource in mountSources:
+            if isinstance(mountSource, FolderMountSource) and mountSource.root == self.mountPoint:
+                self.selfBindMount = mountSource
+                self.mountPointFd = os.open(self.mountPoint, os.O_RDONLY)
+
+    def __del__(self) -> None:
+        try:
+            if self.mountPointWasCreated:
+                os.rmdir(self.mountPoint)
+        except Exception:
+            pass
+
+        try:
+            if self.mountPointFd is not None:
+                os.close(self.mountPointFd)
+        except Exception:
+            pass
 
     @overrides(FuseOperations)
     def init(self, connection) -> None:
@@ -2398,11 +2485,9 @@ class TarMount(FuseOperations):  # type: ignore
 
     @overrides(FuseOperations)
     def getattr(self, path: str, fh=None) -> Dict[str, Any]:
-        fileInfo, filePath, fileVersion = self._getFileInfo(path)
-
-        linkedPath = TarMount._resolveHardLinks(fileInfo, filePath, fileVersion)
-        if linkedPath:
-            return self.getattr(linkedPath, fh)
+        fileInfo = self.mountSource.getFileInfo(path)
+        if not fileInfo:
+            raise fuse.FuseOSError(fuse.errno.EIO)
 
         # dictionary keys: https://pubs.opengroup.org/onlinepubs/007904875/basedefs/sys/stat.h.html
         statDict = {"st_" + key: getattr(fileInfo, key) for key in ('size', 'mtime', 'mode', 'uid', 'gid')}
@@ -2430,39 +2515,19 @@ class TarMount(FuseOperations):  # type: ignore
         if files is not None:
             for key in files:
                 yield key
-            return
-
-        # If no folder was found, check whether the special .versions folder was requested
-        result = self._decodeVersionsPathAPI(path)
-        if not result:
-            return
-        path, pathIsSpecialVersionsFolder, _ = result
-
-        if not pathIsSpecialVersionsFolder:
-            files = self.mountSource.listDir(path)
-            if files is not None:
-                for key in files:
-                    yield key
-            return
-
-        # Print all available versions of the file at filePath as the contents of the special '.versions' folder
-        for version in range(self.mountSource.fileVersions(path)):
-            yield str(version)
 
     @overrides(FuseOperations)
     def readlink(self, path: str) -> str:
-        fileInfo, _, _ = self._getFileInfo(path)
+        fileInfo = self.mountSource.getFileInfo(path)
+        if not fileInfo:
+            raise fuse.FuseOSError(fuse.errno.EIO)
         return fileInfo.linkname
 
     @overrides(FuseOperations)
     def read(self, path: str, size: int, offset: int, fh: int) -> bytes:
-        fileInfo, filePath, fileVersion = self._getFileInfo(path)
+        fileInfo = self.mountSource.getFileInfo(path)
         if not fileInfo:
             raise fuse.FuseOSError(fuse.errno.EIO)
-
-        linkedPath = TarMount._resolveHardLinks(fileInfo, filePath, fileVersion)
-        if linkedPath:
-            return self.read(linkedPath, size, offset, fh)
 
         try:
             return self.mountSource.read(fileInfo, size, offset)
