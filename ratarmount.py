@@ -18,7 +18,7 @@ import traceback
 from abc import ABC, abstractmethod
 from timeit import default_timer as timer
 import typing
-from typing import Any, AnyStr, BinaryIO, Dict, IO, Iterable, List, Optional, Set, Tuple, Union
+from typing import Any, AnyStr, BinaryIO, cast, Dict, IO, Iterable, List, Optional, Set, Tuple, Union
 from dataclasses import dataclass
 
 # Can't do this dynamically with importlib.import_module and using supportedCompressions
@@ -256,6 +256,12 @@ class StenciledFile(io.BufferedIOBase):
         assert i >= 0
         return i
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        pass
+
     @overrides(io.BufferedIOBase)
     def close(self) -> None:
         # Don't close the object given to us
@@ -379,6 +385,10 @@ class MountSource(ABC):
 
     @abstractmethod
     def fileVersions(self, path: str) -> int:
+        pass
+
+    @abstractmethod
+    def open(self, fileInfo: FileInfo) -> IO[bytes]:
         pass
 
     @abstractmethod
@@ -1242,32 +1252,51 @@ class SQLiteIndexedTar(MountSource):
         return len(fileVersions) if isinstance(fileVersions, dict) else 0
 
     @overrides(MountSource)
-    def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
+    def open(self, fileInfo: FileInfo) -> IO[bytes]:
         assert fileInfo.userdata
         tarFileInfo = fileInfo.userdata[-1]
         assert isinstance(tarFileInfo, SQLiteIndexedTarUserData)
 
+        # This is not strictly necessary but it saves two file object layers and therefore might be more performant.
+        # Furthermore, non-sparse files should be the much more likely case anyway.
         if not tarFileInfo.issparse:
-            # For non-sparse files, we can simply seek to the offset and read from it.
-            self.tarFileObject.seek(tarFileInfo.offset + offset, os.SEEK_SET)
-            return self.tarFileObject.read(size)
+            return cast(IO[bytes], StenciledFile(self.tarFileObject, [(tarFileInfo.offset, fileInfo.size)]))
 
         # The TAR file format is very simple. It's just a concatenation of TAR blocks. There is not even a
         # global header, only the TAR block headers. That's why we can simply cut out the TAR block for
         # the sparse file using StenciledFile and then use tarfile on it to expand the sparse file correctly.
         tarBlockSize = tarFileInfo.offset - tarFileInfo.offsetheader + fileInfo.size
+
         tarSubFile = StenciledFile(self.tarFileObject, [(tarFileInfo.offsetheader, tarBlockSize)])
-        with tarfile.open(fileobj=typing.cast(BinaryIO, tarSubFile), mode='r:', encoding=self.encoding) as tmpTarFile:
-            tmpFileObject = tmpTarFile.extractfile(next(iter(tmpTarFile)))
-            if tmpFileObject:
-                tmpFileObject.seek(offset, os.SEEK_SET)
-                result = tmpFileObject.read(size)
-            else:
-                print("tarfile.extractfile returned nothing!")
-                raise fuse.FuseOSError(fuse.errno.EIO) if "fuse" in sys.modules else Exception(
-                    "tarfile.extractfile returned nothing!"
-                )
-        return result
+        # TODO It might be better to somehow call close on tarFile but the question is where and how.
+        #      It would have to be appended to the __exit__ method of fileObject like if being decorated.
+        #      For now this seems to work either because fileObject does not require tarFile to exist
+        #      or because tarFile is simply not closed correctly here, I'm not sure.
+        #      Sparse files are kinda edge-cases anyway, so it isn't high priority as long as the tests work.
+        tarFile = tarfile.open(fileobj=typing.cast(IO[bytes], tarSubFile), mode='r:', encoding=self.encoding)
+        fileObject = tarFile.extractfile(next(iter(tarFile)))
+        if not fileObject:
+            print("tarfile.extractfile returned nothing!")
+            raise fuse.FuseOSError(fuse.errno.EIO) if "fuse" in sys.modules else Exception(
+                "tarfile.extractfile returned nothing!"
+            )
+
+        return fileObject
+
+    @overrides(MountSource)
+    def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
+        assert fileInfo.userdata
+        tarFileInfo = fileInfo.userdata[-1]
+        assert isinstance(tarFileInfo, SQLiteIndexedTarUserData)
+
+        if tarFileInfo.issparse:
+            with self.open(fileInfo) as file:
+                file.seek(offset, os.SEEK_SET)
+                return file.read(size)
+
+        # For non-sparse files, we can simply seek to the offset and read from it.
+        self.tarFileObject.seek(tarFileInfo.offset + offset, os.SEEK_SET)
+        return self.tarFileObject.read(size)
 
     def _tryAddParentFolders(self, path: str) -> None:
         # Add parent folders if they do not exist.
@@ -2003,13 +2032,13 @@ class FolderMountSource(MountSource):
         return 1 if self._exists(path) else 0
 
     @overrides(MountSource)
-    def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
+    def open(self, fileInfo: FileInfo) -> IO[bytes]:
         mountInfo = fileInfo.userdata[-1]
 
         if isinstance(mountInfo, FolderMountSource.MountInfo):
             oldUserData = fileInfo.userdata.pop()
             try:
-                return mountInfo.mountSource.read(fileInfo, size, offset)
+                return mountInfo.mountSource.open(fileInfo)
             finally:
                 fileInfo.userdata.append(oldUserData)
 
@@ -2023,8 +2052,21 @@ class FolderMountSource(MountSource):
         # TODO: Avoid opening the file on each read? I guess that's what the fh argument in fusepy is for!
         #       Note that it does not matter for TAR file read because the TAR itself is kept open and only the
         #       StenciledFile is opened on each read and then only for sparse files.
-        with open(realpath, 'rb') as file:
-            file.seek(offset)
+        return open(realpath, 'rb')
+
+    @overrides(MountSource)
+    def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
+        mountInfo = fileInfo.userdata[-1]
+
+        if isinstance(mountInfo, FolderMountSource.MountInfo):
+            oldUserData = fileInfo.userdata.pop()
+            try:
+                return mountInfo.mountSource.read(fileInfo, size, offset)
+            finally:
+                fileInfo.userdata.append(oldUserData)
+
+        with self.open(fileInfo) as file:
+            file.seek(offset, os.SEEK_SET)
             return file.read(size)
 
 
