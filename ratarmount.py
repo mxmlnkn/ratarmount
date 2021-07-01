@@ -2375,7 +2375,11 @@ in `updated.tar`. Then, you can list all three versions using:
 In this example, the oldest version has only 123 bytes while the newest and
 by default shown version has 1024 bytes. So, in order to look at the oldest
 version, you can simply do:
+
     cat mountpoint/foo.versions/1
+
+Note that these version numbers are the same as when used with tar's
+`--occurrence=N` option.
 
 ## Prefix Removal
 
