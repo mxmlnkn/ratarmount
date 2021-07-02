@@ -483,7 +483,19 @@ class SQLiteIndexedTar:
             if self._tryLoadIndex(indexPath):
                 self.indexFileName = indexPath
                 break
-        if self.indexIsLoaded():
+        if self.indexIsLoaded() and self.sqlConnection:
+            try:
+                indexVersion = self.sqlConnection.execute(
+                    "SELECT major,minor FROM versions WHERE name == 'index';"
+                ).fetchone()
+
+                if indexVersion and indexVersion > __version__:
+                    print("[Warning] The loaded index was created with a newer version of ratarmount.")
+                    print("[Warning] If there are any problems, please update ratarmount or recreate the index")
+                    print("[Warning] with this ratarmount version using the --recreate-index option!")
+            except Exception:
+                pass
+
             self._loadOrStoreCompressionOffsets()
             return
 
