@@ -1,4 +1,11 @@
 
+# Version 0.9.0 built on 2021-08-xx
+
+ - Refactor the code and introduce a MountSource interface.
+ - Add support for zip and rar archives.
+ - Improve recursive mounting. If supported by the decompression backend,
+   compressed archives inside compressed archives can be mounted recursively.
+
 # Version 0.8.1 built on 2021-07-11
 
  - Fix "BLOB longer than INT_MAX bytes" error for .gz archives larger than ~400GB.
