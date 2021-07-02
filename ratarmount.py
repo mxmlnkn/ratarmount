@@ -465,9 +465,13 @@ class SQLiteIndexedTar:
         indexPathAsName = self.tarFileName.replace("/", "_") + ".index.sqlite"
         if isinstance(indexFolders, str):
             indexFolders = [indexFolders]
+
+        # A given index file name takes precedence and there should be no implicit fallback
         if indexFileName:
-            # A given index file name takes precedence and there should be no implicit fallback
-            possibleIndexFilePaths = [os.path.abspath(os.path.expanduser(indexFileName))]
+            if indexFileName == ':memory:':
+                possibleIndexFilePaths = [indexFileName]
+            else:
+                possibleIndexFilePaths = [os.path.abspath(os.path.expanduser(indexFileName))]
         elif indexFolders:
             # An empty path is to be interpreted as the default path right besides the TAR
             if '' not in indexFolders:
@@ -1538,6 +1542,12 @@ class SQLiteIndexedTar:
             print("[Warning] Could not remove:", path)
 
     def _loadOrStoreCompressionOffsets(self):
+        if not self.indexFileName or self.indexFileName == ':memory:':
+            if printDebug >= 2:
+                print("[Info] Will skip storing compression seek data because the database is in memory.")
+                print("[Info] If the database is in memory, then this data will not be read anyway.")
+            return
+
         # This should be called after the TAR file index is complete (loaded or created).
         # If the TAR file index was created, then tarfile has iterated over the whole file once
         # and therefore completed the implicit compression offset creation.
@@ -2554,7 +2564,8 @@ seeking capabilities when opening that file.
 
     parser.add_argument(
         '--index-file', type = str,
-        help = 'Specify a path to the .index.sqlite file. Setting this will disable fallback index folders.' )
+        help = 'Specify a path to the .index.sqlite file. Setting this will disable fallback index folders. '
+               'If the given path is ":memory:", then the index will not be written out to disk.' )
 
     parser.add_argument(
         '--index-folders', default = "," + os.path.join( "~", ".ratarmount" ),

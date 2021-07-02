@@ -194,7 +194,9 @@ positional arguments:
 optional arguments:
   --index-file INDEX_FILE
                         Specify a path to the .index.sqlite file. Setting this
-                        will disable fallback index folders. (default: None)
+                        will disable fallback index folders. If the given path
+                        is ":memory:", then the index will not be written out
+                        to disk. (default: None)
   --index-folders INDEX_FOLDERS
                         Specify one or multiple paths for storing
                         .index.sqlite files. Paths will be tested for
