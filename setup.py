@@ -13,7 +13,7 @@ with open( 'requirements.txt', 'rt' ) as file:
 
 setup(
     name             = 'ratarmount',
-    version          = '0.8.0',
+    version          = '0.8.1',
 
     description      = 'Random Access Read-Only Tar Mount',
     url              = 'https://github.com/mxmlnkn/ratarmount',

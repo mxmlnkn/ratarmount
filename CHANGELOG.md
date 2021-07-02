@@ -1,4 +1,13 @@
 
+# Version 0.8.1 built on 2021-07-11
+
+ - Fix "BLOB longer than INT_MAX bytes" error for .gz archives larger than ~400GB.
+ - Add missing "dataclasses" dependency for Python 3.6.
+ - Open SQLite index read-only to allow multiple ratarmount instances to use it.
+ - Raise exception if SQLiteIndexedTar cannot read given file object.
+ - Warn on newer index versions.
+ - Add support for "--index-name :memory:" to create in-memory indexes.
+
 # Version 0.8.0 built on 2021-06-27
 
  - Fix SQLiteIndexedTar class when being called with a file object.
