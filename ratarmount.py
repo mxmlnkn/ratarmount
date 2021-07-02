@@ -353,7 +353,9 @@ class SQLiteIndexedTar:
     #     updated in the TAR can still be accessed if necessary.
     # Version 0.3.0:
     #   - Add arguments influencing the created index to metadata (ignore-zeros, recursive, ...)
-    __version__ = '0.3.0'
+    # Version 0.4.0:
+    #   - Added 'gzipindexes' table, which may contain multiple blobs in contrast to 'gzipindex' table.
+    __version__ = '0.4.0'
 
     def __init__(
         # fmt: off
@@ -1569,18 +1571,35 @@ class SQLiteIndexedTar:
             and self.compression == 'gz'
             # fmt: on
         ):
+            tables = [x[0] for x in db.execute('SELECT name FROM sqlite_master WHERE type="table"')]
+
             # indexed_gzip index only has a file based API, so we need to write all the index data from the SQL
             # database out into a temporary file. For that, let's first try to use the same location as the SQLite
             # database because it should have sufficient writing rights and free disk space.
             gzindex = None
             for tmpDir in [os.path.dirname(self.indexFileName), None]:
+                if 'gzipindex' not in tables and 'gzipindexes' not in tables:
+                    break
+
                 # Try to export data from SQLite database. Note that no error checking against the existence of
                 # gzipindex table is done because the exported data itself might also be wrong and we can't check
                 # against this. Therefore, collate all error checking by catching exceptions.
+
                 try:
                     gzindex = tempfile.mkstemp(dir=tmpDir)[1]
                     with open(gzindex, 'wb') as file:
-                        file.write(db.execute('SELECT data FROM gzipindex').fetchone()[0])
+                        if 'gzipindexes' in tables:
+                            # Try to read index files containing very large gzip indexes
+                            rows = db.execute('SELECT data FROM gzipindexes ORDER BY ROWID')
+                            for row in rows:
+                                file.write(row[0])
+                        elif 'gzipindex' in tables:
+                            # Try to read legacy index files with exactly one blob.
+                            # This is how old ratarmount version read it. I.e., if there were simply more than one
+                            # blob in the same tbale, then it would ignore all but the first(?!) and I am not sure
+                            # what would happen in that case.
+                            # So, use a differently named table if there are multiple blobs.
+                            file.write(db.execute('SELECT data FROM gzipindex').fetchone()[0])
                     break
                 except Exception:
                     self._uncheckedRemove(gzindex)
@@ -1625,13 +1644,38 @@ class SQLiteIndexedTar:
             if printDebug >= 2:
                 print("Exported GZip index size:", os.stat(gzindex).st_size)
 
-            # Store contents of temporary file into the SQLite database
-            tables = [x[0] for x in db.execute('SELECT name FROM sqlite_master WHERE type="table"')]
+            # Clean up unreadable older data.
             if 'gzipindex' in tables:
                 db.execute('DROP TABLE gzipindex')
-            db.execute('CREATE TABLE gzipindex ( data BLOB )')
-            with open(gzindex, 'rb') as file:
-                db.execute('INSERT INTO gzipindex VALUES (?)', (file.read(),))
+            if 'gzipindexes' in tables:
+                db.execute('DROP TABLE gzipindexes')
+
+            # The maximum blob size configured by SQLite is exactly 1 GB, see https://www.sqlite.org/limits.html
+            # Therefore, this should be smaller. Another argument for making it smaller is that this blob size
+            # will be held fully in memory temporarily.
+            # But, making it too small would result in too many non-backwards compatible indexes being created.
+            maxBlobSize = 256 * 1024 * 1024  # 128 MiB
+
+            # Store contents of temporary file into the SQLite database
+            if os.stat(gzindex).st_size > maxBlobSize:
+                db.execute('CREATE TABLE gzipindexes ( data BLOB )')
+                with open(gzindex, 'rb') as file:
+                    while True:
+                        data = file.read(maxBlobSize)
+                        if not data:
+                            break
+
+                        # I'm pretty sure that the rowid can be used to query the rows with the insertion order:
+                        # https://www.sqlite.org/autoinc.html
+                        # > The usual algorithm is to give the newly created row a ROWID that is one larger than the
+                        #   largest ROWID in the table prior to the insert.
+                        # The "usual" makes me worry a bit, but I think it is in reference to the AUTOINCREMENT feature.
+                        db.execute('INSERT INTO gzipindexes VALUES (?)', (data,))
+            else:
+                db.execute('CREATE TABLE gzipindex ( data BLOB )')
+                with open(gzindex, 'rb') as file:
+                    db.execute('INSERT INTO gzipindex VALUES (?)', (file.read(),))
+
             db.commit()
             os.remove(gzindex)
             return
