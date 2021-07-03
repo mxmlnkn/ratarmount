@@ -35,3 +35,41 @@ tar --delete --occurrence=1 --file 'two-self-links.tar' bar
 
 cp 'single-file.tar' 'empty.tar'
 tar --delete --file 'empty.tar' bar
+
+# Create super nested archive
+mkdir super-nested-archive
+(
+    cd -- "$_" || exit 1
+    tarFileName=updated-file-with-folder.tar
+    cp "../$tarFileName" .
+
+    bzip2 -k -- "$tarFileName"
+    gzip  -k -- "$tarFileName"
+    zstd  -k -- "$tarFileName"
+    xz    -k -- "$tarFileName"
+
+    tar -xf ../single-nested-folder.tar
+    tar -xf ../single-file.tar
+
+    7z a seven-elves.7z foo bar
+    rar a foos-rar-dah.rar foo bar
+    zip -r bag.zip foo bar
+    mkisofs -lJR -o miso.iso foo bar
+
+    mkdir files
+    mv -- * files
+
+    # Create archives of archives
+    tar -cf  tar-with-archives.tar     -- files
+    tar -cjf tar-with-archives.tar.bz2 -- files
+    tar -czf tar-with-archives.tar.gz  -- files
+    tar -cJf tar-with-archives.tar.xz  -- files
+
+    7z a seven-elves.7z files
+    rar a foos-rar-dah.rar files
+    zip -r bag.zip files
+    mkisofs -lJR -o miso.iso files
+
+    cd ..
+    tar -cjf super-nested-archive{.tar.bz2,}
+)

@@ -18,8 +18,9 @@ import traceback
 from abc import ABC, abstractmethod
 from timeit import default_timer as timer
 import typing
-from typing import Any, AnyStr, BinaryIO, cast, Dict, IO, Iterable, List, Optional, Set, Tuple, Union
+from typing import Any, AnyStr, cast, Dict, IO, Iterable, List, Optional, Set, Tuple, Union
 from dataclasses import dataclass
+import dataclasses
 
 # Can't do this dynamically with importlib.import_module and using supportedCompressions
 # because then the static checkers like mypy and pylint won't recognize the modules!
@@ -278,7 +279,8 @@ class StenciledFile(io.BufferedIOBase):
 
     @overrides(io.BufferedIOBase)
     def fileno(self) -> int:
-        return self.fileobj.fileno()
+        # This is a virtual Python level file object and therefore does not have a valid OS file descriptor!
+        raise io.UnsupportedOperation()
 
     @overrides(io.BufferedIOBase)
     def seekable(self) -> bool:
@@ -363,6 +365,13 @@ class FileInfo:
     userdata : List[Any]
     # fmt: on
 
+    def clone(self):
+        copied = dataclasses.replace(self)
+        # Make a new userdata list but do not do a full deep copy because some MountSources put references
+        # to MountSources into userdata and those should and can not be deep copied.
+        copied.userdata = self.userdata[:]
+        return copied
+
 
 @dataclass
 class SQLiteIndexedTarUserData:
@@ -403,6 +412,13 @@ class MountSource(ABC):
     def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
         pass
 
+    def getMountSource(self, fileInfo: FileInfo):
+        """
+        Returns the direct mount source to which the fileInfo belongs, a mount source specific file info,
+        and the mount point of the returned mount source in respect to this (self) MountSource.
+        """
+        return '/', self, fileInfo
+
     def exists(self, path: str):
         return self.getFileInfo(path) is not None
 
@@ -434,7 +450,7 @@ class SQLiteIndexedTar(MountSource):
         # fmt: off
         self,
         tarFileName                : Optional[str]       = None,
-        fileObject                 : Optional[BinaryIO]  = None,
+        fileObject                 : Optional[IO[bytes]] = None,
         writeIndex                 : bool                = False,
         clearIndexCache            : bool                = False,
         indexFileName              : Optional[str]       = None,
@@ -1542,7 +1558,7 @@ class SQLiteIndexedTar(MountSource):
         return self.indexIsLoaded()
 
     @staticmethod
-    def _detectCompression(fileobj: BinaryIO) -> Optional[str]:
+    def _detectCompression(fileobj: IO[bytes]) -> Optional[str]:
         if not isinstance(fileobj, io.IOBase) or not fileobj.seekable():
             return None
 
@@ -1579,7 +1595,7 @@ class SQLiteIndexedTar(MountSource):
         return None
 
     @staticmethod
-    def _detectTar(fileobj: BinaryIO, encoding: str) -> bool:
+    def _detectTar(fileobj: IO[bytes], encoding: str) -> bool:
         if not isinstance(fileobj, io.IOBase) or not fileobj.seekable():
             return False
 
@@ -1596,7 +1612,7 @@ class SQLiteIndexedTar(MountSource):
         return isTar
 
     @staticmethod
-    def _openCompressedFile(fileobj: BinaryIO, gzipSeekPointSpacing: int, encoding: str) -> Any:
+    def _openCompressedFile(fileobj: IO[bytes], gzipSeekPointSpacing: int, encoding: str) -> Any:
         """
         Opens a file possibly undoing the compression.
         Returns (tar_file_obj, raw_file_obj, compression, isTar).
@@ -1840,57 +1856,8 @@ class FolderMountSource(MountSource):
     This class manages one folder as mount source offering methods for listing folders, reading files, and others.
     """
 
-    __slots__ = ('root', 'mountedTars', 'lazyMounting', 'options')
-
-    @dataclass
-    class MountInfo:
-        fullPath: str  # full access path in the original file system
-        # mount point of this recursively mounted TAR is relative root and might have the suffix stripped
-        mountPoint: str
-        rootFileInfo: FileInfo
-        mountSource: MountSource
-
-    def __init__(self, path: str, lazyMounting: bool, **options) -> None:
-        self.root: str = os.path.realpath(path)
-        self.lazyMounting: bool = lazyMounting
-        self.options = options
-        # stores mounted TARs per mount point relative (without leading '/') to self.root.
-        self.mountedTars: Dict[str, FolderMountSource.MountInfo] = {}
-
-        # Find TAR files in this folder and mount them recursively if so requested
-        if options.get('recursive', False) and os.path.isdir(self.root) and not self.lazyMounting:
-            for folder, _, files in os.walk(self.root):
-                assert folder.startswith(self.root)
-                folder = folder[len(self.root) + 1 :]
-
-                for fileName in files:
-                    info = self._tryToMountFile(os.path.join(folder, fileName))
-                    if info:
-                        self.mountedTars[info.mountPoint] = info
-
-    def _tryToMountFile(self, filePath: str) -> Optional[MountInfo]:
-        """filePath : relative to self.root"""
-
-        # For better performance, only looking at the suffix not at the magic bytes.
-        strippedFilePath = stripSuffixFromTarFile(filePath)
-        if strippedFilePath == filePath:
-            return None
-
-        # TODO Accessing the old full path will be problematic when lazy mounting over one of its parent folders
-        fullPath = os.path.realpath(os.path.join(self.root, filePath))
-
-        try:
-            mountSource = openMountSource(fullPath, **self.options)
-        except Exception:
-            return None
-
-        stripSuffix = self.options.get('stripRecursiveTarExtension', False)
-        mountPoint = strippedFilePath if stripSuffix else filePath
-
-        rootFileInfo = _makeMountPointFileInfoFromStats(os.stat(fullPath))
-        mountInfo = FolderMountSource.MountInfo(fullPath, mountPoint, rootFileInfo, mountSource)
-        mountInfo.rootFileInfo.userdata.append(mountInfo)
-        return mountInfo
+    def __init__(self, path: str) -> None:
+        self.root: str = path
 
     def setFolderDescriptor(self, fd: int) -> None:
         """
@@ -1901,60 +1868,216 @@ class FolderMountSource(MountSource):
         os.fchdir(fd)
         self.root = '.'
 
-    def _findMountedTar(self, path: str) -> Optional[Tuple[str, MountInfo]]:
-        """
-        Returns the mount point, which can be found in self.mountedTars, and the rest of the path.
-        Basically, it splits path at the appropriate mount point boundary.
-        """
-
-        if not self.options.get('recursive', False) or not os.path.isdir(self.root):
-            return None
-
-        # TODO Not sure how performance-critical this can turn out, but maybe do something like bisection instead?
-        parts = path.lstrip(os.path.sep).split(os.path.sep)
-        subPath = ""
-        for i, part in enumerate(parts):
-            subPath = os.path.join(subPath, part)
-            if subPath in self.mountedTars:
-                assert self.mountedTars[subPath]
-                pathInsideTar = os.path.join(*parts[i + 1 :]) if i + 1 < len(parts) else "/"
-                return pathInsideTar, self.mountedTars[subPath]
-
-            # Try to dynamically mount TAR files
-            if self.lazyMounting:
-                mountInfo = self._tryToMountFile(subPath)
-                if mountInfo:
-                    pathInsideTar = os.path.join(*parts[i + 1 :]) if i + 1 < len(parts) else "/"
-                    self.mountedTars[mountInfo.mountPoint] = mountInfo
-                    return pathInsideTar, mountInfo
-
-        return None
-
     def _realpath(self, path: str) -> str:
         """Path given relative to folder root. Leading '/' is acceptable"""
         return os.path.join(self.root, path.lstrip(os.path.sep))
 
-    def _exists(self, path: str) -> bool:
-        """Check if path exists."""
+    @overrides(MountSource)
+    def exists(self, path: str) -> bool:
         return os.path.lexists(self._realpath(path))
 
-    @staticmethod
-    def _getFileInfoFromRealFile(filePath: str) -> FileInfo:
-        stats = os.lstat(filePath)
+    @overrides(MountSource)
+    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+        """All returned file infos contain a file path string at the back of FileInfo.userdata."""
+
+        # This is a bit of problematic design, however, the fileVersions count from 1 for the user.
+        # And as -1 means the last version, 0 should also mean the first version ...
+        # Basically, I did accidentally mix user-visible versions 1+ versions with API 0+ versions,
+        # leading to this problematic clash of 0 and 1.
+        if fileVersion not in [0, 1] or not self.exists(path):
+            return None
+
+        realpath = self._realpath(path)
+
+        stats = os.lstat(realpath)
 
         fileInfo = FileInfo(
             # fmt: off
             size     = stats.st_size,
             mtime    = stats.st_mtime,
             mode     = stats.st_mode,
-            linkname = os.readlink( filePath ) if os.path.islink( filePath ) else "",
+            linkname = os.readlink(realpath) if os.path.islink(realpath) else "",
             uid      = stats.st_uid,
             gid      = stats.st_gid,
-            userdata = [],
+            userdata = [path],
             # fmt: on
         )
 
         return fileInfo
+
+    @overrides(MountSource)
+    def listDir(self, path: str) -> Optional[Iterable[str]]:
+        realpath = self._realpath(path)
+        if not os.path.isdir(realpath):
+            return None
+
+        files = list(os.listdir(realpath))
+
+        return files
+
+    @overrides(MountSource)
+    def fileVersions(self, path: str) -> int:
+        return 1 if self.exists(path) else 0
+
+    @overrides(MountSource)
+    def open(self, fileInfo: FileInfo) -> IO[bytes]:
+        path = fileInfo.userdata[-1]
+        assert isinstance(path, str)
+        realpath = self._realpath(path)
+
+        try:
+            return open(realpath, 'rb')
+        except Exception as e:
+            raise ValueError("Specified path '{}' is not a file that can be read!".format(realpath)) from e
+
+    @overrides(MountSource)
+    def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
+        with self.open(fileInfo) as file:
+            file.seek(offset, os.SEEK_SET)
+            return file.read(size)
+
+    def getFilePath(self, fileInfo: FileInfo) -> str:
+        path = fileInfo.userdata[-1]
+        assert isinstance(path, str)
+        return self._realpath(path)
+
+
+class AutoMountLayer(MountSource):
+    """
+    This mount source takes another mount source and automatically shows the contents of files which are archives.
+    The detailed behavior can be controlled using options.
+    """
+
+    __slots__ = ('mounted', 'options')
+
+    @dataclass
+    class MountInfo:
+        mountSource: MountSource
+        rootFileInfo: FileInfo
+
+    def __init__(self, mountSource: MountSource, **options) -> None:
+        self.options = options
+
+        rootFileInfo = FileInfo(
+            # fmt: off
+            size         = 0,
+            mtime        = int(time.time()),
+            mode         = 0o555 | stat.S_IFDIR,
+            linkname     = "",
+            uid          = os.getuid(),
+            gid          = os.getgid(),
+            userdata     = ['/'],
+            # fmt: on
+        )
+
+        # Mount points are specified without trailing slash and with leading slash
+        # representing root of this mount source.
+        self.mounted: Dict[str, AutoMountLayer.MountInfo] = {'/': AutoMountLayer.MountInfo(mountSource, rootFileInfo)}
+
+        if not self.options.get('recursive', False) or self.options.get('lazyMounting', False):
+            return
+
+        # Go over all files and mount archives and even archives in those archives
+        foldersToWalk = ['/']
+        while foldersToWalk:
+            folder = foldersToWalk.pop()
+            fileNames = self.listDir(folder)
+            if not fileNames:
+                continue
+
+            for fileName in fileNames:
+                filePath = os.path.join(folder, fileName)
+                if self.isdir(filePath):
+                    foldersToWalk.append(filePath)
+                else:
+                    mountPoint = self._tryToMountFile(filePath)
+                    if mountPoint:
+                        foldersToWalk.append(mountPoint)
+
+    def _simplyFindMounted(self, path: str) -> Tuple[str, str]:
+        """See _findMounted. This is split off to avoid convoluted recursions during lazy mounting."""
+
+        leftPart = path
+        rightParts: List[str] = []
+        while '/' in leftPart:
+            if leftPart in self.mounted:
+                return leftPart, '/' + '/'.join(rightParts)
+
+            parts = leftPart.rsplit('/', 1)
+            leftPart = parts[0]
+            rightParts.insert(0, parts[1])
+
+        assert '/' in self.mounted
+        return '/', path
+
+    def _tryToMountFile(self, path: str) -> Optional[str]:
+        """
+        Returns the mount point path if it has been successfully mounted.
+        path: Path inside this mount source. May include recursively mounted mount points.
+              Should contain a leading slash.
+        """
+
+        # For better performance, only look at the suffix not at the magic bytes.
+        strippedFilePath = stripSuffixFromTarFile(path)
+        if strippedFilePath == path:
+            return None
+
+        mountPoint = strippedFilePath if self.options.get('stripRecursiveTarExtension', False) else path
+        if mountPoint in self.mounted:
+            return None
+
+        # Use _simplyFindMounted instead of _findMounted or self.open to avoid recursions caused by lazy mounting!
+        parentMountPoint, pathInsideParentMountPoint = self._simplyFindMounted(path)
+        parentMountSource = self.mounted[parentMountPoint].mountSource
+
+        try:
+            archiveFileInfo = parentMountSource.getFileInfo(pathInsideParentMountPoint)
+            if archiveFileInfo is None:
+                return None
+
+            _, deepestMountSource, deepestFileInfo = parentMountSource.getMountSource(archiveFileInfo)
+            if isinstance(deepestMountSource, FolderMountSource):
+                # Open from file path on host file system in order to write out TAR index files.
+                mountSource = openMountSource(deepestMountSource.getFilePath(deepestFileInfo), **self.options)
+            else:
+                # This will fail with StenciledFile objects as returned by SQLiteIndexedTar mount sources and when
+                # given to backends like indexed_xxx, which do expect the file object to have a valid fileno.
+                mountSource = openMountSource(parentMountSource.open(archiveFileInfo), **self.options)
+        except Exception as e:
+            print("[Warning] Mounting of '" + path + "' failed because of:", e)
+            return None
+
+        rootFileInfo = archiveFileInfo.clone()
+        rootFileInfo.mode = (rootFileInfo.mode & 0o777) | stat.S_IFDIR
+        rootFileInfo.linkname = ""
+        rootFileInfo.userdata = [mountPoint]
+        mountInfo = AutoMountLayer.MountInfo(mountSource, rootFileInfo)
+
+        # TODO What if the mount point already exists, e.g., because stripRecursiveTarExtension is true and there
+        #      are multiple archives with the same name but different extesions?
+        self.mounted[mountPoint] = mountInfo
+        if printDebug >= 2:
+            print("Recursively mounted:", mountPoint)
+
+        return mountPoint
+
+    def _findMounted(self, path: str) -> Tuple[str, str]:
+        """
+        Returns the mount point, which can be found in self.mounted, and the rest of the path.
+        Basically, it splits path at the appropriate mount point boundary.
+        Because of the recursive mounting, there might be multiple mount points fitting the path.
+        The longest, i.e., the deepest mount point will be returned.
+        """
+
+        if self.options.get('recursive', False) and self.options.get('lazyMounting', False):
+            subPath = "/"
+            # First go from higher paths to deeper ones and try to mount all parent archives lazily.
+            for part in path.lstrip(os.path.sep).split(os.path.sep):
+                subPath = os.path.join(subPath, part)
+                if subPath not in self.mounted:
+                    self._tryToMountFile(subPath)
+
+        return self._simplyFindMounted(path)
 
     @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
@@ -1965,117 +2088,63 @@ class FolderMountSource(MountSource):
         # TODO: Add support for the .versions API in order to access the underlying TARs if stripRecursiveTarExtension
         #       is false? Then again, SQLiteIndexedTar is not able to do this either, so it might be inconsistent.
 
-        pathSplitAtMountPoint = self._findMountedTar(path)
-        if not pathSplitAtMountPoint:
-            # This is a bit of problematic design, however, the fileVersions count from 1 for the user.
-            # And as -1 means the last version, 0 should also mean the first version ...
-            # Basically, I did accidentally mix user-visible versions 1+ versinos with API 0+ versions,
-            # leading to this problematic clash of 0 and 1.
-            if fileVersion in [0, 1] and self._exists(path):
-                recursiveFileInfo = self._getFileInfoFromRealFile(self._realpath(path))
-                recursiveFileInfo.userdata.append(path)
-                return recursiveFileInfo
-
-            return None
-
-        pathInMountPoint, mountInfo = pathSplitAtMountPoint
-        if not pathInMountPoint or pathInMountPoint == '/':
+        # It might be arguably that we could simply let the mount source handle returning file infos for the root
+        # directory but only we know the permissions of the parent folder and can apply them to the root directory.
+        mountPoint, pathInMountPoint = self._findMounted(path)
+        mountInfo = self.mounted[mountPoint]
+        if pathInMountPoint == '/':
             return mountInfo.rootFileInfo
 
-        fileInfo = mountInfo.mountSource.getFileInfo(pathInMountPoint, fileVersion=fileVersion)
-
-        if not isinstance(fileInfo, FileInfo):
-            return None
-
-        fileInfo.userdata.append(mountInfo)
-
-        if stat.S_ISREG(fileInfo.mode) or stat.S_ISLNK(fileInfo.mode) or not fileInfo.linkname:
+        fileInfo = mountInfo.mountSource.getFileInfo(pathInMountPoint, fileVersion)
+        if fileInfo:
+            fileInfo.userdata.append(mountPoint)
             return fileInfo
 
-        # Dereference hard links
-        targetLink = fileInfo.linkname.lstrip('/')
-
-        # For self-referencing hard links return older versions of that file
-        if targetLink == pathInMountPoint:
-            return self.getFileInfo(
-                os.path.join(mountInfo.mountPoint, targetLink),
-                fileVersion + 1 if fileVersion >= 0 else fileVersion - 1,
-            )
-
-        return self.getFileInfo(os.path.join(mountInfo.mountPoint, targetLink), fileVersion)
+        return None
 
     @overrides(MountSource)
     def listDir(self, path: str) -> Optional[Iterable[str]]:
-        """
-        This method is different from SQLiteIndexedTar.getFileInfo(listDir=True) because stat'ing each file
-        does not come for free here, in contrast to SQLiteIndexedTar.
-        """
-        pathSplitAtMountPoint = self._findMountedTar(path)
-        if pathSplitAtMountPoint:
-            pathInMountPoint, mountInfo = pathSplitAtMountPoint
-            return mountInfo.mountSource.listDir(pathInMountPoint)
-
-        realpath = self._realpath(path)
-        if not os.path.isdir(realpath):
+        mountPoint, pathInMountPoint = self._findMounted(path)
+        files = self.mounted[mountPoint].mountSource.listDir(pathInMountPoint)
+        if not files:
             return None
-
-        files = list(os.listdir(realpath))
+        files = set(files)
 
         # Check whether we need to add recursive mount points to this directory listing
         if self.options.get('recursive', False) and self.options.get('stripRecursiveTarExtension', False):
-            for mountPoint in self.mountedTars.keys():
-                folder, folderName = os.path.split('/' + mountPoint)
-                if folder == path and folderName not in files:
-                    files.append(folderName)
+            for mountPoint in self.mounted:
+                folder, folderName = os.path.split(mountPoint)
+                if folder == path and folderName and folderName not in files:
+                    files.add(folderName)
 
         return files
 
     @overrides(MountSource)
     def fileVersions(self, path: str) -> int:
-        """Returns available versions for a file."""
-        pathSplitAtMountPoint = self._findMountedTar(path)
-        if pathSplitAtMountPoint:
-            pathInMountPoint, mountInfo = pathSplitAtMountPoint
-            return mountInfo.mountSource.fileVersions(pathInMountPoint)
-        return 1 if self._exists(path) else 0
+        mountPoint, pathInMountPoint = self._findMounted(path)
+        return self.mounted[mountPoint].mountSource.fileVersions(pathInMountPoint)
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo) -> IO[bytes]:
-        mountInfo = fileInfo.userdata[-1]
-
-        if isinstance(mountInfo, FolderMountSource.MountInfo):
-            oldUserData = fileInfo.userdata.pop()
-            try:
-                return mountInfo.mountSource.open(fileInfo)
-            finally:
-                fileInfo.userdata.append(oldUserData)
-
-        assert isinstance(mountInfo, str)
-        path = mountInfo
-
-        realpath = self._realpath(path)
-        if not self._exists(path):
-            raise ValueError("Specified path '{}' is not a file that can be read!".format(realpath))
-
-        # TODO: Avoid opening the file on each read? I guess that's what the fh argument in fusepy is for!
-        #       Note that it does not matter for TAR file read because the TAR itself is kept open and only the
-        #       StenciledFile is opened on each read and then only for sparse files.
-        return open(realpath, 'rb')
+        _, mountSource, sourceFileInfo = self.getMountSource(fileInfo)
+        return mountSource.open(sourceFileInfo)
 
     @overrides(MountSource)
     def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
-        mountInfo = fileInfo.userdata[-1]
+        _, mountSource, sourceFileInfo = self.getMountSource(fileInfo)
+        return mountSource.read(sourceFileInfo, size, offset)
 
-        if isinstance(mountInfo, FolderMountSource.MountInfo):
-            oldUserData = fileInfo.userdata.pop()
-            try:
-                return mountInfo.mountSource.read(fileInfo, size, offset)
-            finally:
-                fileInfo.userdata.append(oldUserData)
+    @overrides(MountSource)
+    def getMountSource(self, fileInfo: FileInfo) -> Tuple[str, MountSource, FileInfo]:
+        mountPoint = fileInfo.userdata[-1]
+        assert isinstance(mountPoint, str)
+        mountSource = self.mounted[mountPoint].mountSource
 
-        with self.open(fileInfo) as file:
-            file.seek(offset, os.SEEK_SET)
-            return file.read(size)
+        sourceFileInfo = fileInfo.clone()
+        sourceFileInfo.userdata.pop()
+
+        deeperMountPoint, deeperMountSource, deeperFileInfo = mountSource.getMountSource(sourceFileInfo)
+        return os.path.join(mountPoint, deeperMountPoint.lstrip('/')), deeperMountSource, deeperFileInfo
 
 
 class DummyFuseOperations:
@@ -2107,14 +2176,18 @@ class DummyFuseOperations:
 FuseOperations = fuse.Operations if 'fuse' in sys.modules else DummyFuseOperations
 
 
-def openMountSource(path: str, **options) -> MountSource:
-    if not os.path.exists(path):
-        raise Exception("Mount source does not exist!")
+def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource:
+    if isinstance(fileOrPath, str):
+        if not os.path.exists(fileOrPath):
+            raise Exception("Mount source does not exist!")
 
-    if os.path.isdir(path):
-        return FolderMountSource(path, **options)
+        if os.path.isdir(fileOrPath):
+            return FolderMountSource('.' if fileOrPath == '.' else os.path.realpath(fileOrPath))
 
-    return SQLiteIndexedTar(path, **options)
+    if isinstance(fileOrPath, str):
+        return SQLiteIndexedTar(fileOrPath, **options)
+
+    return SQLiteIndexedTar(fileObject=fileOrPath, **options)
 
 
 class UnionMountSource(MountSource):
@@ -2202,6 +2275,18 @@ class UnionMountSource(MountSource):
         finally:
             fileInfo.userdata.append(mountSource)
 
+    @overrides(MountSource)
+    def getMountSource(self, fileInfo: FileInfo) -> Tuple[str, MountSource, FileInfo]:
+        sourceFileInfo = fileInfo.clone()
+        mountSource = sourceFileInfo.userdata.pop()
+
+        if not isinstance(mountSource, MountSource):
+            return '/', self, fileInfo
+
+        # Because all mount sources are mounted at '/', we do not have to append
+        # the mount point path returned by getMountSource to the mount point '/'.
+        return mountSource.getMountSource(sourceFileInfo)
+
 
 class FileVersionLayer(MountSource):
     """
@@ -2281,32 +2366,58 @@ class FileVersionLayer(MountSource):
         return filePath, pathIsSpecialVersionsFolder, (0 if pathIsSpecialVersionsFolder else fileVersion)
 
     @staticmethod
-    def _resolveHardLinks(fileInfo: FileInfo, path: str, fileVersion: int) -> Optional[Tuple[str, int]]:
+    def _isHardLink(fileInfo: FileInfo) -> bool:
+        # Note that S_ISLNK checks for symbolic links. Hardlinks (at least from tarfile)
+        # return false for S_ISLNK but still have a linkname!
+        return bool(not stat.S_ISREG(fileInfo.mode) and not stat.S_ISLNK(fileInfo.mode) and fileInfo.linkname)
+
+    @staticmethod
+    def _resolveHardLinks(mountSource: MountSource, path: str) -> Optional[FileInfo]:
         """path : Simple path. Should contain no special versioning folders!"""
 
-        # Note that S_ISLNK checks for symbolic links. Hardlinks (at least from tarfile) return false for
-        # S_ISLNK but still have a linkname!
-        if stat.S_ISREG(fileInfo.mode) or stat.S_ISLNK(fileInfo.mode) or not fileInfo.linkname:
+        fileInfo = mountSource.getFileInfo(path)
+        if not fileInfo:
             return None
 
-        targetLink = '/' + fileInfo.linkname.lstrip('/')
-        if targetLink != path:
-            # The file version is only of importance to resolve self-references.
-            # It seems undecidable to me whether to return the given fileVersion or 0 here.
-            # Returning 0 would feel more correct because the we switched to another file and the version
-            # for that file is the most recent one.
-            # However, resetting the file version to 0 means that if there is a cycle, i.e., two hardlinks
-            # of different names referencing each other, than the file version will always be reset to 0
-            # and we have no break condition, entering an infinite loop.
-            # The most correct version would be to track the version of each path in a map and count up the
-            # version per path.
-            # TODO Is such a hardlink cycle even possible?!
-            return targetLink, 0
+        resolvedPath = '/' + fileInfo.linkname.lstrip('/') if FileVersionLayer._isHardLink(fileInfo) else None
+        fileVersion = 0
+        hardLinkCount = 0
 
-        # If file is referencing itself, try to access earlier version of it.
-        # The check for fileVersion against the total number of available file versions is omitted because
-        # that check is done implicitly inside the mount sources getFileInfo method!
-        return path, (fileVersion + 1 if fileVersion >= 0 else fileVersion - 1)
+        while resolvedPath and hardLinkCount < 128:  # For comparison, the maximum symbolic link chain in Linux is 40.
+            # Link targets are relative to the mount source. That's why we need the mount point to get the full path
+            # in respect to this mount source. And we must a file info object for this mount source, so we have to
+            # get that using the full path instead of calling getFileInfo on the deepest mount source.
+            mountPoint, _, _ = mountSource.getMountSource(fileInfo)
+
+            resolvedPath = os.path.join(mountPoint, resolvedPath.lstrip('/'))
+
+            if resolvedPath != path:
+                # The file version is only of importance to resolve self-references.
+                # It seems undecidable to me whether to return the given fileVersion or 0 here.
+                # Returning 0 would feel more correct because the we switched to another file and the version
+                # for that file is the most recent one.
+                # However, resetting the file version to 0 means that if there is a cycle, i.e., two hardlinks
+                # of different names referencing each other, than the file version will always be reset to 0
+                # and we have no break condition, entering an infinite loop.
+                # The most correct version would be to track the version of each path in a map and count up the
+                # version per path.
+                # TODO Is such a hardlink cycle even possible?!
+                fileVersion = 0
+            else:
+                # If file is referencing itself, try to access earlier version of it.
+                # The check for fileVersion against the total number of available file versions is omitted because
+                # that check is done implicitly inside the mount sources getFileInfo method!
+                fileVersion = fileVersion + 1 if fileVersion >= 0 else fileVersion - 1
+
+            path = resolvedPath
+            fileInfo = mountSource.getFileInfo(path, fileVersion)
+            if not fileInfo:
+                return None
+
+            resolvedPath = '/' + fileInfo.linkname.lstrip('/') if FileVersionLayer._isHardLink(fileInfo) else None
+            hardLinkCount += 1
+
+        return fileInfo
 
     @overrides(MountSource)
     def listDir(self, path: str) -> Optional[Iterable[str]]:
@@ -2336,20 +2447,8 @@ class FileVersionLayer(MountSource):
 
         assert fileVersion == 0
 
-        fileInfo = self.mountSource.getFileInfo(path)
+        fileInfo = FileVersionLayer._resolveHardLinks(self.mountSource, path)
         if fileInfo:
-            # Resolve hard links
-            resolved = FileVersionLayer._resolveHardLinks(fileInfo, path, fileVersion)
-            hardLinkCount = 0
-            while resolved and hardLinkCount < 128:  # For comparison, the maximum symbolic link chain in Linux is 40.
-                path, fileVersion = resolved
-                fileInfo = self.mountSource.getFileInfo(path, fileVersion)
-                if not fileInfo:
-                    return None
-                resolved = FileVersionLayer._resolveHardLinks(fileInfo, path, fileVersion)
-                hardLinkCount += 1
-
-            fileInfo.userdata.append((path, fileVersion))
             return fileInfo
 
         # If no file was found, check if a special .versions folder to an existing file/folder was queried.
@@ -2378,13 +2477,11 @@ class FileVersionLayer(MountSource):
                 # fmt: on
             )
 
-            fileInfo.userdata.append((path, 0))
             return fileInfo
 
         # 3.) At this point the request is for an actually older version of a file or folder
         fileInfo = self.mountSource.getFileInfo(path, fileVersion=fileVersion)
         if fileInfo:
-            fileInfo.userdata.append((path, fileVersion))
             return fileInfo
 
         raise fuse.FuseOSError(fuse.errno.ENOENT)
@@ -2396,19 +2493,15 @@ class FileVersionLayer(MountSource):
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo) -> IO[bytes]:
-        pathAndVersion = fileInfo.userdata.pop()
-        try:
-            return self.mountSource.open(fileInfo)
-        finally:
-            fileInfo.userdata.append(pathAndVersion)
+        return self.mountSource.open(fileInfo)
 
     @overrides(MountSource)
     def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
-        pathAndVersion = fileInfo.userdata.pop()
-        try:
-            return self.mountSource.read(fileInfo, size, offset)
-        finally:
-            fileInfo.userdata.append(pathAndVersion)
+        return self.mountSource.read(fileInfo, size, offset)
+
+    @overrides(MountSource)
+    def getMountSource(self, fileInfo: FileInfo) -> Tuple[str, MountSource, FileInfo]:
+        return self.mountSource.getMountSource(fileInfo)
 
 
 class FuseMount(FuseOperations):  # type: ignore
@@ -2443,9 +2536,7 @@ class FuseMount(FuseOperations):  # type: ignore
         'lastFileHandle',
     )
 
-    def __init__(
-        self, pathToMount: Union[str, List[str]], mountPoint: str, lazyMounting: bool, **sqliteIndexedTarOptions
-    ) -> None:
+    def __init__(self, pathToMount: Union[str, List[str]], mountPoint: str, **options) -> None:
         if not isinstance(pathToMount, list):
             try:
                 os.fspath(pathToMount)
@@ -2453,11 +2544,10 @@ class FuseMount(FuseOperations):  # type: ignore
             except Exception:
                 pass
 
-        sqliteIndexedTarOptions['writeIndex'] = True
-        sqliteIndexedTarOptions['lazyMounting'] = lazyMounting
+        options['writeIndex'] = True
 
         # This also will create or load the block offsets for compressed formats
-        mountSources = [openMountSource(path, **sqliteIndexedTarOptions) for path in pathToMount]
+        mountSources = [openMountSource(path, **options) for path in pathToMount]
 
         # No threads should be created and still be open before FUSE forks.
         # Instead, they should be created in 'init'.
@@ -2472,7 +2562,10 @@ class FuseMount(FuseOperations):  # type: ignore
             ):
                 mountSource.tarFileObject.join_threads()
 
-        self.mountSource: MountSource = FileVersionLayer(UnionMountSource(mountSources))
+        self.mountSource: MountSource = UnionMountSource(mountSources)
+        if options.get('recursive', False):
+            self.mountSource = AutoMountLayer(self.mountSource, **options)
+        self.mountSource = FileVersionLayer(self.mountSource)
 
         self.rootFileInfo = _makeMountPointFileInfoFromStats(os.stat(pathToMount[0]))
 
