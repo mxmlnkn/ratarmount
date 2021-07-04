@@ -1519,7 +1519,7 @@ class SQLiteIndexedTar(MountSource):
             if not matches:
                 continue
 
-            if compression.moduleName not in globals() and matches:
+            if compression.moduleName not in sys.modules and matches:
                 return compressionId
 
             try:
@@ -1572,7 +1572,7 @@ class SQLiteIndexedTar(MountSource):
             return fileobj, None, compression, SQLiteIndexedTar._detectTar(fileobj, encoding)
 
         cinfo = supportedCompressions[compression]
-        if cinfo.moduleName not in globals():
+        if cinfo.moduleName not in sys.modules:
             raise CompressionError(
                 "Can't open a {} compressed file '{}' without {} module!".format(
                     compression, fileobj.name, cinfo.moduleName
@@ -2392,7 +2392,7 @@ class TarFileType:
 
             try:
                 # Determining if there are many frames in zstd is O(1) with is_multiframe
-                if compression != 'zst' or supportedCompressions[compression].moduleName not in globals():
+                if compression != 'zst' or supportedCompressions[compression].moduleName not in sys.modules:
                     raise Exception()  # early exit because we catch it ourself anyways
 
                 zstdFile = supportedCompressions[compression].open(fileobj)
@@ -2421,7 +2421,7 @@ class TarFileType:
                 raise argparse.ArgumentTypeError("Archive '{}' can't be opened!\n".format(tarFile))
 
         cinfo = supportedCompressions[compression]
-        if cinfo.moduleName not in globals():
+        if cinfo.moduleName not in sys.modules:
             raise argparse.ArgumentTypeError(
                 "Can't open a {} compressed TAR file '{}' without {} module!".format(
                     compression, fileobj.name, cinfo.moduleName
