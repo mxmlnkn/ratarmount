@@ -438,6 +438,8 @@ class SQLiteIndexedTar:
         self.tarFileObject, self.rawFileObject, self.compression, self.isTar = SQLiteIndexedTar._openCompressedFile(
             fileObject, gzipSeekPointSpacing, encoding
         )
+        if not self.isTar and not self.rawFileObject:
+            raise RatarmountError("File object could not be opened as a TAR file!")
 
         if self.compression == 'xz':
             try:
