@@ -46,6 +46,10 @@ try:
     import lzmaffi
 except ImportError:
     pass
+try:
+    import rarfile
+except ImportError:
+    pass
 
 
 __version__ = '0.9.0'
@@ -108,6 +112,13 @@ supportedCompressions = {
         'indexed_gzip',
         lambda x: x.read(2) == b'\x1F\x8B',
         lambda x: indexed_gzip.IndexedGzipFile(fileobj=x),
+    ),
+    'rar': CompressionInfo(
+        ['rar'],
+        [],
+        'rarfile',
+        lambda x: x.read(6) == b'Rar!\x1A\x07',
+        lambda x: rarfile.RarFile(x),
     ),
     'xz': CompressionInfo(
         ['xz'], ['txz'], 'lzmaffi', lambda x: x.read(6) == b"\xFD7zXZ\x00", lambda x: lzmaffi.open(x)
@@ -2256,6 +2267,95 @@ class ZipMountSource(MountSource):
             return file.read(size)
 
 
+class RarMountSource(MountSource):
+    # Basically copy paste of ZipMountSource because the interfaces are very similar
+    # I'm honestly not sure how it works that well as it does. It does have some problems
+    # when trying to mount .tar.bz2 or .tar.xz inside rar files recursively but it works
+    # reasonably well for .tar.gz and .zip considering that seeking seems to be broken:
+    # https://github.com/markokr/rarfile/issues/73
+
+    def __init__(self, fileOrPath: Union[str, IO[bytes]], **options) -> None:
+        self.fileObject = rarfile.RarFile(fileOrPath, 'r')
+        self.files = self.fileObject.infolist()
+        self.options = options
+
+    @staticmethod
+    def _convertToFileInfo(info: rarfile.RarInfo) -> FileInfo:
+        mode = 0o555 | (stat.S_IFDIR if info.is_dir() else stat.S_IFREG)
+        dtime = datetime.datetime(*info.date_time)
+        dtime = dtime.replace(tzinfo=datetime.timezone.utc)
+        mtime = dtime.timestamp() if info.date_time else 0
+
+        fileInfo = FileInfo(
+            # fmt: off
+            size     = info.file_size,
+            mtime    = mtime,
+            mode     = mode,
+            linkname = "",
+            uid      = os.getuid(),
+            gid      = os.getgid(),
+            userdata = [info],
+            # fmt: on
+        )
+
+        return fileInfo
+
+    @overrides(MountSource)
+    def listDir(self, path: str) -> Optional[Iterable[str]]:
+        path = path.strip('/')
+        if path:
+            path += '/'
+
+        # TODO How to behave with files in archive with absolute paths? Currently, they would never be shown.
+        def getName(filePath):
+            if not filePath.startswith(path):
+                return None
+
+            filePath = filePath[len(path) :].strip('/')
+            if not filePath:
+                return None
+
+            # This effectively adds all parent paths as folders but theoretically parent folders should be in
+            # the archive separately but I'm not sure whether archive enforces that or not.
+            if '/' in filePath:
+                firstSlash = filePath.index('/')
+                filePath = filePath[:firstSlash]
+
+            return filePath
+
+        # ZipInfo.filename is wrongly named as it returns the full path inside the archive not just the name part
+        return set(getName(info.filename) for info in self.files if getName(info.filename))
+
+    def _getFileInfos(self, path: str) -> List['rarfile.RarInfo']:
+        # TODO Generate dummy folder infos for parent folders which are not in the archive as a separate object?
+        return [info for info in self.files if info.filename.rstrip('/') == path.lstrip('/')]
+
+    def _getFileInfo(self, path: str, fileVersion: int = 0) -> Optional['rarfile.RarInfo']:
+        infos = self._getFileInfos(path)
+        return infos[fileVersion] if -len(infos) <= fileVersion < len(infos) else None
+
+    @overrides(MountSource)
+    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+        info = self._getFileInfo(path, fileVersion)
+        return RarMountSource._convertToFileInfo(info) if info else None
+
+    @overrides(MountSource)
+    def fileVersions(self, path: str) -> int:
+        return len(self._getFileInfos(path))
+
+    @overrides(MountSource)
+    def open(self, fileInfo: FileInfo) -> IO[bytes]:
+        info = fileInfo.userdata[-1]
+        assert isinstance(info, rarfile.RarInfo)
+        return self.fileObject.open(info, 'r')
+
+    @overrides(MountSource)
+    def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
+        with self.open(fileInfo) as file:
+            file.seek(offset, os.SEEK_SET)
+            return file.read(size)
+
+
 class DummyFuseOperations:
     """A dummy class that is used to replace
     fuse.Operations if fusepy is not installed."""
@@ -2299,6 +2399,16 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
     except Exception as e:
         if printDebug >= 1:
             print("[Info] Checking for zip file raised an exception:", e)
+    finally:
+        if hasattr(fileOrPath, 'seek'):
+            fileOrPath.seek(0)  # type: ignore
+
+    try:
+        if 'rarfile' in sys.modules and rarfile.is_rarfile(fileOrPath):
+            return RarMountSource(fileOrPath, **options)
+    except Exception as e:
+        if printDebug >= 1:
+            print("[Info] Checking for rar file raised an exception:", e)
     finally:
         if hasattr(fileOrPath, 'seek'):
             fileOrPath.seek(0)  # type: ignore

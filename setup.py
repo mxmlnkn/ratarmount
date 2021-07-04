@@ -41,7 +41,8 @@ setup(
                          'indexed_gzip>=1.6.3',
                          'indexed_zstd>=1.3.1; sys_platform=="darwin"',
                          'indexed_zstd>=1.2.2; platform_system!="Windows"',
-                         'dataclasses; python_version < "3.7.0"' ],
+                         'dataclasses; python_version < "3.7.0"',
+                         'rarfile>=4.0' ],
     # Make these optional requirements because they have no binaries on PyPI meaning they are built from source
     # and will fail if system dependencies are not installed.
     extras_require   = {
