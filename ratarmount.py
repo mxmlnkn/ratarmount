@@ -501,6 +501,7 @@ class SQLiteIndexedTar:
                 pass
 
             self._loadOrStoreCompressionOffsets()
+            self._reloadIndexReadOnly()
             return
 
         # Find a suitable (writable) location for the index database
@@ -520,6 +521,7 @@ class SQLiteIndexedTar:
         self._loadOrStoreCompressionOffsets()  # store
         if self.sqlConnection:
             self._storeMetadata(self.sqlConnection)
+            self._reloadIndexReadOnly()
 
         if printDebug >= 1 and self.indexFileName and os.path.isfile(self.indexFileName):
             # The 0-time is legacy for the automated tests
@@ -691,8 +693,8 @@ class SQLiteIndexedTar:
         return False
 
     @staticmethod
-    def _openSqlDb(path: AnyStr) -> sqlite3.Connection:
-        sqlConnection = sqlite3.connect(path)
+    def _openSqlDb(path: AnyStr, **kwargs) -> sqlite3.Connection:
+        sqlConnection = sqlite3.connect(path, **kwargs)
         sqlConnection.row_factory = sqlite3.Row
         sqlConnection.executescript(
             """
@@ -751,6 +753,13 @@ class SQLiteIndexedTar:
             )
         sqlConnection.executescript(createTables)
         return sqlConnection
+
+    def _reloadIndexReadOnly(self):
+        if not self.indexFileName or self.indexFileName == ':memory:' or not self.sqlConnection:
+            return
+
+        self.sqlConnection.close()
+        self.sqlConnection = SQLiteIndexedTar._openSqlDb(f"file:{self.indexFileName}?mode=ro", uri=True)
 
     @staticmethod
     def _tarInfoFullMode(tarInfo: tarfile.TarInfo) -> int:
