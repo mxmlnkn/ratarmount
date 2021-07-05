@@ -740,6 +740,9 @@ class SQLiteIndexedTar(MountSource):
         sqlConnection = sqlite3.connect(path, **kwargs)
         sqlConnection.row_factory = sqlite3.Row
         sqlConnection.executescript(
+            # Looking mode exclusive leads to a measurable speedup. E.g., find on 2k recursive files tar
+            # improves from ~1s to ~0.4s!
+            # https://blog.devart.com/increasing-sqlite-performance.html
             """
             PRAGMA LOCKING_MODE = EXCLUSIVE;
             PRAGMA TEMP_STORE = MEMORY;
@@ -1059,6 +1062,7 @@ class SQLiteIndexedTar(MountSource):
                 SELECT path,name,0,0,1,0,{},{},"",0,0,0,0
                 FROM "parentfolders" ORDER BY "path","name";
             DROP TABLE "parentfolders";
+            PRAGMA optimize;
         """.format(
             int(0o555 | stat.S_IFDIR), int(tarfile.DIRTYPE)
         )
