@@ -28,7 +28,7 @@ In [contrast](https://github.com/libarchive/libarchive#notes-about-the-library-d
 # Table of Contents
 
 1. [Installation](#installation)
-2. [Benchmarks](benchmarks/BENCHMARKS.md)
+2. [Benchmarks](#benchmarks)
 3. [The Problem](#the-problem)
 4. [The Solution](#the-solution)
 5. [Usage](#usage)
