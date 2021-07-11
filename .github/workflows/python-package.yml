@@ -26,8 +26,7 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get -y install fuse bzip2 pbzip2 pixz zstd shellcheck # necessary for tests
-        python3 -m pip install --upgrade pip
-        python3 -m pip install --upgrade-strategy eager --upgrade black cython flake8 mypy twine pylint pytype wheel types-dataclasses
+        python3 -m pip install --upgrade-strategy eager --upgrade black cython flake8 mypy twine pylint pytype wheel
     - name: Test Startup With Only One Compression Dependency
       run: |
         for module in indexed_gzip indexed_zstd lzmaffi; do
@@ -63,7 +62,10 @@ jobs:
       run: pytype -d import-error ratarmount.py
       if: matrix.python-version != '3.9' # "Python versions > 3.7 are not yet supported."
     - name: Lint With Mypy
-      run: mypy *.py
+      run: |
+        yes | python3 -m pip install --upgrade-strategy eager --upgrade types-dataclasses
+        mypy *.py
+        yes | python3 -m pip uninstall types-dataclasses
     - name: Lint With ShellCheck
       run: shellcheck -e SC2064 tests/*.sh
     - name: Test Startup Without Compression Dependencies

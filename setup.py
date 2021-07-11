@@ -31,7 +31,7 @@ setup(
     long_description_content_type = 'text/markdown',
 
     py_modules       = [ 'ratarmount' ],
-    install_requires = requirements,
+    install_requires = requirements + [ 'dataclasses; python_version < "3.7.0"' ],
     # Make these optional requirements because they have no binaries on PyPI meaning they are built from source
     # and will fail if system dependencies are not installed.
     extras_require   = {
