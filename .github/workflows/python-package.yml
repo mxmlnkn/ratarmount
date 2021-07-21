@@ -5,9 +5,11 @@ on: [push, pull_request]
 jobs:
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
         # Oldest and newest versions should be enough. Python versions are supported 5 years from release date.
         # 3.5 was released 2015-09-13 and end-of-life was 2020-09-13
         # 3.6 was released 2016-12-23 and end-of-life will be 2021-12-23
@@ -15,7 +17,7 @@ jobs:
         # 3.8 was released 2019-10-14 and end-of-life will be 2024-10-14
         # 3.9 was released 2020-10-05 and end-of-life will be 2025-10-25
         # 3.10 is to be released 2021-10-25
-        python-version: ['3.6', '3.9']
+        python-version: [3.6, 3.9]
 
     steps:
     - uses: actions/checkout@v2
@@ -23,9 +25,12 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install Dependencies
+    - if: matrix.os == 'ubuntu-latest'
+      name: Install Dependencies
       run: |
         sudo apt-get -y install fuse bzip2 pbzip2 pixz zstd shellcheck # necessary for tests
+    - name: Install pip Dependencies
+      run: |
         python3 -m pip install --upgrade-strategy eager --upgrade black cython flake8 mypy twine pylint pytype wheel
     - name: Test Startup With Only One Compression Dependency
       run: |
