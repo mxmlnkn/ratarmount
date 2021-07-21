@@ -59,23 +59,29 @@ jobs:
       run: |
         black -q --diff --line-length 120 --skip-string-normalization ratarmount.py > black.diff
         ! [ -s black.diff ]
+      if: matrix.os == 'ubuntu-latest'
     - name: Lint With Flake8
       run: flake8 *.py
+      if: matrix.os == 'ubuntu-latest'
     - name: Lint With Pylint
       run: |
         pylint *.py | tee pylint.log
         ! 'egrep' ': E[0-9]{4}: ' pylint.log
-      if: matrix.python-version != '3.9' # because of this bug https://github.com/PyCQA/pylint/issues/3882
+      if: matrix.os == 'ubuntu-latest'
     - name: Lint With Pytype
       run: pytype -d import-error ratarmount.py
-      if: matrix.python-version != '3.9' # "Python versions > 3.7 are not yet supported."
+      if: |
+        (matrix.python-version == '3.9') && # "Python versions > 3.7 are not yet supported."
+        (matrix.os == 'ubuntu-latest')
     - name: Lint With Mypy
       run: |
-        yes | python3 -m pip install --upgrade-strategy eager --upgrade types-dataclasses
+        yes | python3 -m pip install --upgrade-strategy eager --upgrade types-dataclasses mypy
         mypy *.py
         yes | python3 -m pip uninstall types-dataclasses
+      if: matrix.os == 'ubuntu-latest'
     - name: Lint With ShellCheck
       run: shellcheck -e SC2064 tests/*.sh
+      if: matrix.os == 'ubuntu-latest'
     - name: Test Startup Without Compression Dependencies
       run: |
         # Segfaults (139) are not allowed but other exit codes are valid!
