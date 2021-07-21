@@ -18,9 +18,23 @@ jobs:
         # 3.9 was released 2020-10-05 and end-of-life will be 2025-10-25
         # 3.10 is to be released 2021-10-25
         python-version: [3.6, 3.9]
+        shell: ["bash", "wsl-bash {0}"]
+        exclude:
+          - os: macos-latest
+            shell: "wsl-bash {0}"
+          - os: ubuntu-latest
+            shell: "wsl-bash {0}"
+          - os: windows-latest
+            shell: "bash"
+
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
 
     steps:
     - uses: actions/checkout@v2
+    - uses: Vampire/setup-wsl@v1
+      if: matrix.os == 'windows-latest'
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
@@ -45,7 +59,6 @@ jobs:
           python3 -m pip uninstall --yes "$module"
         done
         python3 -m pip install --upgrade git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=indexed_bzip2
-      if: matrix.os != 'ubuntu-latest'
     - name: Test Installation From Tarball
       run: |
         python3 setup.py sdist bdist_wheel
