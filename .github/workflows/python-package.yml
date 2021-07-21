@@ -34,7 +34,7 @@ jobs:
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade wheel
         python3 -m pip install --upgrade setuptools
-        python3 -m pip install --upgrade-strategy eager --upgrade black cython flake8 mypy twine pylint pytype
+        python3 -m pip install --upgrade-strategy eager --upgrade black cython flake8 mypy twine
     - name: Test Startup With Only One Compression Dependency
       run: |
         for module in indexed_gzip indexed_zstd lzmaffi; do
@@ -65,13 +65,16 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
     - name: Lint With Pylint
       run: |
+        python -m pip install pylint
         pylint *.py | tee pylint.log
         ! 'egrep' ': E[0-9]{4}: ' pylint.log
       if: matrix.os == 'ubuntu-latest'
     - name: Lint With Pytype
-      run: pytype -d import-error ratarmount.py
+      run: |
+        python -m pip install pytype
+        pytype -d import-error ratarmount.py
       if: |
-        (matrix.python-version == '3.9') && # "Python versions > 3.7 are not yet supported."
+        (matrix.python-version == '3.9') &&
         (matrix.os == 'ubuntu-latest')
     - name: Lint With Mypy
       run: |
