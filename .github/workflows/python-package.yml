@@ -45,6 +45,7 @@ jobs:
           python3 -m pip uninstall --yes "$module"
         done
         python3 -m pip install --upgrade git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=indexed_bzip2
+      if: matrix.os != 'ubuntu-latest'
     - name: Test Installation From Tarball
       run: |
         python3 setup.py sdist bdist_wheel
