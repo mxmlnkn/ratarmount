@@ -5,9 +5,10 @@ on: [push, pull_request]
 jobs:
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
         # Oldest and newest versions should be enough. Python versions are supported 5 years from release date.
         # 3.5 was released 2015-09-13 and end-of-life was 2020-09-13
         # 3.6 was released 2016-12-23 and end-of-life will be 2021-12-23
@@ -15,7 +16,7 @@ jobs:
         # 3.8 was released 2019-10-14 and end-of-life will be 2024-10-14
         # 3.9 was released 2020-10-05 and end-of-life will be 2025-10-25
         # 3.10 is to be released 2021-10-25
-        python-version: ['3.6', '3.9']
+        python-version: [3.6, 3.9]
 
     steps:
     - uses: actions/checkout@v2
@@ -23,10 +24,24 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install Dependencies
+
+    - if: matrix.os == 'ubuntu-latest'
+      name: Install Dependencies
       run: |
         sudo apt-get -y install fuse bzip2 pbzip2 pixz zstd shellcheck # necessary for tests
-        python3 -m pip install --upgrade-strategy eager --upgrade black cython flake8 mypy twine pylint pytype wheel
+
+    - if: matrix.os == 'macos-latest'
+      name: Install Dependencies
+      run: |
+        brew install osxfuse
+
+    - name: Install pip Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install --upgrade wheel
+        python -m pip install --upgrade setuptools
+        python -m pip install --upgrade-strategy eager --upgrade black cython flake8 mypy twine
+
     - name: Test Startup With Only One Compression Dependency
       run: |
         for module in indexed_gzip indexed_zstd lzmaffi; do
@@ -37,6 +52,8 @@ jobs:
           python3 -m pip uninstall --yes "$module"
         done
         python3 -m pip install --upgrade git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=indexed_bzip2
+      if: matrix.os != 'windows-latest'
+
     - name: Test Installation From Tarball
       run: |
         python3 setup.py sdist bdist_wheel
@@ -51,23 +68,38 @@ jobs:
       run: |
         black -q --diff --line-length 120 --skip-string-normalization ratarmount.py > black.diff
         ! [ -s black.diff ]
+      if: matrix.os == 'ubuntu-latest'
+
     - name: Lint With Flake8
       run: flake8 *.py
+      if: matrix.os == 'ubuntu-latest'
+
     - name: Lint With Pylint
       run: |
+        python -m pip install pylint
         pylint *.py | tee pylint.log
         ! 'egrep' ': E[0-9]{4}: ' pylint.log
-      if: matrix.python-version != '3.9' # because of this bug https://github.com/PyCQA/pylint/issues/3882
+      if: matrix.os == 'ubuntu-latest'
+
     - name: Lint With Pytype
-      run: pytype -d import-error ratarmount.py
-      if: matrix.python-version != '3.9' # "Python versions > 3.7 are not yet supported."
+      run: |
+        python -m pip install pytype
+        pytype -d import-error ratarmount.py
+      if: |
+        (matrix.python-version == '3.9') &&
+        (matrix.os == 'ubuntu-latest')
+
     - name: Lint With Mypy
       run: |
         yes | python3 -m pip install --upgrade-strategy eager --upgrade types-dataclasses
         mypy *.py
         yes | python3 -m pip uninstall types-dataclasses
+      if: matrix.os == 'ubuntu-latest'
+
     - name: Lint With ShellCheck
       run: shellcheck -e SC2064 tests/*.sh
+      if: matrix.os == 'ubuntu-latest'
+
     - name: Test Startup Without Compression Dependencies
       run: |
         # Segfaults (139) are not allowed but other exit codes are valid!
