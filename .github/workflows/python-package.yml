@@ -31,7 +31,10 @@ jobs:
         sudo apt-get -y install fuse bzip2 pbzip2 pixz zstd shellcheck # necessary for tests
     - name: Install pip Dependencies
       run: |
-        python3 -m pip install --upgrade-strategy eager --upgrade black cython flake8 mypy twine pylint pytype wheel
+        python3 -m pip install --upgrade pip
+        python3 -m pip install --upgrade wheel
+        python3 -m pip install --upgrade setuptools
+        python3 -m pip install --upgrade-strategy eager --upgrade black cython flake8 mypy twine pylint pytype
     - name: Test Startup With Only One Compression Dependency
       run: |
         for module in indexed_gzip indexed_zstd lzmaffi; do
