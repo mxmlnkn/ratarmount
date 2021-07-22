@@ -45,25 +45,25 @@ jobs:
         sudo apt-get -y install fuse bzip2 pbzip2 pixz zstd shellcheck # necessary for tests
     - name: Install pip Dependencies
       run: |
-        python3 -m pip install --upgrade pip
-        python3 -m pip install --upgrade wheel
-        python3 -m pip install --upgrade setuptools
-        python3 -m pip install --upgrade-strategy eager --upgrade black cython flake8 mypy twine
+        python -m pip install --upgrade pip
+        python -m pip install --upgrade wheel
+        python -m pip install --upgrade setuptools
+        python -m pip install --upgrade-strategy eager --upgrade black cython flake8 mypy twine
     - name: Test Startup With Only One Compression Dependency
       run: |
         for module in indexed_gzip indexed_zstd lzmaffi; do
-          python3 -m pip install --upgrade "$module"
+          python -m pip install --upgrade "$module"
           # Segfaults (139) are not allowed but other exit codes are valid!
           # indexed_zstd=1.2.0 did segfault here!
-          python3 ratarmount.py README.md || [ $? != 139 ]
-          python3 -m pip uninstall --yes "$module"
+          python ratarmount.py README.md || [ $? != 139 ]
+          python -m pip uninstall --yes "$module"
         done
-        python3 -m pip install --upgrade git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=indexed_bzip2
+        python -m pip install --upgrade git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=indexed_bzip2
     - name: Test Installation From Tarball
       run: |
-        python3 setup.py sdist bdist_wheel
+        python setup.py sdist bdist_wheel
         twine check dist/*
-        python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )[full]"
+        python -m pip install "$( find dist -name '*.tar.gz' | head -1 )[full]"
     - name: Test Simple Startup
       run: |
         ratarmount --help
@@ -79,22 +79,22 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
     - name: Lint With Pylint
       run: |
-        python3 -m pip install pylint
+        python -m pip install pylint
         pylint *.py | tee pylint.log
         ! 'egrep' ': E[0-9]{4}: ' pylint.log
       if: matrix.os == 'ubuntu-latest'
     - name: Lint With Pytype
       run: |
-        python3 -m pip install pytype
+        python -m pip install pytype
         pytype -d import-error ratarmount.py
       if: |
         (matrix.python-version == '3.9') &&
         (matrix.os == 'ubuntu-latest')
     - name: Lint With Mypy
       run: |
-        yes | python3 -m pip install --upgrade-strategy eager --upgrade types-dataclasses mypy
+        yes | python -m pip install --upgrade-strategy eager --upgrade types-dataclasses mypy
         mypy *.py
-        yes | python3 -m pip uninstall types-dataclasses
+        yes | python -m pip uninstall types-dataclasses
       if: matrix.os == 'ubuntu-latest'
     - name: Lint With ShellCheck
       run: shellcheck -e SC2064 tests/*.sh
@@ -102,11 +102,11 @@ jobs:
     - name: Test Startup Without Compression Dependencies
       run: |
         # Segfaults (139) are not allowed but other exit codes are valid!
-        python3 ratarmount.py tests/simple.bz2 || [ $? != 139 ]
+        python ratarmount.py tests/simple.bz2 || [ $? != 139 ]
     - name: Regression Tests
       run: |
         bash tests/runtests.sh
     - name: Module tests without fusepy
       run: |
-        python3 -m pip uninstall -y fusepy
-        python3 tests/tests.py
+        python -m pip uninstall -y fusepy
+        python tests/tests.py
