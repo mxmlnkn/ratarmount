@@ -42,12 +42,29 @@ In [contrast](https://github.com/libarchive/libarchive#notes-about-the-library-d
 
 # Installation
 
-Python 3.6 or higher and preferably pip 19.0 or higher are required.
-On Debian-like systems like Ubuntu, you can install both using:
+## Dependencies
+
+Python 3.6+, preferably pip 19.0+, and FUSE are required.
+These should be preinstalled on most systems.
+On Debian-like systems like Ubuntu, you can install/update all dependencies using:
 
 ```bash
-sudo apt install python3 python3-pip
+sudo apt install python3 python3-pip fuse
 ```
+
+On macOS, you have to install [macFUSE](https://osxfuse.github.io/) with:
+
+```bash
+brew install macfuse
+```
+
+If you are installing on a system for which there exists no manylinux wheel, then you'll have to install dependencies required to build from source:
+
+```bash
+sudo apt install python3 python3-pip fuse build-essential software-properties-common zlib1g-dev libzstd-dev liblzma-dev cffi
+```
+
+## PIP Package Installation
 
 Then, you can simply install ratarmount from PyPI:
 ```bash
@@ -66,8 +83,8 @@ On Ubuntu 20.10 or similar systems, the setup would look like this:
 
 ```bash
 sudo apt install liblzma-dev
-pip3 install --user cffi # Necessary because of a bug(?) in the lzmaffi setup.py
-pip3 install --user lzmaffi
+python3 -m pip install --user cffi # Necessary because of a bug(?) in the lzmaffi setup.py
+python3 -m pip install --user ratarmount[full]
 ```
 
 
