@@ -1,0 +1,180 @@
+name: Tests
+
+on: [push, pull_request]
+
+jobs:
+  Static-Code-Checks:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+
+    - name: Install pip Dependencies
+      run: |
+        python3 -m pip install --upgrade pip
+
+    - name: Style Check With Black
+      run: |
+        python3 -m pip install black
+        black -q --diff --line-length 120 --skip-string-normalization ratarmount.py > black.diff
+        if [ -s black.diff ]; then
+            cat black.diff
+            exit 123
+        fi
+
+    - name: Lint With Flake8
+      run: |
+        python3 -m pip install flake8
+        flake8 *.py
+
+    - name: Lint With Pylint
+      run: |
+        python3 -m pip install pylint
+        pylint *.py | tee pylint.log
+        ! 'egrep' ': E[0-9]{4}: ' pylint.log
+
+    - name: Lint With Pytype
+      run: |
+        python3 -m pip install pytype
+        pytype -d import-error ratarmount.py
+
+    - name: Lint With Mypy
+      run: |
+        yes | python3 -m pip install --upgrade-strategy eager --upgrade types-dataclasses mypy
+        mypy *.py
+        yes | python3 -m pip uninstall types-dataclasses
+
+    - name: Lint With ShellCheck
+      run: |
+        sudo apt-get -y install shellcheck
+        shellcheck -e SC2064 tests/*.sh
+
+  Tests:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+        # ToDo: Add windows-latest but it requires a lot of setup of the dependencies!
+        #       Maybe only test ratarmount-core without most dependencies after I have split that off.
+        # Oldest and newest versions should be enough. Python versions are supported 5 years from release date.
+        # 3.5 was released 2015-09-13 and end-of-life was 2020-09-13
+        # 3.6 was released 2016-12-23 and end-of-life will be 2021-12-23
+        # 3.7 was released 2018-06-27 and end-of-life will be 2023-06-27
+        # 3.8 was released 2019-10-14 and end-of-life will be 2024-10-14
+        # 3.9 was released 2020-10-05 and end-of-life will be 2025-10-25
+        # 3.10 is to be released 2021-10-25
+        python-version: [3.6, 3.9]
+
+    defaults:
+      run:
+        # This is especially important for windows because it seems to default to powershell
+        shell: bash
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Print System Information
+      run: |
+        echo "uname -a: $( uname -a )"
+        echo "Shell: $SHELL"
+        echo "Mount points:"; mount
+
+    - uses: msys2/setup-msys2@v2
+      if: matrix.os == 'windows-latest'
+      with:
+        install: gcc make liblzma-devel libzstd-devel zlib-devel
+
+    - name: Print System Information (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: msys2
+      run: |
+        pacman -v
+
+    - name: Install Dependencies (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get -y install fuse bzip2 pbzip2 pixz zstd
+        set -x
+
+    - name: Install Dependencies (MacOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        # coreutils is required for the tests written in shell, e.g., for the 'realpath' command
+        brew install macfuse coreutils pixz pbzip2 zstd
+        # Add brew installation binary folder to PATH so that command line tools like zstd can be found
+        export PATH="$PATH:/usr/local/bin"
+
+    - name: Install pip Dependencies
+      run: |
+        python3 -m pip install --upgrade pip
+        python3 -m pip install --upgrade wheel
+        python3 -m pip install --upgrade setuptools
+        python3 -m pip install --upgrade-strategy eager --upgrade cython twine cffi
+
+    - name: Test Startup With Only One Compression Dependency
+      run: |
+        for module in indexed_gzip indexed_zstd lzmaffi; do
+          python3 -m pip install --upgrade "$module"
+          # Segfaults (139) are not allowed but other exit codes are valid!
+          # indexed_zstd=1.2.0 did segfault here!
+          python3 ratarmount.py README.md || [ $? != 139 ]
+          python3 -m pip uninstall --yes "$module"
+        done
+        python3 -m pip install --upgrade git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=indexed_bzip2
+      if: matrix.os != 'windows-latest'
+
+    - name: Test Installation From Tarball
+      if: matrix.os != 'windows-latest'
+      run: |
+        python3 setup.py sdist bdist_wheel
+        twine check dist/*
+        python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )[full]"
+
+    - name: Test Installation From Source
+      if: matrix.os == 'windows-latest'
+      run: |
+        python3 setup.py sdist bdist_wheel
+        twine check dist/*
+        python3 -m pip install .[full]
+
+    - name: Test Simple Startup
+      run: |
+        ratarmount --help
+        ratarmount --version
+
+    - name: Test Simple Mount
+      run: |
+        ratarmount tests/single-file.tar mimi
+        ls -la mimi
+        sleep 1s
+        # MacOS does not have fusermount!
+        if command -v fusermount > /dev/null 2>&1; then
+            fusermount -u mimi
+        else
+            umount mimi
+        fi
+
+    - name: Test Startup Without Compression Dependencies
+      run: |
+        # Segfaults (139) are not allowed but other exit codes are valid!
+        python3 ratarmount.py tests/simple.bz2 || [ $? != 139 ]
+
+    - name: Regression Tests
+      run: |
+        bash tests/runtests.sh
+
+    - name: Module tests without fusepy
+      run: |
+        python3 -m pip uninstall -y fusepy
+        python3 tests/tests.py

@@ -8,14 +8,54 @@ if [[ -z "$RATARMOUNT_CMD" ]]; then
     export RATARMOUNT_CMD
 fi
 
+
+# MAC does not have fusermount!
+if ! command -v fusermount &>/dev/null; then
+    fusermount()
+    {
+        if [[ "$1" == '-u' ]]; then
+            shift
+            umount "$@"
+        else
+            echo "fusermount without -u makes no sense"
+        fi
+    }
+    export -f fusermount
+fi
+
+# MAC does not have fusermount!
+if ! command -v mountpoint &>/dev/null; then
+    mountpoint()
+    {
+        if [[ "$1" == '--' ]]; then shift; fi
+        # Note that this does not the slightly more rigorous check of grepping for " on $1"
+        # because on the Github actions runner it seems we are chrooted to /private, which means
+        # the paths
+        mount | 'grep' -F -q "$1"
+    }
+    export -f mountpoint
+fi
+
+if uname | 'grep' -q -i darwin; then
+    getFileSize() { stat -f %z -- "$1"; }
+    getFileMtime() { stat -f %m -- "$1"; }
+    setFileMTime() { touch -m -t "$( date -r "$1" +%Y%m%d%H%M.%S )" "$2"; }
+else
+    getFileSize() { stat -c %s -- "$1"; }
+    getFileMtime() { stat -c %Y -- "$1"; }
+    setFileMTime() { touch -d "@$1" "$2"; }
+fi
+
+export -f getFileSize
+
 TMP_FILES_TO_CLEANUP=()
 MOUNT_POINTS_TO_CLEANUP=()
 cleanup()
 {
     sleep 0.5s # Give a bit of time for the mount points to become stable before trying to unmount them
     for folder in "${MOUNT_POINTS_TO_CLEANUP[@]}"; do
-        if [[ -d "$folder" ]] && mountpoint -- "$folder" &>/dev/null; then
-            fusermount -u -- "$folder"
+        if [[ -d "$folder" ]]; then
+            funmount "$folder"
         fi
     done
     sleep 0.5s
@@ -35,6 +75,15 @@ trap 'cleanup' EXIT
 
 echoerr() { echo "$@" 1>&2; }
 
+toolMissing=0
+for tool in dd zstd stat grep tar diff find gzip pixz bzip2; do
+    if ! command -v "$tool" &>/dev/null; then
+        echoerr -e '\e[37mDid not find the required '"$tool"' command!\e[0m'
+        toolMissing=1
+    fi
+done
+if [[ $toolMissing -eq 1 ]]; then exit 1; fi
+
 createMultiFrameZstd()
 (
     # Detect being piped into
@@ -42,7 +91,7 @@ createMultiFrameZstd()
         file=$1
         frameSize=$2
         if [[ ! -f "$file" ]]; then echo "Could not find file '$file'." 1>&2; return 1; fi
-        fileSize=$( stat -c %s -- "$file" )
+        fileSize=$( getFileSize "$file" )
     else
         if [ -t 1 ]; then echo 'You should pipe the output to somewhere!' 1>&2; return 1; fi
         #echo 'Will compress from stdin...' 1>&2
@@ -65,14 +114,26 @@ createMultiFrameZstd()
     if [ -t 0 ]; then
         true > "$file.zst"
         for (( offset = 0; offset < fileSize; offset += frameSize )); do
-            dd if="$file" of="$frameFile" bs=$(( 1024*1024 )) \
-               iflag=skip_bytes,count_bytes skip="$offset" count="$frameSize" 2>/dev/null
+            if uname | 'grep' -q  -i darwin; then
+                # This is only a very rudimentary hack and should be used for very large frameSize values!
+                python3 -c "with open('$file', 'rb') as ifile, open('$frameFile', 'wb') as ofile:
+                    ifile.seek($offset)
+                    ofile.write(ifile.read($frameSize))
+                "
+            else
+                dd if="$file" of="$frameFile" bs=$(( 1024*1024 )) \
+                   iflag=skip_bytes,count_bytes skip="$offset" count="$frameSize" 2>/dev/null
+            fi
             zstd -c -q -- "$frameFile" >> "$file.zst"
         done
     else
         while true; do
-            dd of="$frameFile" bs=$(( 1024*1024 )) \
-               iflag=count_bytes count="$frameSize" 2>/dev/null
+            if uname | 'grep' -q  -i darwin; then
+                # untested!
+                head -c "$frameSize" > "$frameFile"
+            else
+                dd of="$frameFile" bs=$(( 1024*1024 )) iflag=count_bytes count="$frameSize" 2>/dev/null
+            fi
             # pipe is finished when reading it yields no further data
             if [[ ! -s "$frameFile" ]]; then break; fi
             zstd -c -q -- "$frameFile"
@@ -111,7 +172,8 @@ funmount()
 {
     local mountFolder="$1"
     sleep 0.2s
-    while mountpoint "$mountFolder" &>/dev/null; do
+
+    while mountpoint -- "$mountFolder" &>/dev/null; do
         sleep 0.2s
         fusermount -u "$mountFolder"
     done
@@ -360,7 +422,7 @@ testLargeTar()
     memoryUsage "$ratarmountPid" "$timeSeriesFile" &
     local memoryUsagePid="$!"
 
-    while ! mountpoint -q "$mountFolder"; do sleep 1s; done
+    while ! mountpoint -- "$mountFolder"; do sleep 1s; done
     fusermount -u "$mountFolder"
     wait "$memoryUsagePid"
     wait "$ratarmountPid"
@@ -374,7 +436,7 @@ testLargeTar()
     memoryUsage "$ratarmountPid" "$timeSeriesFile" &
     local memoryUsagePid="$!"
 
-    while ! mountpoint -q "$mountFolder"; do sleep 1s; done
+    while ! mountpoint -- "$mountFolder"; do sleep 1s; done
     fusermount -u "$mountFolder"
     wait "$memoryUsagePid"
     wait "$ratarmountPid"
@@ -453,13 +515,13 @@ checkAutomaticIndexRecreation()
     sleep 1 # because we are comparing timestamps with seconds precision ...
     indexFile='momo.tar.index.sqlite'
     [[ -f $indexFile ]] || returnError "$LINENO" 'Index file not found!'
-    lastModification=$( stat -c %Y -- "$indexFile" )
+    lastModification=$( getFileMtime "$indexFile" )
     $RATARMOUNT_CMD "$archive" >ratarmount.stdout.log 2>ratarmount.stderr.log
     ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
         returnError "$LINENO" "Found warnings while executing: $RATARMOUNT_CMD $archive"
     diff -- "$fileName" "$mountFolder/$fileName" || returnError "$LINENO" 'Files differ on simple remount!'
     funmount "$mountFolder"
-    [[ $lastModification -eq $( stat -c %Y -- "$indexFile" ) ]] ||
+    [[ $lastModification -eq $( getFileMtime "$indexFile" ) ]] ||
         returnError "$LINENO" 'Index changed even though TAR did not!'
 
     # 3. Change contents (and timestamp) without changing the size
@@ -485,23 +547,23 @@ checkAutomaticIndexRecreation()
         returnError "$LINENO" 'Files differ when trying to trigger index recreation!'
     funmount "$mountFolder"
 
-    [[ $lastModification -ne $( stat -c %Y -- "$indexFile" ) ]] || \
+    [[ $lastModification -ne $( getFileMtime "$indexFile" ) ]] || \
         returnError "$LINENO" 'Index did not change even though TAR did!'
-    lastModification=$( stat -c %Y -- "$indexFile" )
+    lastModification=$( getFileMtime "$indexFile" )
 
     # 4. Check that index changes if size changes but modification timestamp does not
     sleep 1 # because we are comparing timestamps with seconds precision ...
     fileName="heho"
     head -c $(( 100 * 1024 )) /dev/urandom > "$fileName"
     tar -cf "$archive" "$fileName"
-    touch -d "@$lastModification" "$archive"
+    setFileMTime "$lastModification" "$archive"
 
     $RATARMOUNT_CMD "$archive" >ratarmount.stdout.log 2>ratarmount.stderr.log
     'grep' -Eqi 'warn' ratarmount.stdout.log ratarmount.stderr.log ||
         returnError "$LINENO" "Found no warnings while executing: $RATARMOUNT_CMD $archive"
     diff -- "$fileName" "$mountFolder/${fileName}" || returnError "$LINENO" 'Files differ!'
     funmount "$mountFolder"
-    [[ $lastModification -ne $( stat -c %Y -- "$indexFile" ) ]] || \
+    [[ $lastModification -ne $( getFileMtime "$indexFile" ) ]] || \
         returnError "$LINENO" 'Index did not change even though TAR filesize did!'
 
     cd .. || returnError "$LINENO" 'Could not cd to parent in order to clean up!'
@@ -534,7 +596,10 @@ checkUnionMount()
     for tarFile in "${tarFiles[@]}"; do
         # Check whether a simple bind mount works, which is now an officially supported perversion of ratarmount
         runAndCheckRatarmount -c "$tarFile" "$mountPoint"
-        diff -r --no-dereference "$tarFile" "$mountPoint" || returnError "$LINENO" 'Bind mounted folder differs!'
+        # macOS is missing the --no-dereference option
+        if ! uname | 'grep' -q -i darwin; then
+            diff -r --no-dereference "$tarFile" "$mountPoint" || returnError "$LINENO" 'Bind mounted folder differs!'
+        fi
         funmount "$mountPoint"
 
         # Check that bind mount onto the mount point works
@@ -701,7 +766,8 @@ recompressFile()
     esac
 
     # 2. Compress into all supported formats
-    for compression in bz2 gz xz zst; do
+    supportedCompressions=( bz2 gz xz zst )
+    for compression in "${supportedCompressions[@]}"; do
         if [[ "$compression" == "$fileCompression" ]]; then
             recompressedFiles+=( "$file" )
             continue
@@ -737,7 +803,7 @@ recompressFile()
         rm -- "$uncompressedFile"
     fi
 
-    printf '%s\n'  "${recompressedFiles[@]}"
+    printf '%s\n' "${recompressedFiles[@]}"
 }
 
 
@@ -967,7 +1033,7 @@ checkRecursiveFolderMounting()
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
-        'cp' --no-clobber -- "${tests[iTest+1]}" "$archiveFolder"
+        'cp' -- "${tests[iTest+1]}" "$archiveFolder"
     done
     runAndCheckRatarmount -c --ignore-zeros --recursive "$@" "$archiveFolder" "$mountFolder"
 
@@ -1127,11 +1193,12 @@ for parallelization in 1 2 0; do
 echo "== Testing with -P $parallelization =="
 export parallelization
 
+bzip2 -d -k tests/2k-recursive-tars.tar.bz2
 
 checkIndexPathOption tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
 checkIndexFolderFallback tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
 checkIndexArgumentChangeDetection tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
-checkSuffixStripping tests/2k-recursive-tars.tar.bz2 mimi/00001/foo b026324c6904b2a9cb4b88d6d61c81d1
+checkSuffixStripping tests/2k-recursive-tars.tar mimi/00001/foo b026324c6904b2a9cb4b88d6d61c81d1
 checkNestedRecursiveFolderMounting tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
 
 checkTarEncoding tests/single-file.tar utf-8 bar d3b07384d113edec49eaa6238ad5ff00
@@ -1147,13 +1214,21 @@ checkFileInTARPrefix foo/fighter tests/single-nested-file.tar ufo 2709a3348eb2c5
 
 checkAutomaticIndexRecreation || returnError "$LINENO" 'Automatic index recreation test failed!'
 checkAutoMountPointCreation || returnError "$LINENO" 'Automatic mount point creation test failed!'
-checkUnionMount || returnError "$LINENO" 'Union mounting test failed!'
+if ! uname | 'grep' -q -i darwin; then
+    checkUnionMount || returnError "$LINENO" 'Union mounting test failed!'
+fi
 checkUnionMountFileVersions || returnError "$LINENO" 'Union mount file version access test failed!'
 
-checkSelfReferencingHardLinks tests/single-self-link.tar ||
-    returnError "$LINENO" 'Self-referencing hardlinks test failed!'
-checkSelfReferencingHardLinks tests/two-self-links.tar ||
-    returnError "$LINENO" 'Self-referencing hardlinks test failed!'
+# These tests do not work on macOS. It seems that incomplete getattr calls are handled differently there.
+# These TARs are pathological anyway. They self-link and no earlier actual versions of the same file exists,
+# so it can't get any information about the file except for the link location. It's enough that ratarmount
+# doesn't hang with 100% CPU time in these cases, which I tested manually on macOS.
+if ! uname | 'grep' -q -i darwin; then
+    checkSelfReferencingHardLinks tests/single-self-link.tar ||
+        returnError "$LINENO" 'Self-referencing hardlinks test failed!'
+    checkSelfReferencingHardLinks tests/two-self-links.tar ||
+        returnError "$LINENO" 'Self-referencing hardlinks test failed!'
+fi
 
 checkRecursiveFolderMounting
 checkRecursiveFolderMounting --lazy
@@ -1163,7 +1238,13 @@ for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
     tarPath=${tests[iTest+1]}
     fileName=${tests[iTest+2]}
 
-    readarray -t files < <( recompressFile "$tarPath" )
+    # readarray does not work on macOS!
+    #readarray -t files < <( recompressFile "$tarPath" )
+    files=()
+    while IFS=$'\n' read -r line; do
+        files+=( "$line" )
+    done < <( recompressFile "$tarPath" )
+
     TMP_FILES_TO_CLEANUP+=( "${files[@]}" )
     [[ ${#files[@]} -gt 3 ]] || returnError "$LINENO" 'Something went wrong during recompression.'
 

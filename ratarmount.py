@@ -66,24 +66,16 @@ def openBzip2Reader(fileobj):
     return indexed_bzip2.IndexedBzip2File(fileobj.fileno())
 
 
-def getFuseVersion() -> List[int]:
+def hasNonEmptySupport() -> bool:
     try:
         with os.popen('fusermount -V') as pipe:
-            match = re.search(r'[0-9]+[.][0-9]+[.][0-9]+', pipe.read())
+            match = re.search(r'([0-9]+)[.][0-9]+[.][0-9]+', pipe.read())
             if match:
-                return [int(s) for s in match.group(0).split('.')]
+                return int(match.group(1)) < 3
     except Exception:
         pass
 
-    try:
-        # Fusepy already has some platform-specific code for loading a FUSE shared library.
-        # Note that this is not a stable public interface and when switching to refuse, it might have to be changed.
-        majorMinor = fuse._libfuse.fuse_version()
-        return [majorMinor // 10, majorMinor % 10]
-    except Exception:
-        pass
-
-    return []
+    return False  # On macOS, fusermount does nto exist and macfuse also seems to complain with nonempty option.
 
 
 # Defining lambdas does not yet check the names of entities used inside the lambda!
@@ -2700,9 +2692,8 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         fusekwargs['modules'] = 'subdir'
         fusekwargs['subdir'] = args.prefix
 
-    fuseVersion = getFuseVersion()
     if args.mount_point in args.mount_source and os.path.isdir(args.mount_point) and os.listdir(args.mount_point):
-        if len(fuseVersion) > 0 and fuseVersion[0] < 3:
+        if hasNonEmptySupport():
             fusekwargs['nonempty'] = True
 
     global printDebug
