@@ -75,6 +75,14 @@ def getFuseVersion() -> List[int]:
     except Exception:
         pass
 
+    try:
+        # Fusepy already has some platform-specific code for loading a FUSE shared library.
+        # Note that this is not a stable public interface and when switching to refuse, it might have to be changed.
+        majorMinor = fuse._libfuse.fuse_version()
+        return [majorMinor // 10, majorMinor % 10]
+    except Exception:
+        pass
+
     return []
 
 
@@ -2677,7 +2685,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
 
     fuseVersion = getFuseVersion()
     if args.mount_point in args.mount_source and os.path.isdir(args.mount_point) and os.listdir(args.mount_point):
-        if len(fuseVersion) == 3 and fuseVersion[0] < 3:
+        if len(fuseVersion) > 0 and fuseVersion[0] < 3:
             fusekwargs['nonempty'] = True
 
     global printDebug
