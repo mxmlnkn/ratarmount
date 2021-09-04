@@ -1488,7 +1488,10 @@ class SQLiteIndexedTar:
                 compressedFileobj.close()
                 fileobj.seek(oldOffset)
                 return compressionId
-            except Exception:
+            except Exception as e:
+                if printDebug >= 2:
+                    print(f"[Warning] A given file with magic bytes for {compressionId} could not be opened because:")
+                    print(e)
                 fileobj.seek(oldOffset)
 
         return None
