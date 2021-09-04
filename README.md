@@ -1,6 +1,7 @@
 # Random Access Read-Only Tar Mount (Ratarmount)
 
 [![PyPI version](https://badge.fury.io/py/ratarmount.svg)](https://badge.fury.io/py/ratarmount)
+[![Python Version](https://img.shields.io/pypi/pyversions/indexed_bzip2)](https://pypi.org/project/indexed-bzip2/)
 [![Downloads](https://pepy.tech/badge/ratarmount/month)](https://pepy.tech/project/ratarmount)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](http://opensource.org/licenses/MIT)
 [![Build Status](https://github.com/mxmlnkn/ratarmount/workflows/tests/badge.svg)](https://github.com/mxmlnkn/ratarmount/actions)
