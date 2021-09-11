@@ -447,7 +447,7 @@ class SQLiteIndexedTar:
             fileObject, gzipSeekPointSpacing, encoding
         )
         if not self.isTar and not self.rawFileObject:
-            raise RatarmountError("File object could not be opened as a TAR file!")
+            raise RatarmountError("File object (" + str(fileObject) + ") could not be opened as a TAR file!")
 
         if self.compression == 'xz':
             try:
@@ -1507,6 +1507,8 @@ class SQLiteIndexedTar:
             with tarfile.open(fileobj=fileobj, mode='r:', encoding=encoding):
                 isTar = True
         except (tarfile.ReadError, tarfile.CompressionError):
+            if printDebug >= 3:
+                print("[Info] File object", fileobj, "is not a TAR.")
             pass
 
         fileobj.seek(oldOffset)
@@ -1520,6 +1522,9 @@ class SQLiteIndexedTar:
         raw_file_obj will be none if compression is None.
         """
         compression = SQLiteIndexedTar._detectCompression(fileobj)
+        if printDebug >= 3:
+            print(f"[Info] Detected compression {compression} for file object:", fileobj)
+
         if compression not in supportedCompressions:
             return fileobj, None, compression, SQLiteIndexedTar._detectTar(fileobj, encoding)
 
@@ -2363,6 +2368,10 @@ class TarFileType:
             if compression not in supportedCompressions:
                 if SQLiteIndexedTar._detectTar(fileobj, self.encoding):
                     return tarFile, compression
+
+                if printDebug >= 2:
+                    print(f"Archive '{tarFile}' (compression: {compression}) can't be opened!")
+
                 raise argparse.ArgumentTypeError("Archive '{}' can't be opened!\n".format(tarFile))
 
         cinfo = supportedCompressions[compression]
@@ -2499,7 +2508,7 @@ seeking capabilities when opening that file.
                'output when the mounted path is accessed.' )
 
     parser.add_argument(
-        '-d', '--debug', type = int, default = 1,
+        '-d', '--debug', type = int, default = printDebug,
         help = 'Sets the debugging level. Higher means more output. Currently, 3 is the highest.' )
 
     parser.add_argument(
