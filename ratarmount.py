@@ -674,6 +674,11 @@ class SQLiteIndexedTar:
 
             return True
 
+        except PermissionError:
+            if printDebug >= 2:
+                traceback.print_exc()
+                print("Could not create file:", path)
+
         except IOError:
             if printDebug >= 2:
                 traceback.print_exc()
@@ -2337,8 +2342,8 @@ class TarFileType:
         self.encoding = encoding
 
     def __call__(self, tarFile: str) -> Tuple[str, Optional[str]]:
-        if not os.path.exists(tarFile):
-            raise argparse.ArgumentTypeError("File '{}' does not exist!".format(tarFile))
+        if not os.path.isfile(tarFile):
+            raise argparse.ArgumentTypeError("File '{}' is not a file!".format(tarFile))
 
         with open(tarFile, 'rb') as fileobj:
             fileSize = os.stat(tarFile).st_size
