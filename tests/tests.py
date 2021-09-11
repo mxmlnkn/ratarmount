@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import bz2
+import gzip
 import io
 import os
 import sys
-import gzip
 import tarfile
 import tempfile
 
@@ -247,7 +248,9 @@ with tempfile.NamedTemporaryFile(suffix=".gz") as tmpTarFile, tempfile.NamedTemp
             indexFileName=tmpIndexFile.name,
         )
 
-        expected_name = os.path.basename(tmpTarFile.name)[:-3] if kwargs["fileObject"] is None else "tarFileName"
+        expected_name = (
+            os.path.basename(tmpTarFile.name).rsplit('.', 1)[0] if kwargs["fileObject"] is None else "tarFileName"
+        )
 
         finfo = indexedFile.getFileInfo("/", listDir=True)
         assert expected_name in finfo
@@ -257,3 +260,82 @@ with tempfile.NamedTemporaryFile(suffix=".gz") as tmpTarFile, tempfile.NamedTemp
         assert finfo.size == 11
         assert indexedFile.read("/" + expected_name, size=11, offset=0) == b"hello world"
         assert indexedFile.read("/" + expected_name, size=3, offset=3) == b"lo "
+
+
+print("\nTest creating and using an index with .bz2 files with SQLiteIndexedTar")
+
+with tempfile.NamedTemporaryFile(suffix=".bz2") as tmpTarFile, tempfile.NamedTemporaryFile(
+    suffix=".sqlite"
+) as tmpIndexFile:
+    with bz2.open(tmpTarFile.name, "wb") as f:
+        f.write(b"hello world")
+
+    testKwargs = {
+        "file paths": dict(fileObject=None, tarFileName=tmpTarFile.name),
+        "file objects": dict(fileObject=open(tmpTarFile.name, "rb"), tarFileName="tarFileName"),
+        # "file objects with no fileno": dict(
+        #    fileObject=io.BytesIO(open(tmpTarFile.name, "rb").read()), tarFileName="tarFileName"
+        # ),
+    }
+
+    for name, kwargs in testKwargs.items():
+        print("\n== Test with {} ==".format(name))
+
+        # Create index
+        SQLiteIndexedTar(
+            **kwargs,
+            writeIndex=True,
+            clearIndexCache=True,
+            indexFileName=tmpIndexFile.name,
+        )
+
+        # Read from index
+        indexedFile = SQLiteIndexedTar(
+            **kwargs,
+            writeIndex=False,
+            clearIndexCache=False,
+            indexFileName=tmpIndexFile.name,
+        )
+
+        expected_name = (
+            os.path.basename(tmpTarFile.name).rsplit('.', 1)[0] if kwargs["fileObject"] is None else "tarFileName"
+        )
+
+        finfo = indexedFile.getFileInfo("/", listDir=True)
+        assert expected_name in finfo
+        assert finfo[expected_name].size == 11
+
+        finfo = indexedFile.getFileInfo("/" + expected_name)
+        assert finfo.size == 11
+        assert indexedFile.read("/" + expected_name, size=11, offset=0) == b"hello world"
+        assert indexedFile.read("/" + expected_name, size=3, offset=3) == b"lo "
+
+
+print("\nTest reading recursive .bz2 file with SQLiteIndexedTar")
+
+for parallelization in [1, 2, 4]:
+    ratarmount.parallelization = parallelization
+
+    with SQLiteIndexedTar("tests/2k-recursive-tars.tar.bz2", clearIndexCache=True, recursive=False) as file:
+        assert file.listDir('/')
+        assert file.listDir('/mimi')
+
+        assert not file.listDir('/mimi/01995.tar')
+        info = file.getFileInfo('/mimi/01995.tar')
+        assert info.offset == 21440512
+
+        assert not file.listDir('/mimi/00105.tar')
+        info = file.getFileInfo('/mimi/00105.tar')
+        assert info.offset == 1248256
+
+    with SQLiteIndexedTar("tests/2k-recursive-tars.tar.bz2", clearIndexCache=True, recursive=True) as file:
+        assert file.listDir('/')
+        assert file.listDir('/mimi')
+
+        assert file.listDir('/mimi/01995.tar')
+        info = file.getFileInfo('/mimi/01995.tar/foo')
+        assert info.offset == 21441024
+
+        assert file.listDir('/mimi/00105.tar')
+        info = file.getFileInfo('/mimi/00105.tar/foo')
+        assert info.offset == 1248768
