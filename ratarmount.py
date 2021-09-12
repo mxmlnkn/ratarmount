@@ -523,7 +523,7 @@ class SQLiteIndexedTar(MountSource):
 
         if not tarFileName:
             self.tarFileName = '<file object>'
-            self._createIndex(fileObject)
+            self._createIndex(self.tarFileObject)
             # return here because we can't find a save location without any identifying name
             return
 
