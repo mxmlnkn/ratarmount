@@ -58,30 +58,6 @@ __version__ = '0.9.0'
 parallelization = 1
 
 
-def openBzip2Reader(fileobj):
-    if (
-        'indexed_bzip2' in sys.modules
-        and len(indexed_bzip2.__version__.split('.')) >= 2
-        and int(indexed_bzip2.__version__.split('.')[0]) >= 1
-        and int(indexed_bzip2.__version__.split('.')[1]) >= 3
-    ):
-        return indexed_bzip2.open(fileobj, parallelization=parallelization)
-
-    if (
-        'indexed_bzip2' in sys.modules
-        and len(indexed_bzip2.__version__.split('.')) >= 2
-        and int(indexed_bzip2.__version__.split('.')[0]) >= 1
-        and int(indexed_bzip2.__version__.split('.')[1]) >= 2
-    ):
-        return indexed_bzip2.IndexedBzip2File(fileobj.fileno(), parallelization=parallelization)
-
-    if parallelization != 1:
-        print("[Warning] The specified parallelization degree of '{}' can only be applied".format(parallelization))
-        print("[Warning] for the bzip2 decoder with indexed_bzip2 >= 1.2.0 available but no such thing was not found!")
-
-    return indexed_bzip2.IndexedBzip2File(fileobj.fileno())
-
-
 def hasNonEmptySupport() -> bool:
     try:
         with os.popen('fusermount -V') as pipe:
@@ -104,7 +80,7 @@ supportedCompressions = {
         ['tb2', 'tbz', 'tbz2', 'tz2'],
         'indexed_bzip2',
         lambda x: (x.read(4)[:3] == b'BZh' and x.read(6) == (0x314159265359).to_bytes(6, 'big')),
-        openBzip2Reader,
+        lambda x: indexed_bzip2.open(x, parallelization=parallelization),
     ),
     'gz': CompressionInfo(
         ['gz', 'gzip'],
