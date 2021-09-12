@@ -5,6 +5,7 @@
  - Add support for zip and rar archives.
  - Improve recursive mounting. If supported by the decompression backend,
    compressed archives inside compressed archives can be mounted recursively.
+ - Fixes for macOS and Windows.
 
 # Version 0.8.1 built on 2021-07-11
 
