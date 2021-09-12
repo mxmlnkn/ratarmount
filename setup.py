@@ -8,9 +8,6 @@ scriptPath = os.path.abspath( os.path.dirname( __file__ ) )
 with open( os.path.join( scriptPath, 'README.md' ), encoding = 'utf-8' ) as file:
     readmeContents = file.read()
 
-with open( 'requirements.txt', 'rt' ) as file:
-    requirements = file.read().splitlines()
-
 setup(
     name             = 'ratarmount',
     version          = '0.9.0',
