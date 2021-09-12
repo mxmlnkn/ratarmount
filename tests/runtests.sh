@@ -235,7 +235,7 @@ checkFileInTAR()
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
     funmount "$mountFolder"
     'grep' -q 'Creating offset dictionary' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "$LINENO" "Looks like index was not created while executing: $RATARMOUNT_CMD $*"
+        returnError "$LINENO" "Looks like index was not created while executing: $RATARMOUNT_CMD ${args[*]}"
 
     # retry without forcing index recreation
     local args=( -P "$parallelization" --ignore-zeros --recursive "$archive" "$mountFolder" )
@@ -246,7 +246,7 @@ checkFileInTAR()
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
     funmount "$mountFolder"
     'grep' -q 'Loading offset dictionary' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "$LINENO" "Looks like index was not loaded while executing: $RATARMOUNT_CMD $*"
+        returnError "$LINENO" "Looks like index was not loaded while executing: $RATARMOUNT_CMD ${args[*]}"
 
     rmdir "$mountFolder"
 
