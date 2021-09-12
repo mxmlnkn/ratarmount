@@ -427,6 +427,7 @@ class SQLiteIndexedTar(MountSource):
         stripRecursiveTarExtension : bool                = False,
         ignoreZeros                : bool                = False,
         verifyModificationTime     : bool                = False,
+        **kwargs
         # fmt: on
     ) -> None:
         """
@@ -456,6 +457,7 @@ class SQLiteIndexedTar(MountSource):
                                      tar will be mounted at <file>/ instead of <file>.tar/.
         verifyModificationTime : If true, then the index will be recreated automatically if the TAR archive has a more
                                  recent modification time than the index file.
+        kwargs : Unused. Only for compatibility with generic MountSource interface.
         """
 
         # stores which parent folders were last tried to add to database and therefore do exist
@@ -1855,13 +1857,9 @@ class FolderMountSource(MountSource):
 
         # TODO Accessing the old full path will be problematic when lazy mounting over one of its parent folders
         fullPath = os.path.realpath(os.path.join(self.root, filePath))
-        try:
-            TarFileType(encoding=self.options.get('encoding', tarfile.ENCODING))(fullPath)
-        except argparse.ArgumentTypeError:
-            return None
 
         try:
-            indexedTar = SQLiteIndexedTar(fullPath, writeIndex=True, **self.options)
+            mountSource = openMountSource(fullPath, **self.options)
         except Exception:
             return None
 
@@ -1869,7 +1867,7 @@ class FolderMountSource(MountSource):
         mountPoint = strippedFilePath if stripSuffix else filePath
 
         rootFileInfo = _makeMountPointFileInfoFromStats(os.stat(fullPath))
-        return FolderMountSource.MountInfo(fullPath, mountPoint, rootFileInfo, indexedTar)
+        return FolderMountSource.MountInfo(fullPath, mountPoint, rootFileInfo, mountSource)
 
     def setFolderDescriptor(self, fd: int) -> None:
         """
@@ -2055,6 +2053,16 @@ class DummyFuseOperations:
 FuseOperations = fuse.Operations if 'fuse' in sys.modules else DummyFuseOperations
 
 
+def openMountSource(path: str, **options) -> MountSource:
+    if not os.path.exists(path):
+        raise Exception("Mount source does not exist!")
+
+    if os.path.isdir(path):
+        return FolderMountSource(path, **options)
+
+    return SQLiteIndexedTar(path, **options)
+
+
 class TarMount(FuseOperations):  # type: ignore
     """
     This class implements the fusepy interface in order to create a mounted file system view
@@ -2086,12 +2094,12 @@ class TarMount(FuseOperations):  # type: ignore
             except Exception:
                 pass
 
+        sqliteIndexedTarOptions['writeIndex'] = True
+        sqliteIndexedTarOptions['lazyMounting'] = lazyMounting
+
         # This also will create or load the block offsets for compressed formats
         self.mountSources: List[MountSource] = [
-            SQLiteIndexedTar(tarFile, writeIndex=True, **sqliteIndexedTarOptions)
-            if not os.path.isdir(tarFile)
-            else FolderMountSource(tarFile, lazyMounting=lazyMounting, **sqliteIndexedTarOptions)
-            for tarFile in pathToMount
+            openMountSource(path, **sqliteIndexedTarOptions) for path in pathToMount
         ]
 
         # No threads should be created and still be open before FUSE forks.
