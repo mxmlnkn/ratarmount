@@ -73,3 +73,9 @@ mkdir super-nested-archive
     cd ..
     tar -cjf super-nested-archive{.tar.bz2,}
 )
+
+
+tar -xf nested-tar.tar
+rar a -hpfoo encrypted-headers-nested-tar.rar foo
+rar a -pfoo encrypted-nested-tar.rar foo
+zip -r --encrypt --password foo encrypted-nested-tar.zip foo
