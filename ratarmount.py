@@ -56,6 +56,14 @@ def openBzip2Reader(fileobj):
         'indexed_bzip2' in sys.modules
         and len(indexed_bzip2.__version__.split('.')) >= 2
         and int(indexed_bzip2.__version__.split('.')[0]) >= 1
+        and int(indexed_bzip2.__version__.split('.')[1]) >= 3
+    ):
+        return indexed_bzip2.open(fileobj, parallelization=parallelization)
+
+    if (
+        'indexed_bzip2' in sys.modules
+        and len(indexed_bzip2.__version__.split('.')) >= 2
+        and int(indexed_bzip2.__version__.split('.')[0]) >= 1
         and int(indexed_bzip2.__version__.split('.')[1]) >= 2
     ):
         return indexed_bzip2.IndexedBzip2File(fileobj.fileno(), parallelization=parallelization)
