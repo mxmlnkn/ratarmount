@@ -529,10 +529,11 @@ class SQLiteIndexedTar(MountSource):
         self.gzipSeekPointSpacing       = gzipSeekPointSpacing
         # fmt: on
 
+        self.tarFileName: str = '<file object>'
         if not fileObject:
             if not tarFileName:
                 raise ValueError("At least one of tarFileName and fileObject arguments should be set!")
-            self.tarFileName = os.path.abspath(tarFileName) if tarFileName else '<file object>'
+            self.tarFileName = os.path.abspath(tarFileName)
             fileObject = open(self.tarFileName, 'rb')
         elif tarFileName:
             # If tarFileName was specified for a file object, set self.tarFileName accordingly.
@@ -567,7 +568,6 @@ class SQLiteIndexedTar(MountSource):
                 pass
 
         if not tarFileName:
-            self.tarFileName = '<file object>'
             self._createIndex(self.tarFileObject)
             # return here because we can't find a save location without any identifying name
             return
@@ -839,7 +839,7 @@ class SQLiteIndexedTar(MountSource):
     @staticmethod
     def _initializeSqlDb(indexFileName: Optional[str]) -> sqlite3.Connection:
         if printDebug >= 1:
-            print("Creating new SQLite index database at", indexFileName)
+            print("Creating new SQLite index database at", indexFileName if indexFileName else ':memory:')
 
         createTables = """
             CREATE TABLE "files" (
@@ -934,11 +934,7 @@ class SQLiteIndexedTar(MountSource):
         # fmt: on
     ) -> None:
         if printDebug >= 1:
-            print(
-                "Creating offset dictionary for",
-                "<file object>" if self.tarFileName is None else self.tarFileName,
-                "...",
-            )
+            print("Creating offset dictionary for", self.tarFileName, "...")
         t0 = timer()
 
         # 1. If no SQL connection was given (by recursive call), open a new database file
@@ -1084,11 +1080,7 @@ class SQLiteIndexedTar(MountSource):
         if streamOffset > 0:
             t1 = timer()
             if printDebug >= 1:
-                print(
-                    "Creating offset dictionary for",
-                    "<file object>" if self.tarFileName is None else self.tarFileName,
-                    "took {:.2f}s".format(t1 - t0),
-                )
+                print("Creating offset dictionary for", self.tarFileName, "took {:.2f}s".format(t1 - t0))
             return
 
         # If no file is in the TAR, then it most likely indicates a possibly compressed non TAR file.
@@ -1096,6 +1088,9 @@ class SQLiteIndexedTar(MountSource):
         # so check stream offset.
         fileCount = self.sqlConnection.execute('SELECT COUNT(*) FROM "files";').fetchone()[0]
         if fileCount == 0:
+            if printDebug >= 3:
+                print(f"Did not find any file in the given TAR: {self.tarFileName}. Assuming a compressed file.")
+
             try:
                 tarInfo = os.fstat(fileObject.fileno())
             except io.UnsupportedOperation:
@@ -1160,11 +1155,7 @@ class SQLiteIndexedTar(MountSource):
 
         t1 = timer()
         if printDebug >= 1:
-            print(
-                "Creating offset dictionary for",
-                "<file object>" if self.tarFileName is None else self.tarFileName,
-                "took {:.2f}s".format(t1 - t0),
-            )
+            print("Creating offset dictionary for", self.tarFileName, "took {:.2f}s".format(t1 - t0))
 
     @staticmethod
     def _rowToFileInfo(row: Dict[str, Any]) -> FileInfo:
@@ -2072,6 +2063,9 @@ class AutoMountLayer(MountSource):
                 mountSource = openMountSource(parentMountSource.open(archiveFileInfo), **self.options)
         except Exception as e:
             print("[Warning] Mounting of '" + path + "' failed because of:", e)
+            if printDebug >= 3:
+                traceback.print_exc()
+            print()
             return None
 
         rootFileInfo = archiveFileInfo.clone()
@@ -2085,6 +2079,7 @@ class AutoMountLayer(MountSource):
         self.mounted[mountPoint] = mountInfo
         if printDebug >= 2:
             print("Recursively mounted:", mountPoint)
+            print()
 
         return mountPoint
 
