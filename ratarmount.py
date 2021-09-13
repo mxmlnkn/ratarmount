@@ -2147,10 +2147,37 @@ class AutoMountLayer(MountSource):
 
 class ZipMountSource(MountSource):
     def __init__(self, fileOrPath: Union[str, IO[bytes]], **options) -> None:
-        # TODO pass through CLI password list and try to open encrypted zips
         self.fileObject = zipfile.ZipFile(fileOrPath, 'r')
+        ZipMountSource._findPassword(self.fileObject, options.get("passwords", []))
         self.files = self.fileObject.infolist()
         self.options = options
+
+    @staticmethod
+    def _findPassword(fileobj: zipfile.ZipFile, passwords):
+        # If headers are encrypted, then infolist will simply return an empty list!
+        files = fileobj.infolist()
+        if not files:
+            for password in passwords:
+                fileobj.setpassword(password)
+                files = fileobj.infolist()
+                if files:
+                    return password
+
+        # If headers are not encrypted, then try out passwords by trying to open the first file.
+        files = [file for file in files if not file.is_dir() and file.file_size > 0]
+        if not files:
+            return None
+
+        for password in [None] + passwords:
+            fileobj.setpassword(password)
+            try:
+                with fileobj.open(files[0]) as file:
+                    file.read(1)
+                return password
+            except Exception:
+                pass
+
+        raise RuntimeError("Could not find a matching password!")
 
     def __enter__(self):
         return self
@@ -2247,8 +2274,38 @@ class RarMountSource(MountSource):
 
     def __init__(self, fileOrPath: Union[str, IO[bytes]], **options) -> None:
         self.fileObject = rarfile.RarFile(fileOrPath, 'r')
+        RarMountSource._findPassword(self.fileObject, options.get("passwords", []))
         self.files = self.fileObject.infolist()
         self.options = options
+
+    @staticmethod
+    def _findPassword(fileobj: rarfile.RarFile, passwords):
+        if not fileobj.needs_password():
+            return None
+
+        # If headers are encrypted, then infolist will simply return an empty list!
+        files = fileobj.infolist()
+        if not files:
+            for password in passwords:
+                fileobj.setpassword(password)
+                files = fileobj.infolist()
+                if files:
+                    return password
+
+        # If headers are not encrypted, then try out passwords by trying to open the first file.
+        files = [file for file in files if file.is_file()]
+        if not files:
+            return None
+        for password in passwords:
+            fileobj.setpassword(password)
+            try:
+                with fileobj.open(files[0]) as file:
+                    file.read(1)
+                return password
+            except (rarfile.PasswordRequired, rarfile.BadRarFile):
+                pass
+
+        raise rarfile.PasswordRequired("Could not find a matching password!")
 
     @staticmethod
     def _convertToFileInfo(info: rarfile.RarInfo) -> FileInfo:
@@ -2960,6 +3017,16 @@ class TarFileType:
         return tarFile, compression
 
 
+def _removeDuplicatesStable(iterable: Iterable):
+    seen = set()
+    deduplicated = []
+    for x in iterable:
+        if x not in seen:
+            deduplicated.append(x)
+            seen.add(x)
+    return deduplicated
+
+
 class _CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):
     def add_arguments(self, actions):
         actions = sorted(actions, key=lambda x: getattr(x, 'option_strings'))
@@ -3133,6 +3200,15 @@ seeking capabilities when opening that file.
                '>directly< contains history.log.' )
 
     parser.add_argument(
+        '--password', type = str, default = '',
+        help = 'Specify a single password which shall be used for RAR and ZIP files.' )
+
+    parser.add_argument(
+        '--password-file', type = str, default = '',
+        help = 'Specify a file with newline separated passwords for RAR and ZIP files. '
+               'The passwords will be tried out in order of appearance in the file.' )
+
+    parser.add_argument(
         '-e', '--encoding', type = str, default = tarfile.ENCODING,
         help = 'Specify an input encoding used for file names among others in the TAR. '
                'This must be used when, e.g., trying to open a latin1 encoded TAR on an UTF-8 system. '
@@ -3245,6 +3321,17 @@ seeking capabilities when opening that file.
     global parallelization
     parallelization = args.parallelization if args.parallelization > 0 else os.cpu_count()
 
+    # Sanitize different ways to specify passwords into a simple list
+    args.passwords = []
+    if args.password:
+        args.passwords.append(args.password)
+
+    if args.password_file:
+        with open(args.password_file, 'rb') as file:
+            args.passwords += file.read().split(b'\n')
+
+    args.passwords = _removeDuplicatesStable(args.passwords)
+
     return args
 
 
@@ -3293,6 +3380,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         indexFileName              = args.index_file,
         indexFolders               = args.index_folders,
         lazyMounting               = args.lazy,
+        passwords                  = args.passwords,
         # fmt: on
     )
 

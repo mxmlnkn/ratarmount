@@ -190,10 +190,11 @@ Here is a more recent test for version 0.2.0 with the new default SQLite backend
 
 ```
 usage: ratarmount [-h] [-f] [-d DEBUG] [-c] [-r] [-l]
-                  [-gs GZIP_SEEK_POINT_SPACING] [-p PREFIX] [-e ENCODING]
-                  [-i] [--verify-mtime] [-s] [--index-file INDEX_FILE]
-                  [--index-folders INDEX_FOLDERS] [-o FUSE]
-                  [-P PARALLELISM] [-v]
+                  [-gs GZIP_SEEK_POINT_SPACING] [-p PREFIX]
+                  [--password PASSWORD] [--password-file PASSWORD_FILE]
+                  [-e ENCODING] [-i] [--verify-mtime] [-s]
+                  [--index-file INDEX_FILE] [--index-folders INDEX_FOLDERS]
+                  [-o FUSE] [-P PARALLELIZATION] [-v]
                   mount_source [mount_source ...] [mount_point]
 
 With ratarmount, you can:
@@ -239,6 +240,12 @@ optional arguments:
                         storage location and nothing else. Instead, it will
                         first try ~/.ratarmount and the folder "foo,9000".
                         (default: ,~/.ratarmount)
+  --password PASSWORD   Specify a single password which shall be used for RAR
+                        and ZIP files. (default: )
+  --password-file PASSWORD_FILE
+                        Specify a file with newline separated passwords for
+                        RAR and ZIP files. The passwords will be tried out in
+                        order of appearance in the file. (default: )
   --verify-mtime        By default, only the TAR file size is checked to match
                         the one in the found existing ratarmount index. If
                         this option is specified, then also check the
@@ -246,7 +253,7 @@ optional arguments:
                         might change during copying or downloading without the
                         contents changing. So, this check might cause false
                         positives. (default: False)
-  -P PARALLELISM, --parallelism PARALLELISM
+  -P PARALLELIZATION, --parallelization PARALLELIZATION
                         If an integer other than 1 is specified, then the
                         threaded parallel bzip2 decoder will be used specified
                         amount of block decoder threads. Further threads with
