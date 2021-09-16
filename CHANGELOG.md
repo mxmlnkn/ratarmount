@@ -1,8 +1,8 @@
 
-# Version 0.9.0 built on 2021-08-xx
+# Version 0.9.0 built on 2021-09-16
 
  - Refactor the code and introduce a MountSource interface.
- - Add support for zip and rar archives.
+ - Add support for zip and rar archives including password-encrypted ones.
  - Improve recursive mounting. If supported by the decompression backend,
    compressed archives inside compressed archives can be mounted recursively.
  - Fixes for macOS and Windows.

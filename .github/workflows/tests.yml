@@ -95,12 +95,6 @@ jobs:
       with:
         install: gcc make liblzma-devel libzstd-devel zlib-devel
 
-    - name: Print System Information (Windows)
-      if: matrix.os == 'windows-latest'
-      shell: msys2
-      run: |
-        pacman -v
-
     - name: Install Dependencies (Linux)
       if: matrix.os == 'ubuntu-latest'
       run: |
@@ -132,17 +126,14 @@ jobs:
           python3 -m pip uninstall --yes "$module"
         done
         python3 -m pip install --upgrade git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=indexed_bzip2
-      if: matrix.os != 'windows-latest'
 
     - name: Test Installation From Tarball
-      if: matrix.os != 'windows-latest'
       run: |
         python3 setup.py sdist bdist_wheel
         twine check dist/*
         python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )[full]"
 
     - name: Test Installation From Source
-      if: matrix.os == 'windows-latest'
       run: |
         python3 setup.py sdist bdist_wheel
         twine check dist/*
