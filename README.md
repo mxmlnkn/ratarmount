@@ -81,18 +81,20 @@ python3 -m pip install --user --force-reinstall git+https://github.com/mxmlnkn/r
 
 You can also simply download [ratarmount.py](https://github.com/mxmlnkn/ratarmount/raw/master/ratarmount.py) and call it directly after installing the dependencies manually with: `pip3 install --requirement https://raw.githubusercontent.com/mxmlnkn/ratarmount/master/requirements.txt`.
 
-In order to use, the xz backend, you currently have to do more manual setup because [lzmaffi](https://github.com/r3m0t/backports.lzma) does not provide wheels.
-On Ubuntu 20.10 or similar systems, the setup would look like this:
-
-```bash
-sudo apt install liblzma-dev
-python3 -m pip install --user cffi # Necessary because of a bug(?) in the lzmaffi setup.py
-python3 -m pip install --user ratarmount[full]
-```
-
 If there are troubles with the compression backend dependencies, you can try the pip `--no-deps` argument.
 Ratarmount will work without the compression backends.
 The hard requirements are `fusepy` and for Python versions older than 3.7.0 `dataclasses`.
+
+For xz support, [`lzmaffi`](https://github.com/r3m0t/backports.lzma) will be used if available.
+Because `lzmaffi` does not provide wheels and the build from source depends on `cffi`, which might be missing, only `python-xz` is a dependency of ratarmount.
+If there are problems with xz files, please report any encountered issues.
+But, as a quick workaround, you can try to simply switch out the xz decoder backend by installing `lzmaffi` manually and ratarmount will use that instead with higher priority:
+
+```bash
+sudo apt install liblzma-dev
+python3 -m pip install --user cffi  # Necessary because of missing pyprojects.toml
+python3 -m pip install --user lzmaffi
+```
 
 
 ## Benchmarks

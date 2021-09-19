@@ -47,6 +47,10 @@ try:
 except ImportError:
     pass
 try:
+    import xz
+except ImportError:
+    pass
+try:
     import rarfile
 except ImportError:
     pass
@@ -97,7 +101,11 @@ supportedCompressions = {
         lambda x: rarfile.RarFile(x),
     ),
     'xz': CompressionInfo(
-        ['xz'], ['txz'], 'lzmaffi', lambda x: x.read(6) == b"\xFD7zXZ\x00", lambda x: lzmaffi.open(x)
+        ['xz'],
+        ['txz'],
+        'lzmaffi' if 'lzmaffi' in globals() else 'xz',
+        lambda x: x.read(6) == b"\xFD7zXZ\x00",
+        (lambda x: lzmaffi.open(x)) if 'lzmaffi' in globals() else (lambda x: xz.open(x)),
     ),
     'zip': CompressionInfo(
         ['zip'],
@@ -703,6 +711,9 @@ class SQLiteIndexedTar(MountSource):
                     # in favor of 'version' from importlib.metadata which does not even work with zipfile.
                     # Probably, because zipfile is a built-in module whose version would be the Python version.
                     # https://www.python.org/dev/peps/pep-0396/
+                    # The "python-xz" project is imported as an "xz" module, which complicates things because
+                    # there is no generic way to get the "python-xz" name from the "xz" runtime module object
+                    # and importlib.metadata.version will require "python-xz" as argument.
                     if hasattr(module, '__version__'):
                         versions += [makeVersionRow(cinfo.moduleName, module.__version__)]
 

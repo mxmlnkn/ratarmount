@@ -118,7 +118,7 @@ jobs:
 
     - name: Test Startup With Only One Compression Dependency
       run: |
-        for module in indexed_gzip indexed_zstd lzmaffi; do
+        for module in indexed_gzip indexed_zstd lzmaffi python-xz; do
           python3 -m pip install --upgrade "$module"
           # Segfaults (139) are not allowed but other exit codes are valid!
           # indexed_zstd=1.2.0 did segfault here!
@@ -131,13 +131,13 @@ jobs:
       run: |
         python3 setup.py sdist bdist_wheel
         twine check dist/*
-        python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )[full]"
+        python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )"
 
     - name: Test Installation From Source
       run: |
         python3 setup.py sdist bdist_wheel
         twine check dist/*
-        python3 -m pip install .[full]
+        python3 -m pip install .
 
     - name: Test Simple Startup
       run: |
