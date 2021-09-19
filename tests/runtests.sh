@@ -825,7 +825,7 @@ benchmarkDecoderBackends()
                 python3 -m timeit 'from indexed_gzip import IndexedGzipFile as IBF; IBF( '"'$file'"' ).read();'
                 ;;
             xz)
-                python3 -m timeit 'import lzmaffi; lzmaffi.open( '"'$file'"' ).read();'
+                python3 -m timeit 'import xz; xz.open( '"'$file'"' ).read();'
                 ;;
             zstd)
                 python3 -m timeit 'from indexed_zstd import IndexedZstdFile as IBF; IBF( '"'$file'"' ).read();'

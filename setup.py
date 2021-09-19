@@ -46,13 +46,8 @@ setup(
     # Make these optional requirements because they have no binaries on PyPI meaning they are built from source
     # and will fail if system dependencies are not installed.
     extras_require   = {
-                            'full' : [ 'cffi; platform_system!="Windows"',
-                                       'lzmaffi; platform_system!="Windows"' ],
-                            # cffi dependency seems to be configured wrong in lzmaffi,
-                            # therefore also list it here before lzmaffi:
-                            # https://github.com/r3m0t/backports.lzma/issues/3
-                            'xz' : [ 'cffi; platform_system!="Windows"',
-                                     'lzmaffi; platform_system!="Windows"' ],
-                       },
+        'full' : [],
+        'xz' : [],
+    },
     entry_points = { 'console_scripts': [ 'ratarmount=ratarmount:cli' ] }
 )
