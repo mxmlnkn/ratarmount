@@ -1124,6 +1124,7 @@ if [[ -z "$CI" ]]; then
             echoerr 'There were warnings during the pylint run!'
             exit 1
         fi
+        rm pylint.log
     fi
     mypy ratarmount.py setup.py || returnError "$LINENO" 'Mypy failed!'
     pytype -d import-error ratarmount.py || returnError "$LINENO" 'Pytype failed!'
