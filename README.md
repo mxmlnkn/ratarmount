@@ -79,8 +79,6 @@ Or, if you want to test the latest version:
 python3 -m pip install --user --force-reinstall git+https://github.com/mxmlnkn/ratarmount.git@develop#egginfo=ratarmount
 ```
 
-You can also simply download [ratarmount.py](https://github.com/mxmlnkn/ratarmount/raw/master/ratarmount.py) and call it directly after installing the dependencies manually with: `pip3 install --requirement https://raw.githubusercontent.com/mxmlnkn/ratarmount/master/requirements.txt`.
-
 If there are troubles with the compression backend dependencies, you can try the pip `--no-deps` argument.
 Ratarmount will work without the compression backends.
 The hard requirements are `fusepy` and for Python versions older than 3.7.0 `dataclasses`.
