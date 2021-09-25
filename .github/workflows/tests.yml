@@ -131,13 +131,13 @@ jobs:
       run: |
         python3 setup.py sdist bdist_wheel
         twine check dist/*
-        python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )"
+        python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )"[full]
 
     - name: Test Installation From Source
       run: |
         python3 setup.py sdist bdist_wheel
         twine check dist/*
-        python3 -m pip install .
+        python3 -m pip install .[full]
 
     - name: Test Simple Startup
       run: |
