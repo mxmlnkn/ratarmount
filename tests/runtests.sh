@@ -1166,17 +1166,24 @@ tests=()
 # TODO Some bug with rarfile throwing: Failed the read enough data: req=304 got=51 and then seek(0) not working?
 if ! uname | 'grep' -q -i darwin; then
 tests+=(
-    2709a3348eb2c52302a7606ecf5860bc tests/zip.rar                                natsu.zip/ufo
-    10d6977ec2ab378e60339323c24f9308 tests/zip.rar                                natsu.zip/foo
     2709a3348eb2c52302a7606ecf5860bc tests/nested-with-symlink.rar                foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/nested-with-symlink.rar                foo/fighter/saucer
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-with-symlink.rar                foo/lighter.tar/fighter/bar
+)
+fi
+
+# zipfile returns unseekable file object with python 3.6. Therefore I disabled it completely there.
+python3MinorVersion=$( python3 --version | sed -n -E 's|.* 3[.]([0-9]+)[.][0-9]+|\1|p' )
+if [[ -n "$python3MinorVersion" && "$python3MinorVersion" -gt 6 ]]; then
+if ! uname | 'grep' -q -i darwin; then
+tests+=(
+    2709a3348eb2c52302a7606ecf5860bc tests/zip.rar                                natsu.zip/ufo
+    10d6977ec2ab378e60339323c24f9308 tests/zip.rar                                natsu.zip/foo
     49b996b16f59ab6c87dea31e227f8798 tests/rar-misrecognized-as-zip.rar           bag.zip/README.md
     49b996b16f59ab6c87dea31e227f8798 tests/rar-misrecognized-as-zip.rar           bag.zip/CHANGELOG.md
     49b996b16f59ab6c87dea31e227f8798 tests/rar-misrecognized-as-zip.rar           bag1.zip/CHANGELOG.md
 )
 fi
-
 tests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/file-in-non-existing-folder.zip        foo2/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/rar.zip                                natsu.rar/ufo
@@ -1186,7 +1193,10 @@ tests+=(
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-with-symlink.zip                foo/lighter.tar/fighter/bar
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.zip                     foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.zip                     foo/jet/ufo
+)
+fi
 
+tests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/file-in-non-existing-folder.rar        foo2/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.rar                     foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.rar                     foo/jet/ufo

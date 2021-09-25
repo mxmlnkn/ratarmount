@@ -16,7 +16,6 @@ import tarfile
 import tempfile
 import time
 import traceback
-import zipfile
 from abc import ABC, abstractmethod
 from timeit import default_timer as timer
 import typing
@@ -54,6 +53,13 @@ try:
     import rarfile
 except ImportError:
     pass
+
+
+# The file object returned by ZipFile.open is not seekable in Python 3.6 for some reason.
+# Therefore disable ZIP support there!
+# I don't see it documented, instead I tested different Python versions with Docker.
+if sys.version_info[2] > 6:
+    import zipfile
 
 
 __version__ = '0.9.1'
@@ -2595,32 +2601,33 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
         if hasattr(fileOrPath, 'seek'):
             fileOrPath.seek(0)  # type: ignore
 
-    try:
-        # is_zipfile is much too lax when testing for ZIPs because it's only testing for the central directory
-        # at the end of the file not the magic bits at the beginning. Meaning, if another non-ZIP archive has
-        # zip contents at the end, then it might get misclassified! Thefore, manually check for PK at start.
-        # https://bugs.python.org/issue16735
-        # https://bugs.python.org/issue28494
-        # https://bugs.python.org/issue42096
-        # https://bugs.python.org/issue45287
-        # TODO This will not recognize self-extracting ZIP archives, so for now, those are simply not supported!
-        if isinstance(fileOrPath, str):
-            with open(fileOrPath, 'rb') as file:
-                if supportedCompressions['zip'].checkHeader(file) and zipfile.is_zipfile(fileOrPath):
+    if 'zipfile' in sys.modules:
+        try:
+            # is_zipfile is much too lax when testing for ZIPs because it's only testing for the central directory
+            # at the end of the file not the magic bits at the beginning. Meaning, if another non-ZIP archive has
+            # zip contents at the end, then it might get misclassified! Thefore, manually check for PK at start.
+            # https://bugs.python.org/issue16735
+            # https://bugs.python.org/issue28494
+            # https://bugs.python.org/issue42096
+            # https://bugs.python.org/issue45287
+            # TODO This will not recognize self-extracting ZIP archives, so for now, those are simply not supported!
+            if isinstance(fileOrPath, str):
+                with open(fileOrPath, 'rb') as file:
+                    if supportedCompressions['zip'].checkHeader(file) and zipfile.is_zipfile(fileOrPath):
+                        return ZipMountSource(fileOrPath, **options)
+            else:
+                # TODO One problem here is when trying to read and then seek back but there also is no peek method.
+                #      https://github.com/markokr/rarfile/issues/73
+                if fileOrPath.read(2) == b'PK' and zipfile.is_zipfile(fileOrPath):
                     return ZipMountSource(fileOrPath, **options)
-        else:
-            # TODO One problem here is when trying to read and then seek back but there also is no peek method.
-            #      https://github.com/markokr/rarfile/issues/73
-            if fileOrPath.read(2) == b'PK' and zipfile.is_zipfile(fileOrPath):
-                return ZipMountSource(fileOrPath, **options)
-    except Exception as exception:
-        if printDebug >= 1:
-            print("[Info] Checking for ZIP file raised an exception:", exception)
-        if printDebug >= 3:
-            traceback.print_exc()
-    finally:
-        if hasattr(fileOrPath, 'seek'):
-            fileOrPath.seek(0)  # type: ignore
+        except Exception as exception:
+            if printDebug >= 1:
+                print("[Info] Checking for ZIP file raised an exception:", exception)
+            if printDebug >= 3:
+                traceback.print_exc()
+        finally:
+            if hasattr(fileOrPath, 'seek'):
+                fileOrPath.seek(0)  # type: ignore
 
     raise CompressionError("Archive to open has unrecognized format!")
 
@@ -3471,7 +3478,7 @@ seeking capabilities when opening that file.
 
     # Manually check that all specified TARs and folders exist
     def checkMountSource(path):
-        if os.path.isdir(path) or zipfile.is_zipfile(path):
+        if os.path.isdir(path) or ('zipfile' in sys.modules and zipfile.is_zipfile(path)):
             return os.path.realpath(path)
         return TarFileType(encoding=args.encoding)(path)[0]
 
