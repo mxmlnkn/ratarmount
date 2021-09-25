@@ -1,0 +1,81 @@
+@startuml
+
+' bluegray cerulean-outline crt-amber materia-outline mimeograph cyborg
+!theme crt-amber
+
+'!pragma svek_trace on
+/'
+generate in your local folder two intermediate files:
+    foo.dot : intermediate file in "dot" language provided to GraphViz
+    foo.svg : intermediate result file which is going to be parsed by PlantUML to retrieve element positions.
+'/
+
+'skinparam backgroundColor #121212
+skinparam backgroundColor #000000
+
+/' Use the UML symbols +-#~ for visibility instead of PlantUML-specific icons '/
+skinparam classAttributeIconSize 0
+
+set namespaceSeparator ::
+
+hide empty
+hide empty members
+
+
+' Only takes more space vertically, does not reduce width :/
+'left to right direction
+'top to bottom direction
+
+skinparam linetype ortho
+'skinparam linetype polyline
+
+/'
+"linetype ortho" looks the best imo, but it does not work at all with arrow labels
+as they are place too far away to be meaningful. Same bug applies to polyline. See:
+  https://forum.plantuml.net/1608/is-it-possible-to-only-use-straight-lines-in-a-class-diagram
+  https://crashedmind.github.io/PlantUMLHitchhikersGuide/layout/layout.html#linetype-polyline-ortho
+  https://github.com/plantuml/plantuml/issues/149
+'/
+
+class StenciledFile
+class ProgressBar
+
+abstract class MountSource {
+    +{abstract} listDir
+    +{abstract} getFileInfo
+    +{abstract} fileVersions
+    +{abstract} open
+}
+
+class SQLiteIndexedTar
+
+SQLiteIndexedTar *-- StenciledFile
+SQLiteIndexedTar *-- ProgressBar
+
+class FolderMountSource
+class ZipMountSource
+class RarMountSource
+
+class UnionMountSource
+class FileVersionLayer
+
+MountSource <|-- SQLiteIndexedTar
+MountSource <|-- FolderMountSource
+MountSource <|-- ZipMountSource
+MountSource <|-- RarMountSource
+
+MountSource <|-- AutoMountLayer
+MountSource <|-- UnionMountSource
+MountSource <|-- FileVersionLayer
+
+class fuse.Operations
+
+class FuseMount
+
+FuseMount <|-- fuse.Operations
+
+FuseMount *-- AutoMountLayer
+FuseMount *-- UnionMountSource
+FuseMount *-- FileVersionLayer
+
+@enduml

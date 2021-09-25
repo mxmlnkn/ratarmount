@@ -1,0 +1,498 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentScriptType="application/ecmascript" contentStyleType="text/css" height="352.0833px" preserveAspectRatio="none" style="width:1563px;height:352px;background:#FFFFFF;" version="1.1" viewBox="0 0 1563 352" width="1563.5417px" zoomAndPan="magnify"><defs><linearGradient id="gmgzodebqai1p0" x1="50%" x2="50%" y1="0%" y2="100%"><stop offset="0%" stop-color="#59B6EC"/><stop offset="100%" stop-color="#2FA4E7"/></linearGradient><linearGradient id="gmgzodebqai1p1" x1="50%" x2="50%" y1="0%" y2="100%"><stop offset="0%" stop-color="#2FA4E7"/><stop offset="100%" stop-color="#2683B9"/></linearGradient></defs><g><!--MD5=[480bdec3b1ba6622e810ed000238f65e]
+class StenciledFile--><rect codeLine="39" fill="url(#gmgzodebqai1p0)" height="36.025" id="StenciledFile" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="122.9167" x="7.2917" y="310.4167"/><rect fill="url(#gmgzodebqai1p1)" height="36.025" rx="4.1667" ry="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="122.9167" x="7.2917" y="310.4167"/><rect fill="url(#gmgzodebqai1p1)" height="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="122.9167" x="7.2917" y="342.275"/><rect codeLine="39" fill="none" height="36.025" id="StenciledFile" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="122.9167" x="7.2917" y="310.4167"/><ellipse cx="21.875" cy="328.4292" fill="#EDF0F2" rx="10.4167" ry="10.4167" style="stroke:#BABDBF;stroke-width:1.0416666666666667;"/><path d="M23.7793,332.8562 Q23.3561,333.0678 22.8841,333.1818 Q22.4121,333.2957 21.9076,333.2957 Q20.0521,333.2957 19.0755,332.0913 Q18.1152,330.8706 18.1152,328.5756 Q18.1152,326.2644 19.0755,325.06 Q20.0521,323.8393 21.9076,323.8393 Q22.4121,323.8393 22.8841,323.9532 Q23.3724,324.0509 23.7793,324.2788 L23.7793,326.2807 Q23.3236,325.8575 22.8841,325.6622 Q22.4447,325.4506 21.9889,325.4506 Q20.9961,325.4506 20.4915,326.2482 Q19.987,327.0294 19.987,328.5756 Q19.987,330.1056 20.4915,330.8868 Q20.9961,331.6681 21.9889,331.6681 Q22.4447,331.6681 22.8841,331.4728 Q23.3236,331.2775 23.7793,330.8543 L23.7793,332.8562 Z " fill="#000000"/><text fill="#FFFFFF" font-family="Verdana" font-size="12.5" lengthAdjust="spacing" textLength="81.25" x="40.625" y="333.4005">StenciledFile</text><!--MD5=[2f981c9633678630c44c8c04a81224b8]
+class ProgressBar--><rect codeLine="40" fill="url(#gmgzodebqai1p0)" height="36.025" id="ProgressBar" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="121.875" x="167.1875" y="310.4167"/><rect fill="url(#gmgzodebqai1p1)" height="36.025" rx="4.1667" ry="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="121.875" x="167.1875" y="310.4167"/><rect fill="url(#gmgzodebqai1p1)" height="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="121.875" x="167.1875" y="342.275"/><rect codeLine="40" fill="none" height="36.025" id="ProgressBar" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="121.875" x="167.1875" y="310.4167"/><ellipse cx="181.7708" cy="328.4292" fill="#EDF0F2" rx="10.4167" ry="10.4167" style="stroke:#BABDBF;stroke-width:1.0416666666666667;"/><path d="M183.6751,332.8562 Q183.252,333.0678 182.7799,333.1818 Q182.3079,333.2957 181.8034,333.2957 Q179.9479,333.2957 178.9714,332.0913 Q178.0111,330.8706 178.0111,328.5756 Q178.0111,326.2644 178.9714,325.06 Q179.9479,323.8393 181.8034,323.8393 Q182.3079,323.8393 182.7799,323.9532 Q183.2682,324.0509 183.6751,324.2788 L183.6751,326.2807 Q183.2194,325.8575 182.7799,325.6622 Q182.3405,325.4506 181.8848,325.4506 Q180.8919,325.4506 180.3874,326.2482 Q179.8828,327.0294 179.8828,328.5756 Q179.8828,330.1056 180.3874,330.8868 Q180.8919,331.6681 181.8848,331.6681 Q182.3405,331.6681 182.7799,331.4728 Q183.2194,331.2775 183.6751,330.8543 L183.6751,332.8562 Z " fill="#000000"/><text fill="#FFFFFF" font-family="Verdana" font-size="12.5" lengthAdjust="spacing" textLength="80.2083" x="200.5208" y="333.4005">ProgressBar</text><!--MD5=[45fd24129985ac65d7b0eeb6a478e73c]
+class MountSource--><rect codeLine="42" fill="url(#gmgzodebqai1p0)" height="141.7277" id="MountSource" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="123.9583" x="664.0625" y="7.2917"/><rect fill="url(#gmgzodebqai1p1)" height="36.025" rx="4.1667" ry="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="123.9583" x="664.0625" y="7.2917"/><rect fill="url(#gmgzodebqai1p1)" height="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="123.9583" x="664.0625" y="39.15"/><rect codeLine="42" fill="none" height="141.7277" id="MountSource" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="123.9583" x="664.0625" y="7.2917"/><ellipse cx="678.6458" cy="25.3042" fill="#8FB961" rx="10.4167" ry="10.4167" style="stroke:#5C862E;stroke-width:1.0416666666666667;"/><path d="M678.2389,22.2605 L677.3926,25.9878 L679.1016,25.9878 L678.2389,22.2605 Z M677.1484,20.6167 L679.3457,20.6167 L681.8034,29.7312 L679.9967,29.7312 L679.4434,27.4851 L677.0345,27.4851 L676.4811,29.7312 L674.6745,29.7312 L677.1484,20.6167 Z " fill="#000000"/><text fill="#FFFFFF" font-family="Verdana" font-size="12.5" font-style="italic" lengthAdjust="spacing" textLength="82.2917" x="697.3958" y="30.2755">MountSource</text><line style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" x1="665.1042" x2="786.9792" y1="43.3167" y2="43.3167"/><text fill="#F8F9FA" font-family="Verdana" font-size="11.4583" font-style="italic" lengthAdjust="spacing" textLength="42.7083" x="675.5208" y="64.2115">+listDir</text><text fill="#F8F9FA" font-family="Verdana" font-size="11.4583" font-style="italic" lengthAdjust="spacing" textLength="71.875" x="675.5208" y="88.5539">+getFileInfo</text><text fill="#F8F9FA" font-family="Verdana" font-size="11.4583" font-style="italic" lengthAdjust="spacing" textLength="78.125" x="675.5208" y="112.8962">+fileVersions</text><text fill="#F8F9FA" font-family="Verdana" font-size="11.4583" font-style="italic" lengthAdjust="spacing" textLength="38.5417" x="675.5208" y="137.2386">+open</text><!--MD5=[b85e39e0a660bd84d9aeeca278039518]
+class SQLiteIndexedTar--><rect codeLine="49" fill="url(#gmgzodebqai1p0)" height="36.025" id="SQLiteIndexedTar" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="159.375" x="68.2292" y="211.4583"/><rect fill="url(#gmgzodebqai1p1)" height="36.025" rx="4.1667" ry="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="159.375" x="68.2292" y="211.4583"/><rect fill="url(#gmgzodebqai1p1)" height="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="159.375" x="68.2292" y="243.3167"/><rect codeLine="49" fill="none" height="36.025" id="SQLiteIndexedTar" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="159.375" x="68.2292" y="211.4583"/><ellipse cx="82.8125" cy="229.4708" fill="#EDF0F2" rx="10.4167" ry="10.4167" style="stroke:#BABDBF;stroke-width:1.0416666666666667;"/><path d="M84.7168,233.8979 Q84.2936,234.1095 83.8216,234.2234 Q83.3496,234.3374 82.8451,234.3374 Q80.9896,234.3374 80.013,233.1329 Q79.0527,231.9122 79.0527,229.6173 Q79.0527,227.3061 80.013,226.1017 Q80.9896,224.881 82.8451,224.881 Q83.3496,224.881 83.8216,224.9949 Q84.3099,225.0926 84.7168,225.3204 L84.7168,227.3224 Q84.2611,226.8992 83.8216,226.7039 Q83.3822,226.4923 82.9264,226.4923 Q81.9336,226.4923 81.429,227.2898 Q80.9245,228.0711 80.9245,229.6173 Q80.9245,231.1473 81.429,231.9285 Q81.9336,232.7098 82.9264,232.7098 Q83.3822,232.7098 83.8216,232.5144 Q84.2611,232.3191 84.7168,231.896 L84.7168,233.8979 Z " fill="#000000"/><text fill="#FFFFFF" font-family="Verdana" font-size="12.5" lengthAdjust="spacing" textLength="117.7083" x="101.5625" y="234.4421">SQLiteIndexedTar</text><!--MD5=[ebe2df0dcf5aef36c18cbc94661dd27e]
+class FolderMountSource--><rect codeLine="54" fill="url(#gmgzodebqai1p0)" height="36.025" id="FolderMountSource" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="167.7083" x="264.0625" y="211.4583"/><rect fill="url(#gmgzodebqai1p1)" height="36.025" rx="4.1667" ry="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="167.7083" x="264.0625" y="211.4583"/><rect fill="url(#gmgzodebqai1p1)" height="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="167.7083" x="264.0625" y="243.3167"/><rect codeLine="54" fill="none" height="36.025" id="FolderMountSource" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="167.7083" x="264.0625" y="211.4583"/><ellipse cx="278.6458" cy="229.4708" fill="#EDF0F2" rx="10.4167" ry="10.4167" style="stroke:#BABDBF;stroke-width:1.0416666666666667;"/><path d="M280.5501,233.8979 Q280.127,234.1095 279.6549,234.2234 Q279.1829,234.3374 278.6784,234.3374 Q276.8229,234.3374 275.8464,233.1329 Q274.8861,231.9122 274.8861,229.6173 Q274.8861,227.3061 275.8464,226.1017 Q276.8229,224.881 278.6784,224.881 Q279.1829,224.881 279.6549,224.9949 Q280.1432,225.0926 280.5501,225.3204 L280.5501,227.3224 Q280.0944,226.8992 279.6549,226.7039 Q279.2155,226.4923 278.7598,226.4923 Q277.7669,226.4923 277.2624,227.2898 Q276.7578,228.0711 276.7578,229.6173 Q276.7578,231.1473 277.2624,231.9285 Q277.7669,232.7098 278.7598,232.7098 Q279.2155,232.7098 279.6549,232.5144 Q280.0944,232.3191 280.5501,231.896 L280.5501,233.8979 Z " fill="#000000"/><text fill="#FFFFFF" font-family="Verdana" font-size="12.5" lengthAdjust="spacing" textLength="126.0417" x="297.3958" y="234.4421">FolderMountSource</text><!--MD5=[8c2a2717dea47737995c3344a86ec17c]
+class ZipMountSource--><rect codeLine="55" fill="url(#gmgzodebqai1p0)" height="36.025" id="ZipMountSource" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="146.875" x="468.2292" y="211.4583"/><rect fill="url(#gmgzodebqai1p1)" height="36.025" rx="4.1667" ry="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="146.875" x="468.2292" y="211.4583"/><rect fill="url(#gmgzodebqai1p1)" height="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="146.875" x="468.2292" y="243.3167"/><rect codeLine="55" fill="none" height="36.025" id="ZipMountSource" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="146.875" x="468.2292" y="211.4583"/><ellipse cx="482.8125" cy="229.4708" fill="#EDF0F2" rx="10.4167" ry="10.4167" style="stroke:#BABDBF;stroke-width:1.0416666666666667;"/><path d="M484.7168,233.8979 Q484.2936,234.1095 483.8216,234.2234 Q483.3496,234.3374 482.8451,234.3374 Q480.9896,234.3374 480.013,233.1329 Q479.0527,231.9122 479.0527,229.6173 Q479.0527,227.3061 480.013,226.1017 Q480.9896,224.881 482.8451,224.881 Q483.3496,224.881 483.8216,224.9949 Q484.3099,225.0926 484.7168,225.3204 L484.7168,227.3224 Q484.2611,226.8992 483.8216,226.7039 Q483.3822,226.4923 482.9264,226.4923 Q481.9336,226.4923 481.429,227.2898 Q480.9245,228.0711 480.9245,229.6173 Q480.9245,231.1473 481.429,231.9285 Q481.9336,232.7098 482.9264,232.7098 Q483.3822,232.7098 483.8216,232.5144 Q484.2611,232.3191 484.7168,231.896 L484.7168,233.8979 Z " fill="#000000"/><text fill="#FFFFFF" font-family="Verdana" font-size="12.5" lengthAdjust="spacing" textLength="105.2083" x="501.5625" y="234.4421">ZipMountSource</text><!--MD5=[042bf095949dd148a3bcba759ad68fed]
+class RarMountSource--><rect codeLine="56" fill="url(#gmgzodebqai1p0)" height="36.025" id="RarMountSource" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="148.9583" x="651.5625" y="211.4583"/><rect fill="url(#gmgzodebqai1p1)" height="36.025" rx="4.1667" ry="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="148.9583" x="651.5625" y="211.4583"/><rect fill="url(#gmgzodebqai1p1)" height="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="148.9583" x="651.5625" y="243.3167"/><rect codeLine="56" fill="none" height="36.025" id="RarMountSource" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="148.9583" x="651.5625" y="211.4583"/><ellipse cx="666.1458" cy="229.4708" fill="#EDF0F2" rx="10.4167" ry="10.4167" style="stroke:#BABDBF;stroke-width:1.0416666666666667;"/><path d="M668.0501,233.8979 Q667.627,234.1095 667.1549,234.2234 Q666.6829,234.3374 666.1784,234.3374 Q664.3229,234.3374 663.3464,233.1329 Q662.3861,231.9122 662.3861,229.6173 Q662.3861,227.3061 663.3464,226.1017 Q664.3229,224.881 666.1784,224.881 Q666.6829,224.881 667.1549,224.9949 Q667.6432,225.0926 668.0501,225.3204 L668.0501,227.3224 Q667.5944,226.8992 667.1549,226.7039 Q666.7155,226.4923 666.2598,226.4923 Q665.2669,226.4923 664.7624,227.2898 Q664.2578,228.0711 664.2578,229.6173 Q664.2578,231.1473 664.7624,231.9285 Q665.2669,232.7098 666.2598,232.7098 Q666.7155,232.7098 667.1549,232.5144 Q667.5944,232.3191 668.0501,231.896 L668.0501,233.8979 Z " fill="#000000"/><text fill="#FFFFFF" font-family="Verdana" font-size="12.5" lengthAdjust="spacing" textLength="107.2917" x="684.8958" y="234.4421">RarMountSource</text><!--MD5=[aec79306db8a73d25fe26edd3a4d41b2]
+class UnionMountSource--><rect codeLine="58" fill="url(#gmgzodebqai1p0)" height="36.025" id="UnionMountSource" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="164.5833" x="837.5" y="211.4583"/><rect fill="url(#gmgzodebqai1p1)" height="36.025" rx="4.1667" ry="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="164.5833" x="837.5" y="211.4583"/><rect fill="url(#gmgzodebqai1p1)" height="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="164.5833" x="837.5" y="243.3167"/><rect codeLine="58" fill="none" height="36.025" id="UnionMountSource" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="164.5833" x="837.5" y="211.4583"/><ellipse cx="852.0833" cy="229.4708" fill="#EDF0F2" rx="10.4167" ry="10.4167" style="stroke:#BABDBF;stroke-width:1.0416666666666667;"/><path d="M853.9876,233.8979 Q853.5645,234.1095 853.0924,234.2234 Q852.6204,234.3374 852.1159,234.3374 Q850.2604,234.3374 849.2839,233.1329 Q848.3236,231.9122 848.3236,229.6173 Q848.3236,227.3061 849.2839,226.1017 Q850.2604,224.881 852.1159,224.881 Q852.6204,224.881 853.0924,224.9949 Q853.5807,225.0926 853.9876,225.3204 L853.9876,227.3224 Q853.5319,226.8992 853.0924,226.7039 Q852.653,226.4923 852.1973,226.4923 Q851.2044,226.4923 850.6999,227.2898 Q850.1953,228.0711 850.1953,229.6173 Q850.1953,231.1473 850.6999,231.9285 Q851.2044,232.7098 852.1973,232.7098 Q852.653,232.7098 853.0924,232.5144 Q853.5319,232.3191 853.9876,231.896 L853.9876,233.8979 Z " fill="#000000"/><text fill="#FFFFFF" font-family="Verdana" font-size="12.5" lengthAdjust="spacing" textLength="122.9167" x="870.8333" y="234.4421">UnionMountSource</text><!--MD5=[3922171dd4bf7529965294ec21371c32]
+class FileVersionLayer--><rect codeLine="59" fill="url(#gmgzodebqai1p0)" height="36.025" id="FileVersionLayer" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="148.9583" x="1039.0625" y="211.4583"/><rect fill="url(#gmgzodebqai1p1)" height="36.025" rx="4.1667" ry="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="148.9583" x="1039.0625" y="211.4583"/><rect fill="url(#gmgzodebqai1p1)" height="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="148.9583" x="1039.0625" y="243.3167"/><rect codeLine="59" fill="none" height="36.025" id="FileVersionLayer" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="148.9583" x="1039.0625" y="211.4583"/><ellipse cx="1053.6458" cy="229.4708" fill="#EDF0F2" rx="10.4167" ry="10.4167" style="stroke:#BABDBF;stroke-width:1.0416666666666667;"/><path d="M1055.5501,233.8979 Q1055.127,234.1095 1054.6549,234.2234 Q1054.1829,234.3374 1053.6784,234.3374 Q1051.8229,234.3374 1050.8464,233.1329 Q1049.8861,231.9122 1049.8861,229.6173 Q1049.8861,227.3061 1050.8464,226.1017 Q1051.8229,224.881 1053.6784,224.881 Q1054.1829,224.881 1054.6549,224.9949 Q1055.1432,225.0926 1055.5501,225.3204 L1055.5501,227.3224 Q1055.0944,226.8992 1054.6549,226.7039 Q1054.2155,226.4923 1053.7598,226.4923 Q1052.7669,226.4923 1052.2624,227.2898 Q1051.7578,228.0711 1051.7578,229.6173 Q1051.7578,231.1473 1052.2624,231.9285 Q1052.7669,232.7098 1053.7598,232.7098 Q1054.2155,232.7098 1054.6549,232.5144 Q1055.0944,232.3191 1055.5501,231.896 L1055.5501,233.8979 Z " fill="#000000"/><text fill="#FFFFFF" font-family="Verdana" font-size="12.5" lengthAdjust="spacing" textLength="107.2917" x="1072.3958" y="234.4421">FileVersionLayer</text><!--MD5=[15d553a4d8d7f388d388956d1c60063d]
+class AutoMountLayer--><rect fill="url(#gmgzodebqai1p0)" height="36.025" id="AutoMountLayer" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="148.9583" x="1224.4792" y="211.4583"/><rect fill="url(#gmgzodebqai1p1)" height="36.025" rx="4.1667" ry="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="148.9583" x="1224.4792" y="211.4583"/><rect fill="url(#gmgzodebqai1p1)" height="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="148.9583" x="1224.4792" y="243.3167"/><rect fill="none" height="36.025" id="AutoMountLayer" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="148.9583" x="1224.4792" y="211.4583"/><ellipse cx="1239.0625" cy="229.4708" fill="#EDF0F2" rx="10.4167" ry="10.4167" style="stroke:#BABDBF;stroke-width:1.0416666666666667;"/><path d="M1240.9668,233.8979 Q1240.5436,234.1095 1240.0716,234.2234 Q1239.5996,234.3374 1239.0951,234.3374 Q1237.2396,234.3374 1236.263,233.1329 Q1235.3027,231.9122 1235.3027,229.6173 Q1235.3027,227.3061 1236.263,226.1017 Q1237.2396,224.881 1239.0951,224.881 Q1239.5996,224.881 1240.0716,224.9949 Q1240.5599,225.0926 1240.9668,225.3204 L1240.9668,227.3224 Q1240.5111,226.8992 1240.0716,226.7039 Q1239.6322,226.4923 1239.1764,226.4923 Q1238.1836,226.4923 1237.679,227.2898 Q1237.1745,228.0711 1237.1745,229.6173 Q1237.1745,231.1473 1237.679,231.9285 Q1238.1836,232.7098 1239.1764,232.7098 Q1239.6322,232.7098 1240.0716,232.5144 Q1240.5111,232.3191 1240.9668,231.896 L1240.9668,233.8979 Z " fill="#000000"/><text fill="#FFFFFF" font-family="Verdana" font-size="12.5" lengthAdjust="spacing" textLength="107.2917" x="1257.8125" y="234.4421">AutoMountLayer</text><!--MD5=[62b6a3107fb497f3760a7342c4e9c948]
+class fuse.Operations--><rect codeLine="70" fill="url(#gmgzodebqai1p0)" height="36.025" id="fuse.Operations" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="146.875" x="1409.8958" y="211.4583"/><rect fill="url(#gmgzodebqai1p1)" height="36.025" rx="4.1667" ry="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="146.875" x="1409.8958" y="211.4583"/><rect fill="url(#gmgzodebqai1p1)" height="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="146.875" x="1409.8958" y="243.3167"/><rect codeLine="70" fill="none" height="36.025" id="fuse.Operations" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="146.875" x="1409.8958" y="211.4583"/><ellipse cx="1424.4792" cy="229.4708" fill="#EDF0F2" rx="10.4167" ry="10.4167" style="stroke:#BABDBF;stroke-width:1.0416666666666667;"/><path d="M1426.3835,233.8979 Q1425.9603,234.1095 1425.4883,234.2234 Q1425.0163,234.3374 1424.5117,234.3374 Q1422.6563,234.3374 1421.6797,233.1329 Q1420.7194,231.9122 1420.7194,229.6173 Q1420.7194,227.3061 1421.6797,226.1017 Q1422.6563,224.881 1424.5117,224.881 Q1425.0163,224.881 1425.4883,224.9949 Q1425.9766,225.0926 1426.3835,225.3204 L1426.3835,227.3224 Q1425.9277,226.8992 1425.4883,226.7039 Q1425.0488,226.4923 1424.5931,226.4923 Q1423.6003,226.4923 1423.0957,227.2898 Q1422.5911,228.0711 1422.5911,229.6173 Q1422.5911,231.1473 1423.0957,231.9285 Q1423.6003,232.7098 1424.5931,232.7098 Q1425.0488,232.7098 1425.4883,232.5144 Q1425.9277,232.3191 1426.3835,231.896 L1426.3835,233.8979 Z " fill="#000000"/><text fill="#FFFFFF" font-family="Verdana" font-size="12.5" lengthAdjust="spacing" textLength="105.2083" x="1443.2292" y="234.4421">fuse.Operations</text><!--MD5=[2b52f6e1e6c6315a6145d18539435267]
+class FuseMount--><rect codeLine="72" fill="url(#gmgzodebqai1p0)" height="36.025" id="FuseMount" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="113.5417" x="1149.4792" y="59.8958"/><rect fill="url(#gmgzodebqai1p1)" height="36.025" rx="4.1667" ry="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="113.5417" x="1149.4792" y="59.8958"/><rect fill="url(#gmgzodebqai1p1)" height="4.1667" style="stroke:url(#gmgzodebqai1p1);stroke-width:1.0416666666666667;" width="113.5417" x="1149.4792" y="91.7542"/><rect codeLine="72" fill="none" height="36.025" id="FuseMount" rx="4.1667" ry="4.1667" style="stroke:#2FA4E7;stroke-width:1.0416666666666667;" width="113.5417" x="1149.4792" y="59.8958"/><ellipse cx="1164.0625" cy="77.9083" fill="#EDF0F2" rx="10.4167" ry="10.4167" style="stroke:#BABDBF;stroke-width:1.0416666666666667;"/><path d="M1165.9668,82.3354 Q1165.5436,82.547 1165.0716,82.6609 Q1164.5996,82.7749 1164.0951,82.7749 Q1162.2396,82.7749 1161.263,81.5704 Q1160.3027,80.3497 1160.3027,78.0548 Q1160.3027,75.7436 1161.263,74.5392 Q1162.2396,73.3185 1164.0951,73.3185 Q1164.5996,73.3185 1165.0716,73.4324 Q1165.5599,73.5301 1165.9668,73.7579 L1165.9668,75.7599 Q1165.5111,75.3367 1165.0716,75.1414 Q1164.6322,74.9298 1164.1764,74.9298 Q1163.1836,74.9298 1162.679,75.7273 Q1162.1745,76.5086 1162.1745,78.0548 Q1162.1745,79.5848 1162.679,80.366 Q1163.1836,81.1473 1164.1764,81.1473 Q1164.6322,81.1473 1165.0716,80.9519 Q1165.5111,80.7566 1165.9668,80.3335 L1165.9668,82.3354 Z " fill="#000000"/><text fill="#FFFFFF" font-family="Verdana" font-size="12.5" lengthAdjust="spacing" textLength="71.875" x="1182.8125" y="82.8796">FuseMount</text><!--MD5=[bc895aacaf89e8e96b56f467f61237d5]
+reverse link SQLiteIndexedTar to StenciledFile--><path codeLine="51" d="M99.2188,261.8438 C99.2188,261.8438 99.2188,310.1146 99.2188,310.1146 " fill="none" id="SQLiteIndexedTar-backto-StenciledFile" style="stroke:#2FA4E7;stroke-width:3.125;"/><polygon fill="#2FA4E7" points="99.2188,248.3021,95.0521,254.5521,99.2188,260.8021,103.3854,254.5521,99.2188,248.3021" style="stroke:#2FA4E7;stroke-width:3.125;"/><!--MD5=[faebb4c7e2d0349f54461114ce3d8a8b]
+reverse link SQLiteIndexedTar to ProgressBar--><path codeLine="52" d="M197.3958,261.8438 C197.3958,261.8438 197.3958,310.1146 197.3958,310.1146 " fill="none" id="SQLiteIndexedTar-backto-ProgressBar" style="stroke:#2FA4E7;stroke-width:3.125;"/><polygon fill="#2FA4E7" points="197.3958,248.3021,193.2292,254.5521,197.3958,260.8021,201.5625,254.5521,197.3958,248.3021" style="stroke:#2FA4E7;stroke-width:3.125;"/><!--MD5=[e905a8abda78be3f7e62038105bead6b]
+reverse link MountSource to SQLiteIndexedTar--><path codeLine="61" d="M643.0625,42.7083 C643.0625,42.7083 147.9167,42.7083 147.9167,42.7083 C147.9167,42.7083 147.9167,164.375 147.9167,211.4167 " fill="none" id="MountSource-backto-SQLiteIndexedTar" style="stroke:#2FA4E7;stroke-width:3.125;"/><polygon fill="none" points="643.0625,35.4167,663.8958,42.7083,643.0625,50,643.0625,35.4167" style="stroke:#2FA4E7;stroke-width:3.125;"/><!--MD5=[f78387b14583a3a401896c0c0f28e115]
+reverse link MountSource to FolderMountSource--><path codeLine="62" d="M643.1875,78.125 C643.1875,78.125 347.9167,78.125 347.9167,78.125 C347.9167,78.125 347.9167,171.0938 347.9167,211.4063 " fill="none" id="MountSource-backto-FolderMountSource" style="stroke:#2FA4E7;stroke-width:3.125;"/><polygon fill="none" points="643.1875,70.8333,664.0208,78.125,643.1875,85.4167,643.1875,70.8333" style="stroke:#2FA4E7;stroke-width:3.125;"/><!--MD5=[e9f81abd37be14a832603d0e8f061f32]
+reverse link MountSource to ZipMountSource--><path codeLine="63" d="M642.7917,113.5417 C642.7917,113.5417 541.6667,113.5417 541.6667,113.5417 C541.6667,113.5417 541.6667,178.1979 541.6667,211.0313 " fill="none" id="MountSource-backto-ZipMountSource" style="stroke:#2FA4E7;stroke-width:3.125;"/><polygon fill="none" points="642.7917,106.25,663.625,113.5417,642.7917,120.8333,642.7917,106.25" style="stroke:#2FA4E7;stroke-width:3.125;"/><!--MD5=[2698d1272ef8afb8b0af374f0af3f43b]
+reverse link MountSource to RarMountSource--><path codeLine="64" d="M726.0417,169.8542 C726.0417,169.8542 726.0417,211.2292 726.0417,211.2292 " fill="none" id="MountSource-backto-RarMountSource" style="stroke:#2FA4E7;stroke-width:3.125;"/><polygon fill="none" points="718.75,169.8542,726.0417,149.0208,733.3333,169.8542,718.75,169.8542" style="stroke:#2FA4E7;stroke-width:3.125;"/><!--MD5=[a40da3d396d7daeb72c61fabe101591a]
+reverse link MountSource to AutoMountLayer--><path codeLine="66" d="M809.0625,110.4167 C809.0625,110.4167 1237.3229,110.4167 1237.3229,110.4167 C1237.3229,110.4167 1237.3229,177.5104 1237.3229,211.0521 " fill="none" id="MountSource-backto-AutoMountLayer" style="stroke:#2FA4E7;stroke-width:3.125;"/><polygon fill="none" points="809.0625,117.7083,788.2292,110.4167,809.0625,103.125,809.0625,117.7083" style="stroke:#2FA4E7;stroke-width:3.125;"/><!--MD5=[9157be17754d37349d31933e070e05aa]
+reverse link MountSource to UnionMountSource--><path codeLine="67" d="M809.2813,136.4583 C809.2813,136.4583 892.3646,136.4583 892.3646,136.4583 C892.3646,136.4583 892.3646,184.0938 892.3646,211.2708 " fill="none" id="MountSource-backto-UnionMountSource" style="stroke:#2FA4E7;stroke-width:3.125;"/><polygon fill="none" points="809.2813,143.75,788.4479,136.4583,809.2813,129.1667,809.2813,143.75" style="stroke:#2FA4E7;stroke-width:3.125;"/><!--MD5=[50ad1c9d783500261e3ca795b7fe2a0a]
+reverse link MountSource to FileVersionLayer--><path codeLine="68" d="M808.9271,122.9167 C808.9271,122.9167 1094.2708,122.9167 1094.2708,122.9167 C1094.2708,122.9167 1094.2708,180.5 1094.2708,211.0938 " fill="none" id="MountSource-backto-FileVersionLayer" style="stroke:#2FA4E7;stroke-width:3.125;"/><polygon fill="none" points="808.9271,130.2083,788.0938,122.9167,808.9271,115.625,808.9271,130.2083" style="stroke:#2FA4E7;stroke-width:3.125;"/><!--MD5=[d3e79827a3c0c2e1f6a1393adc6cf5bf]
+reverse link FuseMount to fuse.Operations--><path codeLine="74" d="M1284.1563,78.125 C1284.1563,78.125 1483.3333,78.125 1483.3333,78.125 C1483.3333,78.125 1483.3333,171.0938 1483.3333,211.4063 " fill="none" id="FuseMount-backto-fuse.Operations" style="stroke:#2FA4E7;stroke-width:3.125;"/><polygon fill="none" points="1284.1563,85.4167,1263.3229,78.125,1284.1563,70.8333,1284.1563,85.4167" style="stroke:#2FA4E7;stroke-width:3.125;"/><!--MD5=[9bf6580915057b1eaf56446cc44d2a74]
+reverse link FuseMount to AutoMountLayer--><path codeLine="76" d="M1250.1771,109.9479 C1250.1771,109.9479 1250.1771,211.3438 1250.1771,211.3438 " fill="none" id="FuseMount-backto-AutoMountLayer" style="stroke:#2FA4E7;stroke-width:3.125;"/><polygon fill="#2FA4E7" points="1250.1771,96.4063,1246.0104,102.6563,1250.1771,108.9063,1254.3438,102.6563,1250.1771,96.4063" style="stroke:#2FA4E7;stroke-width:3.125;"/><!--MD5=[d62e9d396fc14aa805a4f142c20dde3a]
+reverse link FuseMount to UnionMountSource--><path codeLine="77" d="M1135.8646,78.125 C1135.8646,78.125 947.2188,78.125 947.2188,78.125 C947.2188,78.125 947.2188,171.0938 947.2188,211.4063 " fill="none" id="FuseMount-backto-UnionMountSource" style="stroke:#2FA4E7;stroke-width:3.125;"/><polygon fill="#2FA4E7" points="1149.4063,78.125,1143.1563,73.9583,1136.9063,78.125,1143.1563,82.2917,1149.4063,78.125" style="stroke:#2FA4E7;stroke-width:3.125;"/><!--MD5=[86cfcd5b5abf73d95f1a32683c2e15ec]
+reverse link FuseMount to FileVersionLayer--><path codeLine="78" d="M1168.75,109.9479 C1168.75,109.9479 1168.75,211.3438 1168.75,211.3438 " fill="none" id="FuseMount-backto-FileVersionLayer" style="stroke:#2FA4E7;stroke-width:3.125;"/><polygon fill="#2FA4E7" points="1168.75,96.4063,1164.5833,102.6563,1168.75,108.9063,1172.9167,102.6563,1168.75,96.4063" style="stroke:#2FA4E7;stroke-width:3.125;"/><!--MD5=[c9d02772366216e84cc8949a274661a6]
+@startuml
+
+' bluegray cerulean-outline crt-amber materia-outline mimeograph cyborg
+!theme cerulean
+
+'!pragma svek_trace on
+/'
+generate in your local folder two intermediate files:
+    foo.dot : intermediate file in "dot" language provided to GraphViz
+    foo.svg : intermediate result file which is going to be parsed by PlantUML to retrieve element positions.
+'/
+
+'skinparam backgroundColor #121212
+skinparam backgroundColor #FFFFFF
+
+/' Use the UML symbols +-#~ for visibility instead of PlantUML-specific icons '/
+skinparam classAttributeIconSize 0
+
+set namespaceSeparator ::
+
+hide empty
+hide empty members
+
+
+' Only takes more space vertically, does not reduce width :/
+'left to right direction
+'top to bottom direction
+
+skinparam linetype ortho
+'skinparam linetype polyline
+
+/'
+"linetype ortho" looks the best imo, but it does not work at all with arrow labels
+as they are place too far away to be meaningful. Same bug applies to polyline. See:
+  https://forum.plantuml.net/1608/is-it-possible-to-only-use-straight-lines-in-a-class-diagram
+  https://crashedmind.github.io/PlantUMLHitchhikersGuide/layout/layout.html#linetype-polyline-ortho
+  https://github.com/plantuml/plantuml/issues/149
+'/
+
+class StenciledFile
+class ProgressBar
+
+abstract class MountSource {
+    +{abstract} listDir
+    +{abstract} getFileInfo
+    +{abstract} fileVersions
+    +{abstract} open
+}
+
+class SQLiteIndexedTar
+
+SQLiteIndexedTar *- - StenciledFile
+SQLiteIndexedTar *- - ProgressBar
+
+class FolderMountSource
+class ZipMountSource
+class RarMountSource
+
+class UnionMountSource
+class FileVersionLayer
+
+MountSource <|- - SQLiteIndexedTar
+MountSource <|- - FolderMountSource
+MountSource <|- - ZipMountSource
+MountSource <|- - RarMountSource
+
+MountSource <|- - AutoMountLayer
+MountSource <|- - UnionMountSource
+MountSource <|- - FileVersionLayer
+
+class fuse.Operations
+
+class FuseMount
+
+FuseMount <|- - fuse.Operations
+
+FuseMount *- - AutoMountLayer
+FuseMount *- - UnionMountSource
+FuseMount *- - FileVersionLayer
+
+@enduml
+
+@startuml
+
+
+
+
+skinparam backgroundColor transparent
+skinparam useBetaStyle false
+
+
+
+
+
+
+
+skinparam defaultFontName        "Verdana"
+skinparam defaultFontSize        12
+skinparam dpi                    100
+skinparam shadowing              false
+skinparam roundcorner            8
+skinparam ParticipantPadding     40
+skinparam BoxPadding             40
+skinparam Padding                5
+skinparam ArrowColor             #868E96
+skinparam stereotype {
+    CBackgroundColor #EDF0F2
+    CBorderColor #BABDBF
+    ABackgroundColor #8FB961
+    ABorderColor #5C862E
+    IBackgroundColor #D2494E
+    IBorderColor #9F161B
+    EBackgroundColor #E47833
+    EBorderColor #B14500
+    NBackgroundColor #35638F
+    NBorderColor #02305C
+}
+skinparam title {
+	FontColor	                 #2FA4E7
+	BorderColor	                 #BABDBF
+	FontSize	    	         20
+	BorderRoundCorner            8
+	BorderThickness 	         1
+	BackgroundColor              #EDF0F2-#E9ECEF
+}
+
+
+skinparam legend {
+	BackgroundColor #E9ECEF
+	BorderColor #BABDBF
+	FontColor #343A40
+}
+
+skinparam swimlane {
+	BorderColor #033C73
+	BorderThickness 2
+	TitleBackgroundColor  #EDF0F2-#E9ECEF
+	TitleFontColor #2FA4E7
+}
+
+
+skinparam activity {
+		FontColor #FFF
+	BorderColor #2FA4E7
+	BackgroundColor #59B6EC-#2FA4E7
+	BarColor #73A839
+	StartColor #033C73
+	EndColor #033C73
+	DiamondBackgroundColor #FFF-#EDF0F2
+  	DiamondBorderColor #BABDBF
+	DiamondFontColor #343A40
+}
+
+
+skinparam participant {
+		FontColor #FFF
+	BorderColor #2FA4E7
+	BackgroundColor #59B6EC-#2FA4E7
+	ParticipantBorderThickness 2
+}
+
+
+skinparam actor {
+		FontColor #FFF
+	BorderColor #2FA4E7
+	BackgroundColor #59B6EC-#2FA4E7
+	FontColor #343A40
+}
+
+
+skinparam arrow {
+	Thickness 3
+	Color #2FA4E7
+	FontColor #343A40
+}
+
+
+skinparam sequence {
+	BorderColor #2FA4E7
+	TitleFontColor #2FA4E7
+	BackgroundColor transparent
+	StartColor #2FA4E7
+	EndColor #2FA4E7
+	BoxBackgroundColor #F8F9FA
+	BoxBorderColor #868E96
+	BoxFontColor #343A40
+	LifeLineBorderColor #BABDBF
+	LifeLineBorderThickness 2
+	LifeLineBackgroundColor #EDF0F2
+	GroupBorderColor #868E96
+	GroupFontColor #343A40
+	GroupHeaderFontColor #033C73
+	DividerBackgroundColor #FFF-#F8F9FA
+    DividerBorderColor #868E96
+    DividerBorderThickness 2
+    DividerFontColor #343A40
+	ReferenceBackgroundColor transparent
+	ReferenceBorderColor #868E96
+	ReferenceFontColor #343A40
+	ReferenceHeaderFontColor #033C73
+}
+
+
+skinparam partition {
+	BorderColor #2FA4E7
+	FontColor #2FA4E7
+	BackgroundColor transparent
+}
+
+
+skinparam collections {
+		FontColor #FFF
+	BorderColor #2FA4E7
+	BackgroundColor #59B6EC-#2FA4E7
+}
+
+
+skinparam control {
+		FontColor #FFF
+	BorderColor #2FA4E7
+	BackgroundColor #59B6EC-#2FA4E7
+	FontColor #343A40
+}
+
+
+skinparam entity {
+		FontColor #FFF
+	BorderColor #2FA4E7
+	BackgroundColor #59B6EC-#2FA4E7
+	FontColor #343A40
+}
+
+
+skinparam boundary {
+		FontColor #FFF
+	BorderColor #2FA4E7
+	BackgroundColor #59B6EC-#2FA4E7
+	FontColor #343A40
+}
+
+
+skinparam agent {
+	BackgroundColor #orange
+	BorderColor #999999
+	FontColor #333333
+}
+
+
+skinparam note {
+	BorderThickness 1
+	BackgroundColor #35638F-#033C73
+	BorderColor #033C73
+	FontColor #FFF
+}
+
+
+skinparam artifact {
+	BackgroundColor #FFF-#F8F9FA
+	BorderColor #BABDBF
+	FontColor #343A40
+}
+
+
+skinparam component {
+		FontColor #FFF
+	BorderColor #2FA4E7
+	BackgroundColor #59B6EC-#2FA4E7
+}
+
+
+skinparam interface {
+	BackgroundColor  #D2494E
+	BorderColor  #C71C22
+	FontColor #343A40
+}
+
+
+skinparam storage {
+	BackgroundColor #E47833-#DD5600
+  	BorderColor #DD5600
+	FontColor #FFF
+}
+
+
+skinparam node {
+	BackgroundColor #EDF0F2-#E9ECEF
+	BorderColor #E9ECEF
+	FontColor #343A40
+}
+
+
+skinparam cloud {
+	BackgroundColor #F2FCFE-#eeeeee
+	BorderColor #F2FCFE
+	FontColor #2FA4E7
+}
+
+
+skinparam database {
+		FontColor #FFF
+	BorderColor #2FA4E7
+	BackgroundColor #59B6EC-#2FA4E7
+	FontColor #343A40
+}
+
+
+skinparam class {
+		FontColor #FFF
+	BorderColor #2FA4E7
+	BackgroundColor #59B6EC-#2FA4E7
+	HeaderBackgroundColor #2FA4E7-#2683B9
+	StereotypeFontColor #343A40
+	BorderThickness 1
+	AttributeFontColor #F8F9FA
+	AttributeFontSize 11
+}
+
+
+skinparam object {
+		FontColor #FFF
+	BorderColor #2FA4E7
+	BackgroundColor #59B6EC-#2FA4E7
+	StereotypeFontColor #343A40
+	BorderThickness 1
+	AttributeFontColor #343A40
+	AttributeFontSize 11
+}
+
+
+skinparam usecase {
+		FontColor #FFF
+	BorderColor #2FA4E7
+	BackgroundColor #59B6EC-#2FA4E7
+	BorderThickness 2
+	StereotypeFontColor #2FA4E7
+}
+
+
+skinparam rectangle {
+	FontColor #2FA4E7
+	BorderColor #59B6EC
+	BackgroundColor transparent
+	BorderThickness 2
+	StereotypeFontColor #2FA4E7
+}
+
+
+skinparam package {
+	FontColor #2FA4E7
+	BorderColor #59B6EC
+	BackgroundColor transparent
+	BorderThickness 2
+}
+
+
+skinparam folder {
+	BackgroundColor #FFF-#EDF0F2
+  	BorderColor #DD5600
+	FontColor #DD5600
+	BorderThickness 2
+}
+
+
+skinparam frame {
+	BackgroundColor #FFF-#EDF0F2
+  	BorderColor #033C73
+	FontColor #033C73
+	BorderThickness 2
+}
+
+
+skinparam state {
+		FontColor #FFF
+	BorderColor #2FA4E7
+	BackgroundColor #59B6EC-#2FA4E7
+	BorderColor #2683B9
+	StartColor #033C73
+	EndColor #033C73
+	AttributeFontColor #343A40
+	AttributeFontSize 11
+}
+
+
+skinparam queue {
+		FontColor #FFF
+	BorderColor #2FA4E7
+	BackgroundColor #59B6EC-#2FA4E7
+}
+
+
+skinparam card {
+	BackgroundColor #35638F-#033C73
+	BorderColor #033C73
+	FontColor #FFF
+}
+
+
+skinparam file {
+	BackgroundColor #EDF0F2-#E9ECEF
+	BorderColor #033C73
+	FontColor #868E96
+
+}
+
+
+
+
+skinparam backgroundColor #FFFFFF
+
+skinparam classAttributeIconSize 0
+
+set namespaceSeparator ::
+
+hide empty
+hide empty members
+
+
+
+skinparam linetype ortho
+
+
+class StenciledFile
+class ProgressBar
+
+abstract class MountSource {
+    +{abstract} listDir
+    +{abstract} getFileInfo
+    +{abstract} fileVersions
+    +{abstract} open
+}
+
+class SQLiteIndexedTar
+
+SQLiteIndexedTar *- - StenciledFile
+SQLiteIndexedTar *- - ProgressBar
+
+class FolderMountSource
+class ZipMountSource
+class RarMountSource
+
+class UnionMountSource
+class FileVersionLayer
+
+MountSource <|- - SQLiteIndexedTar
+MountSource <|- - FolderMountSource
+MountSource <|- - ZipMountSource
+MountSource <|- - RarMountSource
+
+MountSource <|- - AutoMountLayer
+MountSource <|- - UnionMountSource
+MountSource <|- - FileVersionLayer
+
+class fuse.Operations
+
+class FuseMount
+
+FuseMount <|- - fuse.Operations
+
+FuseMount *- - AutoMountLayer
+FuseMount *- - UnionMountSource
+FuseMount *- - FileVersionLayer
+
+@enduml
+
+PlantUML version 1.2021.8(Sat Jun 26 10:20:59 CEST 2021)
+(GPL source distribution)
+Java Runtime: OpenJDK Runtime Environment
+JVM: OpenJDK 64-Bit Server VM
+Default Encoding: UTF-8
+Language: en
+Country: US
+--></g></svg>
