@@ -2240,8 +2240,8 @@ class ZipMountSource(MountSource):
             if not filePath:
                 return None
 
-            # This effectively adds all parent paths as folders but theoretically parent folders should be in
-            # the zip separately but I'm not sure whether zip enforces that or not.
+            # This effectively adds all parent paths as folders. It is easy to create
+            # RARs and ZIPs with nested files without information on the parent directories!
             if '/' in filePath:
                 firstSlash = filePath.index('/')
                 filePath = filePath[:firstSlash]
@@ -2251,18 +2251,40 @@ class ZipMountSource(MountSource):
         # ZipInfo.filename is wrongly named as it returns the full path inside the archive not just the name part
         return set(getName(info.filename) for info in self.files if getName(info.filename))
 
-    def _getFileInfos(self, path: str) -> List[zipfile.ZipInfo]:
-        # TODO Generate dummy folder infos for parent folders which are not in the zip as a separate object?
-        return [info for info in self.files if info.filename.rstrip('/') == path.lstrip('/')]
+    def _getFileInfos(self, path: str) -> List[FileInfo]:
+        infoList = [
+            ZipMountSource._convertToFileInfo(info)
+            for info in self.files
+            if info.filename.rstrip('/') == path.lstrip('/')
+        ]
 
-    def _getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[zipfile.ZipInfo]:
-        infos = self._getFileInfos(path)
-        return infos[fileVersion] if -len(infos) <= fileVersion < len(infos) else None
+        # If we have a fileInfo for the given directory path, then everything is fine.
+        pathAsDir = path.strip('/') + '/'
+
+        # Check whether some parent directories of files do not exist as separate entities in the archive.
+        if not any([info.userdata[-1].filename == pathAsDir for info in infoList]) and any(
+            info.filename.rstrip('/').startswith(pathAsDir) for info in self.files
+        ):
+            infoList.append(
+                FileInfo(
+                    # fmt: off
+                    size     = 0,
+                    mtime    = int(time.time()),
+                    mode     = 0o777 | stat.S_IFDIR,
+                    linkname = "",
+                    uid      = os.getuid(),
+                    gid      = os.getgid(),
+                    userdata = [None],
+                    # fmt: on
+                )
+            )
+
+        return infoList
 
     @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
-        info = self._getFileInfo(path, fileVersion)
-        return ZipMountSource._convertToFileInfo(info) if info else None
+        infos = self._getFileInfos(path)
+        return infos[fileVersion] if -len(infos) <= fileVersion < len(infos) else None
 
     @overrides(MountSource)
     def fileVersions(self, path: str) -> int:
@@ -2359,29 +2381,51 @@ class RarMountSource(MountSource):
             if not filePath:
                 return None
 
-            # This effectively adds all parent paths as folders but theoretically parent folders should be in
-            # the archive separately but I'm not sure whether archive enforces that or not.
+            # This effectively adds all parent paths as folders. It is easy to create
+            # RARs and ZIPs with nested files without information on the parent directories!
             if '/' in filePath:
                 firstSlash = filePath.index('/')
                 filePath = filePath[:firstSlash]
 
             return filePath
 
-        # ZipInfo.filename is wrongly named as it returns the full path inside the archive not just the name part
+        # The "filename" member is wrongly named as it returns the full path inside the archive not just the name part.
         return set(getName(info.filename) for info in self.files if getName(info.filename))
 
-    def _getFileInfos(self, path: str) -> List['rarfile.RarInfo']:
-        # TODO Generate dummy folder infos for parent folders which are not in the archive as a separate object?
-        return [info for info in self.files if info.filename.rstrip('/') == path.lstrip('/')]
+    def _getFileInfos(self, path: str) -> List[FileInfo]:
+        infoList = [
+            RarMountSource._convertToFileInfo(info)
+            for info in self.files
+            if info.filename.rstrip('/') == path.lstrip('/')
+        ]
 
-    def _getFileInfo(self, path: str, fileVersion: int = 0) -> Optional['rarfile.RarInfo']:
-        infos = self._getFileInfos(path)
-        return infos[fileVersion] if -len(infos) <= fileVersion < len(infos) else None
+        # If we have a fileInfo for the given directory path, then everything is fine.
+        pathAsDir = path.strip('/') + '/'
+
+        # Check whether some parent directories of files do not exist as separate entities in the archive.
+        if not any([info.userdata[-1].filename == pathAsDir for info in infoList]) and any(
+            info.filename.rstrip('/').startswith(pathAsDir) for info in self.files
+        ):
+            infoList.append(
+                FileInfo(
+                    # fmt: off
+                    size     = 0,
+                    mtime    = int(time.time()),
+                    mode     = 0o777 | stat.S_IFDIR,
+                    linkname = "",
+                    uid      = os.getuid(),
+                    gid      = os.getgid(),
+                    userdata = [None],
+                    # fmt: on
+                )
+            )
+
+        return infoList
 
     @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
-        info = self._getFileInfo(path, fileVersion)
-        return RarMountSource._convertToFileInfo(info) if info else None
+        infos = self._getFileInfos(path)
+        return infos[fileVersion] if -len(infos) <= fileVersion < len(infos) else None
 
     @overrides(MountSource)
     def fileVersions(self, path: str) -> int:
@@ -2471,7 +2515,7 @@ class UnionMountSource(MountSource):
             # fmt: off
             size         = 0,
             mtime        = int(time.time()),
-            mode         = 0o777 | stat.S_IFDIR ,
+            mode         = 0o777 | stat.S_IFDIR,
             linkname     = "",
             uid          = os.getuid(),
             gid          = os.getgid(),

@@ -1172,8 +1172,11 @@ tests+=(
 fi
 
 tests+=(
+    2709a3348eb2c52302a7606ecf5860bc tests/file-in-non-existing-folder.zip        foo2/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/rar.zip                                natsu.rar/ufo
     10d6977ec2ab378e60339323c24f9308 tests/rar.zip                                natsu.rar/foo
+
+    2709a3348eb2c52302a7606ecf5860bc tests/file-in-non-existing-folder.rar        foo2/ufo
 
     d3b07384d113edec49eaa6238ad5ff00 tests/single-file.tar                        bar
     d3b07384d113edec49eaa6238ad5ff00 tests/single-file-with-leading-dot-slash.tar bar

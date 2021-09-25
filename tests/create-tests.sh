@@ -81,6 +81,12 @@ rar a -pfoo encrypted-nested-tar.rar foo
 zip -r --encrypt --password foo encrypted-nested-tar.zip foo
 
 
+mkdir foo2
+echo iriya > foo2/ufo
+rar a file-in-non-existing-folder.rar foo2/ufo
+zip file-in-non-existing-folder.zip foo2/ufo
+
+
 echo fighter > foo
 echo iriya > ufo
 rar a natsu.rar foo ufo
