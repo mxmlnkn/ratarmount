@@ -79,3 +79,12 @@ tar -xf nested-tar.tar
 rar a -hpfoo encrypted-headers-nested-tar.rar foo
 rar a -pfoo encrypted-nested-tar.rar foo
 zip -r --encrypt --password foo encrypted-nested-tar.zip foo
+
+
+echo fighter > foo
+echo iriya > ufo
+rar a natsu.rar foo ufo
+zip rar.zip natsu.rar
+
+zip natsu.zip foo ufo
+rar a zip.rar natsu.rar

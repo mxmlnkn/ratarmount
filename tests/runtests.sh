@@ -234,8 +234,10 @@ checkFileInTAR()
         verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
     funmount "$mountFolder"
-    'grep' -q 'Creating offset dictionary' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "$LINENO" "Looks like index was not created while executing: $RATARMOUNT_CMD ${args[*]}"
+    if [[ "$archive" =~ .tar ]]; then
+        'grep' -q 'Creating offset dictionary' ratarmount.stdout.log ratarmount.stderr.log ||
+            returnError "$LINENO" "Looks like index was not created while executing: $RATARMOUNT_CMD ${args[*]}"
+    fi
 
     # retry without forcing index recreation
     local args=( -P "$parallelization" --ignore-zeros --recursive "$archive" "$mountFolder" )
@@ -245,8 +247,11 @@ checkFileInTAR()
         verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
     funmount "$mountFolder"
-    'grep' -q 'Loading offset dictionary' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "$LINENO" "Looks like index was not loaded while executing: $RATARMOUNT_CMD ${args[*]}"
+
+    if [[ "$archive" =~ .tar ]]; then
+        'grep' -q 'Loading offset dictionary' ratarmount.stdout.log ratarmount.stderr.log ||
+            returnError "$LINENO" "Looks like index was not loaded while executing: $RATARMOUNT_CMD ${args[*]}"
+    fi
 
     rmdir "$mountFolder"
 
@@ -736,12 +741,24 @@ recompressFile()
     tmpFolder=$( mktemp -d )
 
     local file=$1
+
+    if [[ ! -f "$file" ]]; then
+        echoerr "\e[31mFile '$file' does not exist.\[e0m"
+        return 1
+    fi
+
     cp -- "$file" "$tmpFolder"
     file="$tmpFolder/$( basename -- "$file" )"
 
     local uncompressedFile=
     uncompressedFile=${file%.*}
     [[ "$uncompressedFile" != "$file" ]] || returnError "$LINENO" 'Given file seems to have no extension!'
+
+    local extension=${file##*.}
+    if [[ "$extension" == zip || "$extension" == rar ]]; then
+        printf '%s\n' "$file"
+        return 0
+    fi
 
     # 1. Extract if necessary
     local fileCompression
@@ -1143,7 +1160,21 @@ python3 tests/tests.py || returnError "$LINENO" "tests/tests.py"
 
 rm -f tests/*.index.*
 
-tests=(
+
+tests=()
+
+# TODO Some bug with rarfile throwing: Failed the read enough data: req=304 got=51 and then seek(0) not working?
+if ! uname | 'grep' -q -i darwin; then
+tests+=(
+    2709a3348eb2c52302a7606ecf5860bc tests/zip.rar                                natsu.zip/ufo
+    10d6977ec2ab378e60339323c24f9308 tests/zip.rar                                natsu.zip/foo
+)
+fi
+
+tests+=(
+    2709a3348eb2c52302a7606ecf5860bc tests/rar.zip                                natsu.rar/ufo
+    10d6977ec2ab378e60339323c24f9308 tests/rar.zip                                natsu.rar/foo
+
     d3b07384d113edec49eaa6238ad5ff00 tests/single-file.tar                        bar
     d3b07384d113edec49eaa6238ad5ff00 tests/single-file-with-leading-dot-slash.tar bar
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/folder-with-leading-dot-slash.tar      foo/bar
@@ -1196,7 +1227,9 @@ for parallelization in 1 2 0; do
 echo "== Testing with -P $parallelization =="
 export parallelization
 
-bzip2 -d -k tests/2k-recursive-tars.tar.bz2
+if [[ ! -f tests/2k-recursive-tars.tar ]]; then
+    bzip2 -q -d -k tests/2k-recursive-tars.tar.bz2
+fi
 
 checkIndexPathOption tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
 checkIndexFolderFallback tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
@@ -1243,14 +1276,13 @@ for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
     files=()
     while IFS=$'\n' read -r line; do
         files+=( "$line" )
-    done < <( recompressFile "$tarPath" )
+    done < <( recompressFile "$tarPath" || returnError "$LINENO" 'Something went wrong during recompression.' )
 
     TMP_FILES_TO_CLEANUP+=( "${files[@]}" )
-    [[ ${#files[@]} -gt 3 ]] || returnError "$LINENO" 'Something went wrong during recompression.'
 
     for file in "${files[@]}"; do
         case "$( file --mime-type -- "$file" | sed 's|.*[/-]||' )" in
-            bzip2|gzip|xz|zstd|tar)
+            bzip2|gzip|xz|zstd|tar|rar|zip)
                 TMP_FILES_TO_CLEANUP+=( "${file}.index.sqlite" )
                 checkFileInTAR "$file" "$fileName" "$checksum"
                 ;;
