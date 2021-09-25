@@ -1171,6 +1171,9 @@ tests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/nested-with-symlink.rar                foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/nested-with-symlink.rar                foo/fighter/saucer
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-with-symlink.rar                foo/lighter.tar/fighter/bar
+    49b996b16f59ab6c87dea31e227f8798 tests/rar-misrecognized-as-zip.rar           bag.zip/README.md
+    49b996b16f59ab6c87dea31e227f8798 tests/rar-misrecognized-as-zip.rar           bag.zip/CHANGELOG.md
+    49b996b16f59ab6c87dea31e227f8798 tests/rar-misrecognized-as-zip.rar           bag1.zip/CHANGELOG.md
 )
 fi
 
@@ -1187,10 +1190,6 @@ tests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/file-in-non-existing-folder.rar        foo2/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.rar                     foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.rar                     foo/jet/ufo
-    # TODO not working because of https://github.com/markokr/rarfile/issues/73
-    #49b996b16f59ab6c87dea31e227f8798 tests/rar-misrecognized-as-zip.rar           bag.zip/README.md
-    #49b996b16f59ab6c87dea31e227f8798 tests/rar-misrecognized-as-zip.rar           bag.zip/CHANGELOG.md
-    #49b996b16f59ab6c87dea31e227f8798 tests/rar-misrecognized-as-zip.rar           bag1.zip/CHANGELOG.md
 
     d3b07384d113edec49eaa6238ad5ff00 tests/single-file.tar                        bar
     d3b07384d113edec49eaa6238ad5ff00 tests/single-file-with-leading-dot-slash.tar bar
