@@ -94,3 +94,19 @@ zip rar.zip natsu.rar
 
 zip natsu.zip foo ufo
 rar a zip.rar natsu.rar
+
+
+rm foo
+tar -xf nested-tar.tar
+( cd foo/fighter && ln -s ufo saucer; )
+zip -r --symlinks nested-with-symlink.zip foo
+# RAR simply copies the link target when adding the file by default, need -ol to save the link itself
+rar a -ol nested-with-symlink.rar foo
+
+
+rm foo
+tar -xf single-nested-folder.tar
+( cd foo && ln -s fighter jet; )
+zip -r --symlinks folder-symlink.zip foo
+# RAR simply copies the link target when adding the file by default, need -ol to save the link itself
+rar a -ol folder-symlink.rar foo

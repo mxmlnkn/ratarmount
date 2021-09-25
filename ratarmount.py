@@ -2202,21 +2202,32 @@ class ZipMountSource(MountSource):
         self.fileObject.close()
 
     @staticmethod
-    def _convertToFileInfo(info: zipfile.ZipInfo) -> FileInfo:
+    def _convertToFileInfo(info: zipfile.ZipInfo, zipFile: zipfile.ZipFile) -> FileInfo:
         mode = 0o555 | (stat.S_IFDIR if info.is_dir() else stat.S_IFREG)
         mtime = datetime.datetime(*info.date_time, tzinfo=datetime.timezone.utc).timestamp() if info.date_time else 0
 
         # According to section 4.5.7 in the .ZIP file format specification, links are supported:
         # https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
-        # But the Python zipfile module does not even mention links anywhere,
-        # so we currently also can't or rather don't have to bother to support them.
+        # The Python zipfile module has no API for links: https://bugs.python.org/issue45286
+        # However, the file mode exposes whether it's a link and the file mode is shown by ZipInfo.__repr__.
+        # For that, it uses the OS-dependent external_attr member. See also the ZIP specification on that:
+        # > 4.4.15 external file attributes: (4 bytes)
+        # >   The mapping of the external attributes is host-system dependent (see 'version made by').
+        # >   For MS-DOS, the low order byte is the MS-DOS directory attribute byte.
+        # >   If input came from standard input, this field is set to zero.
+
+        # file_redir is (type, flags, target) or None. Only tested for type == RAR5_XREDIR_UNIX_SYMLINK.
+        linkname = ""
+        if stat.S_ISLNK(info.external_attr >> 16):
+            linkname = zipFile.read(info).decode()
+            mode = 0o555 | stat.S_IFLNK
 
         fileInfo = FileInfo(
             # fmt: off
             size     = info.file_size,
             mtime    = mtime,
             mode     = mode,
-            linkname = "",
+            linkname = linkname,
             uid      = os.getuid(),
             gid      = os.getgid(),
             userdata = [info],
@@ -2253,7 +2264,7 @@ class ZipMountSource(MountSource):
 
     def _getFileInfos(self, path: str) -> List[FileInfo]:
         infoList = [
-            ZipMountSource._convertToFileInfo(info)
+            ZipMountSource._convertToFileInfo(info, self.fileObject)
             for info in self.files
             if info.filename.rstrip('/') == path.lstrip('/')
         ]
@@ -2352,12 +2363,18 @@ class RarMountSource(MountSource):
         dtime = dtime.replace(tzinfo=datetime.timezone.utc)
         mtime = dtime.timestamp() if info.date_time else 0
 
+        # file_redir is (type, flags, target) or None. Only tested for type == RAR5_XREDIR_UNIX_SYMLINK.
+        linkname = ""
+        if info.file_redir:
+            linkname = info.file_redir[2]
+            mode = 0o555 | stat.S_IFLNK
+
         fileInfo = FileInfo(
             # fmt: off
             size     = info.file_size,
             mtime    = mtime,
             mode     = mode,
-            linkname = "",
+            linkname = linkname,
             uid      = os.getuid(),
             gid      = os.getgid(),
             userdata = [info],
