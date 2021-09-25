@@ -2570,6 +2570,8 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
     except Exception as exception:
         if printDebug >= 1:
             print("[Info] Checking for RAR file raised an exception:", exception)
+        if printDebug >= 2:
+            traceback.print_exc()
     finally:
         if hasattr(fileOrPath, 'seek'):
             fileOrPath.seek(0)  # type: ignore
@@ -2580,11 +2582,15 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
 
         return SQLiteIndexedTar(fileObject=fileOrPath, **options)
     except RatarmountError as exception:
-        if printDebug >= 3:
+        if printDebug >= 2:
             print("[Info] Checking for (compressed) TAR file raised an exception:", exception)
+        if printDebug >= 3:
+            traceback.print_exc()
     except Exception as exception:
         if printDebug >= 1:
             print("[Info] Checking for (compressed) TAR file raised an exception:", exception)
+        if printDebug >= 3:
+            traceback.print_exc()
     finally:
         if hasattr(fileOrPath, 'seek'):
             fileOrPath.seek(0)  # type: ignore
@@ -2610,6 +2616,8 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
     except Exception as exception:
         if printDebug >= 1:
             print("[Info] Checking for ZIP file raised an exception:", exception)
+        if printDebug >= 3:
+            traceback.print_exc()
     finally:
         if hasattr(fileOrPath, 'seek'):
             fileOrPath.seek(0)  # type: ignore
