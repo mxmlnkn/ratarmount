@@ -2169,7 +2169,7 @@ class ZipMountSource(MountSource):
         self.options = options
 
     @staticmethod
-    def _findPassword(fileobj: zipfile.ZipFile, passwords):
+    def _findPassword(fileobj: "zipfile.ZipFile", passwords):
         # If headers are encrypted, then infolist will simply return an empty list!
         files = fileobj.infolist()
         if not files:
@@ -2202,7 +2202,7 @@ class ZipMountSource(MountSource):
         self.fileObject.close()
 
     @staticmethod
-    def _convertToFileInfo(info: zipfile.ZipInfo, zipFile: zipfile.ZipFile) -> FileInfo:
+    def _convertToFileInfo(info: "zipfile.ZipInfo", zipFile: "zipfile.ZipFile") -> FileInfo:
         mode = 0o555 | (stat.S_IFDIR if info.is_dir() else stat.S_IFREG)
         mtime = datetime.datetime(*info.date_time, tzinfo=datetime.timezone.utc).timestamp() if info.date_time else 0
 
@@ -2394,7 +2394,7 @@ class RarMountSource(MountSource):
         self.options = options
 
     @staticmethod
-    def _findPassword(fileobj: rarfile.RarFile, passwords):
+    def _findPassword(fileobj: "rarfile.RarFile", passwords):
         if not fileobj.needs_password():
             return None
 
@@ -2423,7 +2423,7 @@ class RarMountSource(MountSource):
         raise rarfile.PasswordRequired("Could not find a matching password!")
 
     @staticmethod
-    def _convertToFileInfo(info: rarfile.RarInfo) -> FileInfo:
+    def _convertToFileInfo(info: "rarfile.RarInfo") -> FileInfo:
         mode = 0o555 | (stat.S_IFDIR if info.is_dir() else stat.S_IFREG)
         dtime = datetime.datetime(*info.date_time)
         dtime = dtime.replace(tzinfo=datetime.timezone.utc)
