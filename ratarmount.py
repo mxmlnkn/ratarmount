@@ -830,7 +830,7 @@ class SQLiteIndexedTar(MountSource):
 
         createTables = """
             CREATE TABLE "files" (
-                "path"          VARCHAR(65535) NOT NULL,
+                "path"          VARCHAR(65535) NOT NULL,  /* path with leading and without trailing slash */
                 "name"          VARCHAR(65535) NOT NULL,
                 "offsetheader"  INTEGER,  /* seek offset from TAR file where these file's contents resides */
                 "offset"        INTEGER,  /* seek offset from TAR file where these file's contents resides */
@@ -966,7 +966,12 @@ class SQLiteIndexedTar(MountSource):
                 # Add a leading '/' as a convention where '/' represents the TAR root folder
                 # Partly, done because fusepy specifies paths in a mounted directory like this
                 # os.normpath does not delete duplicate '/' at beginning of string!
-                fullPath = pathPrefix + "/" + os.path.normpath(tarInfo.name).lstrip('/')
+                # tarInfo.name might be identical to "." or begin with "./", which is bad!
+                # os.path.normpath can remove suffixed folder/./ path specifications but it can't remove
+                # a leading dot.
+                # TODO: Would be a nice function / line of code to test because it is very finicky.
+                #       And some cases are only triggered for recursive mounts, i.e., for non-empty pathPrefix.
+                fullPath = "/" + os.path.normpath(pathPrefix + "/" + tarInfo.name).lstrip('/')
 
                 # TODO: As for the tarfile type SQLite expects int but it is generally bytes.
                 #       Most of them would be convertible to int like tarfile.SYMTYPE which is b'2',
@@ -1006,19 +1011,18 @@ class SQLiteIndexedTar(MountSource):
         oldPos = fileObject.tell()
         oldPrintName = self.tarFileName
         for fileInfo in filesToMountRecursively:
+            # Strip file extension for mount point if so configured
+            modifiedName = fileInfo[1]
             tarExtension = '.tar'
-            fullPath = os.path.join(fileInfo[0], fileInfo[1])
             if (
                 self.stripRecursiveTarExtension
                 and len(tarExtension) > 0
-                and fullPath.lower().endswith(tarExtension.lower())
+                and modifiedName.lower().endswith(tarExtension.lower())
             ):
-                modifiedFullPath = fullPath[: -len(tarExtension)]
-            else:
-                modifiedFullPath = fullPath
+                modifiedName = modifiedName[: -len(tarExtension)]
 
             # Temporarily change tarFileName for the info output of the recursive call
-            self.tarFileName = fullPath
+            self.tarFileName = os.path.join(fileInfo[0], fileInfo[1])
 
             # StenciledFile's tell returns the offset inside the file chunk instead of the global one,
             # so we have to always communicate the offset of this chunk to the recursive call no matter
@@ -1029,7 +1033,9 @@ class SQLiteIndexedTar(MountSource):
 
             isTar = False
             try:
-                self._createIndex(tarFileObject, progressBar, modifiedFullPath, globalOffset)
+                # Do not use os.path.join here because the leading / might be missing.
+                # This should instead be seen as the reverse operation of the rsplit further above.
+                self._createIndex(tarFileObject, progressBar, "/".join([fileInfo[0], modifiedName]), globalOffset)
                 isTar = True
             except tarfile.ReadError:
                 pass
@@ -1050,9 +1056,8 @@ class SQLiteIndexedTar(MountSource):
                     | (stat.S_IXOTH if mode & stat.S_IROTH != 0 else 0)
                 )
 
-                path, name = modifiedFullPath.rsplit("/", 1)
-                modifiedFileInfo[0] = path
-                modifiedFileInfo[1] = name
+                modifiedFileInfo[0] = fileInfo[0]
+                modifiedFileInfo[1] = modifiedName
                 modifiedFileInfo[6] = mode
                 modifiedFileInfo[11] = isTar
 

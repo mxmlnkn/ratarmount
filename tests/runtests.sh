@@ -1152,6 +1152,8 @@ tests=(
     2709a3348eb2c52302a7606ecf5860bc tests/single-nested-folder.tar               foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/nested-tar.tar                         foo/fighter/ufo
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar.tar                         foo/lighter.tar/fighter/bar
+    2709a3348eb2c52302a7606ecf5860bc tests/directly-nested-tar.tar                fighter/ufo
+    2b87e29fca6ee7f1df6c1a76cb58e101 tests/directly-nested-tar.tar                lighter.tar/fighter/bar
     2709a3348eb2c52302a7606ecf5860bc tests/nested-tar-with-overlapping-name.tar   foo/fighter/ufo
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar-with-overlapping-name.tar   foo/fighter.tar/fighter/bar
     2709a3348eb2c52302a7606ecf5860bc tests/hardlink.tar                           hardlink/ufo
@@ -1231,9 +1233,6 @@ if ! uname | 'grep' -q -i darwin; then
         returnError "$LINENO" 'Self-referencing hardlinks test failed!'
 fi
 
-checkRecursiveFolderMounting
-checkRecursiveFolderMounting --lazy
-
 for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
     checksum=${tests[iTest]}
     tarPath=${tests[iTest+1]}
@@ -1261,6 +1260,9 @@ for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
     cleanup
     rmdir -- "$( dirname -- "$file" )"
 done
+
+checkRecursiveFolderMounting
+checkRecursiveFolderMounting --lazy
 
 benchmarkDecoderBackends
 #benchmarkSerialization # takes quite long, and a benchmark is not a test ...
