@@ -1,4 +1,15 @@
 
+# Version 0.9.1 built on 2021-09-26
+
+ - Fix recursive mounting failing for archives in top-level directory.
+ - Replace the optional lzmaffi dependency with a python-xz dependency.
+ - Fix missing files in ZIP and RAR if parent folders are not in the archive.
+ - Fix archives getting misrecognized as ZIP because of lenient zipfile.is_zipfile function.
+ - Make indexed_zstd an optional dependency on macOS because wheels are missing.
+ - Fix CRC errors thrown by rarfile when reading after seeking back file objects for files inside RARs.
+ - Fix ratarmount not working if rarfile or zipfile were not installed.
+ - Disable ZIP support with Python 3.6 and older because the returned file object is not seekable.
+
 # Version 0.9.0 built on 2021-09-16
 
  - Refactor the code and introduce a MountSource interface.
