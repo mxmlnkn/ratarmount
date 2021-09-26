@@ -167,14 +167,9 @@ class SQLiteIndexedTar(MountSource):
             except Exception:
                 pass
 
-        if not tarFileName:
-            self._createIndex(self.tarFileObject)
-            # return here because we can't find a save location without any identifying name
-            return
-
         # will be used for storing indexes if current path is read-only
-        possibleIndexFilePaths = [self.tarFileName + ".index.sqlite"]
-        indexPathAsName = self.tarFileName.replace("/", "_") + ".index.sqlite"
+        possibleIndexFilePaths = [self.tarFileName + ".index.sqlite"] if self.tarFileName else []
+        indexPathAsName = self.tarFileName.replace("/", "_") + ".index.sqlite" if self.tarFileName else None
         if isinstance(indexFolders, str):
             indexFolders = [indexFolders]
 
@@ -189,7 +184,7 @@ class SQLiteIndexedTar(MountSource):
             if '' not in indexFolders:
                 possibleIndexFilePaths = []
             for folder in indexFolders:
-                if folder:
+                if folder and indexPathAsName:
                     indexPath = os.path.join(folder, indexPathAsName)
                     possibleIndexFilePaths.append(os.path.abspath(os.path.expanduser(indexPath)))
 
