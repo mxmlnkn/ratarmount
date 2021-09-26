@@ -65,9 +65,6 @@ if sys.version_info[2] > 6:
 __version__ = '0.9.1'
 
 
-parallelization = 1
-
-
 def hasNonEmptySupport() -> bool:
     try:
         with os.popen('fusermount -V') as pipe:
@@ -90,7 +87,7 @@ supportedCompressions = {
         ['tb2', 'tbz', 'tbz2', 'tz2'],
         'indexed_bzip2',
         lambda x: (x.read(4)[:3] == b'BZh' and x.read(6) == (0x314159265359).to_bytes(6, 'big')),
-        lambda x: indexed_bzip2.open(x, parallelization=parallelization),
+        lambda x: indexed_bzip2.open(x),
     ),
     'gz': CompressionInfo(
         ['gz', 'gzip'],
@@ -156,9 +153,6 @@ def stripSuffixFromTarFile(path: str) -> str:
         path = path[:-4]
 
     return path
-
-
-printDebug = 1
 
 
 class RatarmountError(Exception):
@@ -472,6 +466,8 @@ class SQLiteIndexedTar(MountSource):
         stripRecursiveTarExtension : bool                = False,
         ignoreZeros                : bool                = False,
         verifyModificationTime     : bool                = False,
+        parallelization            : int                 = 1,
+        printDebug                 : int                 = 0,
         **kwargs
         # fmt: on
     ) -> None:
@@ -517,6 +513,8 @@ class SQLiteIndexedTar(MountSource):
         self.ignoreZeros                = ignoreZeros
         self.verifyModificationTime     = verifyModificationTime
         self.gzipSeekPointSpacing       = gzipSeekPointSpacing
+        self.parallelization            = parallelization
+        self.printDebug                 = printDebug
         # fmt: on
 
         self.tarFileName: str = '<file object>'
@@ -539,7 +537,7 @@ class SQLiteIndexedTar(MountSource):
         # compression   : Stores what kind of compression the originally specified TAR file uses.
         # isTar         : Can be false for the degenerated case of only a bz2 or gz file not containing a TAR
         self.tarFileObject, self.rawFileObject, self.compression, self.isTar = SQLiteIndexedTar._openCompressedFile(
-            fileObject, gzipSeekPointSpacing, encoding
+            fileObject, gzipSeekPointSpacing, encoding, self.parallelization, printDebug=self.printDebug
         )
         if not self.isTar and not self.rawFileObject:
             raise RatarmountError("File object (" + str(fileObject) + ") could not be opened as a TAR file!")
@@ -613,7 +611,9 @@ class SQLiteIndexedTar(MountSource):
         # Find a suitable (writable) location for the index database
         if writeIndex:
             for indexPath in possibleIndexFilePaths:
-                if self._pathIsWritable(indexPath) and self._pathCanBeUsedForSqlite(indexPath):
+                if self._pathIsWritable(indexPath, printDebug=self.printDebug) and self._pathCanBeUsedForSqlite(
+                    indexPath, printDebug=self.printDebug
+                ):
                     self.indexFileName = indexPath
                     break
 
@@ -629,7 +629,7 @@ class SQLiteIndexedTar(MountSource):
             self._storeMetadata(self.sqlConnection)
             self._reloadIndexReadOnly()
 
-        if printDebug >= 1 and self.indexFileName and os.path.isfile(self.indexFileName):
+        if self.printDebug >= 1 and self.indexFileName and os.path.isfile(self.indexFileName):
             # The 0-time is legacy for the automated tests
             # fmt: off
             print("Writing out TAR index to", self.indexFileName, "took 0s",
@@ -651,7 +651,7 @@ class SQLiteIndexedTar(MountSource):
             self.tarFileObject.close()
 
     def _storeMetadata(self, connection: sqlite3.Connection) -> None:
-        self._storeVersionsMetadata(connection)
+        self._storeVersionsMetadata(connection, printDebug=self.printDebug)
 
         metadataTable = """
             /* empty table whose sole existence specifies that we finished iterating the tar */
@@ -664,12 +664,12 @@ class SQLiteIndexedTar(MountSource):
         connection.executescript(metadataTable)
 
         # All of these require the generic "metadata" table.
-        self._storeTarMetadata(connection, self.tarFileName)
+        self._storeTarMetadata(connection, self.tarFileName, printDebug=self.printDebug)
         self._storeArgumentsMetadata(connection)
         connection.commit()
 
     @staticmethod
-    def _storeVersionsMetadata(connection: sqlite3.Connection) -> None:
+    def _storeVersionsMetadata(connection: sqlite3.Connection, printDebug: int = 0) -> None:
         versionsTable = """
             /* This table's sole existence specifies that we finished iterating the tar for older ratarmount versions */
             CREATE TABLE "versions" (
@@ -730,7 +730,7 @@ class SQLiteIndexedTar(MountSource):
                 print(exception)
 
     @staticmethod
-    def _storeTarMetadata(connection: sqlite3.Connection, tarPath: AnyStr) -> None:
+    def _storeTarMetadata(connection: sqlite3.Connection, tarPath: AnyStr, printDebug: int = 0) -> None:
         """Adds some consistency meta information to recognize the need to update the cached TAR index"""
         try:
             tarStats = os.stat(tarPath)
@@ -758,13 +758,13 @@ class SQLiteIndexedTar(MountSource):
         try:
             connection.execute('INSERT INTO "metadata" VALUES (?,?)', ("arguments", argumentsMetadata))
         except Exception as exception:
-            if printDebug >= 2:
+            if self.printDebug >= 2:
                 print(exception)
             print("[Warning] There was an error when adding argument metadata.")
             print("[Warning] Automatic detection of changed arguments files during index loading might not work.")
 
     @staticmethod
-    def _pathIsWritable(path: AnyStr) -> bool:
+    def _pathIsWritable(path: AnyStr, printDebug: int = 0) -> bool:
         try:
             folder = os.path.dirname(path)
             if folder:
@@ -790,7 +790,7 @@ class SQLiteIndexedTar(MountSource):
         return False
 
     @staticmethod
-    def _pathCanBeUsedForSqlite(path: AnyStr) -> bool:
+    def _pathCanBeUsedForSqlite(path: AnyStr, printDebug: int = 0) -> bool:
         fileExisted = os.path.isfile(path)
         try:
             folder = os.path.dirname(path)
@@ -830,7 +830,7 @@ class SQLiteIndexedTar(MountSource):
         return sqlConnection
 
     @staticmethod
-    def _initializeSqlDb(indexFileName: Optional[str]) -> sqlite3.Connection:
+    def _initializeSqlDb(indexFileName: Optional[str], printDebug: int = 0) -> sqlite3.Connection:
         if printDebug >= 1:
             print("Creating new SQLite index database at", indexFileName if indexFileName else ':memory:')
 
@@ -926,7 +926,7 @@ class SQLiteIndexedTar(MountSource):
         streamOffset: int = 0
         # fmt: on
     ) -> None:
-        if printDebug >= 1:
+        if self.printDebug >= 1:
             print("Creating offset dictionary for", self.tarFileName, "...")
         t0 = timer()
 
@@ -934,7 +934,7 @@ class SQLiteIndexedTar(MountSource):
         openedConnection = False
         if not self.indexIsLoaded() or not self.sqlConnection:
             openedConnection = True
-            self.sqlConnection = self._initializeSqlDb(self.indexFileName)
+            self.sqlConnection = self._initializeSqlDb(self.indexFileName, printDebug=self.printDebug)
 
         # 2. Open TAR file reader
         loadedTarFile: Any = []  # Feign an empty TAR file if anything goes wrong
@@ -1077,7 +1077,7 @@ class SQLiteIndexedTar(MountSource):
         # Everything below should not be done in a recursive call of createIndex
         if streamOffset > 0:
             t1 = timer()
-            if printDebug >= 1:
+            if self.printDebug >= 1:
                 print("Creating offset dictionary for", self.tarFileName, "took {:.2f}s".format(t1 - t0))
             return
 
@@ -1086,7 +1086,7 @@ class SQLiteIndexedTar(MountSource):
         # so check stream offset.
         fileCount = self.sqlConnection.execute('SELECT COUNT(*) FROM "files";').fetchone()[0]
         if fileCount == 0:
-            if printDebug >= 3:
+            if self.printDebug >= 3:
                 print(f"Did not find any file in the given TAR: {self.tarFileName}. Assuming a compressed file.")
 
             try:
@@ -1132,7 +1132,7 @@ class SQLiteIndexedTar(MountSource):
             return
 
         # 5. Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
-        if printDebug >= 2:
+        if self.printDebug >= 2:
             print("Resorting files by path ...")
 
         cleanupDatabase = """
@@ -1152,7 +1152,7 @@ class SQLiteIndexedTar(MountSource):
         self.sqlConnection.commit()
 
         t1 = timer()
-        if printDebug >= 1:
+        if self.printDebug >= 1:
             print("Creating offset dictionary for", self.tarFileName, "took {:.2f}s".format(t1 - t0))
 
     @staticmethod
@@ -1527,7 +1527,7 @@ class SQLiteIndexedTar(MountSource):
 
             raise e
 
-        if printDebug >= 1:
+        if self.printDebug >= 1:
             # Legacy output for automated tests
             print("Loading offset dictionary from", indexFileName, "took {:.2f}s".format(time.time() - t0))
 
@@ -1543,7 +1543,7 @@ class SQLiteIndexedTar(MountSource):
         try:
             self.loadIndex(indexFileName)
         except Exception as exception:
-            if printDebug >= 3:
+            if self.printDebug >= 3:
                 traceback.print_exc()
 
             print("[Warning] Could not load file:", indexFileName)
@@ -1568,13 +1568,13 @@ class SQLiteIndexedTar(MountSource):
             except OSError:
                 print("[Warning] Failed to remove corrupted old cached index file:", indexFileName)
 
-        if printDebug >= 3 and self.indexIsLoaded():
+        if self.printDebug >= 3 and self.indexIsLoaded():
             print("Loaded index", indexFileName)
 
         return self.indexIsLoaded()
 
     @staticmethod
-    def _detectCompression(fileobj: IO[bytes]) -> Optional[str]:
+    def _detectCompression(fileobj: IO[bytes], printDebug: int = 0) -> Optional[str]:
         if not isinstance(fileobj, io.IOBase) or not fileobj.seekable():
             return None
 
@@ -1611,7 +1611,7 @@ class SQLiteIndexedTar(MountSource):
         return None
 
     @staticmethod
-    def _detectTar(fileobj: IO[bytes], encoding: str) -> bool:
+    def _detectTar(fileobj: IO[bytes], encoding: str, printDebug: int = 0) -> bool:
         if not isinstance(fileobj, io.IOBase) or not fileobj.seekable():
             return False
 
@@ -1628,18 +1628,20 @@ class SQLiteIndexedTar(MountSource):
         return isTar
 
     @staticmethod
-    def _openCompressedFile(fileobj: IO[bytes], gzipSeekPointSpacing: int, encoding: str) -> Any:
+    def _openCompressedFile(
+        fileobj: IO[bytes], gzipSeekPointSpacing: int, encoding: str, parallelization: int, printDebug: int = 0
+    ) -> Any:
         """
         Opens a file possibly undoing the compression.
         Returns (tar_file_obj, raw_file_obj, compression, isTar).
         raw_file_obj will be none if compression is None.
         """
-        compression = SQLiteIndexedTar._detectCompression(fileobj)
+        compression = SQLiteIndexedTar._detectCompression(fileobj, printDebug=printDebug)
         if printDebug >= 3:
             print(f"[Info] Detected compression {compression} for file object:", fileobj)
 
         if compression not in supportedCompressions:
-            return fileobj, None, compression, SQLiteIndexedTar._detectTar(fileobj, encoding)
+            return fileobj, None, compression, SQLiteIndexedTar._detectTar(fileobj, encoding, printDebug=printDebug)
 
         cinfo = supportedCompressions[compression]
         if cinfo.moduleName not in sys.modules:
@@ -1652,10 +1654,12 @@ class SQLiteIndexedTar(MountSource):
         if compression == 'gz':
             # drop_handles keeps a file handle opening as is required to call tell() during decoding
             tar_file = indexed_gzip.IndexedGzipFile(fileobj=fileobj, drop_handles=False, spacing=gzipSeekPointSpacing)
+        elif compression == 'bz2':
+            tar_file = indexed_bzip2.open(fileobj, parallelization=parallelization)
         else:
             tar_file = cinfo.open(fileobj)
 
-        return tar_file, fileobj, compression, SQLiteIndexedTar._detectTar(tar_file, encoding)
+        return tar_file, fileobj, compression, SQLiteIndexedTar._detectTar(tar_file, encoding, printDebug=printDebug)
 
     @staticmethod
     def _uncheckedRemove(path: Optional[AnyStr]):
@@ -1672,7 +1676,7 @@ class SQLiteIndexedTar(MountSource):
 
     def _loadOrStoreCompressionOffsets(self):
         if not self.indexFileName or self.indexFileName == ':memory:':
-            if printDebug >= 2:
+            if self.printDebug >= 2:
                 print("[Info] Will skip storing compression seek data because the database is in memory.")
                 print("[Info] If the database is in memory, then this data will not be read anyway.")
             return
@@ -1699,7 +1703,7 @@ class SQLiteIndexedTar(MountSource):
                 offsets = dict(db.execute('SELECT blockoffset,dataoffset FROM {};'.format(table_name)))
                 fileObject.set_block_offsets(offsets)
             except Exception:
-                if printDebug >= 2:
+                if self.printDebug >= 2:
                     print(
                         "[Info] Could not load {} block offset data. Will create it from scratch.".format(
                             self.compression
@@ -1765,7 +1769,7 @@ class SQLiteIndexedTar(MountSource):
                     self._uncheckedRemove(gzindex)
 
             # Store the offsets into a temporary file and then into the SQLite database
-            if printDebug >= 2:
+            if self.printDebug >= 2:
                 print("[Info] Could not load GZip Block offset data. Will create it from scratch.")
 
             # Transparently force index to be built if not already done so. build_full_index was buggy for me.
@@ -1791,7 +1795,7 @@ class SQLiteIndexedTar(MountSource):
                 print("[Info] the index file location. The gzipindex size takes roughly 32kiB per 4MiB of")
                 print("[Info] uncompressed(!) bytes (0.8% of the uncompressed data) by default.")
                 raise RuntimeError("Could not initialize the GZip seek cache.")
-            if printDebug >= 2:
+            if self.printDebug >= 2:
                 print("Exported GZip index size:", os.stat(gzindex).st_size)
 
             # Clean up unreadable older data.
@@ -1973,6 +1977,7 @@ class AutoMountLayer(MountSource):
 
     def __init__(self, mountSource: MountSource, **options) -> None:
         self.options = options
+        self.printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
 
         rootFileInfo = FileInfo(
             # fmt: off
@@ -2061,7 +2066,7 @@ class AutoMountLayer(MountSource):
                 mountSource = openMountSource(parentMountSource.open(archiveFileInfo), **self.options)
         except Exception as e:
             print("[Warning] Mounting of '" + path + "' failed because of:", e)
-            if printDebug >= 3:
+            if self.printDebug >= 3:
                 traceback.print_exc()
             print()
             return None
@@ -2075,7 +2080,7 @@ class AutoMountLayer(MountSource):
         # TODO What if the mount point already exists, e.g., because stripRecursiveTarExtension is true and there
         #      are multiple archives with the same name but different extesions?
         self.mounted[mountPoint] = mountInfo
-        if printDebug >= 2:
+        if self.printDebug >= 2:
             print("Recursively mounted:", mountPoint)
             print()
 
@@ -2563,6 +2568,8 @@ FuseOperations = fuse.Operations if 'fuse' in sys.modules else DummyFuseOperatio
 
 
 def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource:
+    printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
+
     if isinstance(fileOrPath, str):
         if not os.path.exists(fileOrPath):
             raise Exception("Mount source does not exist!")
@@ -2988,6 +2995,8 @@ class FuseMount(FuseOperations):  # type: ignore
 
         options['writeIndex'] = True
 
+        self.printDebug = options.get('printDebug', 0)
+
         # This also will create or load the block offsets for compressed formats
         mountSources = [openMountSource(path, **options) for path in pathToMount]
 
@@ -3120,7 +3129,7 @@ class FuseMount(FuseOperations):  # type: ignore
             return self.openedFiles[fh].read(size)
 
         # As far as I understand FUSE and my own file handle cache, this should never happen. But you never know.
-        if printDebug >= 1:
+        if self.printDebug >= 1:
             print("[Warning] Given file handle does not exist. Will open file before reading which might be slow.")
 
         fileInfo = self.mountSource.getFileInfo(path)
@@ -3140,8 +3149,9 @@ class TarFileType:
     Similar to argparse.FileType but raises an exception if it is not a valid TAR file.
     """
 
-    def __init__(self, encoding: str = tarfile.ENCODING) -> None:
+    def __init__(self, encoding: str = tarfile.ENCODING, printDebug: int = 0) -> None:
         self.encoding = encoding
+        self.printDebug = printDebug
 
     def __call__(self, tarFile: str) -> Tuple[str, Optional[str]]:
         if not os.path.isfile(tarFile):
@@ -3183,10 +3193,10 @@ class TarFileType:
                 pass
 
             if compression not in supportedCompressions:
-                if SQLiteIndexedTar._detectTar(fileobj, self.encoding):
+                if SQLiteIndexedTar._detectTar(fileobj, self.encoding, printDebug=self.printDebug):
                     return tarFile, compression
 
-                if printDebug >= 2:
+                if self.printDebug >= 2:
                     print(f"Archive '{tarFile}' (compression: {compression}) can't be opened!")
 
                 raise argparse.ArgumentTypeError("Archive '{}' can't be opened!\n".format(tarFile))
@@ -3335,7 +3345,7 @@ seeking capabilities when opening that file.
                'output when the mounted path is accessed.' )
 
     parser.add_argument(
-        '-d', '--debug', type = int, default = printDebug,
+        '-d', '--debug', type = int, default = 1,
         help = 'Sets the debugging level. Higher means more output. Currently, 3 is the highest.' )
 
     parser.add_argument(
@@ -3480,7 +3490,7 @@ seeking capabilities when opening that file.
     def checkMountSource(path):
         if os.path.isdir(path) or ('zipfile' in sys.modules and zipfile.is_zipfile(path)):
             return os.path.realpath(path)
-        return TarFileType(encoding=args.encoding)(path)[0]
+        return TarFileType(encoding=args.encoding, printDebug=args.debug)(path)[0]
 
     args.mount_source = [checkMountSource(path) for path in args.mount_source]
 
@@ -3501,10 +3511,11 @@ seeking capabilities when opening that file.
             args.index_folders = args.index_folders.split(',')
 
     # Check the parallelization argument and move to global variable
+    assert isinstance(args.parallelization, int)
     if args.parallelization < 0:
         raise argparse.ArgumentTypeError("Argument for parallelization must be non-negative!")
-    global parallelization
-    parallelization = args.parallelization if args.parallelization > 0 else os.cpu_count()
+    if args.parallelization == 0:
+        args.parallelization = os.cpu_count()
 
     # Sanitize different ways to specify passwords into a simple list
     args.passwords = []
@@ -3548,9 +3559,6 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         if hasNonEmptySupport():
             fusekwargs['nonempty'] = True
 
-    global printDebug
-    printDebug = args.debug
-
     fuseOperationsObject = FuseMount(
         # fmt: off
         pathToMount                = args.mount_source,
@@ -3566,6 +3574,8 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         indexFolders               = args.index_folders,
         lazyMounting               = args.lazy,
         passwords                  = args.passwords,
+        parallelization            = args.parallelization,
+        printDebug                 = args.debug,
         # fmt: on
     )
 
