@@ -126,6 +126,7 @@ class SQLiteIndexedTar(MountSource):
         self.gzipSeekPointSpacing       = gzipSeekPointSpacing
         self.parallelization            = parallelization
         self.printDebug                 = printDebug
+        self.isCustomTarFileName        = fileObject is not None
         # fmt: on
 
         self.tarFileName: str = '<file object>'
@@ -275,7 +276,8 @@ class SQLiteIndexedTar(MountSource):
         connection.executescript(metadataTable)
 
         # All of these require the generic "metadata" table.
-        self._storeTarMetadata(connection, self.tarFileName, printDebug=self.printDebug)
+        if not self.isCustomTarFileName:
+            self._storeTarMetadata(connection, self.tarFileName, printDebug=self.printDebug)
         self._storeArgumentsMetadata(connection)
         connection.commit()
 
@@ -350,10 +352,12 @@ class SQLiteIndexedTar(MountSource):
             )
             connection.execute('INSERT INTO "metadata" VALUES (?,?)', ("tarstats", serializedTarStats))
         except Exception as exception:
-            if printDebug >= 2:
-                print(exception)
             print("[Warning] There was an error when adding file metadata.")
             print("[Warning] Automatic detection of changed TAR files during index loading might not work.")
+            if printDebug >= 2:
+                print(exception)
+            if printDebug >= 3:
+                traceback.print_exc()
 
     def _storeArgumentsMetadata(self, connection: sqlite3.Connection) -> None:
         argumentsToSave = [

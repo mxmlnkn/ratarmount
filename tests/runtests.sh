@@ -1134,22 +1134,36 @@ rm -f ratarmount.{stdout,stderr}.log
 
 # Linting only to be done locally because in CI it is in separate steps
 if [[ -z "$CI" ]]; then
+    files=()
+    while read -r file; do
+        files+=( "$file" )
+    done < <(
+        git ls-tree -r --name-only HEAD |
+            'grep' '[.]py$' |
+            'grep' -v -F '__init__.py' |
+            'grep' -v 'benchmarks/' |
+            'grep' -v -F 'setup.py' |
+            'grep' -v -F 'tests.py'
+    )
+
+    echo "Checking files:"
+    printf '    %s\n' "${files[@]}"
+
     # Ignore Python 3.9. because of the Optiona[T] type hint bug in pylint: https://github.com/PyCQA/pylint/issues/3882
     if [[ ! $( python3 --version ) =~ \ 3\.9\.* ]]; then
-        pylint ratarmount.py setup.py | tee pylint.log
+        pylint "${files[@]}" | tee pylint.log
         if 'grep' -E -q ': E[0-9]{4}: ' pylint.log; then
             echoerr 'There were warnings during the pylint run!'
             exit 1
         fi
         rm pylint.log
     fi
-    mypy ratarmount.py setup.py || returnError "$LINENO" 'Mypy failed!'
-    pytype -d import-error ratarmount.py || returnError "$LINENO" 'Pytype failed!'
-    black -q --line-length 120 --skip-string-normalization ratarmount.py tests/tests.py
+    mypy "${files[@]}" || returnError "$LINENO" 'Mypy failed!'
+    pytype -d import-error -P"$( cd core && pwd ):$( pwd )" "${files[@]}" \
+        || returnError "$LINENO" 'Pytype failed!'
+    black -q --line-length 120 --skip-string-normalization "${files[@]}"
 
-    while read -r file; do
-        flake8 "$file" || returnError "$LINENO" 'Flake8 failed!'
-    done < <( git ls-tree --name-only HEAD '*.py' )
+    flake8 "${files[@]}" || returnError "$LINENO" 'Flake8 failed!'
 
     shellcheck tests/*.sh || returnError "$LINENO" 'shellcheck failed!'
 fi

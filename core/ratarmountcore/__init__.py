@@ -42,7 +42,8 @@ Example:
 
 from .version import __version__
 
-from .utils import RatarmountError, IndexNotOpenError, InvalidIndexError, CompressionError
+from .compressions import supportedCompressions, stripSuffixFromTarFile
+from .utils import RatarmountError, IndexNotOpenError, InvalidIndexError, CompressionError, overrides
 from .StenciledFile import StenciledFile
 
 from .MountSource import FileInfo, MountSource

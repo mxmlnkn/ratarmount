@@ -12,11 +12,11 @@ import tempfile
 
 if __name__ == '__main__' and __package__ is None:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../core')))
 
-import ratarmount
-from ratarmount import FileInfo, SQLiteIndexedTar
+import ratarmountcore as rmc
+from ratarmountcore import FileInfo, SQLiteIndexedTar, SQLiteIndexedTarUserData, StenciledFile
 
-ratarmount.printDebug = 2
 
 testData = b"1234567890"
 tmpFile = tempfile.TemporaryFile()
@@ -24,49 +24,49 @@ tmpFile.write(testData)
 
 
 print("Test StenciledFile._findStencil")
-stenciledFile = ratarmount.StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2), (4, 4), (1, 8), (0, 1)])
+stenciledFile = StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2), (4, 4), (1, 8), (0, 1)])
 expectedResults = [0, 0, 1, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 5]
 for offset, iExpectedStencil in enumerate(expectedResults):
     assert stenciledFile._findStencil(offset) == iExpectedStencil
 
 print("Test StenciledFile with single stencil")
 
-assert ratarmount.StenciledFile(tmpFile, [(0, 1)]).read() == b"1"
-assert ratarmount.StenciledFile(tmpFile, [(0, 2)]).read() == b"12"
-assert ratarmount.StenciledFile(tmpFile, [(0, 3)]).read() == b"123"
-assert ratarmount.StenciledFile(tmpFile, [(0, len(testData))]).read() == testData
+assert StenciledFile(tmpFile, [(0, 1)]).read() == b"1"
+assert StenciledFile(tmpFile, [(0, 2)]).read() == b"12"
+assert StenciledFile(tmpFile, [(0, 3)]).read() == b"123"
+assert StenciledFile(tmpFile, [(0, len(testData))]).read() == testData
 
 
 print("Test StenciledFile with stencils each sized 1 byte")
 
-assert ratarmount.StenciledFile(tmpFile, [(0, 1), (1, 1)]).read() == b"12"
-assert ratarmount.StenciledFile(tmpFile, [(0, 1), (2, 1)]).read() == b"13"
-assert ratarmount.StenciledFile(tmpFile, [(1, 1), (0, 1)]).read() == b"21"
-assert ratarmount.StenciledFile(tmpFile, [(0, 1), (1, 1), (2, 1)]).read() == b"123"
-assert ratarmount.StenciledFile(tmpFile, [(1, 1), (2, 1), (0, 1)]).read() == b"231"
+assert StenciledFile(tmpFile, [(0, 1), (1, 1)]).read() == b"12"
+assert StenciledFile(tmpFile, [(0, 1), (2, 1)]).read() == b"13"
+assert StenciledFile(tmpFile, [(1, 1), (0, 1)]).read() == b"21"
+assert StenciledFile(tmpFile, [(0, 1), (1, 1), (2, 1)]).read() == b"123"
+assert StenciledFile(tmpFile, [(1, 1), (2, 1), (0, 1)]).read() == b"231"
 
 print("Test StenciledFile with stencils each sized 2 bytes")
 
-assert ratarmount.StenciledFile(tmpFile, [(0, 2), (1, 2)]).read() == b"1223"
-assert ratarmount.StenciledFile(tmpFile, [(0, 2), (2, 2)]).read() == b"1234"
-assert ratarmount.StenciledFile(tmpFile, [(1, 2), (0, 2)]).read() == b"2312"
-assert ratarmount.StenciledFile(tmpFile, [(0, 2), (1, 2), (2, 2)]).read() == b"122334"
-assert ratarmount.StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read() == b"233412"
+assert StenciledFile(tmpFile, [(0, 2), (1, 2)]).read() == b"1223"
+assert StenciledFile(tmpFile, [(0, 2), (2, 2)]).read() == b"1234"
+assert StenciledFile(tmpFile, [(1, 2), (0, 2)]).read() == b"2312"
+assert StenciledFile(tmpFile, [(0, 2), (1, 2), (2, 2)]).read() == b"122334"
+assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read() == b"233412"
 
 print("Test reading a fixed length of the StenciledFile")
 
-assert ratarmount.StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(0) == b""
-assert ratarmount.StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(1) == b"2"
-assert ratarmount.StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(2) == b"23"
-assert ratarmount.StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(3) == b"233"
-assert ratarmount.StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(4) == b"2334"
-assert ratarmount.StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(5) == b"23341"
-assert ratarmount.StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(6) == b"233412"
-assert ratarmount.StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(7) == b"233412"
+assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(0) == b""
+assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(1) == b"2"
+assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(2) == b"23"
+assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(3) == b"233"
+assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(4) == b"2334"
+assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(5) == b"23341"
+assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(6) == b"233412"
+assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(7) == b"233412"
 
 print("Test seek and tell")
 
-stenciledFile = ratarmount.StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)])
+stenciledFile = StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)])
 for i in range(7):
     assert stenciledFile.tell() == i
     stenciledFile.read(1)
@@ -135,6 +135,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
             writeIndex=True,
             clearIndexCache=True,
             indexFileName=tmpIndexFile.name,
+            printDebug=3,
         )
 
         # Read from index
@@ -143,6 +144,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
             writeIndex=False,
             clearIndexCache=False,
             indexFileName=tmpIndexFile.name,
+            printDebug=3,
         )
 
         finfo = indexedFile.getFileInfo("/src/test.sh")
@@ -152,7 +154,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
         finfo = indexedFile.getFileInfo("/dist/a")
         assert stat.S_ISDIR(finfo.mode)
         assert indexedFile._getFileInfo("/dist/a", listDir=True) == {
-            'b': ratarmount.FileInfo(
+            'b': FileInfo(
                 size=0,
                 mtime=0,
                 mode=16804,
@@ -160,7 +162,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
                 uid=0,
                 gid=0,
                 userdata=[
-                    ratarmount.SQLiteIndexedTarUserData(
+                    SQLiteIndexedTarUserData(
                         offsetheader=3584,
                         offset=4096,
                         istar=0,
@@ -179,7 +181,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
                 uid=0,
                 gid=0,
                 userdata=[
-                    ratarmount.SQLiteIndexedTarUserData(
+                    SQLiteIndexedTarUserData(
                         offsetheader=0,
                         offset=512,
                         istar=0,
@@ -195,7 +197,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
                 uid=0,
                 gid=0,
                 userdata=[
-                    ratarmount.SQLiteIndexedTarUserData(
+                    SQLiteIndexedTarUserData(
                         offsetheader=2560,
                         offset=3072,
                         istar=0,
@@ -211,7 +213,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
                 uid=0,
                 gid=0,
                 userdata=[
-                    ratarmount.SQLiteIndexedTarUserData(
+                    SQLiteIndexedTarUserData(
                         offsetheader=1024,
                         offset=1536,
                         istar=0,
@@ -328,9 +330,9 @@ with tempfile.NamedTemporaryFile(suffix=".bz2") as tmpTarFile, tempfile.NamedTem
 print("\nTest reading recursive .bz2 file with SQLiteIndexedTar")
 
 for parallelization in [1, 2, 4]:
-    ratarmount.parallelization = parallelization
-
-    with SQLiteIndexedTar("tests/2k-recursive-tars.tar.bz2", clearIndexCache=True, recursive=False) as file:
+    with SQLiteIndexedTar(
+        "tests/2k-recursive-tars.tar.bz2", clearIndexCache=True, recursive=False, parallelization=parallelization,
+    ) as file:
         assert file.listDir('/')
         assert file.listDir('/mimi')
 
@@ -342,7 +344,9 @@ for parallelization in [1, 2, 4]:
         info = file.getFileInfo('/mimi/00105.tar')
         assert info.userdata[0].offset == 1248256
 
-    with SQLiteIndexedTar("tests/2k-recursive-tars.tar.bz2", clearIndexCache=True, recursive=True) as file:
+    with SQLiteIndexedTar(
+        "tests/2k-recursive-tars.tar.bz2", clearIndexCache=True, recursive=True, parallelization=parallelization,
+    ) as file:
         assert file.listDir('/')
         assert file.listDir('/mimi')
 

@@ -17,11 +17,12 @@ jobs:
     - name: Install pip Dependencies
       run: |
         python3 -m pip install --upgrade pip
+        python3 -m pip install --user fusepy
 
     - name: Style Check With Black
       run: |
         python3 -m pip install black
-        black -q --diff --line-length 120 --skip-string-normalization ratarmount.py > black.diff
+        black -q --diff --line-length 120 --skip-string-normalization ratarmount.py tests/*.py core/ratarmountcore/*.py > black.diff
         if [ -s black.diff ]; then
             cat black.diff
             exit 123
@@ -30,23 +31,23 @@ jobs:
     - name: Lint With Flake8
       run: |
         python3 -m pip install flake8
-        flake8 *.py
+        flake8 *.py tests/*.py core/ratarmountcore/[^_]*.py
 
     - name: Lint With Pylint
       run: |
         python3 -m pip install pylint
-        pylint *.py | tee pylint.log
+        pylint *.py tests/*.py core/ratarmountcore/*.py | tee pylint.log
         ! 'egrep' ': E[0-9]{4}: ' pylint.log
 
     - name: Lint With Pytype
       run: |
         python3 -m pip install pytype
-        pytype -d import-error ratarmount.py
+        pytype -d import-error -P$( cd core && pwd ):$( pwd ) ratarmount.py core/ratarmountcore/*.py
 
     - name: Lint With Mypy
       run: |
         yes | python3 -m pip install --upgrade-strategy eager --upgrade types-dataclasses mypy
-        mypy *.py
+        mypy *.py core/ratarmountcore/*.py
         yes | python3 -m pip uninstall types-dataclasses
 
     - name: Lint With ShellCheck
@@ -114,7 +115,7 @@ jobs:
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade wheel
         python3 -m pip install --upgrade setuptools
-        python3 -m pip install --upgrade-strategy eager --upgrade cython twine cffi
+        python3 -m pip install --upgrade-strategy eager --upgrade cython twine build
 
     - name: Test Startup With Only One Compression Dependency
       run: |
@@ -127,6 +128,13 @@ jobs:
         done
         python3 -m pip install --upgrade git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=indexed_bzip2
 
+    - name: Test ratarmountcore Installation From Tarball
+      working-directory: core
+      run: |
+        python3 -m build
+        twine check dist/*
+        python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )"[full]
+
     - name: Test Installation From Tarball
       run: |
         python3 setup.py sdist bdist_wheel
@@ -135,8 +143,6 @@ jobs:
 
     - name: Test Installation From Source
       run: |
-        python3 setup.py sdist bdist_wheel
-        twine check dist/*
         python3 -m pip install .[full]
 
     - name: Test Simple Startup
