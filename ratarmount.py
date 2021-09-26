@@ -18,7 +18,6 @@ import time
 import traceback
 from abc import ABC, abstractmethod
 from timeit import default_timer as timer
-import typing
 from typing import Any, AnyStr, cast, Dict, IO, Iterable, List, Optional, Set, Tuple, Union
 from dataclasses import dataclass
 import dataclasses
@@ -1313,7 +1312,7 @@ class SQLiteIndexedTar(MountSource):
         #      For now this seems to work either because fileObject does not require tarFile to exist
         #      or because tarFile is simply not closed correctly here, I'm not sure.
         #      Sparse files are kinda edge-cases anyway, so it isn't high priority as long as the tests work.
-        tarFile = tarfile.open(fileobj=typing.cast(IO[bytes], tarSubFile), mode='r:', encoding=self.encoding)
+        tarFile = tarfile.open(fileobj=cast(IO[bytes], tarSubFile), mode='r:', encoding=self.encoding)
         fileObject = tarFile.extractfile(next(iter(tarFile)))
         if not fileObject:
             print("tarfile.extractfile returned nothing!")
@@ -3054,7 +3053,7 @@ class FuseMount(FuseOperations):  # type: ignore
         return fileInfo
 
     @overrides(FuseOperations)
-    def init(self, connection) -> None:
+    def init(self, path) -> None:
         if self.selfBindMount is not None and self.mountPointFd is not None:
             self.selfBindMount.setFolderDescriptor(self.mountPointFd)
 
