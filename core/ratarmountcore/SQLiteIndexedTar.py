@@ -69,7 +69,7 @@ class SQLiteIndexedTar(MountSource):
         fileObject                 : Optional[IO[bytes]] = None,
         writeIndex                 : bool                = False,
         clearIndexCache            : bool                = False,
-        indexFileName              : Optional[str]       = None,
+        indexFilePath              : Optional[str]       = None,
         indexFolders               : Optional[List[str]] = None,
         recursive                  : bool                = False,
         gzipSeekPointSpacing       : int                 = 4*1024*1024,
@@ -91,7 +91,7 @@ class SQLiteIndexedTar(MountSource):
         writeIndex : If true, then the sidecar index file will be written to a suitable location.
         clearIndexCache : If true, then check all possible index file locations for the given tarFileName/fileObject
                           combination and delete them. This also implicitly forces a recreation of the index.
-        indexFileName : Path to the index file for this TAR archive. This takes precedence over the automatically
+        indexFilePath : Path to the index file for this TAR archive. This takes precedence over the automatically
                         chosen locations.
         indexFolders : Specify one or multiple paths for storing .index.sqlite files. Paths will be tested for
                        suitability in the given order. An empty path will be interpreted as the location in which
@@ -115,7 +115,7 @@ class SQLiteIndexedTar(MountSource):
         # stores which parent folders were last tried to add to database and therefore do exist
         self.parentFolderCache: List[Tuple[str, str]] = []
         self.sqlConnection: Optional[sqlite3.Connection] = None
-        self.indexFileName = None
+        self.indexFilePath = None
 
         # fmt: off
         self.mountRecursively           = recursive
@@ -179,11 +179,11 @@ class SQLiteIndexedTar(MountSource):
             indexFolders = [indexFolders]
 
         # A given index file name takes precedence and there should be no implicit fallback
-        if indexFileName:
-            if indexFileName == ':memory:':
-                possibleIndexFilePaths = [indexFileName]
+        if indexFilePath:
+            if indexFilePath == ':memory:':
+                possibleIndexFilePaths = [indexFilePath]
             else:
-                possibleIndexFilePaths = [os.path.abspath(os.path.expanduser(indexFileName))]
+                possibleIndexFilePaths = [os.path.abspath(os.path.expanduser(indexFilePath))]
         elif indexFolders:
             # An empty path is to be interpreted as the default path right besides the TAR
             if '' not in indexFolders:
@@ -201,7 +201,7 @@ class SQLiteIndexedTar(MountSource):
         # Try to find an already existing index
         for indexPath in possibleIndexFilePaths:
             if self._tryLoadIndex(indexPath):
-                self.indexFileName = indexPath
+                self.indexFilePath = indexPath
                 break
         if self.indexIsLoaded() and self.sqlConnection:
             try:
@@ -226,10 +226,10 @@ class SQLiteIndexedTar(MountSource):
                 if self._pathIsWritable(indexPath, printDebug=self.printDebug) and self._pathCanBeUsedForSqlite(
                     indexPath, printDebug=self.printDebug
                 ):
-                    self.indexFileName = indexPath
+                    self.indexFilePath = indexPath
                     break
 
-            if not self.indexFileName:
+            if not self.indexFilePath:
                 raise InvalidIndexError(
                     "Could not find any existing index or writable location for an index in "
                     + str(possibleIndexFilePaths)
@@ -241,11 +241,11 @@ class SQLiteIndexedTar(MountSource):
             self._storeMetadata(self.sqlConnection)
             self._reloadIndexReadOnly()
 
-        if self.printDebug >= 1 and self.indexFileName and os.path.isfile(self.indexFileName):
+        if self.printDebug >= 1 and self.indexFilePath and os.path.isfile(self.indexFilePath):
             # The 0-time is legacy for the automated tests
             # fmt: off
-            print("Writing out TAR index to", self.indexFileName, "took 0s",
-                  "and is sized", os.stat( self.indexFileName ).st_size, "B")
+            print("Writing out TAR index to", self.indexFilePath, "took 0s",
+                  "and is sized", os.stat( self.indexFilePath ).st_size, "B")
             # fmt: on
 
     def __enter__(self):
@@ -445,9 +445,9 @@ class SQLiteIndexedTar(MountSource):
         return sqlConnection
 
     @staticmethod
-    def _initializeSqlDb(indexFileName: Optional[str], printDebug: int = 0) -> sqlite3.Connection:
+    def _initializeSqlDb(indexFilePath: Optional[str], printDebug: int = 0) -> sqlite3.Connection:
         if printDebug >= 1:
-            print("Creating new SQLite index database at", indexFileName if indexFileName else ':memory:')
+            print("Creating new SQLite index database at", indexFilePath if indexFilePath else ':memory:')
 
         createTables = """
             CREATE TABLE "files" (
@@ -482,22 +482,22 @@ class SQLiteIndexedTar(MountSource):
             );
         """
 
-        sqlConnection = SQLiteIndexedTar._openSqlDb(indexFileName if indexFileName else ':memory:')
+        sqlConnection = SQLiteIndexedTar._openSqlDb(indexFilePath if indexFilePath else ':memory:')
         tables = sqlConnection.execute('SELECT name FROM sqlite_master WHERE type = "table";')
         if {"files", "filestmp", "parentfolders"}.intersection({t[0] for t in tables}):
             raise InvalidIndexError(
                 "The index file {} already seems to contain a table. "
-                "Please specify --recreate-index.".format(indexFileName)
+                "Please specify --recreate-index.".format(indexFilePath)
             )
         sqlConnection.executescript(createTables)
         return sqlConnection
 
     def _reloadIndexReadOnly(self):
-        if not self.indexFileName or self.indexFileName == ':memory:' or not self.sqlConnection:
+        if not self.indexFilePath or self.indexFilePath == ':memory:' or not self.sqlConnection:
             return
 
         self.sqlConnection.close()
-        self.sqlConnection = SQLiteIndexedTar._openSqlDb(f"file:{self.indexFileName}?mode=ro", uri=True)
+        self.sqlConnection = SQLiteIndexedTar._openSqlDb(f"file:{self.indexFilePath}?mode=ro", uri=True)
 
     @staticmethod
     def _tarInfoFullMode(tarInfo: tarfile.TarInfo) -> int:
@@ -549,7 +549,7 @@ class SQLiteIndexedTar(MountSource):
         openedConnection = False
         if not self.indexIsLoaded() or not self.sqlConnection:
             openedConnection = True
-            self.sqlConnection = self._initializeSqlDb(self.indexFileName, printDebug=self.printDebug)
+            self.sqlConnection = self._initializeSqlDb(self.indexFilePath, printDebug=self.printDebug)
 
         # 2. Open TAR file reader
         loadedTarFile: Any = []  # Feign an empty TAR file if anything goes wrong
@@ -1032,13 +1032,13 @@ class SQLiteIndexedTar(MountSource):
 
         return True
 
-    def loadIndex(self, indexFileName: AnyStr) -> None:
+    def loadIndex(self, indexFilePath: AnyStr) -> None:
         """Loads the given index SQLite database and checks it for validity."""
         if self.indexIsLoaded():
             return
 
         t0 = time.time()
-        self.sqlConnection = self._openSqlDb(indexFileName)
+        self.sqlConnection = self._openSqlDb(indexFilePath)
         tables = [x[0] for x in self.sqlConnection.execute('SELECT name FROM sqlite_master WHERE type="table"')]
         versions = None
         try:
@@ -1141,24 +1141,24 @@ class SQLiteIndexedTar(MountSource):
 
         if self.printDebug >= 1:
             # Legacy output for automated tests
-            print("Loading offset dictionary from", indexFileName, "took {:.2f}s".format(time.time() - t0))
+            print("Loading offset dictionary from", indexFilePath, "took {:.2f}s".format(time.time() - t0))
 
-    def _tryLoadIndex(self, indexFileName: AnyStr) -> bool:
+    def _tryLoadIndex(self, indexFilePath: AnyStr) -> bool:
         """calls loadIndex if index is not loaded already and provides extensive error handling"""
 
         if self.indexIsLoaded():
             return True
 
-        if not os.path.isfile(indexFileName):
+        if not os.path.isfile(indexFilePath):
             return False
 
         try:
-            self.loadIndex(indexFileName)
+            self.loadIndex(indexFilePath)
         except Exception as exception:
             if self.printDebug >= 3:
                 traceback.print_exc()
 
-            print("[Warning] Could not load file:", indexFileName)
+            print("[Warning] Could not load file:", indexFilePath)
             print("[Info] Exception:", exception)
             print("[Info] Some likely reasons for not being able to load the index file:")
             print("[Info]   - The index file has incorrect read permissions")
@@ -1176,12 +1176,12 @@ class SQLiteIndexedTar(MountSource):
             print("       e.g., by opening an issue on the public github page.")
 
             try:
-                os.remove(indexFileName)
+                os.remove(indexFilePath)
             except OSError:
-                print("[Warning] Failed to remove corrupted old cached index file:", indexFileName)
+                print("[Warning] Failed to remove corrupted old cached index file:", indexFilePath)
 
         if self.printDebug >= 3 and self.indexIsLoaded():
-            print("Loaded index", indexFileName)
+            print("Loaded index", indexFilePath)
 
         return self.indexIsLoaded()
 
@@ -1287,7 +1287,7 @@ class SQLiteIndexedTar(MountSource):
             print("[Warning] Could not remove:", path)
 
     def _loadOrStoreCompressionOffsets(self):
-        if not self.indexFileName or self.indexFileName == ':memory:':
+        if not self.indexFilePath or self.indexFilePath == ':memory:':
             if self.printDebug >= 2:
                 print("[Info] Will skip storing compression seek data because the database is in memory.")
                 print("[Info] If the database is in memory, then this data will not be read anyway.")
@@ -1343,7 +1343,7 @@ class SQLiteIndexedTar(MountSource):
             # database out into a temporary file. For that, let's first try to use the same location as the SQLite
             # database because it should have sufficient writing rights and free disk space.
             gzindex = None
-            for tmpDir in [os.path.dirname(self.indexFileName), None]:
+            for tmpDir in [os.path.dirname(self.indexFilePath), None]:
                 if 'gzipindex' not in tables and 'gzipindexes' not in tables:
                     break
 
@@ -1392,7 +1392,7 @@ class SQLiteIndexedTar(MountSource):
             # The created index can unfortunately be pretty large and tmp might actually run out of memory!
             # Therefore, try different paths, starting with the location where the index resides.
             gzindex = None
-            for tmpDir in [os.path.dirname(self.indexFileName), None]:
+            for tmpDir in [os.path.dirname(self.indexFilePath), None]:
                 gzindex = tempfile.mkstemp(dir=tmpDir)[1]
                 try:
                     fileObject.export_index(filename=gzindex)
