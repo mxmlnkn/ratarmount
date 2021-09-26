@@ -1845,32 +1845,6 @@ class SQLiteIndexedTar(MountSource):
         )
 
 
-def _makeMountPointFileInfoFromStats(stats: os.stat_result) -> FileInfo:
-    # make the mount point read only and executable if readable, i.e., allow directory listing
-    # clear higher bits like S_IFREG and set the directory bit instead
-    mountMode = (
-        (stats.st_mode & 0o777)
-        | stat.S_IFDIR
-        | (stat.S_IXUSR if stats.st_mode & stat.S_IRUSR != 0 else 0)
-        | (stat.S_IXGRP if stats.st_mode & stat.S_IRGRP != 0 else 0)
-        | (stat.S_IXOTH if stats.st_mode & stat.S_IROTH != 0 else 0)
-    )
-
-    fileInfo = FileInfo(
-        # fmt: off
-        size     = stats.st_size,
-        mtime    = stats.st_mtime,
-        mode     = mountMode,
-        linkname = "",
-        uid      = stats.st_uid,
-        gid      = stats.st_gid,
-        userdata = [],
-        # fmt: on
-    )
-
-    return fileInfo
-
-
 class FolderMountSource(MountSource):
     """
     This class manages one folder as mount source offering methods for listing folders, reading files, and others.
@@ -2810,7 +2784,7 @@ class FileVersionLayer(MountSource):
             return None
 
         if fileVersion is None:
-            raise Exception("No file version found in special versioning path specification!")
+            return None
 
         return filePath, pathIsSpecialVersionsFolder, (0 if pathIsSpecialVersionsFolder else fileVersion)
 
@@ -2903,7 +2877,7 @@ class FileVersionLayer(MountSource):
         # If no file was found, check if a special .versions folder to an existing file/folder was queried.
         versionsInfo = self._decodeVersionsPathAPI(path)
         if not versionsInfo:
-            raise fuse.FuseOSError(fuse.errno.ENOENT)
+            return None
         path, pathIsSpecialVersionsFolder, fileVersion = versionsInfo
 
         # 2.) Check if the request was for the special .versions folder and return its contents or stats
@@ -2929,11 +2903,7 @@ class FileVersionLayer(MountSource):
             return fileInfo
 
         # 3.) At this point the request is for an actually older version of a file or folder
-        fileInfo = self.mountSource.getFileInfo(path, fileVersion=fileVersion)
-        if fileInfo:
-            return fileInfo
-
-        raise fuse.FuseOSError(fuse.errno.ENOENT)
+        return self.mountSource.getFileInfo(path, fileVersion=fileVersion)
 
     @overrides(MountSource)
     def fileVersions(self, path: str) -> int:
@@ -3018,7 +2988,7 @@ class FuseMount(FuseOperations):  # type: ignore
             self.mountSource = AutoMountLayer(self.mountSource, **options)
         self.mountSource = FileVersionLayer(self.mountSource)
 
-        self.rootFileInfo = _makeMountPointFileInfoFromStats(os.stat(pathToMount[0]))
+        self.rootFileInfo = FuseMount._makeMountPointFileInfoFromStats(os.stat(pathToMount[0]))
 
         self.openedFiles: Dict[int, IO[bytes]] = {}
         self.lastFileHandle: int = 0  # It will be incremented before being returned. It can't hurt to never return 0.
@@ -3051,6 +3021,38 @@ class FuseMount(FuseOperations):  # type: ignore
         except Exception:
             pass
 
+    @staticmethod
+    def _makeMountPointFileInfoFromStats(stats: os.stat_result) -> FileInfo:
+        # make the mount point read only and executable if readable, i.e., allow directory listing
+        # clear higher bits like S_IFREG and set the directory bit instead
+        mountMode = (
+            (stats.st_mode & 0o777)
+            | stat.S_IFDIR
+            | (stat.S_IXUSR if stats.st_mode & stat.S_IRUSR != 0 else 0)
+            | (stat.S_IXGRP if stats.st_mode & stat.S_IRGRP != 0 else 0)
+            | (stat.S_IXOTH if stats.st_mode & stat.S_IROTH != 0 else 0)
+        )
+
+        fileInfo = FileInfo(
+            # fmt: off
+            size     = stats.st_size,
+            mtime    = stats.st_mtime,
+            mode     = mountMode,
+            linkname = "",
+            uid      = stats.st_uid,
+            gid      = stats.st_gid,
+            userdata = [],
+            # fmt: on
+        )
+
+        return fileInfo
+
+    def _getFileInfo(self, path: str) -> FileInfo:
+        fileInfo = self.mountSource.getFileInfo(path)
+        if fileInfo is None:
+            raise fuse.FuseOSError(fuse.errno.ENOENT)
+        return fileInfo
+
     @overrides(FuseOperations)
     def init(self, connection) -> None:
         if self.selfBindMount is not None and self.mountPointFd is not None:
@@ -3058,9 +3060,7 @@ class FuseMount(FuseOperations):  # type: ignore
 
     @overrides(FuseOperations)
     def getattr(self, path: str, fh=None) -> Dict[str, Any]:
-        fileInfo = self.mountSource.getFileInfo(path)
-        if not fileInfo:
-            raise fuse.FuseOSError(fuse.errno.EIO)
+        fileInfo = self._getFileInfo(path)
 
         # dictionary keys: https://pubs.opengroup.org/onlinepubs/007904875/basedefs/sys/stat.h.html
         statDict = {"st_" + key: getattr(fileInfo, key) for key in ('size', 'mtime', 'mode', 'uid', 'gid')}
@@ -3091,18 +3091,13 @@ class FuseMount(FuseOperations):  # type: ignore
 
     @overrides(FuseOperations)
     def readlink(self, path: str) -> str:
-        fileInfo = self.mountSource.getFileInfo(path)
-        if not fileInfo:
-            raise fuse.FuseOSError(fuse.errno.EIO)
-        return fileInfo.linkname
+        return self._getFileInfo(path).linkname
 
     @overrides(FuseOperations)
     def open(self, path, flags):
         """Returns file handle of opened path."""
 
-        fileInfo = self.mountSource.getFileInfo(path)
-        if not fileInfo:
-            raise fuse.FuseOSError(fuse.errno.EIO)
+        fileInfo = self._getFileInfo(path)
 
         try:
             self.lastFileHandle += 1
@@ -3132,9 +3127,7 @@ class FuseMount(FuseOperations):  # type: ignore
         if self.printDebug >= 1:
             print("[Warning] Given file handle does not exist. Will open file before reading which might be slow.")
 
-        fileInfo = self.mountSource.getFileInfo(path)
-        if not fileInfo:
-            raise fuse.FuseOSError(fuse.errno.EIO)
+        fileInfo = self._getFileInfo(path)
 
         try:
             return self.mountSource.read(fileInfo, size, offset)
