@@ -34,6 +34,7 @@ setup(
 
     py_modules       = [ 'ratarmount' ],
     install_requires = [
+        'ratarmountcore~=1.0',
         'fusepy',
         'indexed_bzip2>=1.3.0',
         'indexed_gzip>=1.6.3',
