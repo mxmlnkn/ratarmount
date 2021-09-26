@@ -837,6 +837,8 @@ benchmarkDecoderBackends()
         case "$compression" in
             bzip2)
                 python3 -m timeit 'from indexed_bzip2 import IndexedBzip2File as IBF; IBF( '"'$file'"' ).read();'
+                printf '% 5s : ' "pbz2"
+                python3 -m timeit 'from indexed_bzip2 import IndexedBzip2File as IBF; IBF( '"'$file'"', parallelization = 0 ).read();'
                 ;;
             gzip)
                 python3 -m timeit 'from indexed_gzip import IndexedGzipFile as IBF; IBF( '"'$file'"' ).read();'
@@ -1143,29 +1145,40 @@ if [[ -z "$CI" ]]; then
             'grep' -v -F '__init__.py' |
             'grep' -v 'benchmarks/' |
             'grep' -v -F 'setup.py' |
-            'grep' -v -F 'tests.py'
+            'grep' -v 'test.*.py'
     )
+
+    testFiles=()
+    while read -r file; do
+        testFiles+=( "$file" )
+    done < <( git ls-tree -r --name-only HEAD | 'grep' 'test.*.py' )
 
     echo "Checking files:"
     printf '    %s\n' "${files[@]}"
 
     # Ignore Python 3.9. because of the Optiona[T] type hint bug in pylint: https://github.com/PyCQA/pylint/issues/3882
     if [[ ! $( python3 --version ) =~ \ 3\.9\.* ]]; then
-        pylint "${files[@]}" | tee pylint.log
+        pylint "${files[@]}" "${testFiles[@]}" | tee pylint.log
         if 'grep' -E -q ': E[0-9]{4}: ' pylint.log; then
             echoerr 'There were warnings during the pylint run!'
             exit 1
         fi
         rm pylint.log
     fi
+
     mypy "${files[@]}" || returnError "$LINENO" 'Mypy failed!'
+    mypy "${testFiles[@]}" || returnError "$LINENO" 'Mypy failed!'
+
     pytype -d import-error -P"$( cd core && pwd ):$( pwd )" "${files[@]}" \
         || returnError "$LINENO" 'Pytype failed!'
-    black -q --line-length 120 --skip-string-normalization "${files[@]}"
 
-    flake8 "${files[@]}" || returnError "$LINENO" 'Flake8 failed!'
+    black -q --line-length 120 --skip-string-normalization "${files[@]}" "${testFiles[@]}"
+
+    flake8 "${files[@]}" "${testFiles[@]}" || returnError "$LINENO" 'Flake8 failed!'
 
     shellcheck tests/*.sh || returnError "$LINENO" 'shellcheck failed!'
+
+    pytest "${testFiles[@]}"
 fi
 
 
@@ -1336,13 +1349,14 @@ done
 checkRecursiveFolderMounting
 checkRecursiveFolderMounting --lazy
 
-benchmarkDecoderBackends
-#benchmarkSerialization # takes quite long, and a benchmark is not a test ...
-
 rm -f tests/*.index.*
 rmdir tests/*/
 
 done  # for parallelization
+
+
+benchmarkDecoderBackends
+#benchmarkSerialization # takes quite long, and a benchmark is not a test ...
 
 
 echo -e '\e[32mAll tests ran successfully.\e[0m'

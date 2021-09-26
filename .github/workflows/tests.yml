@@ -167,6 +167,11 @@ jobs:
         # Segfaults (139) are not allowed but other exit codes are valid!
         python3 ratarmount.py tests/simple.bz2 || [ $? != 139 ]
 
+    - name: Unit Tests
+      run: |
+        python3 -m pip install pytest
+        pytest core/tests/*.py
+
     - name: Regression Tests
       run: |
         bash tests/runtests.sh

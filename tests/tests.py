@@ -1,91 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import bz2
-import gzip
+# pylint: disable=wrong-import-position
+# pylint: disable=protected-access
+
 import io
 import os
 import stat
 import sys
 import tarfile
 import tempfile
+from typing import Dict
 
 if __name__ == '__main__' and __package__ is None:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../core')))
 
-import ratarmountcore as rmc
-from ratarmountcore import FileInfo, SQLiteIndexedTar, SQLiteIndexedTarUserData, StenciledFile
-
-
-testData = b"1234567890"
-tmpFile = tempfile.TemporaryFile()
-tmpFile.write(testData)
-
-
-print("Test StenciledFile._findStencil")
-stenciledFile = StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2), (4, 4), (1, 8), (0, 1)])
-expectedResults = [0, 0, 1, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 5]
-for offset, iExpectedStencil in enumerate(expectedResults):
-    assert stenciledFile._findStencil(offset) == iExpectedStencil
-
-print("Test StenciledFile with single stencil")
-
-assert StenciledFile(tmpFile, [(0, 1)]).read() == b"1"
-assert StenciledFile(tmpFile, [(0, 2)]).read() == b"12"
-assert StenciledFile(tmpFile, [(0, 3)]).read() == b"123"
-assert StenciledFile(tmpFile, [(0, len(testData))]).read() == testData
-
-
-print("Test StenciledFile with stencils each sized 1 byte")
-
-assert StenciledFile(tmpFile, [(0, 1), (1, 1)]).read() == b"12"
-assert StenciledFile(tmpFile, [(0, 1), (2, 1)]).read() == b"13"
-assert StenciledFile(tmpFile, [(1, 1), (0, 1)]).read() == b"21"
-assert StenciledFile(tmpFile, [(0, 1), (1, 1), (2, 1)]).read() == b"123"
-assert StenciledFile(tmpFile, [(1, 1), (2, 1), (0, 1)]).read() == b"231"
-
-print("Test StenciledFile with stencils each sized 2 bytes")
-
-assert StenciledFile(tmpFile, [(0, 2), (1, 2)]).read() == b"1223"
-assert StenciledFile(tmpFile, [(0, 2), (2, 2)]).read() == b"1234"
-assert StenciledFile(tmpFile, [(1, 2), (0, 2)]).read() == b"2312"
-assert StenciledFile(tmpFile, [(0, 2), (1, 2), (2, 2)]).read() == b"122334"
-assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read() == b"233412"
-
-print("Test reading a fixed length of the StenciledFile")
-
-assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(0) == b""
-assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(1) == b"2"
-assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(2) == b"23"
-assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(3) == b"233"
-assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(4) == b"2334"
-assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(5) == b"23341"
-assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(6) == b"233412"
-assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(7) == b"233412"
-
-print("Test seek and tell")
-
-stenciledFile = StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)])
-for i in range(7):
-    assert stenciledFile.tell() == i
-    stenciledFile.read(1)
-for i in reversed(range(6)):
-    assert stenciledFile.seek(-1, io.SEEK_CUR) == i
-    assert stenciledFile.tell() == i
-assert stenciledFile.seek(0, io.SEEK_END) == 6
-assert stenciledFile.tell() == 6
-assert stenciledFile.seek(20, io.SEEK_END) == 26
-assert stenciledFile.tell() == 26
-assert stenciledFile.read(1) == b""
-assert stenciledFile.seek(-6, io.SEEK_END) == 0
-assert stenciledFile.read(1) == b"2"
-
-
-print("Test __enter__ and __exit__")
-
-with SQLiteIndexedTar(os.path.join(os.path.dirname(__file__), 'single-file.tar'), writeIndex=False) as indexedTar:
-    assert indexedTar.listDir('/')
+from ratarmountcore import FileInfo, SQLiteIndexedTar, SQLiteIndexedTarUserData
 
 
 print("\nTest creating and using an index with .tar.gz files with SQLiteIndexedTar")
@@ -117,7 +48,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
 
     print("Created temp tar:", tmpTarFile.name)
 
-    testKwargs = {
+    testKwargs: Dict[str, Dict] = {
         "file paths": {'fileObject': None, 'tarFileName': tmpTarFile.name},
         "file objects": {'fileObject': open(tmpTarFile.name, "rb"), 'tarFileName': "tarFileName"},
         "file objects with no fileno": {
@@ -134,7 +65,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
             **kwargs,
             writeIndex=True,
             clearIndexCache=True,
-            indexFileName=tmpIndexFile.name,
+            indexFilePath=tmpIndexFile.name,
             printDebug=3,
         )
 
@@ -143,7 +74,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
             **kwargs,
             writeIndex=False,
             clearIndexCache=False,
-            indexFileName=tmpIndexFile.name,
+            indexFilePath=tmpIndexFile.name,
             printDebug=3,
         )
 
@@ -227,133 +158,3 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
         assert finfo.size == 11
         assert indexedFile.read(finfo, size=11, offset=0) == b"hello world"
         assert indexedFile.read(finfo, size=3, offset=3) == b"lo "
-
-
-print("\nTest creating and using an index with .gz files with SQLiteIndexedTar")
-
-with tempfile.NamedTemporaryFile(suffix=".gz") as tmpTarFile, tempfile.NamedTemporaryFile(
-    suffix=".sqlite"
-) as tmpIndexFile:
-    with gzip.open(tmpTarFile.name, "wb") as f:
-        f.write(b"hello world")
-
-    testKwargs = {
-        "file paths": dict(fileObject=None, tarFileName=tmpTarFile.name),
-        "file objects": dict(fileObject=open(tmpTarFile.name, "rb"), tarFileName="tarFileName"),
-        "file objects with no fileno": dict(
-            fileObject=io.BytesIO(open(tmpTarFile.name, "rb").read()), tarFileName="tarFileName"
-        ),
-    }
-
-    for name, kwargs in testKwargs.items():
-        print("\n== Test with {} ==".format(name))
-
-        # Create index
-        SQLiteIndexedTar(
-            **kwargs,
-            writeIndex=True,
-            clearIndexCache=True,
-            indexFileName=tmpIndexFile.name,
-        )
-
-        # Read from index
-        indexedFile = SQLiteIndexedTar(
-            **kwargs,
-            writeIndex=False,
-            clearIndexCache=False,
-            indexFileName=tmpIndexFile.name,
-        )
-
-        expected_name = (
-            os.path.basename(tmpTarFile.name).rsplit('.', 1)[0] if kwargs["fileObject"] is None else "tarFileName"
-        )
-
-        finfo = indexedFile._getFileInfo("/", listDir=True)
-        assert expected_name in finfo
-        assert finfo[expected_name].size == 11
-
-        finfo = indexedFile.getFileInfo("/" + expected_name)
-        assert finfo.size == 11
-        assert indexedFile.read(finfo, size=11, offset=0) == b"hello world"
-        assert indexedFile.read(finfo, size=3, offset=3) == b"lo "
-
-
-print("\nTest creating and using an index with .bz2 files with SQLiteIndexedTar")
-
-with tempfile.NamedTemporaryFile(suffix=".bz2") as tmpTarFile, tempfile.NamedTemporaryFile(
-    suffix=".sqlite"
-) as tmpIndexFile:
-    with bz2.open(tmpTarFile.name, "wb") as f:
-        f.write(b"hello world")
-
-    testKwargs = {
-        "file paths": dict(fileObject=None, tarFileName=tmpTarFile.name),
-        "file objects": dict(fileObject=open(tmpTarFile.name, "rb"), tarFileName="tarFileName"),
-        # "file objects with no fileno": dict(
-        #    fileObject=io.BytesIO(open(tmpTarFile.name, "rb").read()), tarFileName="tarFileName"
-        # ),
-    }
-
-    for name, kwargs in testKwargs.items():
-        print("\n== Test with {} ==".format(name))
-
-        # Create index
-        SQLiteIndexedTar(
-            **kwargs,
-            writeIndex=True,
-            clearIndexCache=True,
-            indexFileName=tmpIndexFile.name,
-        )
-
-        # Read from index
-        indexedFile = SQLiteIndexedTar(
-            **kwargs,
-            writeIndex=False,
-            clearIndexCache=False,
-            indexFileName=tmpIndexFile.name,
-        )
-
-        expected_name = (
-            os.path.basename(tmpTarFile.name).rsplit('.', 1)[0] if kwargs["fileObject"] is None else "tarFileName"
-        )
-
-        finfo = indexedFile._getFileInfo("/", listDir=True)
-        assert expected_name in finfo
-        assert finfo[expected_name].size == 11
-
-        finfo = indexedFile.getFileInfo("/" + expected_name)
-        assert finfo.size == 11
-        assert indexedFile.read(finfo, size=11, offset=0) == b"hello world"
-        assert indexedFile.read(finfo, size=3, offset=3) == b"lo "
-
-
-print("\nTest reading recursive .bz2 file with SQLiteIndexedTar")
-
-for parallelization in [1, 2, 4]:
-    with SQLiteIndexedTar(
-        "tests/2k-recursive-tars.tar.bz2", clearIndexCache=True, recursive=False, parallelization=parallelization,
-    ) as file:
-        assert file.listDir('/')
-        assert file.listDir('/mimi')
-
-        assert not file.listDir('/mimi/01995.tar')
-        info = file.getFileInfo('/mimi/01995.tar')
-        assert info.userdata[0].offset == 21440512
-
-        assert not file.listDir('/mimi/00105.tar')
-        info = file.getFileInfo('/mimi/00105.tar')
-        assert info.userdata[0].offset == 1248256
-
-    with SQLiteIndexedTar(
-        "tests/2k-recursive-tars.tar.bz2", clearIndexCache=True, recursive=True, parallelization=parallelization,
-    ) as file:
-        assert file.listDir('/')
-        assert file.listDir('/mimi')
-
-        assert file.listDir('/mimi/01995.tar')
-        info = file.getFileInfo('/mimi/01995.tar/foo')
-        assert info.userdata[0].offset == 21441024
-
-        assert file.listDir('/mimi/00105.tar')
-        info = file.getFileInfo('/mimi/00105.tar/foo')
-        assert info.userdata[0].offset == 1248768
