@@ -21,6 +21,10 @@ tmpFile.write(testData)
 
 class TestStenciledFile:
     @staticmethod
+    def test_empty_file():
+        assert StenciledFile(tmpFile, [(0, 0)]).read() == b""
+
+    @staticmethod
     def test_findStencil():
         stenciledFile = StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2), (4, 4), (1, 8), (0, 1)])
         expectedResults = [0, 0, 1, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 5]

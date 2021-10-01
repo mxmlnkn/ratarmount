@@ -38,7 +38,7 @@ class StenciledFile(io.BufferedIOBase):
         self.cumsizes = [0]
         for offset, size in stencils:
             assert offset >= 0
-            assert size > 0
+            assert size >= 0
             self.cumsizes.append(self.cumsizes[-1] + size)
 
         # Seek to the first stencil offset in the underlying file so that "read" will work out-of-the-box
