@@ -763,7 +763,9 @@ class SQLiteIndexedTar:
             return
 
         self.sqlConnection.close()
-        self.sqlConnection = SQLiteIndexedTar._openSqlDb(f"file:{self.indexFileName}?mode=ro", uri=True)
+        self.sqlConnection = SQLiteIndexedTar._openSqlDb(
+            f"file:{self.indexFileName}?mode=ro", uri=True, check_same_thread=False
+        )
 
     @staticmethod
     def _tarInfoFullMode(tarInfo: tarfile.TarInfo) -> int:
@@ -2705,7 +2707,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         operations=fuseOperationsObject,
         mountpoint=args.mount_point,
         foreground=args.foreground,
-        nothreads=True,  # Can't access SQLite database connection object from multiple threads
+        nothreads=False,  # Can't access SQLite database connection object from multiple threads
         # fmt: off
         **fusekwargs
     )
