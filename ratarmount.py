@@ -2636,28 +2636,109 @@ class UnionMountSource(MountSource):
     def __init__(self, mountSources: List[MountSource]) -> None:
         self.mountSources: List[MountSource] = mountSources
 
+        self.folderCache: Dict[str, List[MountSource]] = {"/": self.mountSources}
+        self.folderCacheDepth = 0  # depth 1 means, we only cached top-level directories.
+
         self.rootFileInfo = FileInfo(
             # fmt: off
-            size         = 0,
-            mtime        = int(time.time()),
-            mode         = 0o777 | stat.S_IFDIR,
-            linkname     = "",
-            uid          = os.getuid(),
-            gid          = os.getgid(),
-            userdata     = [None],
+            size     = 0,
+            mtime    = int(time.time()),
+            mode     = 0o777 | stat.S_IFDIR,
+            linkname = "",
+            uid      = os.getuid(),
+            gid      = os.getgid(),
+            userdata = [None],
             # fmt: on
         )
+
+        if len(self.mountSources) > 1:
+            self._buildFolderCache()
+
+    def _buildFolderCache(self, maxDepth=1024, nMaxCacheSize=100000, nMaxSecondsToCache=60):
+        """
+        nMaxCacheSize:
+            Even assuming very long file paths like 1000 chars, the cache size
+            will be below 100 MB if the maximum number of elements is 100k.
+        nMaxSecondsToCache:
+            Another problem is the setup time, as it might take ~0.001s for each getFileInfo call
+            and it shouldn't take minutes! Note that there always can be an edge case with hundred
+            thousands of files in one folder, which can take an arbitrary amount of time to cache.
+        """
+        t0 = time.time()
+
+        if printDebug >= 1:
+            print(f"Building cache for union mount (timeout after {nMaxSecondsToCache}s)...")
+
+        self.folderCache = {"/": self.mountSources}
+
+        lastFolderCache: Dict[str, List[MountSource]] = {"/": self.mountSources}
+
+        for depth in range(1, maxDepth):
+            # This intermediary structure is used because:
+            #   1. We need to only iterate over the newly added folders in the next step
+            #   2. We always want to (atomically) merge results for one folder depth so that we can be sure
+            #      that if a folder of a cached depth can not be found in the cache that it does not exist at all.
+            newFolderCache: Dict[str, List[MountSource]] = {}
+
+            for folder, mountSources in lastFolderCache.items():
+                for mountSource in mountSources:
+                    filesInFolder = mountSource.listDir(folder)
+                    if not filesInFolder:
+                        continue
+
+                    for file in filesInFolder:
+                        if time.time() - t0 > nMaxSecondsToCache or nMaxCacheSize <= 0:
+                            return
+
+                        fullPath = os.path.join(folder, file)
+                        fileInfo = mountSource.getFileInfo(fullPath)
+                        if not fileInfo or not stat.S_ISDIR(fileInfo.mode):
+                            continue
+
+                        nMaxCacheSize -= 1
+
+                        if fullPath in newFolderCache:
+                            newFolderCache[fullPath].append(mountSource)
+                        else:
+                            newFolderCache[fullPath] = [mountSource]
+
+            if not newFolderCache:
+                break
+
+            self.folderCache.update(newFolderCache)
+            self.folderCacheDepth = depth
+            lastFolderCache = newFolderCache
+
+        t1 = time.time()
+
+        if printDebug >= 1:
+            print(
+                f"Cached mount sources for {len(self.folderCache)} folders up to a depth of "
+                f"{self.folderCacheDepth} in {t1-t0:.3}s for faster union mount."
+            )
 
     @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         if path == '/':
             return self.rootFileInfo
 
+        if path in self.folderCache:
+            # This case might be triggered when path is a folder
+            mountSources = self.folderCache[path]
+        elif self.folderCache and self.folderCacheDepth > 0 and path.startswith('/'):
+            # This should be the most common case, i.e., for regular files. Look up the parent folder in this case.
+            parentFolder = '/'.join(path.split('/', self.folderCacheDepth + 1)[:-1])
+            if parentFolder not in self.folderCache:
+                return None
+            mountSources = self.folderCache[parentFolder]
+        else:
+            mountSources = self.mountSources
+
         # We need to keep the sign of the fileVersion in order to forward it to SQLiteIndexedTar.
         # When the requested version can't be found in a mount source, increment negative specified versions
         # by the amount of versions in that mount source or decrement the initially positive version.
         if fileVersion <= 0:
-            for mountSource in reversed(self.mountSources):
+            for mountSource in reversed(mountSources):
                 fileInfo = mountSource.getFileInfo(path, fileVersion=fileVersion)
                 if isinstance(fileInfo, FileInfo):
                     fileInfo.userdata.append(mountSource)
@@ -2667,7 +2748,7 @@ class UnionMountSource(MountSource):
                     break
 
         else:  # fileVersion >= 1
-            for mountSource in self.mountSources:
+            for mountSource in mountSources:
                 fileInfo = mountSource.getFileInfo(path, fileVersion=fileVersion)
                 if isinstance(fileInfo, FileInfo):
                     fileInfo.userdata.append(mountSource)
