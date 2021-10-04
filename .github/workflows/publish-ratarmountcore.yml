@@ -1,0 +1,30 @@
+name: Publish ratarmountcore to PyPI
+
+on:
+  push:
+    tags:
+      - 'core-v*.*.*'
+
+jobs:
+  deploy:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+    - name: Install Dependencies
+      run: |
+        python3 -m pip install --upgrade pip
+        pip install setuptools wheel twine build
+    - name: Build and Publish
+      working-directory: core
+      env:
+        TWINE_PASSWORD: ${{ secrets.RATARMOUNTCORE_TWINE_PASSWORD }}
+      run: |
+        python3 -m build
+        twine check dist/*
+        twine upload --skip-existing -u __token__ dist/*
