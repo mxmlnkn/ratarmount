@@ -92,7 +92,7 @@ class FuseMount(fuse.Operations):
             ):
                 mountSource.tarFileObject.join_threads()
 
-        self.mountSource: MountSource = UnionMountSource(mountSources)
+        self.mountSource: MountSource = UnionMountSource(mountSources, printDebug=self.printDebug)
         if options.get('recursive', False):
             self.mountSource = AutoMountLayer(self.mountSource, **options)
         self.mountSource = FileVersionLayer(self.mountSource)
