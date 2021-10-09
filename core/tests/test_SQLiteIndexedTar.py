@@ -5,8 +5,11 @@
 # pylint: disable=protected-access
 
 import bz2
+import io
 import os
+import stat
 import sys
+import tarfile
 import tempfile
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -18,6 +21,18 @@ from ratarmountcore import SQLiteIndexedTar  # noqa: E402
 
 @pytest.mark.parametrize("parallelization", [1, 2, 4])
 class TestSQLiteIndexedTarParallelized:
+    @staticmethod
+    def _createFile(tarArchive, name, contents):
+        tinfo = tarfile.TarInfo(name)
+        tinfo.size = len(contents)
+        tarArchive.addfile(tinfo, io.BytesIO(contents.encode()))
+
+    @staticmethod
+    def _makeFolder(tarArchive, name):
+        tinfo = tarfile.TarInfo(name)
+        tinfo.type = tarfile.DIRTYPE
+        tarArchive.addfile(tinfo, io.BytesIO())
+
     @staticmethod
     def test_context_manager(parallelization):
         with SQLiteIndexedTar('tests/single-file.tar', writeIndex=False, parallelization=parallelization) as indexedTar:
@@ -114,3 +129,44 @@ class TestSQLiteIndexedTarParallelized:
         assert finfo.size == len(contents)
         assert indexedFile.read(finfo, size=len(contents), offset=0) == contents
         assert indexedFile.read(finfo, size=3, offset=3) == contents[3:6]
+
+    @staticmethod
+    def test_listDir_and_fileVersions(parallelization):
+        with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile:
+            with tarfile.open(name=tmpTarFile.name, mode="w:gz") as tarFile:
+                createFile = TestSQLiteIndexedTarParallelized._createFile
+                makeFolder = TestSQLiteIndexedTarParallelized._makeFolder
+
+                createFile(tarFile, "./README.md", "hello world")
+                makeFolder(tarFile, "./src")
+                createFile(tarFile, "./src/test.sh", "echo hi")
+                makeFolder(tarFile, "./dist")
+                makeFolder(tarFile, "./dist/a")
+                makeFolder(tarFile, "./dist/a/b")
+                createFile(tarFile, "./dist/a/b/test2.sh", "echo two")
+
+            with SQLiteIndexedTar(tmpTarFile.name, clearIndexCache=True, parallelization=parallelization) as indexedTar:
+                folders = []
+                files = []
+
+                foldersToRecurse = ["/"]
+                while foldersToRecurse:
+                    folder = foldersToRecurse.pop()
+                    for name in indexedTar.listDir(folder):
+                        path = os.path.join(folder, name)
+                        print(path)
+                        fileInfo = indexedTar.getFileInfo(path)
+                        if not fileInfo:
+                            continue
+
+                        if stat.S_ISDIR(fileInfo.mode):
+                            folders.append(path)
+                            foldersToRecurse.append(path)
+                        else:
+                            files.append(path)
+
+                assert set(folders) == set(["/dist", "/dist/a", "/dist/a/b", "/src"])
+                assert set(files) == set(["/dist/a/b/test2.sh", "/src/test.sh", "/README.md"])
+
+                for path in folders + files:
+                    assert indexedTar.fileVersions(path) == 1
