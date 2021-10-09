@@ -472,6 +472,7 @@ class SQLiteIndexedTar(MountSource):
         stripRecursiveTarExtension : bool                = False,
         ignoreZeros                : bool                = False,
         verifyModificationTime     : bool                = False,
+        # pylint: disable=unused-argument
         **kwargs
         # fmt: on
     ) -> None:
@@ -838,7 +839,7 @@ class SQLiteIndexedTar(MountSource):
             CREATE TABLE "files" (
                 "path"          VARCHAR(65535) NOT NULL,  /* path with leading and without trailing slash */
                 "name"          VARCHAR(65535) NOT NULL,
-                "offsetheader"  INTEGER,  /* seek offset from TAR file where these file's contents resides */
+                "offsetheader"  INTEGER,  /* seek offset from TAR file where the TAR metadata for this file resides */
                 "offset"        INTEGER,  /* seek offset from TAR file where these file's contents resides */
                 "size"          INTEGER,
                 "mtime"         INTEGER,
@@ -861,9 +862,12 @@ class SQLiteIndexedTar(MountSource):
              * Therefore, it will not be sorted and inserting will be faster! */
             CREATE TABLE "filestmp" AS SELECT * FROM "files" WHERE 0;
             CREATE TABLE "parentfolders" (
-                "path"     VARCHAR(65535) NOT NULL,
-                "name"     VARCHAR(65535) NOT NULL,
+                "path"          VARCHAR(65535) NOT NULL,
+                "name"          VARCHAR(65535) NOT NULL,
+                "offsetheader"  INTEGER,
+                "offset"        INTEGER,
                 PRIMARY KEY (path,name)
+                UNIQUE (path,name)
             );
         """
 
@@ -1140,8 +1144,10 @@ class SQLiteIndexedTar(MountSource):
             DROP TABLE "filestmp";
             INSERT OR IGNORE INTO "files"
                 /* path name offsetheader offset size mtime mode type linkname uid gid istar issparse */
-                SELECT path,name,0,0,0,0,{},{},"",0,0,0,0
-                FROM "parentfolders" ORDER BY "path","name";
+                SELECT path,name,offsetheader,offset,0,0,{},{},"",0,0,0,0
+                FROM "parentfolders"
+                WHERE (path,name) NOT IN ( SELECT path,name FROM "files" WHERE mode & (1 << 14) != 0 )
+                ORDER BY "path","name";
             DROP TABLE "parentfolders";
             PRAGMA optimize;
         """.format(
@@ -1338,7 +1344,7 @@ class SQLiteIndexedTar(MountSource):
         self.tarFileObject.seek(tarFileInfo.offset + offset, os.SEEK_SET)
         return self.tarFileObject.read(size)
 
-    def _tryAddParentFolders(self, path: str) -> None:
+    def _tryAddParentFolders(self, path: str, offsetheader: int, offset: int) -> None:
         # Add parent folders if they do not exist.
         # E.g.: path = '/a/b/c' -> paths = [('', 'a'), ('/a', 'b'), ('/a/b', 'c')]
         # Without the parentFolderCache, the additional INSERT statements increase the creation time
@@ -1365,8 +1371,22 @@ class SQLiteIndexedTar(MountSource):
 
         if not self.sqlConnection:
             raise IndexNotOpenError("This method can not be called without an opened index database!")
+
+        # TODO This method is still not perfect but I do not know how to perfect it without loosing significant
+        #      performance. Currently, adding implicit folders will fail when a file is overwritten implicitly with
+        #      a folder and then overwritten by a file and then again overwritten by a folder. Because the parent
+        #      folderwas already added implicitly the first time, the second time will be skipped.
+        #      To solve this, I would have to add all parent folders for all files, which might easily explode
+        #      the temporary database and the indexing performance by the folder depth.
+        #      Also, I do not want to add versions for a parent folder for each implicitly added parent folder for
+        #      each file, so I would have to sort out those in a post-processing step. E.g., sort by offsetheader
+        #      and then clean out successive implicitly added folders as long as there is no file of the same name
+        #      inbetween.
+        #      The unmentioned alternative would be to lookup paths with LIKE but that is just madness because it
+        #      will have a worse complexity of O(N) insteda of O(log(N)).
         self.sqlConnection.executemany(
-            'INSERT OR IGNORE INTO "parentfolders" VALUES (?,?)', [(p[0], p[1]) for p in paths]
+            'INSERT OR IGNORE INTO "parentfolders" VALUES (?,?,?,?)',
+            [(p[0], p[1], offsetheader, offset) for p in paths],
         )
 
     def _setFileInfo(self, row: tuple) -> None:
@@ -1405,7 +1425,7 @@ class SQLiteIndexedTar(MountSource):
             print("[Warning] The escaped inserted row is now:", row)
             print()
 
-        self._tryAddParentFolders(row[0])
+        self._tryAddParentFolders(row[0], row[2], row[3])
 
     def indexIsLoaded(self) -> bool:
         """Returns true if the SQLite database has been opened for reading and a "files" table exists."""
