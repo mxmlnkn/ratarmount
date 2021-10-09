@@ -10,7 +10,7 @@ import sys
 import tarfile
 import tempfile
 
-if __name__ == '__main__' and __package__ is None:
+if __name__ == '__main__' or __package__ is not None:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import ratarmount
@@ -91,16 +91,16 @@ with SQLiteIndexedTar(os.path.join(os.path.dirname(__file__), 'single-file.tar')
 print("\nTest creating and using an index with .tar.gz files with SQLiteIndexedTar")
 
 
-def createFile(tarFile, name, contents):
+def createFile(tarArchive, name, contents):
     tinfo = tarfile.TarInfo(name)
     tinfo.size = len(contents)
-    tarFile.addfile(tinfo, io.BytesIO(contents.encode()))
+    tarArchive.addfile(tinfo, io.BytesIO(contents.encode()))
 
 
-def makeFolder(tarFile, name):
+def makeFolder(tarArchive, name):
     tinfo = tarfile.TarInfo(name)
     tinfo.type = tarfile.DIRTYPE
-    tarFile.addfile(tinfo, io.BytesIO())
+    tarArchive.addfile(tinfo, io.BytesIO())
 
 
 with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.NamedTemporaryFile(
