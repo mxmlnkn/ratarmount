@@ -1140,7 +1140,7 @@ class SQLiteIndexedTar(MountSource):
             DROP TABLE "filestmp";
             INSERT OR IGNORE INTO "files"
                 /* path name offsetheader offset size mtime mode type linkname uid gid istar issparse */
-                SELECT path,name,0,0,1,0,{},{},"",0,0,0,0
+                SELECT path,name,0,0,0,0,{},{},"",0,0,0,0
                 FROM "parentfolders" ORDER BY "path","name";
             DROP TABLE "parentfolders";
             PRAGMA optimize;
