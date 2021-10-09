@@ -125,3 +125,19 @@ cp CHANGELOG.md README.md
 zip bag.zip README.md CHANGELOG.md &&
 zip bag1.zip CHANGELOG.md &&
 rar a rar-misrecognized-as-zip.rar bag.zip bag1.zip
+
+
+tarFile='updated-file-with-file-under-that-path.tar'
+echo bar > foo
+tar -c --owner=user --group=group --numeric -f "$tarFile" foo
+rm foo
+mkdir foo
+echo iriya > foo/fighter
+tar -u --owner=user --group=group --numeric -f "$tarFile" foo/fighter
+mkdir -p bar/par
+echo ufo > bar/par/sora
+tar -u --owner=user --group=group --numeric -f "$tarFile" bar
+rm bar/par/sora
+mkdir bar/par/sora
+echo iriya > bar/par/sora/natsu
+tar -u --owner=user --group=group --numeric -f "$tarFile" bar/par/sora/natsu

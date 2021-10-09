@@ -1201,6 +1201,13 @@ tests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.rar                     foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.rar                     foo/jet/ufo
 
+    2709a3348eb2c52302a7606ecf5860bc tests/updated-file-implicitly-with-folder.tar foo/fighter
+    2709a3348eb2c52302a7606ecf5860bc tests/updated-file-implicitly-with-folder.tar foo.versions/2/fighter
+    c157a79031e1c40f85931829bc5fc552 tests/updated-file-implicitly-with-folder.tar foo.versions/1
+    2709a3348eb2c52302a7606ecf5860bc tests/updated-file-implicitly-with-folder.tar bar/par/sora/natsu
+    2709a3348eb2c52302a7606ecf5860bc tests/updated-file-implicitly-with-folder.tar bar/par/sora.versions/2/natsu
+    cd85c6a5e5053c04f95e1df301c80755 tests/updated-file-implicitly-with-folder.tar bar/par/sora.versions/1
+
     d3b07384d113edec49eaa6238ad5ff00 tests/single-file.tar                        bar
     d3b07384d113edec49eaa6238ad5ff00 tests/single-file-with-leading-dot-slash.tar bar
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/folder-with-leading-dot-slash.tar      foo/bar
@@ -1215,15 +1222,14 @@ tests+=(
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar-with-overlapping-name.tar   foo/fighter.tar/fighter/bar
     2709a3348eb2c52302a7606ecf5860bc tests/hardlink.tar                           hardlink/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/hardlink.tar                           hardlink/natsu
-    832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   01.sparse1.bin
-    832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   02.normal1.bin
-    832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   03.sparse1.bin
     b3de7534cbc8b8a7270c996235d0c2da tests/concatenated.tar                       foo/fighter
     2709a3348eb2c52302a7606ecf5860bc tests/concatenated.tar                       foo/bar
+
     b3de7534cbc8b8a7270c996235d0c2da tests/updated-file.tar                       foo/fighter/ufo
     b3de7534cbc8b8a7270c996235d0c2da tests/updated-file.tar                       foo/fighter/ufo.versions/3
     9a12be5ebb21d497bd1024d159f2cc5f tests/updated-file.tar                       foo/fighter/ufo.versions/2
     2709a3348eb2c52302a7606ecf5860bc tests/updated-file.tar                       foo/fighter/ufo.versions/1
+
     9a12be5ebb21d497bd1024d159f2cc5f tests/updated-folder-with-file.tar           foo
     b3de7534cbc8b8a7270c996235d0c2da tests/updated-folder-with-file.tar           foo.versions/1/fighter
     b3de7534cbc8b8a7270c996235d0c2da tests/updated-folder-with-file.tar           foo.versions/1/fighter.versions/2
@@ -1232,19 +1238,26 @@ tests+=(
     b3de7534cbc8b8a7270c996235d0c2da tests/updated-folder-with-file.tar           foo.versions/2/fighter.versions/2
     2709a3348eb2c52302a7606ecf5860bc tests/updated-folder-with-file.tar           foo.versions/2/fighter.versions/1
     9a12be5ebb21d497bd1024d159f2cc5f tests/updated-folder-with-file.tar           foo.versions/3
+
     b3de7534cbc8b8a7270c996235d0c2da tests/updated-file-with-folder.tar           foo/fighter
     b3de7534cbc8b8a7270c996235d0c2da tests/updated-file-with-folder.tar           foo/fighter.versions/1
     9a12be5ebb21d497bd1024d159f2cc5f tests/updated-file-with-folder.tar           foo.versions/1
     b3de7534cbc8b8a7270c996235d0c2da tests/updated-file-with-folder.tar           foo.versions/2/fighter
     b3de7534cbc8b8a7270c996235d0c2da tests/updated-file-with-folder.tar           foo.versions/2/fighter.versions/1
-    b026324c6904b2a9cb4b88d6d61c81d1 tests/2k-recursive-tars.tar.bz2              mimi/00001.tar/foo
-    8f30b20831bade7a2236edf09a55af60 tests/2k-recursive-tars.tar.bz2              mimi/01333.tar/foo
-    f95f8943f6dcf7b3c1c8c2cab5455f8b tests/2k-recursive-tars.tar.bz2              mimi/02000.tar/foo
-    c157a79031e1c40f85931829bc5fc552 tests/2k-recursive-tars.tar.bz2              mimi/foo
+
     19696f24a91fc4e8950026f9c801a0d0 tests/simple.bz2                             simple
     19696f24a91fc4e8950026f9c801a0d0 tests/simple.gz                              simple
     2709a3348eb2c52302a7606ecf5860bc tests/file-existing-as-non-link-and-link.tar foo/fighter/ufo
     d3b07384d113edec49eaa6238ad5ff00 tests/two-self-links-to-existing-file.tar    bar
+
+    832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   01.sparse1.bin
+    832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   02.normal1.bin
+    832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   03.sparse1.bin
+
+    b026324c6904b2a9cb4b88d6d61c81d1 tests/2k-recursive-tars.tar.bz2              mimi/00001.tar/foo
+    8f30b20831bade7a2236edf09a55af60 tests/2k-recursive-tars.tar.bz2              mimi/01333.tar/foo
+    f95f8943f6dcf7b3c1c8c2cab5455f8b tests/2k-recursive-tars.tar.bz2              mimi/02000.tar/foo
+    c157a79031e1c40f85931829bc5fc552 tests/2k-recursive-tars.tar.bz2              mimi/foo
 )
 
 
