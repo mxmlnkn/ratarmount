@@ -1134,6 +1134,34 @@ checkSelfReferencingHardLinks()
 }
 
 
+checkGnuIncremental()
+{
+    local archive="$1"; shift
+    local fileInTar="$1"; shift
+    local correctChecksum="$1"
+
+    rm -f ratarmount.{stdout,stderr}.log
+
+    local mountFolder
+    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+
+    # try with index recreation and forcing to read as GNU incremental
+    local args=( -P "$parallelization" -c --ignore-zeros --recursive --gnu-incremental "$archive" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}" &&
+        checkStat "$mountFolder/$fileInTar" &&
+        verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+    funmount "$mountFolder"
+
+    safeRmdir "$mountFolder"
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully '$fileInTar' in '$archive' for checksum $correctChecksum"
+
+    return 0
+}
+
 rm -f ratarmount.{stdout,stderr}.log
 
 # Linting only to be done locally because in CI it is in separate steps
@@ -1284,6 +1312,17 @@ tests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/nested-directly-compressed.tar.bz2     directly-compressed/ufo.gz/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/nested-directly-compressed.tar.bz2     directly-compressed/ufo.xz/ufo
 
+    c157a79031e1c40f85931829bc5fc552    tests/absolute-file-incremental.tar           14130612002/tmp/foo
+    8ddd8be4b179a529afa5f2ffae4b9858    tests/incremental-backup.level.0.tar          root-file.txt
+    5bbf5a52328e7439ae6e719dfe712200    tests/incremental-backup.level.0.tar          foo/1
+    c193497a1a06b2c72230e6146ff47080    tests/incremental-backup.level.0.tar          foo/2
+    febe6995bad457991331348f7b9c85fa    tests/incremental-backup.level.0.tar          foo/3
+    3d45efe945446cd53a944972bf60810c    tests/incremental-backup.level.1.tar          foo/3
+    5bbf5a52328e7439ae6e719dfe712200    tests/incremental-backup.level.1.tar          foo/moved
+    c157a79031e1c40f85931829bc5fc552    tests/single-file-incremental-mockup.tar      14130613451/foo
+    c157a79031e1c40f85931829bc5fc552    tests/single-file-incremental-long-name-mockup.tar 14130613451/000000000100000000020000000003000000000400000000050000000006000000000700000000080000000009000000000A000000000B000000000C
+    c157a79031e1c40f85931829bc5fc552    tests/single-file-incremental-long-name.tar 000000000100000000020000000003000000000400000000050000000006000000000700000000080000000009000000000A000000000B000000000C
+
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   01.sparse1.bin
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   02.normal1.bin
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   03.sparse1.bin
@@ -1303,6 +1342,17 @@ export parallelization
 if [[ ! -f tests/2k-recursive-tars.tar ]]; then
     bzip2 -q -d -k tests/2k-recursive-tars.tar.bz2
 fi
+
+# GNU inremental TARs without directory entries cannot be reliably recognized as such. GNU TAR seems to use the
+# heuristic of the prefix but the prefix can also be validly set without it being an incremental TAR.
+# Note that bsdtar, which is based on libarchive, can somehow recognize this as a GNU tar and strips the prefix.
+# Busyboxes TAR implementation does show the prefix for this file and if there are directory entries it will fail
+# on the incremental directory type marker with: "tar: unknown typeflag: 0x44".
+# This busybox behavior seems to support my understanding that without directory entries, incremental files behave
+# like valid TARs and cannot be identified reliably as incremental TARs.
+# TODO Look at the source code of bsdtar how it recognizes GNU incremental TARs
+checkGnuIncremental tests/single-file-incremental.tar foo c157a79031e1c40f85931829bc5fc552
+checkGnuIncremental tests/absolute-file-incremental.tar /tmp/foo c157a79031e1c40f85931829bc5fc552
 
 checkIndexPathOption tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
 checkIndexFolderFallback tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00

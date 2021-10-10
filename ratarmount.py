@@ -542,6 +542,15 @@ seeking capabilities when opening that file.
                'is useful when reading archives created with the -A option.' )
 
     parser.add_argument(
+        '--gnu-incremental', dest = 'gnu_incremental', action = 'store_true', default = None,
+        help = 'Will strip octal modification time prefixes from file paths, which appear in GNU incremental backups '
+               'created with GNU tar with the --incremental or --listed-incremental options.')
+
+    parser.add_argument(
+        '--no-gnu-incremental', dest = 'gnu_incremental', action = 'store_false',
+        help = 'If specified, will never strip octal modification prefixes and will also not do automatic detection.')
+
+    parser.add_argument(
         '--verify-mtime', action = 'store_true',
         help = 'By default, only the TAR file size is checked to match the one in the found existing ratarmount index. '
                'If this option is specified, then also check the modification timestamp. But beware that the mtime '
@@ -702,6 +711,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         lazyMounting               = args.lazy,
         passwords                  = args.passwords,
         parallelization            = args.parallelization,
+        isGnuIncremental           = args.gnu_incremental,
         printDebug                 = args.debug,
         # fmt: on
     )
