@@ -141,3 +141,46 @@ rm bar/par/sora
 mkdir bar/par/sora
 echo iriya > bar/par/sora/natsu
 tar -u --owner=user --group=group --numeric -f "$tarFile" bar/par/sora/natsu
+
+
+rm foo ./*'-incremental-backup.level.'* root-file.txt
+mkdir foo
+echo 'Hello World!' > root-file.txt
+echo 'one' > foo/1
+echo 'three' > foo/3
+sleep 2s
+echo 'two' > foo/2
+tar -c --owner=user --group=group --numeric -f 'incremental-backup.level.0.tar' --listed-incremental="new-incremental-backup.level.0.snar" root-file.txt foo
+
+# Create an incremental backup
+cp new-incremental-backup.level.{0,1}.snar
+mv foo/{1,moved}
+printf '\nmodified\n' >> foo/3
+rm foo/2
+tar -c --owner=user --group=group --numeric -f 'incremental-backup.level.1.tar' --listed-incremental="new-incremental-backup.level.1.snar" root-file.txt foo
+
+rm foo root-file.txt
+
+
+rm foo
+echo bar > foo
+tar -c --owner=user --group=group --numeric -f 'single-file-incremental.tar' --incremental foo
+octalMTime=$( printf %o "$( stat -c %Y foo )" )
+mkdir "$octalMTime"
+mv foo "$_"
+tar -c --owner=user --group=group --numeric -f 'single-file-incremental-mockup.tar' "$octalMTime/foo"
+rm "$octalMTime"
+
+longName=$( printf 000000000%s 1 2 3 4 5 6 7 8 9 A B C )
+rm "$longName" 'single-file-incremental-long-name'*
+echo bar > "$longName"
+tar -c --owner=user --group=group --numeric -f 'single-file-incremental-long-name.tar' --incremental "$longName"
+octalMTime=$( printf %o "$( stat -c %Y "$longName" )" )
+mkdir "$octalMTime"
+mv "$longName" "$_"
+tar -c --owner=user --group=group --numeric -f 'single-file-incremental-long-name-mockup.tar' "$octalMTime/$longName"
+rm "$octalMTime"
+
+
+echo bar > /tmp/foo
+tar -c --absolute-names --owner=user --group=group --numeric -f 'absolute-file-incremental.tar' --incremental /tmp/foo
