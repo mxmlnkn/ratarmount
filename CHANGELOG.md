@@ -1,4 +1,8 @@
 
+# Version 0.10.0 built on 2021-10-xx
+
+ - Split ratarmount into ratarmount, which contains the CLI, and ratarmountcore.
+
 # Version 0.9.1 built on 2021-09-26
 
  - Fix recursive mounting failing for archives in top-level directory.
