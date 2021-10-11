@@ -13,6 +13,7 @@ import zipfile
 from typing import Any, Dict, Iterable, IO, List, Optional, Tuple, Union
 import fuse
 
+import ratarmountcore as core
 from ratarmountcore import (
     SQLiteIndexedTar,
     MountSource,
@@ -640,6 +641,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
     tmpArgs = sys.argv[1:] if rawArgs is None else rawArgs
     if '--version' in tmpArgs or '-v' in tmpArgs:
         print("ratarmount", __version__)
+        print("ratarmountcore", core.__version__)
         return
 
     # tmpArgs are only for the manual parsing. In general, rawArgs is None, meaning it reads sys.argv,
