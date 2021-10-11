@@ -38,8 +38,10 @@ except ImportError:
 # The file object returned by ZipFile.open is not seekable in Python 3.6 for some reason.
 # Therefore disable ZIP support there!
 # I don't see it documented, instead I tested different Python versions with Docker.
-if sys.version_info[2] > 6:
+if sys.version_info[1] > 6:
     import zipfile
+else:
+    zipfile = None
 
 
 # Defining lambdas does not yet check the names of entities used inside the lambda!
