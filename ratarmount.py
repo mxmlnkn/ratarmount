@@ -13,6 +13,11 @@ import zipfile
 from typing import Any, Dict, Iterable, IO, List, Optional, Tuple, Union
 import fuse
 
+try:
+    import rarfile
+except ImportError:
+    pass
+
 import ratarmountcore as core
 from ratarmountcore import (
     SQLiteIndexedTar,
@@ -589,7 +594,7 @@ seeking capabilities when opening that file.
 
     # Manually check that all specified TARs and folders exist
     def checkMountSource(path):
-        if os.path.isdir(path) or zipfile.is_zipfile(path):
+        if os.path.isdir(path) or zipfile.is_zipfile(path) or ('rarfile' in sys.modules and rarfile.is_rarfile(path)):
             return os.path.realpath(path)
         return TarFileType(encoding=args.encoding, printDebug=args.debug)(path)[0]
 
