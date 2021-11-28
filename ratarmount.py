@@ -62,7 +62,7 @@ if sys.version_info[2] > 6:
     import zipfile
 
 
-__version__ = '0.9.1'
+__version__ = '0.9.2'
 
 
 parallelization = 1

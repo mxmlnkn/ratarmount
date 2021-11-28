@@ -1,4 +1,14 @@
 
+# Version 0.9.2 built on 2021-11-28
+
+ - Fix StenciledFile accidentally throwing an exception when accessing empty files.
+ - Improve performance when using union mounting by using a folder-to-archive lookup cache.
+ - Implicitly added parent folders will now show a size of 0B instead of arbitrary 1B.
+ - Fix version ordering for implicitly added folders.
+ - Fix permissions to not remove write permissions. FUSE will still return a
+   "Read-only file system" error when trying to modify the file system.
+ - Fix RAR files were not found when ratarmount was daemonized and changed the current working directory.
+
 # Version 0.9.1 built on 2021-09-26
 
  - Fix recursive mounting failing for archives in top-level directory.
