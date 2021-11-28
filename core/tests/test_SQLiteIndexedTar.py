@@ -78,23 +78,45 @@ class TestSQLiteIndexedTarParallelized:
 
     @staticmethod
     def test_index_creation_and_loading(parallelization):
-        with tempfile.NamedTemporaryFile(suffix=".bz2") as tmpTarFile:
-            contents = b"Hello World!"
-            with bz2.open(tmpTarFile.name, "wb") as bz2File:
-                bz2File.write(contents)
+        with tempfile.TemporaryDirectory() as tmpDirectory:
+            oldCurrentWorkingDirectory = os.getcwd()
+            os.chdir(tmpDirectory)
+            try:
+                archiveName = 'simple.bz2'
+                indexPath = 'simple.custom.index'
+                contents = b"Hello World!"
+                with bz2.open(archiveName, "wb") as bz2File:
+                    bz2File.write(contents)
 
-            testIndex = TestSQLiteIndexedTarParallelized._test_index_creation_and_loading
+                def testIndex(x, y, z):
+                    TestSQLiteIndexedTarParallelized._test_index_creation_and_loading(
+                        x, y, z, contents, parallelization
+                    )
 
-            with tempfile.NamedTemporaryFile(suffix=".sqlite") as tmpIndexFile:
-                testIndex(None, tmpTarFile.name, tmpIndexFile.name, contents, parallelization)
+                # Three optional arguments give 2^3=8 test cases
 
-            with tempfile.NamedTemporaryFile(suffix=".sqlite") as tmpIndexFile:
-                with open(tmpTarFile.name, "rb") as file:
-                    testIndex(file, "tarFileName", tmpIndexFile.name, contents, parallelization)
+                with pytest.raises(ValueError):
+                    testIndex(None, None, indexPath)
+                with pytest.raises(ValueError):
+                    testIndex(None, None, None)
+
+                testIndex(archiveName, None, indexPath)
+                testIndex(archiveName, None, None)
+
+                with open(archiveName, "rb") as file:
+                    testIndex("tarFileName", file, indexPath)
+                    testIndex("tarFileName", file, None)
+                    testIndex(None, file, indexPath)
+                    testIndex(None, file, None)
+
+            finally:
+                os.chdir(oldCurrentWorkingDirectory)
 
     @staticmethod
-    def _test_index_creation_and_loading(fileObject, tarFileName, indexFilePath, contents, parallelization):
-        assert not os.path.exists(indexFilePath) or os.stat(indexFilePath).st_size == 0
+    def _test_index_creation_and_loading(tarFileName, fileObject, indexFilePath, contents, parallelization):
+        if indexFilePath:
+            assert not os.path.exists(indexFilePath) or os.stat(indexFilePath).st_size == 0
+        oldFolderContents = os.listdir('.')
 
         # Create index
         with SQLiteIndexedTar(
@@ -107,7 +129,15 @@ class TestSQLiteIndexedTarParallelized:
         ):
             pass
 
-        assert os.stat(indexFilePath).st_size > 0
+        # When opening a file object without a path, no index should have been created anywhere!
+        if indexFilePath is None and fileObject is not None:
+            assert oldFolderContents == os.listdir('.')
+            return
+
+        createdIndexFilePath = indexFilePath
+        if not indexFilePath and not fileObject and tarFileName:
+            createdIndexFilePath = tarFileName + '.index.sqlite'
+        assert os.stat(createdIndexFilePath).st_size > 0
 
         # Read from index
         indexedFile = SQLiteIndexedTar(
@@ -119,16 +149,20 @@ class TestSQLiteIndexedTarParallelized:
             parallelization=parallelization,
         )
 
-        expected_name = os.path.basename(tarFileName).rsplit('.', 1)[0] if fileObject is None else tarFileName
+        objectName = '<file object>' if tarFileName is None else tarFileName
+        expectedName = os.path.basename(tarFileName).rsplit('.', 1)[0] if fileObject is None else objectName
 
         finfo = indexedFile._getFileInfo("/", listDir=True)
-        assert expected_name in finfo
-        assert finfo[expected_name].size == len(contents)
+        assert expectedName in finfo
+        assert finfo[expectedName].size == len(contents)
 
-        finfo = indexedFile.getFileInfo("/" + expected_name)
+        finfo = indexedFile.getFileInfo("/" + expectedName)
         assert finfo.size == len(contents)
         assert indexedFile.read(finfo, size=len(contents), offset=0) == contents
         assert indexedFile.read(finfo, size=3, offset=3) == contents[3:6]
+
+        if createdIndexFilePath:
+            os.remove(createdIndexFilePath)
 
     @staticmethod
     def test_listDir_and_fileVersions(parallelization):
