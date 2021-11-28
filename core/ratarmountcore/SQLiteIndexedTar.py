@@ -158,7 +158,7 @@ class SQLiteIndexedTar(MountSource):
         if self.compression == 'xz':
             try:
                 if len(self.tarFileObject.block_boundaries) <= 1 and (fileSize is None or fileSize > 1024 * 1024):
-                    print("[Warning] The specified file '{}'".format(self.tarFileName))
+                    print(f"[Warning] The specified file '{self.tarFileName}'")
                     print("[Warning] is compressed using xz but only contains one xz block. This makes it ")
                     print("[Warning] impossible to use true seeking! Please (re)compress your TAR using pixz")
                     print("[Warning] (see https://github.com/vasi/pixz) in order for ratarmount to do be able ")
@@ -485,8 +485,7 @@ class SQLiteIndexedTar(MountSource):
         tables = sqlConnection.execute('SELECT name FROM sqlite_master WHERE type = "table";')
         if {"files", "filestmp", "parentfolders"}.intersection({t[0] for t in tables}):
             raise InvalidIndexError(
-                "The index file {} already seems to contain a table. "
-                "Please specify --recreate-index.".format(indexFilePath)
+                f"The index file {indexFilePath} already seems to contain a table. Please specify --recreate-index."
             )
         sqlConnection.executescript(createTables)
         return sqlConnection
@@ -692,7 +691,7 @@ class SQLiteIndexedTar(MountSource):
         if streamOffset > 0:
             t1 = timer()
             if self.printDebug >= 1:
-                print("Creating offset dictionary for", self.tarFileName, "took {:.2f}s".format(t1 - t0))
+                print(f"Creating offset dictionary for {self.tarFileName} took {t1 - t0:.2f}s")
             return
 
         # If no file is in the TAR, then it most likely indicates a possibly compressed non TAR file.
@@ -749,27 +748,25 @@ class SQLiteIndexedTar(MountSource):
         if self.printDebug >= 2:
             print("Resorting files by path ...")
 
-        cleanupDatabase = """
+        cleanupDatabase = f"""
             INSERT OR REPLACE INTO "files" SELECT * FROM "filestmp" ORDER BY "path","name",rowid;
             DROP TABLE "filestmp";
             INSERT OR IGNORE INTO "files"
                 /* path name offsetheader offset size mtime mode type linkname uid gid istar issparse */
-                SELECT path,name,offsetheader,offset,0,0,{},{},"",0,0,0,0
+                SELECT path,name,offsetheader,offset,0,0,{int(0o555 | stat.S_IFDIR)},{int(tarfile.DIRTYPE)},"",0,0,0,0
                 FROM "parentfolders"
                 WHERE (path,name) NOT IN ( SELECT path,name FROM "files" WHERE mode & (1 << 14) != 0 )
                 ORDER BY "path","name";
             DROP TABLE "parentfolders";
             PRAGMA optimize;
-        """.format(
-            int(0o555 | stat.S_IFDIR), int(tarfile.DIRTYPE)
-        )
+        """
         self.sqlConnection.executescript(cleanupDatabase)
 
         self.sqlConnection.commit()
 
         t1 = timer()
         if self.printDebug >= 1:
-            print("Creating offset dictionary for", self.tarFileName, "took {:.2f}s".format(t1 - t0))
+            print(f"Creating offset dictionary for {self.tarFileName} took {t1 - t0:.2f}s")
 
     @staticmethod
     def _rowToFileInfo(row: Dict[str, Any]) -> FileInfo:
@@ -873,14 +870,12 @@ class SQLiteIndexedTar(MountSource):
 
         path, name = fullPath.rsplit('/', 1)
         row = self.sqlConnection.execute(
-            """
+            f"""
             SELECT * FROM "files"
             WHERE "path" == (?) AND "name" == (?)
-            ORDER BY "offsetheader" {}
+            ORDER BY "offsetheader" {'DESC' if fileVersion is None or fileVersion <= 0 else 'ASC'}
             LIMIT 1 OFFSET (?);
-            """.format(
-                'DESC' if fileVersion is None or fileVersion <= 0 else 'ASC'
-            ),
+            """,
             (path, name, 0 if fileVersion is None else fileVersion - 1 if fileVersion > 0 else -fileVersion),
         ).fetchone()
         return self._rowToFileInfo(row) if row else None
@@ -1142,7 +1137,7 @@ class SQLiteIndexedTar(MountSource):
                         print("[Warning] given for mounting the archive now. In order to apply these changes, ")
                         print("[Warning] recreate the index using the --recreate-index option!")
                         for arg, oldState, newState in differingArgs:
-                            print("[Warning] {}: index: {}, current: {}".format(arg, oldState, newState))
+                            print(f"[Warning] {arg}: index: {oldState}, current: {newState}")
 
         except Exception as e:
             # indexIsLoaded checks self.sqlConnection, so close it before returning because it was found to be faulty
@@ -1156,7 +1151,7 @@ class SQLiteIndexedTar(MountSource):
 
         if self.printDebug >= 1:
             # Legacy output for automated tests
-            print("Loading offset dictionary from", indexFilePath, "took {:.2f}s".format(time.time() - t0))
+            print(f"Loading offset dictionary from {str(indexFilePath)} took {time.time() - t0:.2f}s")
 
     def _tryLoadIndex(self, indexFilePath: AnyStr) -> bool:
         """calls loadIndex if index is not loaded already and provides extensive error handling"""
@@ -1273,9 +1268,7 @@ class SQLiteIndexedTar(MountSource):
         cinfo = supportedCompressions[compression]
         if cinfo.moduleName not in sys.modules:
             raise CompressionError(
-                "Can't open a {} compressed file '{}' without {} module!".format(
-                    compression, fileobj.name, cinfo.moduleName
-                )
+                f"Can't open a {compression} compressed file '{fileobj.name}' without {cinfo.moduleName} module!"
             )
 
         if compression == 'gz':
@@ -1327,21 +1320,17 @@ class SQLiteIndexedTar(MountSource):
                 table_name = 'zstdblocks'
 
             try:
-                offsets = dict(db.execute('SELECT blockoffset,dataoffset FROM {};'.format(table_name)))
+                offsets = dict(db.execute(f"SELECT blockoffset,dataoffset FROM {table_name};"))
                 fileObject.set_block_offsets(offsets)
             except Exception:
                 if self.printDebug >= 2:
-                    print(
-                        "[Info] Could not load {} block offset data. Will create it from scratch.".format(
-                            self.compression
-                        )
-                    )
+                    print(f"[Info] Could not load {self.compression} block offset data. Will create it from scratch.")
 
                 tables = [x[0] for x in db.execute('SELECT name FROM sqlite_master WHERE type="table";')]
                 if table_name in tables:
-                    db.execute('DROP TABLE {}'.format(table_name))
-                db.execute('CREATE TABLE {} ( blockoffset INTEGER PRIMARY KEY, dataoffset INTEGER )'.format(table_name))
-                db.executemany('INSERT INTO {} VALUES (?,?)'.format(table_name), fileObject.block_offsets().items())
+                    db.execute(f"DROP TABLE {table_name}")
+                db.execute(f"CREATE TABLE {table_name} ( blockoffset INTEGER PRIMARY KEY, dataoffset INTEGER )")
+                db.executemany(f"INSERT INTO {table_name} VALUES (?,?)", fileObject.block_offsets().items())
                 db.commit()
             return
 
@@ -1465,8 +1454,7 @@ class SQLiteIndexedTar(MountSource):
         if self.compression in [None, 'xz']:
             return
 
-        assert (
-            False
-        ), "Could not load or store block offsets for {} probably because adding support was forgotten!".format(
-            self.compression
+        assert False, (
+            f"Could not load or store block offsets for {self.compression} "
+            "probably because adding support was forgotten!"
         )

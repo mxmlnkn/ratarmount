@@ -58,7 +58,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
     }
 
     for name, kwargs in testKwargs.items():
-        print("\n== Test with {} ==".format(name))
+        print(f"\n== Test with {name} ==")
 
         # Create index
         SQLiteIndexedTar(

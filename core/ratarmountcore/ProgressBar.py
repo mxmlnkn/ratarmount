@@ -28,14 +28,9 @@ class ProgressBar:
         # However, this estimate might vary a lot while the other one stabilizes after some time!
         eta2 = int((time.time() - self.lastUpdateTime) / (value - self.lastUpdateValue) * (self.maxValue - value))
         print(
-            "Currently at position {} of {} ({:.2f}%). "
-            "Estimated time remaining with current rate: {} min {} s, with average rate: {} min {} s.".format(
-                # fmt:off
-                value, self.maxValue, value / self.maxValue * 100.0,
-                eta2 // 60, eta2 % 60,
-                eta1 // 60, eta1 % 60
-                # fmt:on
-            ),
+            f"Currently at position {value} of {self.maxValue} ({value / self.maxValue * 100.0:.2f}%). "
+            f"Estimated time remaining with current rate: {eta2 // 60} min {eta2 % 60} s, "
+            f"with average rate: {eta1 // 60} min {eta1 % 60} s.",
             flush=True,
         )
 
