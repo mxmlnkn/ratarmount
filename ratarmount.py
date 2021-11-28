@@ -174,8 +174,6 @@ class FuseMount(fuse.Operations):
 
         # dictionary keys: https://pubs.opengroup.org/onlinepubs/007904875/basedefs/sys/stat.h.html
         statDict = {"st_" + key: getattr(fileInfo, key) for key in ('size', 'mtime', 'mode', 'uid', 'gid')}
-        # signal that everything was mounted read-only
-        statDict['st_mode'] &= ~(stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH)
         statDict['st_mtime'] = int(statDict['st_mtime'])
         statDict['st_nlink'] = 1  # TODO: this is wrong for files with hardlinks
 
