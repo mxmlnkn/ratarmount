@@ -27,7 +27,10 @@ except ImportError:
 try:
     import xz
 except ImportError:
-    xz = None
+    if 'xz' not in sys.modules:
+        # For some reason, only this import triggers mypy. All the others are fine.
+        # Should be something like Optional[Module] but there is no Module type.
+        xz = None  # type: ignore
 
 try:
     import rarfile
