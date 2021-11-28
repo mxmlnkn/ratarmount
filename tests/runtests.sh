@@ -1310,14 +1310,20 @@ for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
     tarPath=${tests[iTest+1]}
     fileName=${tests[iTest+2]}
 
-    # readarray does not work on macOS!
-    #readarray -t files < <( recompressFile "$tarPath" )
-    files=()
-    while IFS=$'\n' read -r line; do
-        files+=( "$line" )
-    done < <( recompressFile "$tarPath" || returnError "$LINENO" 'Something went wrong during recompression.' )
-
-    TMP_FILES_TO_CLEANUP+=( "${files[@]}" )
+    # Only test some larger files for all compression backends because most of the files are minimal
+    # tests which all have the same size of 20*512B. In the first place, the compression backends
+    # should be tested more rigorously inside their respective projects not by ratarmount.
+    if [[ "$fileName" =~ 2k-recursive ]]; then
+        # readarray does not work on macOS!
+        #readarray -t files < <( recompressFile "$tarPath" )
+        files=()
+        while IFS=$'\n' read -r line; do
+            files+=( "$line" )
+        done < <( recompressFile "$tarPath" || returnError "$LINENO" 'Something went wrong during recompression.' )
+        TMP_FILES_TO_CLEANUP+=( "${files[@]}" )
+    else
+        files=( "$tarPath" )
+    fi
 
     for file in "${files[@]}"; do
         case "$( file --mime-type -- "$file" | sed 's|.*[/-]||' )" in
@@ -1327,7 +1333,7 @@ for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
                 ;;
         esac
         (( ++nFiles ))
-    done < <( recompressFile "$tarPath" )
+    done
     cleanup
     rmdir -- "$( dirname -- "$file" )"
 done
