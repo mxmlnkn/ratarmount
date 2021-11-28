@@ -85,7 +85,7 @@ class FolderMountSource(MountSource):
         try:
             return open(realpath, 'rb')
         except Exception as e:
-            raise ValueError("Specified path '{}' is not a file that can be read!".format(realpath)) from e
+            raise ValueError(f"Specified path '{realpath}' is not a file that can be read!") from e
 
     @overrides(MountSource)
     def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:

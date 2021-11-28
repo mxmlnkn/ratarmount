@@ -261,7 +261,7 @@ class TarFileType:
 
     def __call__(self, tarFile: str) -> Tuple[str, Optional[str]]:
         if not os.path.isfile(tarFile):
-            raise argparse.ArgumentTypeError("File '{}' is not a file!".format(tarFile))
+            raise argparse.ArgumentTypeError(f"File '{tarFile}' is not a file!")
 
         with open(tarFile, 'rb') as fileobj:
             fileSize = os.stat(tarFile).st_size
@@ -285,7 +285,7 @@ class TarFileType:
                 zstdFile = supportedCompressions[compression].open(fileobj)
 
                 if not zstdFile.is_multiframe() and fileSize > 1024 * 1024:
-                    print("[Warning] The specified file '{}'".format(tarFile))
+                    print(f"[Warning] The specified file '{tarFile}'")
                     print("[Warning] is compressed using zstd but only contains one zstd frame. This makes it ")
                     print("[Warning] impossible to use true seeking! Please (re)compress your TAR using multiple ")
                     print("[Warning] frames in order for ratarmount to do be able to do fast seeking to requested ")
@@ -305,14 +305,12 @@ class TarFileType:
                 if self.printDebug >= 2:
                     print(f"Archive '{tarFile}' (compression: {compression}) can't be opened!")
 
-                raise argparse.ArgumentTypeError("Archive '{}' can't be opened!\n".format(tarFile))
+                raise argparse.ArgumentTypeError(f"Archive '{tarFile}' can't be opened!\n")
 
         cinfo = supportedCompressions[compression]
         if cinfo.moduleName not in sys.modules:
             raise argparse.ArgumentTypeError(
-                "Can't open a {} compressed TAR file '{}' without {} module!".format(
-                    compression, fileobj.name, cinfo.moduleName
-                )
+                f"Can't open a {compression} compressed TAR file '{fileobj.name}' without {cinfo.moduleName} module!"
             )
 
         return tarFile, compression
@@ -569,7 +567,7 @@ seeking capabilities when opening that file.
         '-P', '--parallelization', type = int, default = 1,
         help = 'If an integer other than 1 is specified, then the threaded parallel bzip2 decoder will be used '
                'specified amount of block decoder threads. Further threads with lighter work may be started. '
-               'A value of 0 will use all the available cores ({}).'.format(os.cpu_count()))
+               f'A value of 0 will use all the available cores ({os.cpu_count()}).')
 
     parser.add_argument(
         '-v', '--version', action='store_true', help = 'Print version string.' )
