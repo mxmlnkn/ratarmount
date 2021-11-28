@@ -425,9 +425,8 @@ class SQLiteIndexedTar(MountSource):
             if folder:
                 os.makedirs(folder, exist_ok=True)
 
-            f = open(path, 'wb')
-            f.write(b'\0' * 1024 * 1024)
-            f.close()
+            with open(path, 'wb') as file:
+                file.write(b'\0' * 1024 * 1024)
             os.remove(path)
 
             return True
