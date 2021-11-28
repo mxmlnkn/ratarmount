@@ -90,10 +90,13 @@ class SQLiteIndexedTar(MountSource):
                      If it is an instance of IndexedBzip2File, IndexedGzipFile, or IndexedZstdFile, then the offset
                      loading and storing from and to the SQLite database is managed automatically by this class.
         writeIndex : If true, then the sidecar index file will be written to a suitable location.
+                     Will be ignored if indexFilePath is ':memory:' or if only fileObject is specified
+                     but not tarFileName.
         clearIndexCache : If true, then check all possible index file locations for the given tarFileName/fileObject
                           combination and delete them. This also implicitly forces a recreation of the index.
         indexFilePath : Path to the index file for this TAR archive. This takes precedence over the automatically
-                        chosen locations.
+                        chosen locations. If it is ':memory:', then the SQLite database will be kept in memory
+                        and not stored to the file system at any point.
         indexFolders : Specify one or multiple paths for storing .index.sqlite files. Paths will be tested for
                        suitability in the given order. An empty path will be interpreted as the location in which
                        the TAR resides. This overrides the default index fallback folder in ~/.ratarmount.
@@ -127,22 +130,25 @@ class SQLiteIndexedTar(MountSource):
         self.gzipSeekPointSpacing       = gzipSeekPointSpacing
         self.parallelization            = parallelization
         self.printDebug                 = printDebug
-        self.isCustomTarFileName        = fileObject is not None
+        self.isFileObject               = fileObject is not None
         # fmt: on
 
-        self.tarFileName: str = '<file object>'
-        if not fileObject:
-            if not tarFileName:
+        # Determine an archive file name to show for debug output
+        self.tarFileName: str
+        if fileObject:
+            self.tarFileName = tarFileName if tarFileName else '<file object>'
+        else:
+            if tarFileName:
+                self.tarFileName = os.path.abspath(tarFileName)
+            else:
                 raise ValueError("At least one of tarFileName and fileObject arguments should be set!")
-            self.tarFileName = os.path.abspath(tarFileName)
-            fileObject = open(self.tarFileName, 'rb')
-        elif tarFileName:
-            # If tarFileName was specified for a file object, set self.tarFileName accordingly.
-            self.tarFileName = tarFileName
 
+        # If no fileObject given, then self.tarFileName is the path to the archive to open.
+        if not fileObject:
+            fileObject = open(self.tarFileName, 'rb')
         fileObject.seek(0, io.SEEK_END)
         fileSize = fileObject.tell()
-        fileObject.seek(0)
+        fileObject.seek(0)  # Even if not interested in the file size, seeking to the start might be useful.
 
         # rawFileObject : Only set when opening a compressed file and only kept to keep the
         #                 compressed file handle from being closed by the garbage collector.
@@ -169,25 +175,36 @@ class SQLiteIndexedTar(MountSource):
                 pass
 
         # will be used for storing indexes if current path is read-only
-        possibleIndexFilePaths = [self.tarFileName + ".index.sqlite"] if self.tarFileName else []
-        indexPathAsName = self.tarFileName.replace("/", "_") + ".index.sqlite" if self.tarFileName else None
+        if self.isFileObject:
+            possibleIndexFilePaths = []
+            indexPathAsName = None
+        else:
+            possibleIndexFilePaths = [self.tarFileName + ".index.sqlite"]
+            indexPathAsName = self.tarFileName.replace("/", "_") + ".index.sqlite"
+
         if isinstance(indexFolders, str):
             indexFolders = [indexFolders]
 
         # A given index file name takes precedence and there should be no implicit fallback
         if indexFilePath:
             if indexFilePath == ':memory:':
-                possibleIndexFilePaths = [indexFilePath]
+                possibleIndexFilePaths = []
             else:
                 possibleIndexFilePaths = [os.path.abspath(os.path.expanduser(indexFilePath))]
         elif indexFolders:
             # An empty path is to be interpreted as the default path right besides the TAR
             if '' not in indexFolders:
                 possibleIndexFilePaths = []
-            for folder in indexFolders:
-                if folder and indexPathAsName:
-                    indexPath = os.path.join(folder, indexPathAsName)
-                    possibleIndexFilePaths.append(os.path.abspath(os.path.expanduser(indexPath)))
+
+            if indexPathAsName:
+                for folder in indexFolders:
+                    if folder:
+                        indexPath = os.path.join(folder, indexPathAsName)
+                        possibleIndexFilePaths.append(os.path.abspath(os.path.expanduser(indexPath)))
+            else:
+                writeIndex = False
+        elif self.isFileObject:
+            writeIndex = False
 
         if clearIndexCache:
             for indexPath in possibleIndexFilePaths:
@@ -217,7 +234,7 @@ class SQLiteIndexedTar(MountSource):
             return
 
         # Find a suitable (writable) location for the index database
-        if writeIndex:
+        if writeIndex and indexFilePath != ':memory:':
             for indexPath in possibleIndexFilePaths:
                 if self._pathIsWritable(indexPath, printDebug=self.printDebug) and self._pathCanBeUsedForSqlite(
                     indexPath, printDebug=self.printDebug
@@ -272,7 +289,7 @@ class SQLiteIndexedTar(MountSource):
         connection.executescript(metadataTable)
 
         # All of these require the generic "metadata" table.
-        if not self.isCustomTarFileName:
+        if not self.isFileObject:
             self._storeTarMetadata(connection, self.tarFileName, printDebug=self.printDebug)
         self._storeArgumentsMetadata(connection)
         connection.commit()
