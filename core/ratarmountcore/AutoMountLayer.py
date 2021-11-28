@@ -47,6 +47,9 @@ class AutoMountLayer(MountSource):
 
         # Mount points are specified without trailing slash and with leading slash
         # representing root of this mount source.
+        # Disable false positive introduced when updating pylint from 2.6 to 2.12.
+        # It now thinks that the assignment is to AutoMountLayer instead of self.mounted.
+        # pylint: disable=used-before-assignment
         self.mounted: Dict[str, AutoMountLayer.MountInfo] = {'/': AutoMountLayer.MountInfo(mountSource, rootFileInfo)}
 
         if not self.options.get('recursive', False) or self.options.get('lazyMounting', False):
