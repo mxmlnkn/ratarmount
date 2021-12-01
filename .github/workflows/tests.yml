@@ -59,7 +59,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        os: [macos-10.15, ubuntu-latest]
         # ToDo: Add windows-latest but it requires a lot of setup of the dependencies!
         #       Maybe only test ratarmount-core without most dependencies after I have split that off.
         # Oldest and newest versions should be enough. Python versions are supported 5 years from release date.
@@ -91,18 +91,18 @@ jobs:
         echo "Mount points:"; mount
 
     - uses: msys2/setup-msys2@v2
-      if: matrix.os == 'windows-latest'
+      if: startsWith( matrix.os, 'windows' )
       with:
         install: gcc make liblzma-devel libzstd-devel zlib-devel
 
     - name: Install Dependencies (Linux)
-      if: matrix.os == 'ubuntu-latest'
+      if: startsWith( matrix.os, 'ubuntu' )
       run: |
         sudo apt-get -y install fuse bzip2 pbzip2 pixz zstd unar
         set -x
 
     - name: Install Dependencies (MacOS)
-      if: matrix.os == 'macos-latest'
+      if: startsWith( matrix.os, 'macos' )
       run: |
         # coreutils is required for the tests written in shell, e.g., for the 'realpath' command
         brew install macfuse coreutils pixz pbzip2 zstd
