@@ -900,7 +900,7 @@ class SQLiteIndexedTar(MountSource):
                 /* path name offsetheader offset size mtime mode type linkname uid gid istar issparse */
                 SELECT path,name,offsetheader,offset,0,0,{int(0o555 | stat.S_IFDIR)},{int(tarfile.DIRTYPE)},"",0,0,0,0
                 FROM "parentfolders"
-                WHERE (path,name) NOT IN ( SELECT path,name FROM "files" WHERE mode & (1 << 14) != 0 )
+                WHERE ( path || "/" || name ) NOT IN ( SELECT path || "/" || name FROM "files" WHERE mode & (1 << 14) != 0 )
                 ORDER BY "path","name";
             DROP TABLE "parentfolders";
             PRAGMA optimize;
