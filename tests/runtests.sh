@@ -40,10 +40,12 @@ if uname | 'grep' -q -i darwin; then
     getFileSize() { stat -f %z -- "$1"; }
     getFileMtime() { stat -f %m -- "$1"; }
     setFileMTime() { touch -m -t "$( date -r "$1" +%Y%m%d%H%M.%S )" "$2"; }
+    safeRmdir() { if [[ -z "$( find "$1" -maxdepth 1 )" ]]; then rmdir "$1"; fi; }
 else
     getFileSize() { stat -c %s -- "$1"; }
     getFileMtime() { stat -c %Y -- "$1"; }
     setFileMTime() { touch -d "@$1" "$2"; }
+    safeRmdir() { rmdir --ignore-fail-on-non-empty -- "$1"; }
 fi
 
 export -f getFileSize
@@ -60,12 +62,12 @@ cleanup()
     done
     sleep 0.5s
     for folder in "${MOUNT_POINTS_TO_CLEANUP[@]}"; do
-        if [[ -d "$folder" ]]; then rmdir --ignore-fail-on-non-empty -- "$folder"; fi
+        if [[ -d "$folder" ]]; then safeRmdir "$folder"; fi
     done
     MOUNT_POINTS_TO_CLEANUP=()
 
     for file in "${TMP_FILES_TO_CLEANUP[@]}"; do
-        if [ -d "$file" ]; then rmdir --ignore-fail-on-non-empty -- "$file"; fi
+        if [ -d "$file" ]; then safeRmdir "$file"; fi
         if [ -f "$file" ]; then rm -- "$file"; fi
     done
     TMP_FILES_TO_CLEANUP=()
@@ -253,7 +255,7 @@ checkFileInTAR()
             returnError "$LINENO" "Looks like index was not loaded while executing: $RATARMOUNT_CMD ${args[*]}"
     fi
 
-    rmdir --ignore-fail-on-non-empty "$mountFolder"
+    safeRmdir "$mountFolder"
 
     local duration
     duration=$(( $( date +%s ) - startTime ))
@@ -284,7 +286,7 @@ checkFileInTARPrefix()
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
     funmount "$mountFolder"
 
-    rmdir --ignore-fail-on-non-empty "$mountFolder"
+    safeRmdir "$mountFolder"
 
     echoerr "[${FUNCNAME[0]}] Tested successfully '$fileInTar' in '$archive' for checksum $correctChecksum"
 
@@ -315,7 +317,7 @@ checkLinkInTAR()
     fi
     funmount "$mountFolder"
 
-    rmdir --ignore-fail-on-non-empty "$mountFolder"
+    safeRmdir "$mountFolder"
 
     echoerr "[${FUNCNAME[0]}] Tested successfully '$fileInTar' in '$archive' for link target $correctLinkTarget"
 
@@ -448,7 +450,7 @@ testLargeTar()
 
     # cleanup
 
-    rmdir --ignore-fail-on-non-empty "$mountFolder"
+    safeRmdir "$mountFolder"
 
     echo "$timeSeriesFile"
 }
@@ -629,7 +631,7 @@ checkUnionMount()
         funmount "$mountPoint"
     done
 
-    rmdir --ignore-fail-on-non-empty -- "$mountPoint"
+    safeRmdir "$mountPoint"
     cd .. || returnError "$LINENO" 'Could not cd to parent in order to clean up!'
     rm -rf -- "$tmpFolder" || returnError "$LINENO" 'Something went wrong. Should have been able to clean up!'
 
@@ -722,7 +724,7 @@ checkTarEncoding()
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
     funmount "$mountFolder"
 
-    rmdir --ignore-fail-on-non-empty "$mountFolder"
+    safeRmdir "$mountFolder"
 
     echoerr "[${FUNCNAME[0]}] Tested successfully '$fileInTar' in '$archive' for encoding $encoding"
 
@@ -853,7 +855,7 @@ benchmarkDecoderBackends()
     done < <( recompressFile 'tests/2k-recursive-tars.tar.bz2' )
 
     cleanup
-    rmdir --ignore-fail-on-non-empty -- "$tmpFolder"
+    safeRmdir "$tmpFolder"
 }
 
 
@@ -1362,7 +1364,7 @@ for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
         (( ++nFiles ))
     done
     cleanup
-    rmdir --ignore-fail-on-non-empty -- "$( dirname -- "$file" )"
+    safeRmdir "$( dirname -- "$file" )"
 done
 
 checkRecursiveFolderMounting
