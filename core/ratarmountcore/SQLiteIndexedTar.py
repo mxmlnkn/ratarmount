@@ -764,6 +764,15 @@ class SQLiteIndexedTar(MountSource):
         if self.printDebug >= 2:
             print("Resorting files by path ...")
 
+        try:
+            queriedLibSqliteVersion = sqlite3.connect(":memory:").execute("select sqlite_version();").fetchone()
+            libSqliteVersion = tuple(int(x) for x in queriedLibSqliteVersion[0].split('.'))
+        except Exception:
+            libSqliteVersion = (0, 0, 0)
+
+        searchByTuple = """(path,name) NOT IN ( SELECT path,name"""
+        searchByConcat = """path || "/" || name NOT IN ( SELECT path || "/" || name"""
+
         cleanupDatabase = f"""
             INSERT OR REPLACE INTO "files" SELECT * FROM "filestmp" ORDER BY "path","name",rowid;
             DROP TABLE "filestmp";
@@ -771,7 +780,9 @@ class SQLiteIndexedTar(MountSource):
                 /* path name offsetheader offset size mtime mode type linkname uid gid istar issparse */
                 SELECT path,name,offsetheader,offset,0,0,{int(0o555 | stat.S_IFDIR)},{int(tarfile.DIRTYPE)},"",0,0,0,0
                 FROM "parentfolders"
-                WHERE (path,name) NOT IN ( SELECT path,name FROM "files" WHERE mode & (1 << 14) != 0 )
+                WHERE {searchByTuple if libSqliteVersion >= (2,22,0) else searchByConcat}
+                    FROM "files" WHERE mode & (1 << 14) != 0
+                )
                 ORDER BY "path","name";
             DROP TABLE "parentfolders";
             PRAGMA optimize;
