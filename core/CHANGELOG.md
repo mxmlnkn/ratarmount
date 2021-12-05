@@ -1,4 +1,8 @@
 
+# Version 0.2.0 built on 2021-12-xx
+
+ - Support for GNU incremental TAR file format.
+
 # Version 0.1.3 built on 2021-12-08
 
  - Workaround did test for the wrong libSqlite major version.
