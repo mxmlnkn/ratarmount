@@ -1,4 +1,8 @@
 
+# Version 0.1.3 built on 2021-12-08
+
+ - Workaround did test for the wrong libSqlite major version.
+
 # Version 0.1.2 built on 2021-12-05
 
  - Avoid SQLite error for libsqlite 3.11.0 on Ubuntu 16.04.
