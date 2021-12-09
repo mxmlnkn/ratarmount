@@ -1136,15 +1136,13 @@ rm -f ratarmount.{stdout,stderr}.log
 
 # Linting only to be done locally because in CI it is in separate steps
 if [[ -z "$CI" ]]; then
-    # Ignore Python 3.9. because of the Optiona[T] type hint bug in pylint: https://github.com/PyCQA/pylint/issues/3882
-    if [[ ! $( python3 --version ) =~ \ 3\.9\.* ]]; then
-        pylint ratarmount.py setup.py | tee pylint.log
-        if 'grep' -E -q ': E[0-9]{4}: ' pylint.log; then
-            echoerr 'There were warnings during the pylint run!'
-            exit 1
-        fi
-        rm pylint.log
+    pylint ratarmount.py setup.py | tee pylint.log
+    if 'grep' -E -q ': E[0-9]{4}: ' pylint.log; then
+        echoerr 'There were warnings during the pylint run!'
+        exit 1
     fi
+    rm pylint.log
+
     mypy ratarmount.py setup.py || returnError "$LINENO" 'Mypy failed!'
     pytype -d import-error ratarmount.py || returnError "$LINENO" 'Pytype failed!'
     black -q --line-length 120 --skip-string-normalization ratarmount.py tests/tests.py
