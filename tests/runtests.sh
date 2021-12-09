@@ -1158,15 +1158,12 @@ if [[ -z "$CI" ]]; then
     echo "Checking files:"
     printf '    %s\n' "${files[@]}"
 
-    # Ignore Python 3.9. because of the Optiona[T] type hint bug in pylint: https://github.com/PyCQA/pylint/issues/3882
-    if [[ ! $( python3 --version ) =~ \ 3\.9\.* ]]; then
-        pylint "${files[@]}" "${testFiles[@]}" | tee pylint.log
-        if 'grep' -E -q ': E[0-9]{4}: ' pylint.log; then
-            echoerr 'There were warnings during the pylint run!'
-            exit 1
-        fi
-        rm pylint.log
+    pylint "${files[@]}" "${testFiles[@]}" | tee pylint.log
+    if 'grep' -E -q ': E[0-9]{4}: ' pylint.log; then
+        echoerr 'There were warnings during the pylint run!'
+        exit 1
     fi
+    rm pylint.log
 
     mypy "${files[@]}" || returnError "$LINENO" 'Mypy failed!'
     mypy "${testFiles[@]}" || returnError "$LINENO" 'Mypy failed!'
