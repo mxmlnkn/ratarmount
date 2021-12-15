@@ -194,14 +194,19 @@ class AutoMountLayer(MountSource):
         files = self.mounted[mountPoint].mountSource.listDir(pathInMountPoint)
         if not files:
             return None
-        files = set(files)
+
+        if not isinstance(files, dict):
+            files = set(files)
 
         # Check whether we need to add recursive mount points to this directory listing
         if self.options.get('recursive', False) and self.options.get('stripRecursiveTarExtension', False):
-            for mountPoint in self.mounted:
+            for mountPoint, mountInfo in self.mounted.items():
                 folder, folderName = os.path.split(mountPoint)
                 if folder == path and folderName and folderName not in files:
-                    files.add(folderName)
+                    if isinstance(files, set):
+                        files.add(folderName)
+                    else:
+                        files.update({folderName: mountInfo.rootFileInfo})
 
         return files
 

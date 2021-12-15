@@ -13,6 +13,11 @@ from .utils import overrides
 
 class UnionMountSource(MountSource):
     def __init__(self, mountSources: List[MountSource], printDebug: int = 0) -> None:
+        """
+        mountSources : List of mount sources for which to show a union view. The rightmost mount sources have
+                       the highest precedence. Meaning, if a file with the same name exists in multiple mount
+                       sources, then by default the file of the rightmost mount source will be returned.
+        """
         self.mountSources: List[MountSource] = mountSources
         self.printDebug = printDebug
         self.folderCache: Dict[str, List[MountSource]] = {"/": self.mountSources}
@@ -136,16 +141,31 @@ class UnionMountSource(MountSource):
         Returns the set of all folder contents over all mount sources or None if the path was found in none of them.
         """
 
-        files: Set[str] = set()
-        folderExists = False
+        files: Optional[Union[Set[str], Dict[str, FileInfo]]] = None
 
-        for mountSource in self.mountSources:
+        for mountSource in reversed(self.mountSources):
             result = mountSource.listDir(path)
-            if result is not None:
-                files = files.union(result)
-                folderExists = True
 
-        return files if folderExists else None
+            if files is None:
+                if isinstance(result, dict):
+                    files = result
+                elif result is not None:
+                    files = set(result)
+
+            elif isinstance(result, dict):
+                if isinstance(files, dict):
+                    files.update(result)
+                else:
+                    files = files.union(result.keys())
+
+            elif result is not None:
+                # If one of the mount sources does not return extended information,
+                # then strip it from all others and only return the names.
+                if isinstance(files, dict):
+                    files = set(files.keys())
+                files = files.union(result)
+
+        return files
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo) -> IO[bytes]:

@@ -29,6 +29,29 @@ class FolderMountSource(MountSource):
         """Path given relative to folder root. Leading '/' is acceptable"""
         return os.path.join(self.root, path.lstrip(os.path.sep))
 
+    @staticmethod
+    def _statsToFileInfo(stats: os.stat_result, path: str, linkname: str):
+        return FileInfo(
+            # fmt: off
+            size     = stats.st_size,
+            mtime    = stats.st_mtime,
+            mode     = stats.st_mode,
+            linkname = linkname,
+            uid      = stats.st_uid,
+            gid      = stats.st_gid,
+            userdata = [path],
+            # fmt: on
+        )
+
+    @staticmethod
+    def _dirEntryToFileInfo(dirEntry: os.DirEntry, path: str, realpath: str):
+        try:
+            linkname = os.readlink(realpath) if dirEntry.is_symlink() else ""
+        except OSError:
+            linkname = ""
+
+        return FolderMountSource._statsToFileInfo(dirEntry.stat(follow_symlinks=False), linkname, path)
+
     @overrides(MountSource)
     def exists(self, path: str) -> bool:
         return os.path.lexists(self._realpath(path))
@@ -45,22 +68,8 @@ class FolderMountSource(MountSource):
             return None
 
         realpath = self._realpath(path)
-
-        stats = os.lstat(realpath)
-
-        fileInfo = FileInfo(
-            # fmt: off
-            size     = stats.st_size,
-            mtime    = stats.st_mtime,
-            mode     = stats.st_mode,
-            linkname = os.readlink(realpath) if os.path.islink(realpath) else "",
-            uid      = stats.st_uid,
-            gid      = stats.st_gid,
-            userdata = [path],
-            # fmt: on
-        )
-
-        return fileInfo
+        linkname = os.readlink(realpath) if os.path.islink(realpath) else ""
+        return self._statsToFileInfo(os.lstat(realpath), path, linkname)
 
     @overrides(MountSource)
     def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
@@ -68,9 +77,10 @@ class FolderMountSource(MountSource):
         if not os.path.isdir(realpath):
             return None
 
-        files = list(os.listdir(realpath))
-
-        return files
+        return {
+            os.fsdecode(dirEntry.name): FolderMountSource._dirEntryToFileInfo(dirEntry, path, realpath)
+            for dirEntry in os.scandir(realpath)
+        }
 
     @overrides(MountSource)
     def fileVersions(self, path: str) -> int:

@@ -115,6 +115,9 @@ class FuseMount(fuse.Operations):
             self.mountPointWasCreated = True
         self.mountPoint = os.path.realpath(mountPoint)
 
+        statResults = os.lstat(self.mountPoint)
+        self.mountPointInfo = {key: getattr(statResults, key) for key in dir(statResults) if key.startswith('st_')}
+
         # Take care that bind-mounting folders to itself works
         self.mountPointFd = None
         self.selfBindMount: Optional[FolderMountSource] = None
@@ -173,10 +176,8 @@ class FuseMount(fuse.Operations):
         if self.selfBindMount is not None and self.mountPointFd is not None:
             self.selfBindMount.setFolderDescriptor(self.mountPointFd)
 
-    @overrides(fuse.Operations)
-    def getattr(self, path: str, fh=None) -> Dict[str, Any]:
-        fileInfo = self._getFileInfo(path)
-
+    @staticmethod
+    def _fileInfoToDict(fileInfo: FileInfo):
         # dictionary keys: https://pubs.opengroup.org/onlinepubs/007904875/basedefs/sys/stat.h.html
         statDict = {"st_" + key: getattr(fileInfo, key) for key in ('size', 'mtime', 'mode', 'uid', 'gid')}
         statDict['st_mtime'] = int(statDict['st_mtime'])
@@ -191,14 +192,35 @@ class FuseMount(fuse.Operations):
         return statDict
 
     @overrides(fuse.Operations)
+    def getattr(self, path: str, fh=None) -> Dict[str, Any]:
+        return self._fileInfoToDict(self._getFileInfo(path))
+
+    @overrides(fuse.Operations)
     def readdir(self, path: str, fh):
-        # we only need to return these special directories. FUSE automatically expands these and will not ask
-        # for paths like /../foo/./../bar, so we don't need to worry about cleaning such paths
-        yield '.'
-        yield '..'
+        '''
+        Can return either a list of names, or a list of (name, attrs, offset)
+        tuples. attrs is a dict as in getattr.
+        '''
 
         files = self.mountSource.listDir(path)
-        if files is not None:
+
+        # we only need to return these special directories. FUSE automatically expands these and will not ask
+        # for paths like /../foo/./../bar, so we don't need to worry about cleaning such paths
+        if isinstance(files, dict):
+            yield '.', self.getattr(path), 0
+
+            if path == '/':
+                yield '..', self.mountPointInfo, 0
+            else:
+                yield '..', self.getattr(path.rsplit('/', 1)[0]), 0
+        else:
+            yield '.'
+            yield '..'
+
+        if isinstance(files, dict):
+            for key, fileInfo in files.items():
+                yield key, self._fileInfoToDict(fileInfo), 0
+        elif files is not None:
             for key in files:
                 yield key
 

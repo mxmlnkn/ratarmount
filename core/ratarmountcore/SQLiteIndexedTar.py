@@ -925,7 +925,7 @@ class SQLiteIndexedTar(MountSource):
         """
         result = self._getFileInfo(path, listDir=True)
         if isinstance(result, dict):
-            return result.keys()
+            return result
         return None
 
     @overrides(MountSource)

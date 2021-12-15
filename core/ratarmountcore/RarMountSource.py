@@ -176,7 +176,7 @@ class RarMountSource(MountSource):
             return filePath
 
         # The "filename" member is wrongly named as it returns the full path inside the archive not just the name part.
-        return set(getName(info.filename) for info in self.files if getName(info.filename))
+        return {getName(info.filename): self._convertToFileInfo(info) for info in self.files if getName(info.filename)}
 
     def _getFileInfos(self, path: str) -> List[FileInfo]:
         infoList = [
