@@ -6,7 +6,7 @@ import os
 import stat
 import time
 
-from typing import IO, Iterable, List, Optional, Union
+from typing import Dict, IO, Iterable, List, Optional, Union
 
 from .compressions import zipfile
 from .MountSource import FileInfo, MountSource
@@ -89,7 +89,7 @@ class ZipMountSource(MountSource):
         return fileInfo
 
     @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Iterable[str]]:
+    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         path = path.strip('/')
         if path:
             path += '/'

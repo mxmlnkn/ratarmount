@@ -5,7 +5,7 @@ import stat
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import dataclasses
-from typing import Any, IO, Iterable, List, Optional
+from typing import Any, Dict, IO, Iterable, List, Optional, Union
 
 
 @dataclass
@@ -42,7 +42,7 @@ class MountSource(ABC):
     """
 
     @abstractmethod
-    def listDir(self, path: str) -> Optional[Iterable[str]]:
+    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         pass
 
     @abstractmethod

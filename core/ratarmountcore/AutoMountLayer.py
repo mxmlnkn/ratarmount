@@ -7,7 +7,7 @@ import time
 import traceback
 
 from dataclasses import dataclass
-from typing import Dict, IO, Iterable, List, Optional, Tuple
+from typing import Dict, IO, Iterable, List, Optional, Tuple, Union
 
 from .compressions import stripSuffixFromTarFile
 from .factory import openMountSource
@@ -189,7 +189,7 @@ class AutoMountLayer(MountSource):
         return None
 
     @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Iterable[str]]:
+    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         mountPoint, pathInMountPoint = self._findMounted(path)
         files = self.mounted[mountPoint].mountSource.listDir(pathInMountPoint)
         if not files:

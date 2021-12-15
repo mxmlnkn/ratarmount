@@ -6,7 +6,7 @@ import io
 import os
 import stat
 import time
-from typing import cast, IO, Iterable, List, Optional, Union
+from typing import cast, Dict, IO, Iterable, List, Optional, Union
 
 from .MountSource import FileInfo, MountSource
 from .utils import overrides
@@ -153,7 +153,7 @@ class RarMountSource(MountSource):
         return fileInfo
 
     @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Iterable[str]]:
+    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         path = path.strip('/')
         if path:
             path += '/'

@@ -5,7 +5,7 @@ import os
 import stat
 
 
-from typing import IO, Iterable, Optional, Tuple
+from typing import Dict, IO, Iterable, Optional, Tuple, Union
 
 from .MountSource import FileInfo, MountSource
 from .utils import overrides
@@ -143,7 +143,7 @@ class FileVersionLayer(MountSource):
         return fileInfo
 
     @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Iterable[str]]:
+    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         files = self.mountSource.listDir(path)
         if files is not None:
             return files

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
-from typing import IO, Iterable, Optional
+from typing import Dict, IO, Iterable, Optional, Union
 
 from .MountSource import FileInfo, MountSource
 from .utils import overrides
@@ -63,7 +63,7 @@ class FolderMountSource(MountSource):
         return fileInfo
 
     @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Iterable[str]]:
+    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         realpath = self._realpath(path)
         if not os.path.isdir(realpath):
             return None

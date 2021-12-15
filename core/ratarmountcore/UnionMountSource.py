@@ -5,7 +5,7 @@ import os
 import stat
 import time
 
-from typing import Dict, Iterable, IO, List, Optional, Set, Tuple
+from typing import Dict, Iterable, IO, List, Optional, Set, Tuple, Union
 
 from .MountSource import FileInfo, MountSource
 from .utils import overrides
@@ -131,7 +131,7 @@ class UnionMountSource(MountSource):
         return sum(mountSource.fileVersions(path) for mountSource in self.mountSources)
 
     @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Iterable[str]]:
+    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         """
         Returns the set of all folder contents over all mount sources or None if the path was found in none of them.
         """

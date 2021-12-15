@@ -919,7 +919,7 @@ class SQLiteIndexedTar(MountSource):
         return self.listDir(path) is not None
 
     @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Iterable[str]]:
+    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         """
         Usability wrapper for getFileInfo(listDir=True) with FileInfo stripped if you are sure you don't need it.
         """
