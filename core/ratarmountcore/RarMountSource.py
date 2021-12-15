@@ -189,7 +189,7 @@ class RarMountSource(MountSource):
         pathAsDir = path.strip('/') + '/'
 
         # Check whether some parent directories of files do not exist as separate entities in the archive.
-        if not any([info.userdata[-1].filename == pathAsDir for info in infoList]) and any(
+        if not any(info.userdata[-1].filename == pathAsDir for info in infoList) and any(
             info.filename.rstrip('/').startswith(pathAsDir) for info in self.files
         ):
             infoList.append(
