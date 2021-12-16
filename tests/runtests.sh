@@ -1159,6 +1159,7 @@ python3 tests/tests.py || returnError "$LINENO" "tests/tests.py"
 
 
 rm -f tests/*.index.*
+'cp' 'tests/single-file.tar' 'tests/#not-a-good-name! Ör, is it?.tar'
 
 
 tests=()
@@ -1208,6 +1209,7 @@ tests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/updated-file-implicitly-with-folder.tar bar/par/sora.versions/2/natsu
     cd85c6a5e5053c04f95e1df301c80755 tests/updated-file-implicitly-with-folder.tar bar/par/sora.versions/1
 
+    d3b07384d113edec49eaa6238ad5ff00 'tests/#not-a-good-name! Ör, is it?.tar'     bar
     d3b07384d113edec49eaa6238ad5ff00 tests/single-file.tar                        bar
     d3b07384d113edec49eaa6238ad5ff00 tests/single-file-with-leading-dot-slash.tar bar
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/folder-with-leading-dot-slash.tar      foo/bar

@@ -16,6 +16,7 @@ import tarfile
 import tempfile
 import time
 import traceback
+import urllib
 from abc import ABC, abstractmethod
 from timeit import default_timer as timer
 import typing
@@ -885,8 +886,11 @@ class SQLiteIndexedTar(MountSource):
         if not self.indexFileName or self.indexFileName == ':memory:' or not self.sqlConnection:
             return
 
+        self.sqlConnection.commit()
         self.sqlConnection.close()
-        self.sqlConnection = SQLiteIndexedTar._openSqlDb(f"file:{self.indexFileName}?mode=ro", uri=True)
+
+        uriPath = urllib.parse.quote(self.indexFileName)
+        self.sqlConnection = SQLiteIndexedTar._openSqlDb(f"file:{uriPath}?mode=ro", uri=True)
 
     @staticmethod
     def _tarInfoFullMode(tarInfo: tarfile.TarInfo) -> int:
