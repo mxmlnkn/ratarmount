@@ -742,6 +742,8 @@ class SQLiteIndexedTar(MountSource):
                 self._updateProgressBar(progressBar, fileObject)
             fileSize = fileObject.tell()
 
+            mode = 0o777 | stat.S_IFREG  # default mode
+
             # fmt: off
             fileInfo = (
                 ""                                   ,  # 0 path
@@ -750,7 +752,7 @@ class SQLiteIndexedTar(MountSource):
                 0                                    ,  # 3 data offset
                 fileSize                             ,  # 4
                 tarInfo.st_mtime if tarInfo else 0   ,  # 5
-                tarInfo.st_mode if tarInfo else 0o777,  # 6
+                tarInfo.st_mode if tarInfo else mode ,  # 6
                 None                                 ,  # 7 TAR file type. Currently unused. Overlaps with mode
                 None                                 ,  # 8 linkname
                 tarInfo.st_uid if tarInfo else 0     ,  # 9

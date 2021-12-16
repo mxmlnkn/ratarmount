@@ -120,7 +120,11 @@ class AutoMountLayer(MountSource):
             else:
                 # This will fail with StenciledFile objects as returned by SQLiteIndexedTar mount sources and when
                 # given to backends like indexed_xxx, which do expect the file object to have a valid fileno.
-                mountSource = openMountSource(parentMountSource.open(archiveFileInfo), **self.options)
+                mountSource = openMountSource(
+                    parentMountSource.open(archiveFileInfo),
+                    tarFileName=pathInsideParentMountPoint.rsplit('/', 1)[-1],
+                    **self.options
+                )
         except Exception as e:
             print("[Warning] Mounting of '" + path + "' failed because of:", e)
             if self.printDebug >= 3:
