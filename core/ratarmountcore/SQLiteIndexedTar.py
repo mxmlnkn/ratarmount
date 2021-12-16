@@ -12,6 +12,8 @@ import tarfile
 import tempfile
 import time
 import traceback
+import urllib
+
 from timeit import default_timer as timer
 from typing import Any, AnyStr, cast, Dict, IO, Iterable, List, Optional, Tuple, Union
 from dataclasses import dataclass
@@ -510,8 +512,11 @@ class SQLiteIndexedTar(MountSource):
         if not self.indexFilePath or self.indexFilePath == ':memory:' or not self.sqlConnection:
             return
 
+        self.sqlConnection.commit()
         self.sqlConnection.close()
-        self.sqlConnection = SQLiteIndexedTar._openSqlDb(f"file:{self.indexFilePath}?mode=ro", uri=True)
+
+        uriPath = urllib.parse.quote(self.indexFilePath)
+        self.sqlConnection = SQLiteIndexedTar._openSqlDb(f"file:{uriPath}?mode=ro", uri=True)
 
     @staticmethod
     def _tarInfoFullMode(tarInfo: tarfile.TarInfo) -> int:
@@ -1349,9 +1354,12 @@ class SQLiteIndexedTar(MountSource):
             try:
                 offsets = dict(db.execute(f"SELECT blockoffset,dataoffset FROM {table_name};"))
                 fileObject.set_block_offsets(offsets)
-            except Exception:
+            except Exception as exception:
                 if self.printDebug >= 2:
                     print(f"[Info] Could not load {self.compression} block offset data. Will create it from scratch.")
+                    print(exception)
+                if self.printDebug >= 3:
+                    traceback.print_exc()
 
                 tables = [x[0] for x in db.execute('SELECT name FROM sqlite_master WHERE type="table";')]
                 if table_name in tables:
