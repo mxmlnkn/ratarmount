@@ -106,11 +106,23 @@ class UnionMountSource(MountSource):
         if path == '/':
             return self.rootFileInfo
 
+        if path in self.folderCache:
+            # This case might be triggered when path is a folder
+            mountSources = self.folderCache[path]
+        elif self.folderCache and self.folderCacheDepth > 0 and path.startswith('/'):
+            # This should be the most common case, i.e., for regular files. Look up the parent folder in this case.
+            parentFolder = '/'.join(path.split('/', self.folderCacheDepth + 1)[:-1])
+            if parentFolder not in self.folderCache:
+                return None
+            mountSources = self.folderCache[parentFolder]
+        else:
+            mountSources = self.mountSources
+
         # We need to keep the sign of the fileVersion in order to forward it to SQLiteIndexedTar.
         # When the requested version can't be found in a mount source, increment negative specified versions
         # by the amount of versions in that mount source or decrement the initially positive version.
         if fileVersion <= 0:
-            for mountSource in reversed(self.mountSources):
+            for mountSource in reversed(mountSources):
                 fileInfo = mountSource.getFileInfo(path, fileVersion=fileVersion)
                 if isinstance(fileInfo, FileInfo):
                     fileInfo.userdata.append(mountSource)
@@ -120,7 +132,7 @@ class UnionMountSource(MountSource):
                     break
 
         else:  # fileVersion >= 1
-            for mountSource in self.mountSources:
+            for mountSource in mountSources:
                 fileInfo = mountSource.getFileInfo(path, fileVersion=fileVersion)
                 if isinstance(fileInfo, FileInfo):
                     fileInfo.userdata.append(mountSource)
