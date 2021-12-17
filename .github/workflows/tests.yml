@@ -137,7 +137,7 @@ jobs:
 
     - name: Test Installation From Tarball
       run: |
-        python3 setup.py sdist bdist_wheel
+        python3 -m build
         twine check dist/*
         python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )"[full]
 
@@ -229,7 +229,7 @@ jobs:
 
     - name: Test Installation From Tarball
       run: |
-        python3.9 setup.py sdist bdist_wheel
+        python3.9 -m build
         twine check dist/*
         python3.9 -m pip install "$( find dist -name '*.tar.gz' | head -1 )"[full]
 

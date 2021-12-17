@@ -24,6 +24,6 @@ jobs:
       env:
         TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
       run: |
-        python setup.py sdist bdist_wheel
+        python3 -m build
         twine check dist/*
         twine upload --skip-existing -u __token__ dist/*
