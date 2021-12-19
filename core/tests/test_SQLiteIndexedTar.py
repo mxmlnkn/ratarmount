@@ -223,3 +223,25 @@ class TestSQLiteIndexedTarParallelized:
 
                 for path in folders + files:
                     assert indexedTar.fileVersions(path) == 1
+
+    @staticmethod
+    def test_open(parallelization):
+        with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile:
+            repeatCount = 10000
+
+            with tarfile.open(name=tmpTarFile.name, mode="w:gz") as tarFile:
+                createFile = TestSQLiteIndexedTarParallelized._createFile
+                createFile(tarFile, "increasing.dat", "".join(["0123456789"] * repeatCount))
+                createFile(tarFile, "decreasing.dat", "".join(["9876543210"] * repeatCount))
+
+            with SQLiteIndexedTar(tmpTarFile.name, clearIndexCache=True, parallelization=parallelization) as indexedTar:
+                iFile = indexedTar.open(indexedTar.getFileInfo("/increasing.dat"))
+                dFile = indexedTar.open(indexedTar.getFileInfo("/decreasing.dat"))
+
+                for i in range(repeatCount):
+                    try:
+                        assert iFile.read(10) == b"0123456789"
+                        assert dFile.read(10) == b"9876543210"
+                    except AssertionError as e:
+                        print("Reading failed in iteration:", i)
+                        raise e
