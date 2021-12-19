@@ -19,6 +19,11 @@ tmpFile = tempfile.TemporaryFile()
 tmpFile.write(testData)
 
 
+randomTestData = os.urandom(128 * 1024)
+randomTmpFile = tempfile.TemporaryFile()
+randomTmpFile.write(randomTestData)
+
+
 class TestStenciledFile:
     @staticmethod
     def test_empty_file():
@@ -81,3 +86,18 @@ class TestStenciledFile:
         assert stenciledFile.read(1) == b""
         assert stenciledFile.seek(-6, io.SEEK_END) == 0
         assert stenciledFile.read(1) == b"2"
+
+    @staticmethod
+    def test_reading_from_shared_file():
+        stenciledFile1 = StenciledFile(tmpFile, [(0, len(testData))])
+        stenciledFile2 = StenciledFile(tmpFile, [(0, len(testData))])
+        for i in range(len(testData)):
+            assert stenciledFile1.read(1) == testData[i : i + 1]
+            assert stenciledFile2.read(1) == testData[i : i + 1]
+
+    @staticmethod
+    def test_successive_reads():
+        stenciledFile = StenciledFile(randomTmpFile, [(0, len(randomTestData))])
+        batchSize = 1024
+        for i in range(len(randomTestData) // batchSize):
+            assert stenciledFile.read(batchSize) == randomTestData[i * batchSize : (i + 1) * batchSize]
