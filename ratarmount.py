@@ -315,6 +315,14 @@ class StenciledFile(io.BufferedIOBase):
         # and on each odd iteration it reads the data and increments the offset inside the stencil!
         result = b''
         i = self._findStencil(self.offset)
+        if i >= len(self.sizes):
+            return result
+
+        offsetInsideStencil = self.offset - self.cumsizes[i]
+        assert offsetInsideStencil >= 0
+        assert offsetInsideStencil < self.sizes[i]
+        self.fileobj.seek(self.offsets[i] + offsetInsideStencil, io.SEEK_SET)
+
         while size > 0 and i < len(self.sizes):
             # Read as much as requested or as much as the current contiguous region / stencil still contains
             readableSize = min(size, self.sizes[i] - (self.offset - self.cumsizes[i]))
@@ -347,12 +355,6 @@ class StenciledFile(io.BufferedIOBase):
             raise ValueError("Trying to seek before the start of the file!")
         if self.offset >= self.cumsizes[-1]:
             return self.offset
-
-        i = self._findStencil(self.offset)
-        offsetInsideStencil = self.offset - self.cumsizes[i]
-        assert offsetInsideStencil >= 0
-        assert offsetInsideStencil < self.sizes[i]
-        self.fileobj.seek(self.offsets[i] + offsetInsideStencil, io.SEEK_SET)
 
         return self.offset
 
