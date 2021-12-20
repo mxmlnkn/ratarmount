@@ -5,6 +5,7 @@
 # pylint: disable=protected-access
 
 import bz2
+import concurrent.futures
 import io
 import os
 import stat
@@ -245,3 +246,44 @@ class TestSQLiteIndexedTarParallelized:
                     except AssertionError as e:
                         print("Reading failed in iteration:", i)
                         raise e
+
+    @staticmethod
+    def test_multithreaded_reading(parallelization):
+        parallelism = parallelization * 6  # Need a bit more parallelism to trigger bugs easier
+        with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, concurrent.futures.ThreadPoolExecutor(
+            parallelism
+        ) as pool:
+            repeatCount = 10000
+
+            with tarfile.open(name=tmpTarFile.name, mode="w:gz") as tarFile:
+                createFile = TestSQLiteIndexedTarParallelized._createFile
+                createFile(tarFile, "increasing.dat", "".join(["0123456789"] * repeatCount))
+                createFile(tarFile, "decreasing.dat", "".join(["9876543210"] * repeatCount))
+
+            with SQLiteIndexedTar(tmpTarFile.name, clearIndexCache=True, parallelization=parallelization) as indexedTar:
+
+                def read_sequences(file, useIncreasing):
+                    for i in range(repeatCount):
+                        try:
+                            if useIncreasing:
+                                assert file.read(10) == b"0123456789"
+                            else:
+                                assert file.read(10) == b"9876543210"
+                        except AssertionError as e:
+                            print("Reading failed in iteration:", i)
+                            raise e
+                    return True
+
+                files = [
+                    indexedTar.open(indexedTar.getFileInfo(f"/{'in' if i % 2 == 0 else 'de'}creasing.dat"))
+                    for i in range(parallelism)
+                ]
+
+                results = []
+                for i in range(parallelism):
+                    results.append(pool.submit(read_sequences, files[i], i % 2 == 0))
+                for result in results:
+                    result.result()
+
+                for file in files:
+                    file.close()

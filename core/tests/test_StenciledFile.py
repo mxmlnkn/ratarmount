@@ -4,10 +4,12 @@
 # pylint: disable=wrong-import-position
 # pylint: disable=protected-access
 
+import concurrent.futures
 import io
 import os
 import sys
 import tempfile
+import threading
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -96,8 +98,19 @@ class TestStenciledFile:
             assert stenciledFile2.read(1) == testData[i : i + 1]
 
     @staticmethod
-    def test_successive_reads():
-        stenciledFile = StenciledFile(randomTmpFile, [(0, len(randomTestData))])
+    def test_successive_reads(lock=None):
+        stenciledFile = StenciledFile(randomTmpFile, [(0, len(randomTestData))], lock)
         batchSize = 1024
         for i in range(len(randomTestData) // batchSize):
             assert stenciledFile.read(batchSize) == randomTestData[i * batchSize : (i + 1) * batchSize]
+
+    @staticmethod
+    def test_multithreaded_reading():
+        parallelism = 24
+        with concurrent.futures.ThreadPoolExecutor(24) as pool:
+            lock = threading.Lock()
+            results = []
+            for _ in range(parallelism):
+                results.append(pool.submit(TestStenciledFile.test_successive_reads, lock))
+            for result in results:
+                result.result()

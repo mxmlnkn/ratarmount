@@ -9,10 +9,18 @@ from typing import IO, List, Tuple
 from .utils import overrides
 
 
+class _DummyContext:
+    def __enter__(self):
+        pass
+
+    def __exit__(self, *args):
+        pass
+
+
 class StenciledFile(io.BufferedIOBase):
     """A file abstraction layer giving a stenciled view to an underlying file."""
 
-    def __init__(self, fileobj: IO, stencils: List[Tuple[int, int]]) -> None:
+    def __init__(self, fileobj: IO, stencils: List[Tuple[int, int]], fileobjLock=None) -> None:
         """
         stencils: A list tuples specifying the offset and length of the underlying file to use.
                   The order of these tuples will be kept.
@@ -33,6 +41,8 @@ class StenciledFile(io.BufferedIOBase):
         self.sizes   = [x[1] for x in stencils]
         self.offset  = 0
         # fmt: on
+
+        self.fileobjLock = fileobjLock
 
         # Calculate cumulative sizes
         self.cumsizes = [0]
@@ -99,27 +109,28 @@ class StenciledFile(io.BufferedIOBase):
         if i >= len(self.sizes):
             return result
 
-        offsetInsideStencil = self.offset - self.cumsizes[i]
-        assert offsetInsideStencil >= 0
-        assert offsetInsideStencil < self.sizes[i]
-        self.fileobj.seek(self.offsets[i] + offsetInsideStencil, io.SEEK_SET)
+        with self.fileobjLock if self.fileobjLock else _DummyContext():
+            offsetInsideStencil = self.offset - self.cumsizes[i]
+            assert offsetInsideStencil >= 0
+            assert offsetInsideStencil < self.sizes[i]
+            self.fileobj.seek(self.offsets[i] + offsetInsideStencil, io.SEEK_SET)
 
-        while size > 0 and i < len(self.sizes):
-            # Read as much as requested or as much as the current contiguous region / stencil still contains
-            readableSize = min(size, self.sizes[i] - (self.offset - self.cumsizes[i]))
-            if readableSize == 0:
-                # Go to next stencil
-                i += 1
-                if i >= len(self.offsets):
-                    break
-                self.fileobj.seek(self.offsets[i])
-            else:
-                # Actually read data
-                tmp = self.fileobj.read(readableSize)
-                self.offset += len(tmp)
-                result += tmp
-                size -= readableSize
-                # Now, either size is 0 or readableSize will be 0 in the next iteration
+            while size > 0 and i < len(self.sizes):
+                # Read as much as requested or as much as the current contiguous region / stencil still contains
+                readableSize = min(size, self.sizes[i] - (self.offset - self.cumsizes[i]))
+                if readableSize == 0:
+                    # Go to next stencil
+                    i += 1
+                    if i >= len(self.offsets):
+                        break
+                    self.fileobj.seek(self.offsets[i])
+                else:
+                    # Actually read data
+                    tmp = self.fileobj.read(readableSize)
+                    self.offset += len(tmp)
+                    result += tmp
+                    size -= readableSize
+                    # Now, either size is 0 or readableSize will be 0 in the next iteration
 
         return result
 

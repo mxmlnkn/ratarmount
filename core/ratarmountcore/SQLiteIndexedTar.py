@@ -10,6 +10,7 @@ import stat
 import sys
 import tarfile
 import tempfile
+import threading
 import time
 import traceback
 import urllib
@@ -167,6 +168,8 @@ class SQLiteIndexedTar(MountSource):
         )
         if not self.isTar and not self.rawFileObject:
             raise RatarmountError("File object (" + str(fileObject) + ") could not be opened as a TAR file!")
+
+        self.fileObjectLock = threading.Lock()
 
         if self.compression == 'xz':
             try:
@@ -1083,14 +1086,16 @@ class SQLiteIndexedTar(MountSource):
         # This is not strictly necessary but it saves two file object layers and therefore might be more performant.
         # Furthermore, non-sparse files should be the much more likely case anyway.
         if not tarFileInfo.issparse:
-            return cast(IO[bytes], StenciledFile(self.tarFileObject, [(tarFileInfo.offset, fileInfo.size)]))
+            return cast(
+                IO[bytes], StenciledFile(self.tarFileObject, [(tarFileInfo.offset, fileInfo.size)], self.fileObjectLock)
+            )
 
         # The TAR file format is very simple. It's just a concatenation of TAR blocks. There is not even a
         # global header, only the TAR block headers. That's why we can simply cut out the TAR block for
         # the sparse file using StenciledFile and then use tarfile on it to expand the sparse file correctly.
         tarBlockSize = tarFileInfo.offset - tarFileInfo.offsetheader + fileInfo.size
 
-        tarSubFile = StenciledFile(self.tarFileObject, [(tarFileInfo.offsetheader, tarBlockSize)])
+        tarSubFile = StenciledFile(self.tarFileObject, [(tarFileInfo.offsetheader, tarBlockSize)], self.fileObjectLock)
         # TODO It might be better to somehow call close on tarFile but the question is where and how.
         #      It would have to be appended to the __exit__ method of fileObject like if being decorated.
         #      For now this seems to work either because fileObject does not require tarFile to exist
