@@ -631,6 +631,26 @@ checkUnionMount()
         funmount "$mountPoint"
     done
 
+    # Check whether union mounting two folders works
+
+    mkdir -p "folder1/subfolder"
+    echo 'hello' > "folder1/subfolder/world"
+    mkdir "folder2"
+    echo 'iriya' > "folder2/ufo"
+
+    runAndCheckRatarmount -c "folder1" "folder2" "$mountPoint"
+
+    checkStat "$mountPoint/" || returnError "$LINENO" 'Could not stat file!'
+    checkStat "$mountPoint/ufo" || returnError "$LINENO" 'Could not stat file!'
+    checkStat "$mountPoint/subfolder/world" || returnError "$LINENO" 'Could not stat file!'
+
+    verifyCheckSum "$mountPoint" "subfolder/world" "<folder union mount>" b1946ac92492d2347c6235b4d2611184 ||
+        returnError "$LINENO" 'Checksum mismatches!'
+    verifyCheckSum "$mountPoint" "ufo" "<folder union mount>" 2709a3348eb2c52302a7606ecf5860bc ||
+        returnError "$LINENO" 'Checksum mismatches!'
+
+    # Clean up
+
     safeRmdir "$mountPoint"
     cd .. || returnError "$LINENO" 'Could not cd to parent in order to clean up!'
     rm -rf -- "$tmpFolder" || returnError "$LINENO" 'Something went wrong. Should have been able to clean up!'
@@ -1181,10 +1201,10 @@ if [[ -z "$CI" ]]; then
     testFiles=()
     while read -r file; do
         testFiles+=( "$file" )
-    done < <( git ls-tree -r --name-only HEAD | 'grep' 'test.*.py' )
+    done < <( git ls-tree -r --name-only HEAD | 'grep' 'test.*[.]py$' | 'grep' -v 'conftest[.]py$' )
 
     echo "Checking files:"
-    printf '    %s\n' "${files[@]}"
+    printf '    %s\n' "${files[@]}" "${testFiles[@]}"
 
     pylint "${files[@]}" "${testFiles[@]}" | tee pylint.log
     if 'grep' -E -q ': E[0-9]{4}: ' pylint.log; then
