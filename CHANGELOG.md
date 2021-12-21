@@ -3,6 +3,13 @@
 
  - Split ratarmount into ratarmount, which contains the CLI, and ratarmountcore.
 
+# Version 0.9.3 built on 2021-12-21
+
+ - Fix mounting of TAR fails if there are special characters like '#' in the path.
+ - Fix recursive mounting of simple compressed files (file.bz2) inside TAR.
+ - Fix file objects being returned by SQLiteIndexedTar not being independent from each other
+   because of the shared underlying file object.
+
 # Version 0.9.2 built on 2021-11-28
 
  - Fix StenciledFile accidentally throwing an exception when accessing empty files.
