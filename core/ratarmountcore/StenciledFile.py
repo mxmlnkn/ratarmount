@@ -110,6 +110,11 @@ class StenciledFile(io.BufferedIOBase):
             return result
 
         with self.fileobjLock if self.fileobjLock else _DummyContext():
+            # Note that seek and read of the file object itself do not seem to check against this and
+            # instead lead to a segmentation fault in the multithreading tests.
+            if self.fileobj.closed:
+                raise ValueError("A closed file can't be read from!")
+
             offsetInsideStencil = self.offset - self.cumsizes[i]
             assert offsetInsideStencil >= 0
             assert offsetInsideStencil < self.sizes[i]
