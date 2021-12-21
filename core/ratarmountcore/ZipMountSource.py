@@ -89,6 +89,10 @@ class ZipMountSource(MountSource):
         return fileInfo
 
     @overrides(MountSource)
+    def isImmutable(self) -> bool:
+        return True
+
+    @overrides(MountSource)
     def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         path = path.strip('/')
         if path:

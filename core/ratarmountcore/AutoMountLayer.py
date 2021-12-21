@@ -166,6 +166,10 @@ class AutoMountLayer(MountSource):
         return self._simplyFindMounted(path)
 
     @overrides(MountSource)
+    def isImmutable(self) -> bool:
+        return self.mounted['/'].mountSource.isImmutable()
+
+    @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         """
         Return file info for given path. Note that all returned file infos contain MountInfo

@@ -943,6 +943,10 @@ class SQLiteIndexedTar(MountSource):
         if self.printDebug >= 1:
             print(f"Creating offset dictionary for {self.tarFileName} took {t1 - t0:.2f}s")
 
+    @overrides(MountSource)
+    def isImmutable(self) -> bool:
+        return True
+
     @staticmethod
     def _rowToFileInfo(row: Dict[str, Any]) -> FileInfo:
         userData = SQLiteIndexedTarUserData(

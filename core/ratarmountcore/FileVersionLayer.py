@@ -143,6 +143,10 @@ class FileVersionLayer(MountSource):
         return fileInfo
 
     @overrides(MountSource)
+    def isImmutable(self) -> bool:
+        return self.mountSource.isImmutable()
+
+    @overrides(MountSource)
     def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         files = self.mountSource.listDir(path)
         if files is not None:

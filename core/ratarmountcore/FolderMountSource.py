@@ -53,6 +53,10 @@ class FolderMountSource(MountSource):
         return FolderMountSource._statsToFileInfo(dirEntry.stat(follow_symlinks=False), linkname, path)
 
     @overrides(MountSource)
+    def isImmutable(self) -> bool:
+        return False
+
+    @overrides(MountSource)
     def exists(self, path: str) -> bool:
         return os.path.lexists(self._realpath(path))
 

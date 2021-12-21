@@ -61,6 +61,14 @@ class MountSource(ABC):
     def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
         pass
 
+    @abstractmethod
+    def isImmutable(self) -> bool:
+        """
+        Should return True if the mount source is known to not change over time in order to allow for optimizations.
+        Meaning, all interface metods should return the same results given the same arguments at any time.
+        """
+        pass
+
     def getMountSource(self, fileInfo: FileInfo):
         """
         Returns the direct mount source to which the fileInfo belongs, a mount source specific file info,

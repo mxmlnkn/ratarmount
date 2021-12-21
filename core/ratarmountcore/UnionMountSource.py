@@ -102,6 +102,10 @@ class UnionMountSource(MountSource):
             )
 
     @overrides(MountSource)
+    def isImmutable(self) -> bool:
+        return all(m.isImmutable() for m in self.mountSources)
+
+    @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         if path == '/':
             return self.rootFileInfo
