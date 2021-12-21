@@ -134,6 +134,7 @@ class TestUnionMountSource:
 
         TestUnionMountSource._check_file(union, "/ufo2", 0, contents)
         TestUnionMountSource._check_file(union, "/subfolder2", 0, None)
+        TestUnionMountSource._check_file(union, "/subfolder2/world", 0, contents)
 
     @staticmethod
     def test_unite_two_archives(sample_tar_a, sample_tar_b):

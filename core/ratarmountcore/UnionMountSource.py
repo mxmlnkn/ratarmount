@@ -53,9 +53,9 @@ class UnionMountSource(MountSource):
         if self.printDebug >= 1:
             print(f"Building cache for union mount (timeout after {nMaxSecondsToCache}s)...")
 
-        self.folderCache = {"/": self.mountSources}
+        self.folderCache = {"/": [m for m in self.mountSources if m.isImmutable()]}
 
-        lastFolderCache: Dict[str, List[MountSource]] = {"/": self.mountSources}
+        lastFolderCache: Dict[str, List[MountSource]] = self.folderCache.copy()
 
         for depth in range(1, maxDepth):
             # This intermediary structure is used because:
@@ -112,7 +112,7 @@ class UnionMountSource(MountSource):
 
         if path in self.folderCache:
             # This case might be triggered when path is a folder
-            mountSources = self.folderCache[path]
+            cachedMountSources = self.folderCache[path]
         elif self.folderCache and self.folderCacheDepth > 0 and path.startswith('/'):
             # This should be the most common case, i.e., for regular files. Look up the parent folder in this case.
             parentFolder = '/'.join(path.split('/', self.folderCacheDepth + 1)[:-1])
@@ -120,9 +120,11 @@ class UnionMountSource(MountSource):
                 parentFolder = '/'
             if parentFolder not in self.folderCache:
                 return None
-            mountSources = self.folderCache[parentFolder]
+            cachedMountSources = self.folderCache[parentFolder]
         else:
-            mountSources = self.mountSources
+            cachedMountSources = self.mountSources
+
+        mountSources = [m for m in self.mountSources if not m.isImmutable() or m in cachedMountSources]
 
         # We need to keep the sign of the fileVersion in order to forward it to SQLiteIndexedTar.
         # When the requested version can't be found in a mount source, increment negative specified versions
