@@ -112,6 +112,8 @@ class UnionMountSource(MountSource):
         elif self.folderCache and self.folderCacheDepth > 0 and path.startswith('/'):
             # This should be the most common case, i.e., for regular files. Look up the parent folder in this case.
             parentFolder = '/'.join(path.split('/', self.folderCacheDepth + 1)[:-1])
+            if not parentFolder:
+                parentFolder = '/'
             if parentFolder not in self.folderCache:
                 return None
             mountSources = self.folderCache[parentFolder]
