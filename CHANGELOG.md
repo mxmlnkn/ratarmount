@@ -14,6 +14,7 @@
  - Fixed progress indicator not working for XZ files when using the python-xz backend.
  - Add elapsed time output to progress indicator.
  - Depend on python-xz 0.4.0 to fix runaway memory usage for large files.
+ - Parallelize XZ decoder backend for huge speedups for mounting and reading large files inside the mount point.
 
 # Version 0.9.3 built on 2021-12-21
 
