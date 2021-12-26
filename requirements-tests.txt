@@ -6,6 +6,7 @@ indexed_bzip2
 indexed_gzip
 indexed_zstd
 mypy
+pandas
 pylint
 pytest
 pytype
