@@ -65,7 +65,7 @@ class MountSource(ABC):
     def isImmutable(self) -> bool:
         """
         Should return True if the mount source is known to not change over time in order to allow for optimizations.
-        Meaning, all interface metods should return the same results given the same arguments at any time.
+        Meaning, all interface methods should return the same results given the same arguments at any time.
         """
         pass
 

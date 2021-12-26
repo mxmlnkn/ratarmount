@@ -302,12 +302,12 @@ for nFiles in [ 1000*1000 ]:
         db.execute( 'PRAGMA SYNCHRONOUS = OFF;' ) # ~10% speedup but does hurt integrity!
         # default (-2000): ~20s, 100: ~18s, 1000: ~18.6s, ~10000: 15s, ~100 000: ~8s
         # -100 000: ~12s, -400000 (~400MB): ~8s, -768000: ~8s
-        # Benchmark with 4M rows: defaut(-2000): 114s, -512 000: ~70s
+        # Benchmark with 4M rows: default(-2000): 114s, -512 000: ~70s
         # default page size: 4096 -> positive cache sizes are in page sizes, negative in kiB
         # I guess this normally is not that relevant because an increasing integer ID is used but
         # for this use case where it seems like on each transaction, the database gets resorted by
         # a string key, it might help to do the sorting less frequently and in memory on larger data.
-        # Also, 512MB is alright for a tradeoff. If you have a TAR with that much metadata in it,
+        # Also, 512MB is alright for a trade-off. If you have a TAR with that much metadata in it,
         # you should have a system which can afford 512MB in the first place.
         db.execute( 'PRAGMA CACHE_SIZE = -512000;' )
 
@@ -381,7 +381,7 @@ for nFiles in [ 1000*1000 ]:
 
         ########### Cleanup ###########
 
-        #db.execute( 'VACUUM' ) # does not help beause we don't delete anything but still adds significant time overhead
+        #db.execute( 'VACUUM' )  # does not help because we don't delete anything but still adds significant time overhead
         db.close()
         stats = os.stat( databaseFile )
         log( "SQL database size in bytes: {}".format( stats.st_size ) )
@@ -433,7 +433,7 @@ Conclusions:
     the 8ms for one single lookup, would still result in 1s time for a directory listing of 100 files, so it'd be
     better to cache the last SELECT path == "folder" lookup, then everything should work fine.
     In the first place, the benchmarks above have relatively long file names unlike in practice and are 100% flat.
-  - I don't know whether the O(n^2) creation time could be a tradeoff, but for 16M files and
+  - I don't know whether the O(n^2) creation time could be a trade-off, but for 16M files and
     PRIMARY KEY(VARCHAR,VARCHAR), it takes 918s ~15min.
     ImageNet has 14M files with quite a lot shorter file names (which probably is also a factor in speed!)
     and still takes 4h anyways, so this SQLite overhead might not be all that bad. But for archives

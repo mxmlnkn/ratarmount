@@ -105,7 +105,7 @@ python3 -m pip install --user lzmaffi
  - **Getting file contents** of a mounted archive is generally **vastly faster** than archivemount and, in contrast to archivemount, does not increase with the archive size or file count resulting in the largest observed speedups to be around 5 orders of magnitudes!
  - **Memory consumption** of ratarmount is mostly **less** than archivemount and mostly does not grow with the archive size.
    The gzip backend grows linearly with the archive size because the data for seeking is thousands of times larger than the simple two 64-bit offsets required for bzip2.
-   The memory usage of the zstd backend only seems humungous because it uses `mmap` to open.
+   The memory usage of the zstd backend only seems humongous because it uses `mmap` to open.
    The memory used by `mmap` is not even counted as used memory when showing the memory usage with `free` or `htop`.
  - For empty files, mounting with ratarmount and archivemount does not seem be bounded by decompression nor I/O bandwidths but instead by the algorithm for creating the internal file index.
    This algorithm scales linear for ratarmount but seems to scale worse than even quadratically for archives >100GB when using archivemount.
@@ -145,7 +145,7 @@ You downloaded a large TAR file from the internet, for example the [1.31TB](http
 
 I didn't find out about [TAR Browser](https://github.com/tomorrow-nf/tar-as-filesystem/) before I finished the ratarmount script. That's also one of it's cons:
 
-  - Hard to find. I don't seem to be the only one who has trouble finding it as it has onr star on Github after 7 years compared to 45 stars for tarindexer after roughly the same amount of time.
+  - Hard to find. I don't seem to be the only one who has trouble finding it as it has one star on Github after 7 years compared to 45 stars for tarindexer after roughly the same amount of time.
   - Hassle to set up. Needs compilation and I gave up when I was instructed to set up a MySQL database for it to use. Confusingly, the setup instructions are not on its Github but [here](https://web.wpi.edu/Pubs/E-project/Available/E-project-030615-133259/unrestricted/TARBrowserFinal.pdf).
   - Doesn't seem to support recursive TAR mounting. I didn't test it because of the MysQL dependency but the code does not seem to have logic for recursive mounting.
   - Xz compression also is only block or frame based, i.e., only works faster with files created by [pixz](https://github.com/vasi/pixz) or [pxz](https://github.com/jnovy/pxz).
@@ -158,7 +158,7 @@ Pros:
 
 Ratarmount creates an index file with file names, ownership, permission flags, and offset information.
 This sidecar is stored at the TAR file's location or in `~/.ratarmount/`.
-Ratarmount can load that index file in under a second if it exists and then offsers FUSE mount integration for easy access to the files inside the archive.
+Ratarmount can load that index file in under a second if it exists and then offers FUSE mount integration for easy access to the files inside the archive.
 
 The test with the first version (50e8dbb), which used the removed pickle backend for serializing the metadata index, for the ImageNet data set is promising:
 

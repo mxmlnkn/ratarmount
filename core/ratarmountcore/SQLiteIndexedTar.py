@@ -605,7 +605,7 @@ class SQLiteIndexedTar(MountSource):
 
         def extractSize(tarBlockOffset):
             fileObject.seek(tarBlockOffset + 124)
-            return int(fileObject.read(12).strip(b"\0"), 8)  # octal encoded file size @todo might alse be base64
+            return int(fileObject.read(12).strip(b"\0"), 8)  # octal encoded file size TODO might also be base64
 
         oldPosition = fileObject.tell()
 
@@ -613,7 +613,7 @@ class SQLiteIndexedTar(MountSource):
         # But, for long-names the prefix will not be prefixed but for long links it will be prefixed by tarfile.
         # This complicates things. Also, both long link and long name are implemented by a prepended
         # tar block with the special file name "././@LongLink" and tarfile will return the header offset of the
-        # corresponding GNU LongLink file header in the TarInfo obejct instead of the actual file header, which
+        # corresponding GNU LongLink file header in the TarInfo object instead of the actual file header, which
         # contains the prefix.
         try:
             if extractName(tarInfo.offset).startswith(b"././@LongLink\0"):
@@ -774,8 +774,8 @@ class SQLiteIndexedTar(MountSource):
                 if tarInfo.type == b'D':
                     dirFileInfo = list(fileInfo)
                     # This is only to get a unique primary key :/
-                    # Then again, TAR blocks are known to be on 512B bonudaries, so the lower
-                    # bits in the ofset are redundant anyway.
+                    # Then again, TAR blocks are known to be on 512B boundaries, so the lower
+                    # bits in the offset are redundant anyway.
                     dirFileInfo[2] += 1
                     dirFileInfo[4] = 0  # directory entries have no size by convention
                     dirFileInfo[6] = tarInfo.mode | stat.S_IFDIR
@@ -1005,7 +1005,7 @@ class SQLiteIndexedTar(MountSource):
                       So, even if a folder was overwritten by a file, which is already not well supported by tar,
                       then listDir for that path will still list all contents of the overwritten folder or folders,
                       no matter the specified version. The file system layer has to take care that a directory
-                      listing is not even requeted in the first place if it is not a directory.
+                      listing is not even requested in the first place if it is not a directory.
                       FUSE already does this by calling getattr for all parent folders in the specified path first.
 
         If path does not exist, always return None
@@ -1158,15 +1158,15 @@ class SQLiteIndexedTar(MountSource):
         # TODO This method is still not perfect but I do not know how to perfect it without loosing significant
         #      performance. Currently, adding implicit folders will fail when a file is overwritten implicitly with
         #      a folder and then overwritten by a file and then again overwritten by a folder. Because the parent
-        #      folderwas already added implicitly the first time, the second time will be skipped.
+        #      folder was already added implicitly the first time, the second time will be skipped.
         #      To solve this, I would have to add all parent folders for all files, which might easily explode
         #      the temporary database and the indexing performance by the folder depth.
         #      Also, I do not want to add versions for a parent folder for each implicitly added parent folder for
         #      each file, so I would have to sort out those in a post-processing step. E.g., sort by offsetheader
         #      and then clean out successive implicitly added folders as long as there is no file of the same name
-        #      inbetween.
+        #      in between.
         #      The unmentioned alternative would be to lookup paths with LIKE but that is just madness because it
-        #      will have a worse complexity of O(N) insteda of O(log(N)).
+        #      will have a worse complexity of O(N) instead of O(log(N)).
         self.sqlConnection.executemany(
             'INSERT OR IGNORE INTO "parentfolders" VALUES (?,?,?,?)',
             [(p[0], p[1], offsetheader, offset) for p in paths],
@@ -1358,7 +1358,7 @@ class SQLiteIndexedTar(MountSource):
             print("[Info]   - The index file got corrupted because of:")
             print("[Info]     - The program exited while it was still writing the index because of:")
             print("[Info]       - the user sent SIGINT to force the program to quit")
-            print("[Info]       - an internal error occured while writing the index")
+            print("[Info]       - an internal error occurred while writing the index")
             print("[Info]       - the disk filled up while writing the index")
             print("[Info]     - Rare lowlevel corruptions caused by hardware failure")
 
@@ -1550,7 +1550,7 @@ class SQLiteIndexedTar(MountSource):
                         elif 'gzipindex' in tables:
                             # Try to read legacy index files with exactly one blob.
                             # This is how old ratarmount version read it. I.e., if there were simply more than one
-                            # blob in the same tbale, then it would ignore all but the first(?!) and I am not sure
+                            # blob in the same table, then it would ignore all but the first(?!) and I am not sure
                             # what would happen in that case.
                             # So, use a differently named table if there are multiple blobs.
                             file.write(db.execute('SELECT data FROM gzipindex').fetchone()[0])
@@ -1577,7 +1577,7 @@ class SQLiteIndexedTar(MountSource):
             while fileObject.read(1024 * 1024):
                 pass
 
-            # The created index can unfortunately be pretty large and tmp might actually run out of memory!
+            # The created index can unfortunately be pretty large and /tmp might actually run out of memory!
             # Therefore, try different paths, starting with the location where the index resides.
             gzindex = None
             for tmpDir in [os.path.dirname(self.indexFilePath), None]:

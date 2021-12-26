@@ -139,7 +139,7 @@ class AutoMountLayer(MountSource):
         mountInfo = AutoMountLayer.MountInfo(mountSource, rootFileInfo)
 
         # TODO What if the mount point already exists, e.g., because stripRecursiveTarExtension is true and there
-        #      are multiple archives with the same name but different extesions?
+        #      are multiple archives with the same name but different extensions?
         self.mounted[mountPoint] = mountInfo
         if self.printDebug >= 2:
             print("Recursively mounted:", mountPoint)

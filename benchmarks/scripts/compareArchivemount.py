@@ -206,7 +206,7 @@ def plotComparison( fileName ):
     x = 10 ** np.linspace( np.log10( xmin ), np.log10( xmax ) )
     y = x**2;
     y = y / y[-1] * ymax / 2000
-    ax.plot( x[y > ymin], y[y > ymin], color = 'k', linestyle = '--', label = "quadratig scaling" )
+    ax.plot( x[y > ymin], y[y > ymin], color = 'k', linestyle = '--', label = "quadratic scaling" )
 
     ax.legend( [ Line2D( [], [], linestyle = '--', color = 'k' ) ], [ 'quadratic scaling' ],  loc = 'best' )
 

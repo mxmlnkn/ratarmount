@@ -46,7 +46,7 @@ def hasNonEmptySupport() -> bool:
     except Exception:
         pass
 
-    return False  # On macOS, fusermount does nto exist and macfuse also seems to complain with nonempty option.
+    return False  # On macOS, fusermount does not exist and macfuse also seems to complain with nonempty option.
 
 
 class FuseMount(fuse.Operations):
@@ -302,7 +302,7 @@ class TarFileType:
             try:
                 # Determining if there are many frames in zstd is O(1) with is_multiframe
                 if compression != 'zst' or supportedCompressions[compression].moduleName not in sys.modules:
-                    raise Exception()  # early exit because we catch it ourself anyways
+                    raise Exception()  # early exit because we catch it anyways
 
                 zstdFile = supportedCompressions[compression].open(fileobj)
 

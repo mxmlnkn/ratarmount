@@ -9,7 +9,7 @@
 
 Since the last comparison benchmark, the zstd compression backend was added and `indexed_bzip2` was parallelized using threads.
 
-To reduce the clutter, in the plot, the benchmarks with a file size of `64B` have been removed because they behave virtually the same as the `0B` per file case because `64B` of file contents are miniscule compoared to 20x512B blocks per record per default.
+To reduce the clutter, in the plot, the benchmarks with a file size of `64B` have been removed because they behave virtually the same as the `0B` per file case because `64B` of file contents are minuscule compared to 20x512B blocks per record per default.
 
 ![Benchmark comparison between ratarmount and archivemount](plots/archivemount-comparison.png)
 
@@ -264,5 +264,5 @@ Instead of simply using `INSERT INTO` it is much better to use `INSERT INTO ... 
 
 ![sqlite using intermediary table order by cache size benchmark 1000k files](plots/sqlite%20using%20intermediary%20table%20order%20by%20cache%20size%20benchmark%201000k%20files.png)
 
-this yields pretty "stable" performance "indepent" of the cache size, which is similar or even better than using no intermediary table and a relatively large cache of 512MB.
+this yields pretty "stable" performance "independent" of the cache size, which is similar or even better than using no intermediary table and a relatively large cache of 512MB.
 However, the variance seems to be much larger than all other benchmarks, probably caused by the disk accesses.

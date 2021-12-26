@@ -34,7 +34,7 @@ class FileVersionLayer(MountSource):
         Therefore, translate something like: /foo.version/3/bar.version/2/mimi.version/1 into
         /foo/bar/mimi.version/1
         This is possibly time-costly but requesting a different version from the most recent should
-        be a rare occurence and FUSE also checks all parent parts before accessing a file so it
+        be a rare occurrence and FUSE also checks all parent parts before accessing a file so it
         might only slow down access by roughly factor 2.
         """
 
