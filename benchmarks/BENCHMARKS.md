@@ -1,8 +1,88 @@
 # Table of Contents
 
-1. [Comparison with Archivemount](#comparison-with-archivemount)
-2. [Benchmarks for the Index File Serialization Backends](#benchmarks-for-the-index-file-serialization-backends)
-3. [Comparison of SQLite Table Designs](#comparison-of-sqlite-table-designs)
+1. [Comparison with Archivemount and Fuse-archive (December 2021)](#comparison-with-archivemount-and-fuse-archive-december-2021)
+1. [Speedup for Readdir Returning File Attributes](#speedup-for-readdir-returning-file-attributes)
+1. [Parallel XZ Decoder Speedup](#parallel-xz-decoder-speedup)
+1. [Parallel Indexing](#parallel-indexing)
+1. [Comparison with Archivemount (June 2021)](#comparison-with-archivemount-june-2021)
+1. [Parallel Bzip2 Decoder Speedup](#parallel-bzip2-decoder-speedup)
+1. [Comparison with Archivemount (December 2019)](#comparison-with-archivemount-december-2019)
+1. [Benchmarks for the Index File Serialization Backends](#benchmarks-for-the-index-file-serialization-backends)
+1. [Comparison of SQLite Table Designs](#comparison-of-sqlite-table-designs)
+
+
+# Comparison with Archivemount and Fuse-archive (December 2021)
+
+Since the last comparison benchmark, fuse-archive and a benchmark for xz based on python-xz was added.
+This makes the plot a bit crowded so that I removed the error bars for file access time and simply used the median but also adjusted the benchmark to create the archive the `--sort=name`, which should make the file access times more stable between different runs.
+Furthermore, since the last benchmark, the performance for `find` could be improved upon by implementing the FUSE `readdir` alternative interface, which returns attributes for each file instead of just the names.
+
+Xz support already existed at the time of the last benchmark but it had runaway memory usage, which got fixed in python-xz 0.4.0.
+And the lzmaffi backend caused problems with installing on systems because the cffi dependency has to be installed beforehand manually and there are also no wheels.
+This is why it was a more experimental feature.
+But now it is more polished and even has been parallized, see the [next section](#parallel-xz-decoder-speedup).
+
+![Benchmark comparison between ratarmount and archivemount](plots/archivemount-comparison.png)
+
+
+# Speedup for Readdir Returning File Attributes
+
+![Speedup ratarmount after returning file attributes](plots/parallel-find-ratarmount-comparison.png)
+
+One major and rather simple performance improvement in ratarmount 0.10.0 is for speeding up `find` performance by returning not just the file names for FUSE `readdir` calls but also file attributes.
+Previously, find had to stat each file in a folder even to just know which are files and which are folders to iterate further into.
+But now, the `readdir` call for listing file contents already returns all `stat` information and therefore can reduce the number of FUSE callbacks by the number of files in each folder.
+
+Further improvements to close the distance to archivemount performance in this might be possible by using the more difficult to use low-level FUSE interface.
+But for ratarmount, this might not help much because the low-level API is based on inodes but if the conversion between inode and name is so complex that it also requires a map, then it might be similarly slow as the high-level interface and might even result in runaway memory usage.
+And for ratarmount with union mounting and recursive mounting and even bind mounting of folders whose contents might change, it **is** difficult to find a fast inode mapping.
+For simply TAR mounts, it might be possible and performance improving by using the SQLite row index as inode.
+
+
+# Parallel XZ Decoder Speedup
+
+![Speedup ratarmount -P 24 over -P 1 for xz backend](plots/parallel-xz-ratarmount-comparison.png)
+
+When using all 24 logical cores (12 physical cores) for the parallel xz decoder based ontop of python-xz, the speedup tops out at roughly 10 but drops to 8 for very large archives, which is still a significant improvement upon the serial version.
+
+Note that the boundary case of empty files inside the TAR, does not benefit from this because decompression is not the bottleneck but instead creating the SQLite index is.
+
+In general, the parallelization is quite trivial over the xz blocks but there might be issues reducing the parallel efficiency like I/O access becoming more random instead of sequential or caches being thrashed.
+
+Xz decompression has been parallized using a simple scheme in ratarmountcore ontop of python-xz:
+
+ - For each thread in a thread pool:
+   1. Seek to the specified block in constant time thanks to python-xz.
+   2. Decode the block.
+   3. Put the decoded contents into the block cache.
+ - for the main thread:
+   1. Submit block to thread pool if not found in cache.
+   2. Get the requested block from the cache.
+   3. Get result from future and return it.
+
+Note that this heavily depends on fast seeking and therefore won't work for single-frame xz archives as created by default.
+Instead, it requires xz-files, e.g., as created with `xz -T0` or with `pixz`.
+
+
+# Parallel Indexing
+
+![Speedup ratarmount -P 24 over -P 1 for indexing uncompressed TARs](plots/parallel-ratarmount-comparison.png)
+
+Ratarmountcore 0.2.0 has been refactored to support traversing uncompressed TAR files in parallel in order to speed up SQLite index creation.
+For this, each thread seeks to a TAR file boundary and starts collecting file metadata from there until a defined end point.
+
+In order for this to improve speed, we need to find file boundaries faster than each thread does.
+This can be done by simply iterating over the TAR raw, i.e., read the file size from the TAR header and jump over the file contents.
+This scheme is 30x faster than iterating over the files using tarfile!
+However, it also adds complexity and potential for bugs when accounting for TAR file metadata stored in previous blocks like for very long TAR file names.
+
+Furthermore, as the chart above shows, the speedup is very unstable, probably because of the increased random I/O accesses.
+For the boundary case of empty files, it can speed up indexing by factor 5 but for very large archives even with relatively small 64kiB files, it might result in 3 times slower indexing!
+
+For these two reasons, this feature is still commented out in ratarmountcore 0.2.0 so that not even `-P 0` will activate it.
+
+A possibly remedy might be to order I/O access by reading the TAR headers only and distributing that to the workers instead of having each worker open the archive file and seeking inside it.
+Also, heuristics could be added to only use the parallelized indexing when there are a lot of **very** small files.
 
 
 # Comparison with Archivemount (June 2021)
@@ -11,7 +91,7 @@ Since the last comparison benchmark, the zstd compression backend was added and 
 
 To reduce the clutter, in the plot, the benchmarks with a file size of `64B` have been removed because they behave virtually the same as the `0B` per file case because `64B` of file contents are minuscule compared to 20x512B blocks per record per default.
 
-![Benchmark comparison between ratarmount and archivemount](plots/archivemount-comparison.png)
+![Benchmark comparison between ratarmount and archivemount](plots/archivemount-comparison-2021-06-27.png)
 
 ## Conclusions
 
@@ -55,7 +135,7 @@ It has to be explicitly enabled with `-P 0`.
 When using all 24 logical cores for the parallel bz2 decoder in `indexed_bzip2`, the speedup tops out at roughly 12, which seems to coincide with my physical cores.
 However, with only `-P 12`, the speedup will be much smaller than 12! The latter is not shown here but was observed manually.
 
-In general, the parallelization is quite trivial over the bz2 blocks but there might be reducing the parallel efficiency like I/O access becoming more random instead of sequential or caches being thrashed.
+In general, the parallelization is quite trivial over the bz2 blocks but there might be issues reducing the parallel efficiency like I/O access becoming more random instead of sequential or caches being thrashed.
 
 
 # Comparison with Archivemount (December 2019)

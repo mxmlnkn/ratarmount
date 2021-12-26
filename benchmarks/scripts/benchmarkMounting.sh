@@ -10,6 +10,9 @@ set -e
 echoerr() { echo "$@" 1>&2; }
 
 
+# Kinda obsolete parallelized bash version
+# For 1MiB frames, the frequent process spawning for dd and and zstd cost the most of the time!
+# Therefore, use a process pool in python to fix that speed issue.
 function createMultiFrameZstd()
 (
     frameSize=$1
@@ -24,24 +27,86 @@ function createMultiFrameZstd()
 
     # Create a temporary file. I avoid simply piping to zstd
     # because it wouldn't store the uncompressed size.
-    if [[ -d /dev/shm ]]; then frameFile=$( mktemp --tmpdir=/dev/shm ); fi
-    if [[ -z $frameFile ]]; then frameFile=$( mktemp ); fi
-    if [[ -z $frameFile ]]; then
-        echo "Could not create a temporary file for the frames." 1>&2
+    if [[ -d /dev/shm ]]; then tmpFolder=$( mktemp -d --tmpdir=/dev/shm ); fi
+    if [[ -z $tmpFolder ]]; then tmpFolder=$( mktemp -d ); fi
+    if [[ -z $tmpFolder ]]; then
+        echo "Could not create a temporary folder for the frames." 1>&2
         return 1
     fi
 
     echo "Compress into $file.zst" 1>&2
     true > "$file.zst"
-    for (( offset = 0; offset < fileSize; offset += frameSize )); do
-        dd if="$file" of="$frameFile" bs=$(( 1024*1024 )) \
-           iflag=skip_bytes,count_bytes skip="$offset" count="$frameSize" 2>/dev/null
-        zstd -c -q -- "$frameFile" >> "$file.zst"
+    nCores=$( nproc )  # nproc is actually pretty slow when used in a loop!
+    for (( offset = 0; offset < fileSize; )); do
+        # Do it chunk-wise because we are compressing the frames with temporary files in limited /dev/shm!
+        printf '' > "$tmpFolder/offsets"
+        for (( part = 0; part < 2 * nCores; ++part )); do
+            echo "$part $offset" >> "$tmpFolder/offsets"
+            (( offset += frameSize ))
+            if (( offset >= fileSize )); then
+                break
+            fi
+        done
+        cat "$tmpFolder/offsets" | xargs -P 0 -I {} bash -c '
+            file=$1
+            frameSize=$2
+            tmpFolder=$3
+            part=${4% *}
+            offset=${4#* }
+
+            time dd if="$file" of="$tmpFolder/$part" bs=$(( 1024*1024 )) \
+               iflag=skip_bytes,count_bytes skip="$offset" count="$frameSize" # 2>/dev/null
+            zstd --rm -q -- "$tmpFolder/$part"
+        ' bash "$file" "$frameSize" "$tmpFolder" {}
+
+        compressedFrames=( $( sed -n -E 's|([0-9]+) .*|'"$tmpFolder"'/\1.zst|p' "$tmpFolder/offsets" ) )
+        cat "${compressedFrames[@]}" >> "$file.zst"
+        'rm' "${compressedFrames[@]}"
     done
 
-    'rm' -f -- "$frameFile"
+    ls -la "$tmpFolder"
+    'rm' -r -- "$tmpFolder"
 )
 
+
+cat <<EOF > createMultiFrameZstd.py
+import concurrent.futures
+import os
+import sys
+
+import zstandard
+
+
+def compressZstd(data):
+    return zstandard.ZstdCompressor().compress(data)
+
+
+if __name__ == '__main__':
+    filePath = sys.argv[1]
+    frameSize = int(sys.argv[2])
+    parallelization = os.cpu_count() * 2
+
+    with open(filePath, 'rb') as file, open(
+        filePath + ".zst", 'wb'
+    ) as compressedFile, concurrent.futures.ThreadPoolExecutor(parallelization) as pool:
+        results = []
+        while True:
+            toCompress = file.read(frameSize)
+            if not toCompress:
+                break
+            results.append(pool.submit(compressZstd, toCompress))
+            while len(results) >= parallelization:
+                compressedData = results.pop(0).result()
+                compressedFile.write(compressedData)
+
+        while results:
+            compressedFile.write(results.pop(0).result())
+EOF
+
+function createMultiFrameZstd()
+{
+    python3 createMultiFrameZstd.py "$@"
+}
 
 function benchmarkCommand()
 {
@@ -49,12 +114,42 @@ function benchmarkCommand()
 
     echoerr "Running: ${commandToBenchmark[*]} ..."
 
-    duration=$( { /bin/time -f '%e s %M kiB max rss' \
-                      "${commandToBenchmark[@]}"; } 2>&1 1>/dev/null |
-                      'grep' 'max rss' )
-    rss=$( printf '%s' "$duration" | sed -r 's|.* s ([0-9]+) kiB.*|\1|' )
+    if [[ "${commandToBenchmark[0]}" == 'fuse-archive' ]]; then
+        tmpFile=$( mktemp )
+        # We need to keep fuse-archive in foreground until it has finished mounting to get a useful max RSS estimate!
+        { /bin/time -f '%e s %M kiB max rss' "${commandToBenchmark[@]}" -f; } 2>&1 1>/dev/null |
+            'grep' 'max rss' > "$tmpFile" &
+        pid=$!
 
-    echoerr "Command took $duration"  # duration includes RSS, which is helpful to print here
+        local mountPoint
+        mountPoint=${commandToBenchmark[${#commandToBenchmark[@]} -1]}
+        while ! command mountpoint -q "$mountPoint"; do sleep 0.1; done
+        stat -- "$mountPoint"  &>/dev/null
+        fusermount -u "$mountPoint"
+        for (( i = 0; i < 30; ++i )); do
+            if ! mountpoint -q "$mountPoint" && ! ps -p $pid &> /dev/null; then
+                break
+            fi
+            sleep 1s
+            echoerr "Waiting for mountpoint"
+        done # throw error after timeout?
+        rss=$( cat -- "$tmpFile" | sed -r 's|.* s ([0-9]+) kiB.*|\1|' )
+        rm "$tmpFile"
+
+        # This also remounted so that we get the mount point!
+        duration=$( { /bin/time -f '%e s %M kiB max rss' \
+                          bash -c 'fuse-archive "$@" && stat "${@: -1}"' "${commandToBenchmark[@]}"; } 2>&1 1>/dev/null |
+                          'grep' 'max rss' )
+
+        echoerr "Command took ${duration%% s *} s and $rss kiB"
+    else
+        duration=$( { /bin/time -f '%e s %M kiB max rss' \
+                          "${commandToBenchmark[@]}"; } 2>&1 1>/dev/null |
+                          'grep' 'max rss' )
+        rss=$( printf '%s' "$duration" | sed -r 's|.* s ([0-9]+) kiB.*|\1|' )
+
+        echoerr "Command took $duration"  # duration includes RSS, which is helpful to print here
+    fi
 
     # Check for file path arguments
     for arg in "${commandToBenchmark[@]}"; do
@@ -122,7 +217,9 @@ function createLargeTar()
     done
 
     tarFile="tar-with-$nFolders-folders-with-$nFilesPerFolder-files-${nBytesPerFile}B-files.tar"
-    benchmarkCommand tar --hard-dereference --dereference -c -C "$tarFolder" -f "$tarFile" --owner=user --group=group .
+    # Transform and remove leading dot because fuse-archive had problems with that
+    # https://github.com/google/fuse-archive/issues/2
+    benchmarkCommand tar --hard-dereference --dereference --sort=name -c --transform='s|^[.]/||' -C "$tarFolder" -f "$tarFile" --owner=user --group=group .
     'rm' -rf -- "$tarFolder"
 }
 
@@ -230,57 +327,70 @@ echo '# tool command compression nameLength nFolders nFilesPerFolder nBytesPerFi
 
 nameLength=32
 nFilesPerFolder=1000
+extendedBenchmarks=1
 
 for nFolders in 1 10 100 300 1000 2000; do
 for nBytesPerFile in 0 $(( 64 * 1024 )); do
-for compression in '' '.gz' '.bz2' '.zst'; do
+for compression in '' '.bz2' '.gz' '.xz' '.zst'; do
     tarFile="tar-with-$nFolders-folders-with-$nFilesPerFolder-files-${nBytesPerFile}B-files.tar"
 
     echoerr ""
     echoerr "Test with tar$compression archive containing $nFolders folders with each $nFilesPerFolder files with each $nBytesPerFile bytes"
 
-    cmd=  # clear for benchmarCommand method because it is not relevant for these tests
+    cmd=  # clear for benchmarkCommand method because it is not relevant for these tests
     if [[ ! -f $tarFile ]]; then
         createLargeTar
     fi
 
-    if [[ ! -f $tarFile.$compression ]]; then
+    if [[ ! -f $tarFile$compression ]]; then
         case "$compression" in
             '.bz2') benchmarkCommand lbzip2 --keep "$tarFile"; ;;
             '.gz' ) benchmarkCommand pigz --keep "$tarFile"; ;;
-            '.zst') benchmarkFunction createMultiFrameZstd "$(( 1024 * 1024 ))" "$tarFile"; ;;
+            # Use same block sizes for zstd as for xz for a fair comparison!
+            '.xz' ) benchmarkCommand xz -T 0 --block-size=$(( 1024*1024 )) --keep "$tarFile"; ;;
+            '.zst') benchmarkFunction createMultiFrameZstd "$tarFile" "$(( 1024*1024 ))"; ;;
         esac
     fi
 
-    # Benchmark decompression and listing with other tools for comparison
-    benchmarkCommand tar tvlf "${tarFile}${compression}"
-
-    case "$compression" in
-        '.bz2')
-            benchmarkCommand lbzip2 --keep --decompress --stdout "${tarFile}${compression}"
-            benchmarkCommand bzip2 --keep --decompress --stdout "${tarFile}${compression}"
-            ;;
-        '.gz' )
-            benchmarkCommand pigz --keep --decompress --stdout "${tarFile}${compression}"
-            benchmarkCommand gzip --keep --decompress --stdout "${tarFile}${compression}"
-            ;;
-        '.zst')
-            benchmarkCommand zstd --keep --decompress --stdout "${tarFile}${compression}"
-            ;;
-    esac
-
-    for cmd in archivemount "ratarmount -P $( nproc )"; do
+    for cmd in  "ratarmount -P $( nproc )"; do
         benchmark
     done
 
-    if [[ "$compression" == '.bz2' ]]; then
-        cmd=ratarmount
-        benchmark
+    if [[ $extendedBenchmarks -eq 1 ]]; then
+        for cmd in archivemount fuse-archive; do
+            benchmark
+        done
+
+        # Benchmark decompression and listing with other tools for comparison
+        benchmarkCommand tar tvlf "${tarFile}${compression}"
+
+        case "$compression" in
+            '.bz2')
+                benchmarkCommand lbzip2 --force --keep --decompress --stdout "${tarFile}${compression}"
+                benchmarkCommand bzip2 --force --keep --decompress --stdout "${tarFile}${compression}"
+                ;;
+            '.gz' )
+                benchmarkCommand pigz --force --keep --decompress --stdout "${tarFile}${compression}"
+                benchmarkCommand gzip --force --keep --decompress --stdout "${tarFile}${compression}"
+                ;;
+            '.xz' )
+                benchmarkCommand xz -T 0 --block-size=$(( 1024*1024 )) --force --keep --decompress --stdout "${tarFile}${compression}"
+                ;;
+            '.zst')
+                benchmarkCommand zstd --force --keep --decompress --stdout "${tarFile}${compression}"
+                ;;
+        esac
+
+        # Benchmark single-core version of anything that is parallelized
+        if [[ "$compression" == '.bz2' || "$compression" == '.xz' || "$compression" == '' ]]; then
+            cmd=ratarmount
+            benchmark
+        fi
     fi
 
     # I don't have enough free space on my SSD to keep 4x 100GB large files around
     if [[ -n "$compression" &&
-          ( $( stat --format=%s -- ${tarFile}${compression} ) -gt $(( 100*1024*1024*1024 )) ) ]]
+          ( $( stat --format=%s -- ${tarFile}${compression} ) -gt $(( 40*1024*1024*1024 )) ) ]]
     then
         'rm' "${tarFile}${compression}"
     fi

@@ -13,7 +13,7 @@ In [contrast](https://github.com/libarchive/libarchive#notes-about-the-library-d
 
 *Other capabilities:*
 
- - **Highly Parallelized:** Using the `-P <cores>` option will activate parallel xz and bzip2 decoders as well as parallel uncompressed TAR analysis. This can yield huge speedups on most modern processors.
+ - **Highly Parallelized:** Using the `-P <cores>` option will activate parallel xz and bzip2 decoders. This can yield huge speedups on most modern processors.
  - **Recursive Mounting:** Ratarmount will also mount TARs inside TARs inside TARs, ... recursively into folders of the same name, which is useful for the 1.31TB ImageNet data set.
  - **Mount Compressed Files:** You may also mount files with one of the supported compression schemes. Even if these files do not contain a TAR, you can leverage ratarmount's true seeking capabilities when opening the mounted uncompressed view of such a file.
  - **Read-Only Bind Mounting:** Folders may be mounted read-only to other folders for usecases like merging a backup TAR with newer versions of those files residing in a normal folder.
@@ -101,19 +101,23 @@ python3 -m pip install --user lzmaffi
 ![Benchmark comparison between ratarmount and archivemount](benchmarks/plots/archivemount-comparison.png)
 
 
- - Not shown in the benchmarks, but ratarmount can mount files with **preexisting index sidecar files** in under a second making it **vastly more efficient** compared to archivemount for every **subsequent mounts**.
-   Also archivemount has no progress indicator making it very unlikely the user will wait hours for the mounting to finish.
- - **Getting file contents** of a mounted archive is generally **vastly faster** than archivemount and, in contrast to archivemount, does not increase with the archive size or file count resulting in the largest observed speedups to be around 5 orders of magnitudes!
+ - Not shown in the benchmarks, but ratarmount can mount files with **preexisting index sidecar files** in under a second making it **vastly more efficient** compared to archivemount for every **subsequent mount**.
+   Also, archivemount has no progress indicator making it very unlikely the user will wait hours for the mounting to finish.
+   Fuse-archive, an iteration on archivemount, has the `--asyncprogress` option to give a progress indicator using the timestamp of a dummy file.
+   Note that fuse-archive daemonizes instantly but the mount point will not be usable for a long time and everything trying to use it will hang until then when not using `--asyncprogress`!
+ - **Getting file contents** of a mounted archive is generally **vastly faster** than archivemount and fuse-archive and does not increase with the archive size or file count resulting in the largest observed speedups to be around 5 orders of magnitude!
  - **Memory consumption** of ratarmount is mostly **less** than archivemount and mostly does not grow with the archive size.
+   Not shown in the plots, but the memory usage will be much smaller when not specifying `-P 0`, i.e., when not parallelizing.
    The gzip backend grows linearly with the archive size because the data for seeking is thousands of times larger than the simple two 64-bit offsets required for bzip2.
    The memory usage of the zstd backend only seems humongous because it uses `mmap` to open.
    The memory used by `mmap` is not even counted as used memory when showing the memory usage with `free` or `htop`.
  - For empty files, mounting with ratarmount and archivemount does not seem be bounded by decompression nor I/O bandwidths but instead by the algorithm for creating the internal file index.
-   This algorithm scales linear for ratarmount but seems to scale worse than even quadratically for archives >100GB when using archivemount.
- - Mounting **bzip2** archives has actually become **faster** than archivemount with `ratarmount -P 0` on most modern processors because archivemount only uses one core for decoding bzip2. `indexed_bzip2` supports block **parallel decoding** since version 1.2.0.
- - **Gzip** compressed TAR files are roughly one order of magnitude **slower** with ratarmount than archivemount during first time mounting.
+   This algorithm scales **linearly** for ratarmount and fuse-archive but seems to scale worse than even quadratically for archives containing more than 1M files when using archivemount.
+   Ratarmount 0.10.0 improves upon earlier versions by batching SQLite insertions.
+ - Mounting **bzip2** and **xz** archives has actually become **faster** than archivemount and fuse-archive with `ratarmount -P 0` on most modern processors because it actually uses more than one core for decoding those compressions. `indexed_bzip2` supports block **parallel decoding** since version 1.2.0.
+ - **Gzip** compressed TAR files are roughly one order of magnitude **slower** with ratarmount than archivemount during first time mounting. I opened an [issue](https://github.com/pauldmccarthy/indexed_gzip/issues/89) at the backend and I'm also experimenting with parallelized gzip compression like the prototype [pugz](https://github.com/Piezoid/pugz) offers for non-binary files only.
  - For the other cases, mounting times become roughly the same compared to archivemount for archives with 2M files in an approximately 100GB archive.
- - **Getting a lot of metadata** for archive contents as demonstrated by calling `find` on the mount point is generally more than an order of magnitude **slower** compared to archivemount, probably because of the Python and SQLite layer in contrast to a pure C implementation.
+ - **Getting a lot of metadata** for archive contents as demonstrated by calling `find` on the mount point is an order of magnitude **slower** compared to archivemount. Because the C-based fuse-archive is even slower than ratarmount, the difference is very likely that archivemount uses the low-level FUSE interface while ratarmount and fuse-archive use the high-level FUSE interface.
 
 Further benchmarks can be viewed [here](benchmarks/BENCHMARKS.md).
 
