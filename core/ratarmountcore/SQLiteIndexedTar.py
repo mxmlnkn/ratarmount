@@ -718,7 +718,8 @@ class SQLiteIndexedTar(MountSource):
 
         # 3. Iterate over files inside TAR and add them to the database
         try:
-            filesToMountRecursively = []
+            filesToMountRecursively: List[Tuple] = []
+            fileInfos: List[Tuple] = []
 
             for tarInfo in loadedTarFile:
                 loadedTarFile.members = []  # Clear this in order to limit memory usage by tarfile
@@ -751,7 +752,7 @@ class SQLiteIndexedTar(MountSource):
                 #       When looking at the generated index, those values get silently converted to 0?
                 path, name = fullPath.rsplit("/", 1)
                 # fmt: off
-                fileInfo = (
+                fileInfo : Tuple = (
                     path                              ,  # 0
                     name                              ,  # 1
                     streamOffset + tarInfo.offset     ,  # 2
@@ -771,7 +772,10 @@ class SQLiteIndexedTar(MountSource):
                 if self.mountRecursively and tarInfo.isfile() and tarInfo.name.lower().endswith('.tar'):
                     filesToMountRecursively.append(fileInfo)
                 else:
-                    self._setFileInfo(fileInfo)
+                    fileInfos.append(fileInfo)
+                    if len(fileInfos) > 1000:
+                        self._setFileInfos(fileInfos)
+                        fileInfos = []
 
                 # Add GNU incremental TAR directory metadata files also as directories
                 if tarInfo.type == b'D':
@@ -783,6 +787,9 @@ class SQLiteIndexedTar(MountSource):
                     dirFileInfo[4] = 0  # directory entries have no size by convention
                     dirFileInfo[6] = tarInfo.mode | stat.S_IFDIR
                     self._setFileInfo(tuple(dirFileInfo))
+
+            self._setFileInfos(fileInfos)
+            fileInfos = []
 
         except tarfile.ReadError as e:
             if 'unexpected end of data' in str(e):
@@ -1174,6 +1181,25 @@ class SQLiteIndexedTar(MountSource):
             'INSERT OR IGNORE INTO "parentfolders" VALUES (?,?,?,?)',
             [(p[0], p[1], offsetheader, offset) for p in paths],
         )
+
+    def _setFileInfos(self, rows: List[Tuple]) -> None:
+        if not self.sqlConnection:
+            raise IndexNotOpenError("This method can not be called without an opened index database!")
+        if not rows:
+            return
+
+        try:
+            self.sqlConnection.executemany(
+                'INSERT OR REPLACE INTO "files" VALUES (' + ','.join('?' * len(rows[0])) + ');', rows
+            )
+        except UnicodeEncodeError:
+            # Fall back to separately inserting each row to find those in need of string cleaning.
+            for row in rows:
+                self._setFileInfo(row)
+            return
+
+        for row in rows:
+            self._tryAddParentFolders(row[0], row[2], row[3])
 
     def _setFileInfo(self, row: tuple) -> None:
         if not self.sqlConnection:
