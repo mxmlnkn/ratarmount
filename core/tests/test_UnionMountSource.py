@@ -39,9 +39,9 @@ def _makeFolder(tarArchive, name):
 
 def _populate_folder(sampleArchive: SampleArchive):
     for folder in sampleArchive.folders:
-        os.makedirs(os.path.join(sampleArchive.path, folder), exist_ok=True)
+        os.makedirs(os.path.join(sampleArchive.path, folder.strip('/')), exist_ok=True)
     for path, contents in sampleArchive.files.items():
-        with open(os.path.join(sampleArchive.path, path), "wb") as file:
+        with open(os.path.join(sampleArchive.path, path.strip('/')), "wb") as file:
             file.write(contents)
 
 
@@ -59,7 +59,7 @@ def fixture_sample_folder_a(tmpdir):
         # original tmpdir is a deprecated py.path.local object
         path=os.path.join(tmpdir.realpath(), "folderA"),
         folders=["subfolder"],
-        files={"subfolder/world": b"hello\n", "ufo": b"iriya in folder 1\n"},
+        files={"/subfolder/world": b"hello\n", "/ufo": b"iriya in folder 1\n"},
     )
     _populate_folder(sampleArchive)
     return sampleArchive
@@ -71,7 +71,7 @@ def fixture_sample_folder_b(tmpdir):
         # original tmpdir is a deprecated py.path.local object
         path=os.path.join(tmpdir.realpath(), "folderB"),
         folders=["subfolder"],
-        files={"ufo": b"iriya\n"},
+        files={"/ufo": b"iriya\n"},
     )
     _populate_folder(sampleArchive)
     return sampleArchive
@@ -131,10 +131,17 @@ class TestUnionMountSource:
         os.mkdir(os.path.join(sample_folder_a.path, "subfolder2"))
         with open(os.path.join(sample_folder_a.path, "subfolder2/world"), "wb") as file:
             file.write(contents)
+        os.mkdir(os.path.join(sample_folder_a.path, "subfolder3"))
+        with open(os.path.join(sample_folder_a.path, "subfolder3/world"), "wb") as file:
+            file.write(contents)
+        with open(os.path.join(sample_folder_a.path, "second-world"), "wb") as file:
+            file.write(contents)
 
         TestUnionMountSource._check_file(union, "/ufo2", 0, contents)
         TestUnionMountSource._check_file(union, "/subfolder2", 0, None)
         TestUnionMountSource._check_file(union, "/subfolder2/world", 0, contents)
+        TestUnionMountSource._check_file(union, "/subfolder3/world", 0, contents)
+        TestUnionMountSource._check_file(union, "/second-world", 0, contents)
 
     @staticmethod
     def test_unite_two_archives(sample_tar_a, sample_tar_b):
@@ -145,3 +152,29 @@ class TestUnionMountSource:
             TestUnionMountSource._check_file(union, path, 0, contents)
         for path, contents in sample_tar_a.files.items():
             TestUnionMountSource._check_file(union, path, 0 if path not in sample_tar_b.files else 1, contents)
+
+    @staticmethod
+    def test_unite_folder_and_archive_and_update_folder(sample_tar_a, sample_folder_a):
+        union = UnionMountSource([SQLiteIndexedTar(sample_tar_a.path), FolderMountSource(sample_folder_a.path)])
+        for path in sample_tar_a.folders + sample_folder_a.folders:
+            TestUnionMountSource._check_file(union, path, 0, None)
+        for path, contents in sample_folder_a.files.items():
+            TestUnionMountSource._check_file(union, path, 0, contents)
+        for path, contents in sample_tar_a.files.items():
+            print("patH:", path)
+            TestUnionMountSource._check_file(union, path, 0 if path not in sample_folder_a.files else 1, contents)
+
+        contents = b"atarashii iriya\n"
+        with open(os.path.join(sample_folder_a.path, "ufo2"), "wb") as file:
+            file.write(contents)
+        os.mkdir(os.path.join(sample_folder_a.path, "subfolder2"))
+        with open(os.path.join(sample_folder_a.path, "subfolder2/world"), "wb") as file:
+            file.write(contents)
+        os.mkdir(os.path.join(sample_folder_a.path, "subfolder3"))
+        with open(os.path.join(sample_folder_a.path, "subfolder3/world"), "wb") as file:
+            file.write(contents)
+
+        TestUnionMountSource._check_file(union, "/ufo2", 0, contents)
+        TestUnionMountSource._check_file(union, "/subfolder2", 0, None)
+        TestUnionMountSource._check_file(union, "/subfolder2/world", 0, contents)
+        TestUnionMountSource._check_file(union, "/subfolder3/world", 0, contents)

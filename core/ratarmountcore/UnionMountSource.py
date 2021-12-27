@@ -118,9 +118,7 @@ class UnionMountSource(MountSource):
             parentFolder = '/'.join(path.split('/', self.folderCacheDepth + 1)[:-1])
             if not parentFolder:
                 parentFolder = '/'
-            if parentFolder not in self.folderCache:
-                return None
-            cachedMountSources = self.folderCache[parentFolder]
+            cachedMountSources = self.folderCache[parentFolder] if parentFolder in self.folderCache else []
         else:
             cachedMountSources = self.mountSources
 
