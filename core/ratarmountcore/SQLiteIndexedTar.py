@@ -3,7 +3,9 @@
 
 import io
 import json
+import multiprocessing.pool
 import os
+import platform
 import re
 import sqlite3
 import stat
@@ -16,7 +18,7 @@ import traceback
 import urllib
 
 from timeit import default_timer as timer
-from typing import Any, AnyStr, cast, Dict, IO, Iterable, List, Optional, Tuple, Union
+from typing import Any, AnyStr, Callable, cast, Dict, Generator, IO, Iterable, List, Optional, Tuple, Union
 from dataclasses import dataclass
 
 try:
@@ -33,7 +35,525 @@ from .MountSource import FileInfo, MountSource
 from .ProgressBar import ProgressBar
 from .StenciledFile import StenciledFile
 from .compressions import supportedCompressions
-from .utils import RatarmountError, IndexNotOpenError, InvalidIndexError, CompressionError, overrides
+from .utils import RatarmountError, IndexNotOpenError, InvalidIndexError, CompressionError, overrides, ceilDiv
+
+
+class _TarFileMetadataReader:
+    def __init__(
+        self,
+        parent: 'SQLiteIndexedTar',
+        _setFileInfos: Callable[[List[Tuple]], None],
+        _updateProgressBar: Callable[[], None],
+    ):
+        self._parent = parent
+        self._setFileInfos = _setFileInfos
+        self._updateProgressBar = _updateProgressBar
+
+        self._lastUpdateTime = time.time()
+
+        self._futures: List[multiprocessing.pool.AsyncResult] = []
+        self._filesToMountRecursively: List[Tuple] = []
+        self._fileInfos: List[Tuple] = []
+
+    @staticmethod
+    def _getTarPrefix(fileObject: IO[bytes], tarInfo: tarfile.TarInfo, printDebug: int) -> Optional[bytes]:
+        """Get the actual prefix as stored in the TAR."""
+
+        # Offsets taken from https://en.wikipedia.org/wiki/Tar_(computing)#UStar_format
+        def extractPrefix(tarBlockOffset):
+            fileObject.seek(tarBlockOffset + 345)
+            return fileObject.read(155)
+
+        def extractName(tarBlockOffset):
+            fileObject.seek(tarBlockOffset)
+            return fileObject.read(100)
+
+        def extractSize(tarBlockOffset):
+            fileObject.seek(tarBlockOffset + 124)
+            return int(fileObject.read(12).strip(b"\0"), 8)  # octal encoded file size TODO might also be base64
+
+        oldPosition = fileObject.tell()
+
+        # Normally, getting the prefix, could be as easy as calling extractPrefix.
+        # But, for long-names the prefix will not be prefixed but for long links it will be prefixed by tarfile.
+        # This complicates things. Also, both long link and long name are implemented by a prepended
+        # tar block with the special file name "././@LongLink" and tarfile will return the header offset of the
+        # corresponding GNU LongLink file header in the TarInfo object instead of the actual file header, which
+        # contains the prefix.
+        try:
+            if extractName(tarInfo.offset).startswith(b"././@LongLink\0"):
+                nextHeaderOffset = tarInfo.offset + 512 + (extractSize(tarInfo.offset) + 512 - 1) // 512 * 512
+                return extractPrefix(nextHeaderOffset)
+            return extractPrefix(tarInfo.offset)
+
+        except Exception as exception:
+            if printDebug >= 1:
+                print("[Warning] Encountered exception when trying to get TAR prefix", exception)
+            if printDebug >= 3:
+                traceback.print_exc()
+
+        finally:
+            fileObject.seek(oldPosition)
+
+        return None
+
+    @staticmethod
+    def _tarInfoFullMode(tarInfo: tarfile.TarInfo) -> int:
+        """
+        Returns the full mode for a TarInfo object. Note that TarInfo.mode only contains the permission bits
+        and not other bits like set for directory, symbolic links, and other special files.
+        """
+
+        return (
+            tarInfo.mode
+            # fmt: off
+            | ( stat.S_IFDIR if tarInfo.isdir () else 0 )
+            | ( stat.S_IFREG if tarInfo.isfile() or tarInfo.type == b'D' else 0 )
+            | ( stat.S_IFLNK if tarInfo.issym () else 0 )
+            | ( stat.S_IFCHR if tarInfo.ischr () else 0 )
+            | ( stat.S_IFIFO if tarInfo.isfifo() else 0 )
+            # fmt: on
+        )
+
+    @staticmethod
+    def _fixIncrementalBackupNamePrefixes(fileObject: IO[bytes], tarInfo: tarfile.TarInfo, printDebug: int):
+        """
+        Tarfile joins the TAR prefix with the file path.
+        However, for incremental TARs, the prefix is an octal timestamp and should be ignored.
+        This function reads the raw prefix from the TAR file and removes it from the TarInfo object's path
+        if the prefix is an octal number indicating an incremental archive prefix.
+        """
+
+        fixedPath = None
+        if '/' in tarInfo.name:
+            prefix, name = tarInfo.name.split('/', 1)
+            octalMTime = re.fullmatch("^[0-7]+$", prefix)
+
+            realPrefix = _TarFileMetadataReader._getTarPrefix(fileObject, tarInfo, printDebug)
+
+            # For names longer than 100B, GNU tar will store it using a ././@LongLink named file.
+            # In this case, tarfile will ignore the truncated filename AND the octal timestamp prefix!
+            # However, for long symbolic links, the prefix WILL be prepended to the @LongLink contents!
+            # In order to not strip folders erroneously, test against this prefix. Unfortunately, this is
+            # not perfect either because tarfile removes trailing slashes for names. So we have to
+            # read the TAR information ourselves.
+            # Note that the prefix contains two not always identical octal timestamps! E.g.,
+            #   b'13666753432\x0013666377326\x00\x00\x00...
+            # We only test for the first here as I'm not sure what the second one is.
+            if octalMTime and realPrefix and realPrefix.startswith(prefix.encode() + b"\0"):
+                secondTimestamp = re.match(b"^[0-7]+(\x00|)", realPrefix[len(prefix.encode()) + 1 :])
+                if secondTimestamp:
+                    fixedPath = name
+                elif printDebug >= 2:
+                    print("[Info] Second timestamp is not octal!", realPrefix[len(prefix.encode()) + 1 :])
+
+            if octalMTime and fixedPath is None and printDebug >= 1:
+                print(f"[Warning] ignored prefix '{prefix}' because it was not found in TAR header prefix.")
+                print("[Warning]", realPrefix[:30] if realPrefix else realPrefix)
+                print(f"[Info] TAR header offset: {tarInfo.offset}, type: {str(tarInfo.type)}")
+                print("[Info] name:", tarInfo.name)
+                print()
+
+        if fixedPath is not None:
+            tarInfo.name = fixedPath
+
+    @staticmethod
+    def _processTarInfo(
+        # fmt: off
+        tarInfo          : tarfile.TarInfo,
+        fileObject       : IO[bytes],
+        pathPrefix       : str,
+        streamOffset     : int,
+        isGnuIncremental : Optional[bool],
+        mountRecursively : bool,
+        printDebug       : int,
+        # fmt: on
+    ) -> Tuple[List[Tuple], bool, Optional[bool]]:
+        """Postprocesses a TarInfo object into one or multiple FileInfo tuples."""
+
+        if tarInfo.type == b'D' and not isGnuIncremental:
+            isGnuIncremental = True
+            if printDebug >= 1:
+                print(f"[Warning] A folder metadata entry ({tarInfo.name}) for GNU incremental archives")
+                print("[Warning] was encountered but this archive was not automatically recognized as such!")
+                print("[Warning] Please call ratarmount with the --gnu-incremental flag if there are problems.")
+                print()
+
+        if isGnuIncremental:
+            _TarFileMetadataReader._fixIncrementalBackupNamePrefixes(fileObject, tarInfo, printDebug)
+
+        # Add a leading '/' as a convention where '/' represents the TAR root folder
+        # Partly, done because fusepy specifies paths in a mounted directory like this
+        # os.normpath does not delete duplicate '/' at beginning of string!
+        # tarInfo.name might be identical to "." or begin with "./", which is bad!
+        # os.path.normpath can remove suffixed folder/./ path specifications but it can't remove
+        # a leading dot.
+        # TODO: Would be a nice function / line of code to test because it is very finicky.
+        #       And some cases are only triggered for recursive mounts, i.e., for non-empty pathPrefix.
+        fullPath = "/" + os.path.normpath(pathPrefix + "/" + tarInfo.name).lstrip('/')
+
+        # TODO: As for the tarfile type SQLite expects int but it is generally bytes.
+        #       Most of them would be convertible to int like tarfile.SYMTYPE which is b'2',
+        #       but others should throw errors, like GNUTYPE_SPARSE which is b'S'.
+        #       When looking at the generated index, those values get silently converted to 0?
+        path, name = fullPath.rsplit("/", 1)
+        # fmt: off
+        fileInfo : Tuple = (
+            path                                            ,  # 0
+            name                                            ,  # 1
+            streamOffset + tarInfo.offset                   ,  # 2
+            streamOffset + tarInfo.offset_data              ,  # 3
+            tarInfo.size                                    ,  # 4
+            tarInfo.mtime                                   ,  # 5
+            _TarFileMetadataReader._tarInfoFullMode(tarInfo),  # 6
+            tarInfo.type                                    ,  # 7
+            tarInfo.linkname                                ,  # 8
+            tarInfo.uid                                     ,  # 9
+            tarInfo.gid                                     ,  # 10
+            False                                           ,  # 11 (isTar)
+            tarInfo.issparse()                              ,  # 12
+        )
+        # fmt: on
+
+        fileInfos = [fileInfo]
+
+        if mountRecursively and tarInfo.isfile() and tarInfo.name.lower().endswith('.tar'):
+            return fileInfos, True, isGnuIncremental
+
+        # Add GNU incremental TAR directory metadata files also as directories
+        if tarInfo.type == b'D':
+            dirFileInfo = list(fileInfo)
+            # This is only to get a unique primary key :/
+            # Then again, TAR blocks are known to be on 512B boundaries, so the lower
+            # bits in the offset are redundant anyway.
+            dirFileInfo[2] += 1
+            dirFileInfo[4] = 0  # directory entries have no size by convention
+            dirFileInfo[6] = tarInfo.mode | stat.S_IFDIR
+            fileInfos.append(tuple(dirFileInfo))
+
+        return fileInfos, False, isGnuIncremental
+
+    @staticmethod
+    def _readTarFiles(
+        # fmt: off
+        pathToTar        : str,
+        startOffset      : int,
+        size             : int,
+        pathPrefix       : str,
+        streamOffset     : int,
+        isGnuIncremental : Optional[bool],
+        mountRecursively : bool,
+        ignoreZeros      : bool,
+        encoding         : str,
+        printDebug       : int,
+    ):
+        """
+        Opens a view of the data range [startOffset, startOffset+size) of the given pathToTar and extracts
+        all TAR file metadata and returns it as FileInfo tuples.
+        """
+
+        filesToMountRecursively: List[Tuple] = []
+        fileInfos: List[Tuple] = []
+
+        with open(pathToTar, 'rb') as rawFileObject:
+            fileObject = cast(IO[bytes], StenciledFile(rawFileObject, [(startOffset, size)]))
+            try:
+                loadedTarFile: Any = tarfile.open(
+                    fileobj=fileObject, mode='r:', ignore_zeros=ignoreZeros, encoding=encoding
+                )
+            except tarfile.ReadError:
+                return fileInfos, filesToMountRecursively, isGnuIncremental
+
+            for tarInfo in loadedTarFile:
+                loadedTarFile.members = []  # Clear this in order to limit memory usage by tarfile
+                newFileInfos, mightBeTar, isGnuIncremental = _TarFileMetadataReader._processTarInfo(
+                    tarInfo,
+                    pathPrefix=pathPrefix,
+                    streamOffset=streamOffset + startOffset,
+                    fileObject=fileObject,
+                    isGnuIncremental=isGnuIncremental,
+                    mountRecursively=mountRecursively,
+                    printDebug=printDebug,
+                )
+
+                if mightBeTar:
+                    filesToMountRecursively.extend(newFileInfos)
+                else:
+                    fileInfos.extend(newFileInfos)
+
+        return fileInfos, filesToMountRecursively, isGnuIncremental
+
+    @staticmethod
+    def findTarFileOffsets(fileObject: IO[bytes], ignoreZeros: bool) -> Generator[Tuple[int, bytes], None, None]:
+        """
+        Generator which yields offsets in the given TAR suitable for splitting the file into sub TARs.
+        Also returns the type of the TAR metadata block at the returned offset for convenience.
+        """
+
+        blockNumber = 0
+        skipNextBlocks = 0
+        fileObject.seek(0)
+
+        while True:
+            blockContents = fileObject.read(512)
+            if len(blockContents) < 512:
+                break
+
+            # > The end of an archive is marked by at least two consecutive zero-filled records.
+            if blockContents == b"\0" * 512:
+                blockContents = fileObject.read(512)
+                if blockContents == b"\0" * 512:
+                    if ignoreZeros:
+                        continue
+                    break
+
+                if len(blockContents) < 512:
+                    break
+
+            typeFlag = blockContents[156:157]
+
+            if skipNextBlocks > 0:
+                skipNextBlocks -= 1
+            else:
+                yield blockNumber * 512, typeFlag
+
+            blockNumber += 1
+            rawSize = blockContents[124 : 124 + 12].strip(b"\0")
+            size = int(rawSize, 8) if rawSize else 0
+            blockNumber += ceilDiv(size, 512)
+            fileObject.seek(blockNumber * 512)
+
+            # A lot of the special files contain information about the next file, therefore keep do not yield
+            # the offset of the next block so that the TAR will not be split between them.
+            # K: Identifies the *next* file on the tape as having a long name.
+            # L: Identifies the *next* file on the tape as having a long linkname.
+            # x: Extended header with meta data for the next file in the archive (POSIX.1-2001)
+            # 0: Normal file.
+            if typeFlag != b'0':
+                skipNextBlocks += 1
+
+    def _processFuture(self, future):
+        """Updates progress bar, waits for future and appends the results or even inserts them into the database."""
+
+        # ProgressBar does a similar check like this inside 'update' but doing this outside avoids huge
+        # call stacks and also avoids calling tell() on the file object in each loop iteration.
+        # I could observe 10% # shorter runtimes because of this with the test file:
+        #     tar-with-1000-folders-with-1000-files-0B-files.tar
+        if time.time() - self._lastUpdateTime >= 2:
+            self._lastUpdateTime = time.time()
+            self._updateProgressBar()
+
+        newFileInfos, filesToMountRecursively, _ = future.get()
+        self._filesToMountRecursively.extend(filesToMountRecursively)
+        self._fileInfos.extend(newFileInfos)
+        if len(self._fileInfos) > 1000:
+            self._setFileInfos(self._fileInfos)
+            self._fileInfos = []
+
+    def _enqueue(self, future):
+        """Enqueues future and if a threshold is reached, waits for and pops the oldest future."""
+
+        self._futures.append(future)
+        if len(self._futures) > 2 * self._parent.parallelization:
+            self._processFuture(self._futures.pop(0))
+
+    def _processParallel(
+        self, fileObject: IO[bytes], pathPrefix: str, streamOffset: int, processPool
+    ) -> Iterable[Tuple]:
+        """
+        Iterates over the files inside the TAR to finde good splitting points and then extracts FileInfo tuples
+        for partial TARs in parallel using the given processPool.
+        """
+
+        self._filesToMountRecursively.clear()
+        processedFiles = 0
+        tarBlocks: List[int] = []  # Contains offsets for TAR blocks
+
+        offsets = self.findTarFileOffsets(fileObject, self._parent.ignoreZeros)
+        while True:
+            result = next(offsets, None)
+            if result:
+                offset, typeFlag = result
+
+                if typeFlag == b'D' and self._parent.isGnuIncremental is None:
+                    self._parent.isGnuIncremental = True
+                    if self._parent.printDebug >= 1:
+                        print("[Warning] A folder metadata entry for GNU incremental archives")
+                        print("[Warning] was encountered but this archive was not automatically recognized as such!")
+                        print("[Warning] Please call ratarmount with the --gnu-incremental flag if there are problems.")
+                        print()
+
+            tarBlocks.append(offset)
+            processedFiles += 1
+
+            if len(tarBlocks) >= 10000 or (result is None and len(tarBlocks) > 0):
+                if result is None:
+                    tarBlocks.append(fileObject.tell())
+
+                startOffset = tarBlocks[0]
+                subSize = tarBlocks[-1] - tarBlocks[0]
+
+                tarBlocks = tarBlocks[-1:]
+
+                self._enqueue(
+                    processPool.apply_async(
+                        self._readTarFiles,
+                        (
+                            fileObject.name,
+                            startOffset,
+                            subSize,
+                            pathPrefix,
+                            streamOffset,
+                            self._parent.isGnuIncremental,
+                            self._parent.mountRecursively,
+                            self._parent.ignoreZeros,
+                            self._parent.encoding,
+                            self._parent.printDebug,
+                        ),
+                    )
+                )
+
+            if result is None:
+                break
+
+        if processedFiles == 0:
+            raise ValueError("Could not any find TAR blocks!")
+
+        while self._futures:
+            self._processFuture(self._futures.pop(0))
+        self._setFileInfos(self._fileInfos)
+        self._fileInfos = []
+
+        return self._filesToMountRecursively
+
+    def _openTar(self, fileObject: IO[bytes]):
+        """
+        Opens the fileObject with the appropriate settings using the tarfile module.
+        Instead of throwing, an empty iterable might be returned.
+        """
+
+        if not self._parent.isTar:
+            return []  # Feign an empty TAR file (iterable) if anything goes wrong
+
+        try:
+            # r: uses seeks to skip to the next file inside the TAR while r| doesn't do any seeks.
+            # r| might be slower but for compressed files we have to go over all the data once anyways.
+            # Note that with ignore_zeros = True, no invalid header issues or similar will be raised even for
+            # non TAR files!?
+            return tarfile.open(
+                # fmt:off
+                fileobj      = fileObject,
+                mode         = 'r|' if self._parent.compression else 'r:',
+                ignore_zeros = self._parent.ignoreZeros,
+                encoding     = self._parent.encoding,
+                # fmt:on
+            )
+        except tarfile.ReadError:
+            pass
+
+        return []
+
+    def _processSerial(self, fileObject: IO[bytes], pathPrefix: str, streamOffset: int) -> Iterable[Tuple]:
+        """
+        Opens the given fileObject using the tarfile module, iterates over all files converting their metadata to
+        FileInfo tuples and inserting those into the databse in a chunked manner using the given _setFileInfos.
+        """
+
+        loadedTarFile: Any = self._openTar(fileObject)
+
+        # Iterate over files inside TAR and add them to the database
+        fileInfos: List[Tuple] = []
+        filesToMountRecursively: List[Tuple] = []
+
+        # thread_time is twice as fast, which can shave off 10% of time in some tests but it is not as "correct"
+        # because it does not count the sleep time of the thread, e.g., caused by waiting for I/O or even waiting
+        # for work done inside multiprocessing.pool.Pool! This can lead to more than factor 10 distortions and
+        # therefore is not suitable. If time.time is indeed an issue, then it should be better to use _processParallel.
+        self._lastUpdateTime = time.time()
+
+        for tarInfo in loadedTarFile:
+            loadedTarFile.members = []  # Clear this in order to limit memory usage by tarfile
+
+            # ProgressBar does a similar check like this inside 'update' but doing this outside avoids huge
+            # call stacks and also avoids calling tell() on the file object in each loop iteration.
+            # I could observe 10% shorter runtimes because of this with the test file:
+            #     tar-with-1000-folders-with-1000-files-0B-files.tar
+            if time.time() - self._lastUpdateTime >= 2:
+                self._lastUpdateTime = time.time()
+                self._updateProgressBar()
+
+            newFileInfos, mightBeTar, self._parent.isGnuIncremental = _TarFileMetadataReader._processTarInfo(
+                tarInfo,
+                fileObject=fileObject,
+                pathPrefix=pathPrefix,
+                streamOffset=streamOffset,
+                isGnuIncremental=self._parent.isGnuIncremental,
+                mountRecursively=self._parent.mountRecursively,
+                printDebug=self._parent.printDebug,
+            )
+
+            if mightBeTar:
+                filesToMountRecursively.extend(newFileInfos)
+            else:
+                fileInfos.extend(newFileInfos)
+                if len(fileInfos) > 1000:
+                    self._setFileInfos(fileInfos)
+                    fileInfos.clear()
+
+        self._setFileInfos(fileInfos)
+        return filesToMountRecursively
+
+    def process(self, fileObject: IO[bytes], pathPrefix: str, streamOffset: int) -> Iterable[Tuple]:
+        """
+        Iterates over all files inside the given fileObject TAR and inserts their metadata into the database using
+        the given _setFileInfos.
+        A list of files which might be of interest for recursive mounting of uncompressed TARs is returned.
+        """
+
+        try:
+            return self._processSerial(fileObject, pathPrefix, streamOffset)
+
+            # Hidden Feature: Parallelized TAR analysis. It is hidden because it slows things down in certain
+            # circumstances. But I did observe a nice speedup for TARs containing only empty files.
+            # Probably unchanged for files <= 512B but for anything else it is doubtful whether this parallelization
+            # fileCanBeReopenedFromName = (
+            #     not self._parent.isFileObject
+            #     and hasattr(fileObject, 'name')
+            #     and isinstance(fileObject.name, str)
+            #     and os.path.isfile(fileObject.name)
+            # )
+            #
+            # # is helpful because of the high amount of random access necessary.
+            # # - Parallelizing is only possible for actual files not objects because the file needs to be reopened
+            # #   from a different process (not just thread to circumvent the global interpreter lock).
+            # # - For compressed files, the bottleneck is the decompression and the necessary seeks for this
+            # #   parallelization scheme would slow that down even more.
+            # # - If no parallelization is required than fall back to a simple scheme which has been tested for longer
+            # #   and should also be smaller because it avoids expensive setup only required for the parallelization.
+            # # - Only parallelize on Linux because of multi-file access problems on macOS and Windows.
+            # if (
+            #     fileCanBeReopenedFromName
+            #     and not self._parent.compression
+            #     and self._parent.parallelization != 1
+            #     and platform.system() == 'Linux'
+            #     and streamOffset == 0
+            # ):
+            #     # Distribute contiguous TAR block ranges to parallel workers
+            #     with multiprocessing.pool.Pool(self._parent.parallelization) as pool:
+            #         return self._processParallel(fileObject, pathPrefix, streamOffset, pool)
+            # else:
+            #     return self._processSerial(fileObject, pathPrefix, streamOffset)
+
+        except tarfile.ReadError as e:
+            if 'unexpected end of data' in str(e):
+                print(
+                    "[Warning] The TAR file is incomplete. Ratarmount will work but some files might be cut off. "
+                    "If the TAR file size changes, ratarmount will recreate the index during the next mounting."
+                )
+                if self._parent.printDebug >= 3:
+                    traceback.print_exc()
+
+        return []
 
 
 @dataclass
@@ -275,28 +795,28 @@ class SQLiteIndexedTar(MountSource):
         """Check for GNU incremental backup TARs."""
         oldPos = fileObject.tell()
 
+        t0 = time.time()
         try:
-            with tarfile.open(
-                fileobj=fileObject,
-                mode='r|' if self.compression else 'r:',
-                ignore_zeros=self.ignoreZeros,
-                encoding=self.encoding,
-            ) as tarFile:
-                nMaxToTry = 1000
-                for file in tarFile:
-                    # It seems to be possible to create mixtures of incremental archives and normal contents,
-                    # therefore do not check that all files must have the mtime prefix.
-                    if file.type == b'D':
-                        if self.printDebug >= 1:
-                            print("[Info] Detected GNU incremental TAR.")
-                        return True
+            # For an uncompressed 500MB TAR, this iteration took ~0.7s for 1M files roughly 30x faster than tarfile.
+            # But for compressed TARs or for HDDs as opposed to SSDs, this might be much slower.
+            nMaxToTry = 1000 if self.isFileObject or self.compression else 10000
+            for _, typeFlag in _TarFileMetadataReader.findTarFileOffsets(fileObject, self.ignoreZeros):
+                # It seems to be possible to create mixtures of incremental archives and normal contents,
+                # therefore do not check that all files must have the mtime prefix.
+                if typeFlag == b'D':
+                    if self.printDebug >= 1:
+                        print("[Info] Detected GNU incremental TAR.")
+                    return True
 
-                    nMaxToTry -= 1
-                    if nMaxToTry <= 0:
-                        break
+                nMaxToTry -= 1
+                if nMaxToTry <= 0 or time.time() - t0 > 3:
+                    break
 
-        except tarfile.ReadError:
-            pass
+        except Exception as exception:
+            if self.printDebug >= 2:
+                print("[Info] TAR was not recognized as GNU incremental TAR because of exception", exception)
+            if self.printDebug >= 3:
+                traceback.print_exc()
         finally:
             fileObject.seek(oldPos)
 
@@ -557,24 +1077,6 @@ class SQLiteIndexedTar(MountSource):
         uriPath = urllib.parse.quote(self.indexFilePath)
         self.sqlConnection = SQLiteIndexedTar._openSqlDb(f"file:{uriPath}?mode=ro", uri=True)
 
-    @staticmethod
-    def _tarInfoFullMode(tarInfo: tarfile.TarInfo) -> int:
-        """
-        Returns the full mode for a TarInfo object. Note that TarInfo.mode only contains the permission bits
-        and not other bits like set for directory, symbolic links, and other special files.
-        """
-
-        return (
-            tarInfo.mode
-            # fmt: off
-            | ( stat.S_IFDIR if tarInfo.isdir () else 0 )
-            | ( stat.S_IFREG if tarInfo.isfile() or tarInfo.type == b'D' else 0 )
-            | ( stat.S_IFLNK if tarInfo.issym () else 0 )
-            | ( stat.S_IFCHR if tarInfo.ischr () else 0 )
-            | ( stat.S_IFIFO if tarInfo.isfifo() else 0 )
-            # fmt: on
-        )
-
     def _updateProgressBar(self, progressBar, fileobj: Any) -> None:
         try:
             if hasattr(fileobj, 'tell_compressed') and self.compression == 'bz2':
@@ -593,155 +1095,6 @@ class SQLiteIndexedTar(MountSource):
                 print("An exception occured when trying to update the progress bar:", exception)
             if self.printDebug >= 3:
                 traceback.print_exc()
-
-    @staticmethod
-    def _getTarPrefix(fileObject: IO[bytes], tarInfo: tarfile.TarInfo, printDebug: int) -> Optional[bytes]:
-        """Get the actual prefix as stored in the TAR."""
-
-        # Offsets taken from https://en.wikipedia.org/wiki/Tar_(computing)#UStar_format
-        def extractPrefix(tarBlockOffset):
-            fileObject.seek(tarBlockOffset + 345)
-            return fileObject.read(155)
-
-        def extractName(tarBlockOffset):
-            fileObject.seek(tarBlockOffset)
-            return fileObject.read(100)
-
-        def extractSize(tarBlockOffset):
-            fileObject.seek(tarBlockOffset + 124)
-            return int(fileObject.read(12).strip(b"\0"), 8)  # octal encoded file size TODO might also be base64
-
-        oldPosition = fileObject.tell()
-
-        # Normally, getting the prefix, could be as easy as calling extractPrefix.
-        # But, for long-names the prefix will not be prefixed but for long links it will be prefixed by tarfile.
-        # This complicates things. Also, both long link and long name are implemented by a prepended
-        # tar block with the special file name "././@LongLink" and tarfile will return the header offset of the
-        # corresponding GNU LongLink file header in the TarInfo object instead of the actual file header, which
-        # contains the prefix.
-        try:
-            if extractName(tarInfo.offset).startswith(b"././@LongLink\0"):
-                nextHeaderOffset = tarInfo.offset + 512 + (extractSize(tarInfo.offset) + 512 - 1) // 512 * 512
-                return extractPrefix(nextHeaderOffset)
-            return extractPrefix(tarInfo.offset)
-
-        except Exception as exception:
-            if printDebug >= 1:
-                print("[Warning] Encountered exception when trying to get TAR prefix", exception)
-            if printDebug >= 3:
-                traceback.print_exc()
-
-        finally:
-            fileObject.seek(oldPosition)
-
-        return None
-
-    @staticmethod
-    def _fixIncrementalBackupNamePrefixes(fileObject: IO[bytes], tarInfo: tarfile.TarInfo, printDebug: int):
-        fixedPath = None
-        if '/' in tarInfo.name:
-            prefix, name = tarInfo.name.split('/', 1)
-            octalMTime = re.fullmatch("^[0-7]+$", prefix)
-
-            realPrefix = SQLiteIndexedTar._getTarPrefix(fileObject, tarInfo, printDebug)
-
-            # For names longer than 100B, GNU tar will store it using a ././@LongLink named file.
-            # In this case, tarfile will ignore the truncated filename AND the octal timestamp prefix!
-            # However, for long symbolic links, the prefix WILL be prepended to the @LongLink contents!
-            # In order to not strip folders erroneously, test against this prefix. Unfortunately, this is
-            # not perfect either because tarfile removes trailing slashes for names. So we have to
-            # read the TAR information ourselves.
-            # Note that the prefix contains two not always identical octal timestamps! E.g.,
-            #   b'13666753432\x0013666377326\x00\x00\x00...
-            # We only test for the first here as I'm not sure what the second one is.
-            if octalMTime and realPrefix and realPrefix.startswith(prefix.encode() + b"\0"):
-                secondTimestamp = re.match(b"^[0-7]+(\x00|)", realPrefix[len(prefix.encode()) + 1 :])
-                if secondTimestamp:
-                    fixedPath = name
-                elif printDebug >= 2:
-                    print("[Info] Second timestamp is not octal!", realPrefix[len(prefix.encode()) + 1 :])
-
-            if octalMTime and fixedPath is None and printDebug >= 1:
-                print(f"[Warning] ignored prefix '{prefix}' because it was not found in TAR header prefix.")
-                print("[Warning]", realPrefix[:30] if realPrefix else realPrefix)
-                print(f"[Info] TAR header offset: {tarInfo.offset}, type: {str(tarInfo.type)}")
-                print("[Info] name:", tarInfo.name)
-                print()
-
-        if fixedPath is not None:
-            tarInfo.name = fixedPath
-
-    @staticmethod
-    def _processTarInfo(
-        tarInfo: tarfile.TarInfo,
-        fileObject: IO[bytes],
-        pathPrefix: str,
-        streamOffset: int,
-        isGnuIncremental: Optional[bool],
-        mountRecursively: bool,
-        printDebug: int,
-    ):
-        if tarInfo.type == b'D' and not isGnuIncremental:
-            isGnuIncremental = True
-            if printDebug >= 1:
-                print(f"[Warning] A folder metadata entry ({tarInfo.name}) for GNU incremental archives")
-                print("[Warning] was encountered but this archive was not automatically recognized as such!")
-                print("[Warning] Please call ratarmount with the --gnu-incremental flag if there are problems.")
-                print()
-
-        if isGnuIncremental:
-            SQLiteIndexedTar._fixIncrementalBackupNamePrefixes(fileObject, tarInfo, printDebug)
-
-        # Add a leading '/' as a convention where '/' represents the TAR root folder
-        # Partly, done because fusepy specifies paths in a mounted directory like this
-        # os.normpath does not delete duplicate '/' at beginning of string!
-        # tarInfo.name might be identical to "." or begin with "./", which is bad!
-        # os.path.normpath can remove suffixed folder/./ path specifications but it can't remove
-        # a leading dot.
-        # TODO: Would be a nice function / line of code to test because it is very finicky.
-        #       And some cases are only triggered for recursive mounts, i.e., for non-empty pathPrefix.
-        fullPath = "/" + os.path.normpath(pathPrefix + "/" + tarInfo.name).lstrip('/')
-
-        # TODO: As for the tarfile type SQLite expects int but it is generally bytes.
-        #       Most of them would be convertible to int like tarfile.SYMTYPE which is b'2',
-        #       but others should throw errors, like GNUTYPE_SPARSE which is b'S'.
-        #       When looking at the generated index, those values get silently converted to 0?
-        path, name = fullPath.rsplit("/", 1)
-        # fmt: off
-        fileInfo : Tuple = (
-            path                                      ,  # 0
-            name                                      ,  # 1
-            streamOffset + tarInfo.offset             ,  # 2
-            streamOffset + tarInfo.offset_data        ,  # 3
-            tarInfo.size                              ,  # 4
-            tarInfo.mtime                             ,  # 5
-            SQLiteIndexedTar._tarInfoFullMode(tarInfo),  # 6
-            tarInfo.type                              ,  # 7
-            tarInfo.linkname                          ,  # 8
-            tarInfo.uid                               ,  # 9
-            tarInfo.gid                               ,  # 10
-            False                                     ,  # 11 (isTar)
-            tarInfo.issparse()                        ,  # 12
-        )
-        # fmt: on
-
-        fileInfos = [fileInfo]
-
-        if mountRecursively and tarInfo.isfile() and tarInfo.name.lower().endswith('.tar'):
-            return fileInfos, True, isGnuIncremental
-
-        # Add GNU incremental TAR directory metadata files also as directories
-        if tarInfo.type == b'D':
-            dirFileInfo = list(fileInfo)
-            # This is only to get a unique primary key :/
-            # Then again, TAR blocks are known to be on 512B boundaries, so the lower
-            # bits in the offset are redundant anyway.
-            dirFileInfo[2] += 1
-            dirFileInfo[4] = 0  # directory entries have no size by convention
-            dirFileInfo[6] = tarInfo.mode | stat.S_IFDIR
-            fileInfos.append(tuple(dirFileInfo))
-
-        return fileInfos, False, isGnuIncremental
 
     def _createIndex(
         self,
@@ -765,67 +1118,16 @@ class SQLiteIndexedTar(MountSource):
         if self.isGnuIncremental is None:
             self.isGnuIncremental = self._isGnuIncremental(fileObject)
 
-        # 2. Open TAR file reader
-        loadedTarFile: Any = []  # Feign an empty TAR file if anything goes wrong
-        if self.isTar:
-            try:
-                # r: uses seeks to skip to the next file inside the TAR while r| doesn't do any seeks.
-                # r| might be slower but for compressed files we have to go over all the data once anyways.
-                # Note that with ignore_zeros = True, no invalid header issues or similar will be raised even for
-                # non TAR files!?
-                loadedTarFile = tarfile.open(
-                    # fmt:off
-                    fileobj      = fileObject,
-                    mode         = 'r|' if self.compression else 'r:',
-                    ignore_zeros = self.ignoreZeros,
-                    encoding     = self.encoding,
-                    # fmt:on
-                )
-            except tarfile.ReadError:
-                pass
-
         if progressBar is None:
             try:
                 progressBar = ProgressBar(os.fstat(fileObject.fileno()).st_size)
             except io.UnsupportedOperation:
                 pass
 
-        # 3. Iterate over files inside TAR and add them to the database
-        try:
-            filesToMountRecursively: List[Tuple] = []
-            fileInfos: List[Tuple] = []
-
-            for tarInfo in loadedTarFile:
-                loadedTarFile.members = []  # Clear this in order to limit memory usage by tarfile
-                self._updateProgressBar(progressBar, fileObject)
-
-                newFileInfos, mightBeTar, self.isGnuIncremental = SQLiteIndexedTar._processTarInfo(
-                    tarInfo,
-                    fileObject=fileObject,
-                    pathPrefix=pathPrefix,
-                    streamOffset=streamOffset,
-                    isGnuIncremental=self.isGnuIncremental,
-                    mountRecursively=self.mountRecursively,
-                    printDebug=self.printDebug,
-                )
-
-                if mightBeTar:
-                    filesToMountRecursively.extend(newFileInfos)
-                else:
-                    fileInfos.extend(newFileInfos)
-                    if len(fileInfos) > 1000:
-                        self._setFileInfos(fileInfos)
-                        fileInfos = []
-
-            self._setFileInfos(fileInfos)
-            fileInfos = []
-
-        except tarfile.ReadError as e:
-            if 'unexpected end of data' in str(e):
-                print(
-                    "[Warning] The TAR file is incomplete. Ratarmount will work but some files might be cut off. "
-                    "If the TAR file size changes, ratarmount will recreate the index during the next mounting."
-                )
+        metadataReader = _TarFileMetadataReader(
+            self, self._setFileInfos, lambda: self._updateProgressBar(progressBar, fileObject)
+        )
+        filesToMountRecursively = metadataReader.process(fileObject, pathPrefix, streamOffset)
 
         # 4. Open contained TARs for recursive mounting
         oldPos = fileObject.tell()

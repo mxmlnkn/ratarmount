@@ -27,3 +27,7 @@ def overrides(parentClass):
         return method
 
     return overrider
+
+
+def ceilDiv(dividend, divisor):
+    return -(dividend // -divisor)

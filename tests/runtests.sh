@@ -1328,6 +1328,8 @@ tests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/file-existing-as-non-link-and-link.tar foo/fighter/ufo
     d3b07384d113edec49eaa6238ad5ff00 tests/two-self-links-to-existing-file.tar    bar
 
+    c9172d469a8faf82fe598c0ce978fcea tests/base64.gz                              base64
+
     2709a3348eb2c52302a7606ecf5860bc tests/nested-directly-compressed.tar.bz2     directly-compressed/ufo.bz2/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/nested-directly-compressed.tar.bz2     directly-compressed/ufo.gz/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/nested-directly-compressed.tar.bz2     directly-compressed/ufo.xz/ufo
