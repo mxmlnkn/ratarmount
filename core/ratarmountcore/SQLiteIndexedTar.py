@@ -594,7 +594,8 @@ class SQLiteIndexedTar(MountSource):
             if self.printDebug >= 3:
                 traceback.print_exc()
 
-    def _getTarPrefix(self, fileObject, tarInfo) -> Optional[bytes]:
+    @staticmethod
+    def _getTarPrefix(fileObject: IO[bytes], tarInfo: tarfile.TarInfo, printDebug: int) -> Optional[bytes]:
         """Get the actual prefix as stored in the TAR."""
 
         # Offsets taken from https://en.wikipedia.org/wiki/Tar_(computing)#UStar_format
@@ -625,9 +626,9 @@ class SQLiteIndexedTar(MountSource):
             return extractPrefix(tarInfo.offset)
 
         except Exception as exception:
-            if self.printDebug >= 1:
+            if printDebug >= 1:
                 print("[Warning] Encountered exception when trying to get TAR prefix", exception)
-            if self.printDebug >= 3:
+            if printDebug >= 3:
                 traceback.print_exc()
 
         finally:
@@ -635,13 +636,14 @@ class SQLiteIndexedTar(MountSource):
 
         return None
 
-    def _fixIncrementalBackupNamePrefixes(self, fileObject, tarInfo):
+    @staticmethod
+    def _fixIncrementalBackupNamePrefixes(fileObject: IO[bytes], tarInfo: tarfile.TarInfo, printDebug: int):
         fixedPath = None
         if '/' in tarInfo.name:
             prefix, name = tarInfo.name.split('/', 1)
             octalMTime = re.fullmatch("^[0-7]+$", prefix)
 
-            realPrefix = self._getTarPrefix(fileObject, tarInfo)
+            realPrefix = SQLiteIndexedTar._getTarPrefix(fileObject, tarInfo, printDebug)
 
             # For names longer than 100B, GNU tar will store it using a ././@LongLink named file.
             # In this case, tarfile will ignore the truncated filename AND the octal timestamp prefix!
@@ -656,18 +658,90 @@ class SQLiteIndexedTar(MountSource):
                 secondTimestamp = re.match(b"^[0-7]+(\x00|)", realPrefix[len(prefix.encode()) + 1 :])
                 if secondTimestamp:
                     fixedPath = name
-                elif self.printDebug >= 2:
+                elif printDebug >= 2:
                     print("[Info] Second timestamp is not octal!", realPrefix[len(prefix.encode()) + 1 :])
 
-            if octalMTime and fixedPath is None and self.printDebug >= 1:
+            if octalMTime and fixedPath is None and printDebug >= 1:
                 print(f"[Warning] ignored prefix '{prefix}' because it was not found in TAR header prefix.")
-                print("[Warning]", realPrefix[:30])
-                print(f"[Info] TAR header offset: {tarInfo.offset}, type: {tarInfo.type}")
+                print("[Warning]", realPrefix[:30] if realPrefix else realPrefix)
+                print(f"[Info] TAR header offset: {tarInfo.offset}, type: {str(tarInfo.type)}")
                 print("[Info] name:", tarInfo.name)
                 print()
 
         if fixedPath is not None:
             tarInfo.name = fixedPath
+
+    @staticmethod
+    def _processTarInfo(
+        tarInfo: tarfile.TarInfo,
+        fileObject: IO[bytes],
+        pathPrefix: str,
+        streamOffset: int,
+        isGnuIncremental: Optional[bool],
+        mountRecursively: bool,
+        printDebug: int,
+    ):
+        if tarInfo.type == b'D' and not isGnuIncremental:
+            isGnuIncremental = True
+            if printDebug >= 1:
+                print(f"[Warning] A folder metadata entry ({tarInfo.name}) for GNU incremental archives")
+                print("[Warning] was encountered but this archive was not automatically recognized as such!")
+                print("[Warning] Please call ratarmount with the --gnu-incremental flag if there are problems.")
+                print()
+
+        if isGnuIncremental:
+            SQLiteIndexedTar._fixIncrementalBackupNamePrefixes(fileObject, tarInfo, printDebug)
+
+        # Add a leading '/' as a convention where '/' represents the TAR root folder
+        # Partly, done because fusepy specifies paths in a mounted directory like this
+        # os.normpath does not delete duplicate '/' at beginning of string!
+        # tarInfo.name might be identical to "." or begin with "./", which is bad!
+        # os.path.normpath can remove suffixed folder/./ path specifications but it can't remove
+        # a leading dot.
+        # TODO: Would be a nice function / line of code to test because it is very finicky.
+        #       And some cases are only triggered for recursive mounts, i.e., for non-empty pathPrefix.
+        fullPath = "/" + os.path.normpath(pathPrefix + "/" + tarInfo.name).lstrip('/')
+
+        # TODO: As for the tarfile type SQLite expects int but it is generally bytes.
+        #       Most of them would be convertible to int like tarfile.SYMTYPE which is b'2',
+        #       but others should throw errors, like GNUTYPE_SPARSE which is b'S'.
+        #       When looking at the generated index, those values get silently converted to 0?
+        path, name = fullPath.rsplit("/", 1)
+        # fmt: off
+        fileInfo : Tuple = (
+            path                                      ,  # 0
+            name                                      ,  # 1
+            streamOffset + tarInfo.offset             ,  # 2
+            streamOffset + tarInfo.offset_data        ,  # 3
+            tarInfo.size                              ,  # 4
+            tarInfo.mtime                             ,  # 5
+            SQLiteIndexedTar._tarInfoFullMode(tarInfo),  # 6
+            tarInfo.type                              ,  # 7
+            tarInfo.linkname                          ,  # 8
+            tarInfo.uid                               ,  # 9
+            tarInfo.gid                               ,  # 10
+            False                                     ,  # 11 (isTar)
+            tarInfo.issparse()                        ,  # 12
+        )
+        # fmt: on
+
+        fileInfos = [fileInfo]
+
+        if mountRecursively and tarInfo.isfile() and tarInfo.name.lower().endswith('.tar'):
+            return fileInfos, True, isGnuIncremental
+
+        # Add GNU incremental TAR directory metadata files also as directories
+        if tarInfo.type == b'D':
+            dirFileInfo = list(fileInfo)
+            # This is only to get a unique primary key :/
+            # Then again, TAR blocks are known to be on 512B boundaries, so the lower
+            # bits in the offset are redundant anyway.
+            dirFileInfo[2] += 1
+            dirFileInfo[4] = 0  # directory entries have no size by convention
+            dirFileInfo[6] = tarInfo.mode | stat.S_IFDIR
+            fileInfos.append(tuple(dirFileInfo))
+
+        return fileInfos, False, isGnuIncremental
 
     def _createIndex(
         self,
@@ -725,68 +799,23 @@ class SQLiteIndexedTar(MountSource):
                 loadedTarFile.members = []  # Clear this in order to limit memory usage by tarfile
                 self._updateProgressBar(progressBar, fileObject)
 
-                if tarInfo.type == b'D' and not self.isGnuIncremental:
-                    self.isGnuIncremental = True
-                    if self.printDebug >= 1:
-                        print(f"[Warning] A folder metadata entry ({tarInfo.name}) for GNU incremental archives")
-                        print("[Warning] was encountered but this archive was not automatically recognized as such!")
-                        print("[Warning] Please call ratarmount with the --gnu-incremental flag if there are problems.")
-                        print()
-
-                if self.isGnuIncremental:
-                    self._fixIncrementalBackupNamePrefixes(fileObject, tarInfo)
-
-                # Add a leading '/' as a convention where '/' represents the TAR root folder
-                # Partly, done because fusepy specifies paths in a mounted directory like this
-                # os.normpath does not delete duplicate '/' at beginning of string!
-                # tarInfo.name might be identical to "." or begin with "./", which is bad!
-                # os.path.normpath can remove suffixed folder/./ path specifications but it can't remove
-                # a leading dot.
-                # TODO: Would be a nice function / line of code to test because it is very finicky.
-                #       And some cases are only triggered for recursive mounts, i.e., for non-empty pathPrefix.
-                fullPath = "/" + os.path.normpath(pathPrefix + "/" + tarInfo.name).lstrip('/')
-
-                # TODO: As for the tarfile type SQLite expects int but it is generally bytes.
-                #       Most of them would be convertible to int like tarfile.SYMTYPE which is b'2',
-                #       but others should throw errors, like GNUTYPE_SPARSE which is b'S'.
-                #       When looking at the generated index, those values get silently converted to 0?
-                path, name = fullPath.rsplit("/", 1)
-                # fmt: off
-                fileInfo : Tuple = (
-                    path                              ,  # 0
-                    name                              ,  # 1
-                    streamOffset + tarInfo.offset     ,  # 2
-                    streamOffset + tarInfo.offset_data,  # 3
-                    tarInfo.size                      ,  # 4
-                    tarInfo.mtime                     ,  # 5
-                    self._tarInfoFullMode(tarInfo)    ,  # 6
-                    tarInfo.type                      ,  # 7
-                    tarInfo.linkname                  ,  # 8
-                    tarInfo.uid                       ,  # 9
-                    tarInfo.gid                       ,  # 10
-                    False                             ,  # 11 (isTar)
-                    tarInfo.issparse()                ,  # 12
+                newFileInfos, mightBeTar, self.isGnuIncremental = SQLiteIndexedTar._processTarInfo(
+                    tarInfo,
+                    fileObject=fileObject,
+                    pathPrefix=pathPrefix,
+                    streamOffset=streamOffset,
+                    isGnuIncremental=self.isGnuIncremental,
+                    mountRecursively=self.mountRecursively,
+                    printDebug=self.printDebug,
                 )
-                # fmt: on
 
-                if self.mountRecursively and tarInfo.isfile() and tarInfo.name.lower().endswith('.tar'):
-                    filesToMountRecursively.append(fileInfo)
+                if mightBeTar:
+                    filesToMountRecursively.extend(newFileInfos)
                 else:
-                    fileInfos.append(fileInfo)
+                    fileInfos.extend(newFileInfos)
                     if len(fileInfos) > 1000:
                         self._setFileInfos(fileInfos)
                         fileInfos = []
-
-                # Add GNU incremental TAR directory metadata files also as directories
-                if tarInfo.type == b'D':
-                    dirFileInfo = list(fileInfo)
-                    # This is only to get a unique primary key :/
-                    # Then again, TAR blocks are known to be on 512B boundaries, so the lower
-                    # bits in the offset are redundant anyway.
-                    dirFileInfo[2] += 1
-                    dirFileInfo[4] = 0  # directory entries have no size by convention
-                    dirFileInfo[6] = tarInfo.mode | stat.S_IFDIR
-                    self._setFileInfo(tuple(dirFileInfo))
 
             self._setFileInfos(fileInfos)
             fileInfos = []
