@@ -582,14 +582,17 @@ class SQLiteIndexedTar(MountSource):
                 progressBar.update(fileobj.tell_compressed() // 8)
             elif hasattr(fileobj, 'tell_compressed'):
                 progressBar.update(fileobj.tell_compressed())
-            elif hasattr(fileobj, 'fileobj'):
+            elif hasattr(fileobj, 'fileobj') and callable(fileobj.fileobj):
                 progressBar.update(fileobj.fileobj().tell())
             elif self.rawFileObject and hasattr(self.rawFileObject, 'tell'):
                 progressBar.update(self.rawFileObject.tell())
             else:
                 progressBar.update(fileobj.tell())
-        except Exception:
-            pass
+        except Exception as exception:
+            if self.printDebug >= 1:
+                print("An exception occured when trying to update the progress bar:", exception)
+            if self.printDebug >= 3:
+                traceback.print_exc()
 
     def _getTarPrefix(self, fileObject, tarInfo) -> Optional[bytes]:
         """Get the actual prefix as stored in the TAR."""
