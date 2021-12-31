@@ -29,6 +29,10 @@ try:
     import indexed_gzip
 except ImportError:
     pass
+try:
+    import xz
+except ImportError:
+    xz = None  # type: ignore
 
 from .version import __version__
 from .MountSource import FileInfo, MountSource
@@ -36,6 +40,7 @@ from .ProgressBar import ProgressBar
 from .StenciledFile import StenciledFile
 from .compressions import supportedCompressions
 from .utils import RatarmountError, IndexNotOpenError, InvalidIndexError, CompressionError, overrides, ceilDiv
+from .BlockParallelReaders import ParallelXZReader
 
 
 class _TarFileMetadataReader:
@@ -1078,6 +1083,9 @@ class SQLiteIndexedTar(MountSource):
         self.sqlConnection = SQLiteIndexedTar._openSqlDb(f"file:{uriPath}?mode=ro", uri=True)
 
     def _updateProgressBar(self, progressBar, fileobj: Any) -> None:
+        if not progressBar:
+            return
+
         try:
             if hasattr(fileobj, 'tell_compressed') and self.compression == 'bz2':
                 # Note that because bz2 works on a bitstream the tell_compressed returns the offset in bits
@@ -1086,6 +1094,8 @@ class SQLiteIndexedTar(MountSource):
                 progressBar.update(fileobj.tell_compressed())
             elif hasattr(fileobj, 'fileobj') and callable(fileobj.fileobj):
                 progressBar.update(fileobj.fileobj().tell())
+            elif isinstance(fileobj, ParallelXZReader):
+                progressBar.update(fileobj.tell())
             elif self.rawFileObject and hasattr(self.rawFileObject, 'tell'):
                 progressBar.update(self.rawFileObject.tell())
             else:
@@ -1119,10 +1129,24 @@ class SQLiteIndexedTar(MountSource):
             self.isGnuIncremental = self._isGnuIncremental(fileObject)
 
         if progressBar is None:
+            fileSize = None
             try:
-                progressBar = ProgressBar(os.fstat(fileObject.fileno()).st_size)
+                fileSize = os.fstat(fileObject.fileno()).st_size
             except io.UnsupportedOperation:
                 pass
+
+            if fileSize is None and isinstance(fileObject, ParallelXZReader):
+                oldOffset = fileObject.tell()
+                try:
+                    # This is O(1) because xz stores the block information easily accessible
+                    fileSize = fileObject.seek(0, io.SEEK_END)
+                finally:
+                    fileObject.seek(oldOffset)
+
+            if fileSize is not None:
+                progressBar = ProgressBar(fileSize)
+            elif self.printDebug >= 2:
+                print("[Info] Could not create a progress bar because the file size could not be queried.")
 
         metadataReader = _TarFileMetadataReader(
             self, self._setFileInfos, lambda: self._updateProgressBar(progressBar, fileObject)
@@ -1817,6 +1841,15 @@ class SQLiteIndexedTar(MountSource):
             tar_file = indexed_gzip.IndexedGzipFile(fileobj=fileobj, drop_handles=False, spacing=gzipSeekPointSpacing)
         elif compression == 'bz2':
             tar_file = indexed_bzip2.open(fileobj, parallelization=parallelization)
+        elif (
+            compression == 'xz'
+            and xz
+            and parallelization != 1
+            and hasattr(fileobj, 'name')
+            and os.path.isfile(fileobj.name)
+            and platform.system() == 'Linux'
+        ):
+            tar_file = ParallelXZReader(fileobj.name, parallelization=parallelization)
         else:
             tar_file = cinfo.open(fileobj)
 

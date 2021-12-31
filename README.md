@@ -13,6 +13,7 @@ In [contrast](https://github.com/libarchive/libarchive#notes-about-the-library-d
 
 *Other capabilities:*
 
+ - **Highly Parallelized:** Using the `-P <cores>` option will activate parallel xz and bzip2 decoders as well as parallel uncompressed TAR analysis. This can yield huge speedups on most modern processors.
  - **Recursive Mounting:** Ratarmount will also mount TARs inside TARs inside TARs, ... recursively into folders of the same name, which is useful for the 1.31TB ImageNet data set.
  - **Mount Compressed Files:** You may also mount files with one of the supported compression schemes. Even if these files do not contain a TAR, you can leverage ratarmount's true seeking capabilities when opening the mounted uncompressed view of such a file.
  - **Read-Only Bind Mounting:** Folders may be mounted read-only to other folders for usecases like merging a backup TAR with newer versions of those files residing in a normal folder.
