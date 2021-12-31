@@ -42,9 +42,10 @@ Example:
 
 from .version import __version__
 
-from .compressions import supportedCompressions, stripSuffixFromTarFile
+from .compressions import supportedCompressions, stripSuffixFromTarFile, compressZstd
 from .utils import RatarmountError, IndexNotOpenError, InvalidIndexError, CompressionError, overrides
 from .StenciledFile import StenciledFile
+from .BlockParallelReaders import BlockParallelReader, ParallelXZReader, ParallelZstdReader
 
 from .MountSource import FileInfo, MountSource
 

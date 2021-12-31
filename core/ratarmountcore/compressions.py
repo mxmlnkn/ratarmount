@@ -2,7 +2,10 @@
 # -*- coding: utf-8 -*-
 
 import collections
+import concurrent.futures
+import os
 import sys
+from typing import Optional
 
 try:
     import indexed_bzip2
@@ -36,6 +39,11 @@ try:
     import rarfile
 except ImportError:
     rarfile = None
+
+try:
+    import zstandard
+except ImportError:
+    zstandard = None  # type: ignore
 
 
 # The file object returned by ZipFile.open is not seekable in Python 3.6 for some reason.
@@ -125,3 +133,32 @@ def stripSuffixFromTarFile(path: str) -> str:
         path = path[:-4]
 
     return path
+
+
+def _compressZstd(data):
+    return zstandard.ZstdCompressor().compress(data)
+
+
+def compressZstd(filePath: str, outputFilePath: str, frameSize: int, parallelization: Optional[int] = None):
+    """
+    Compresses filePath into outputFilePath with one zstandard frame for each frameSize chunk of uncompressed data.
+    """
+    if not parallelization:
+        parallelization = os.cpu_count()
+        assert parallelization is not None, "Cannot automatically determine CPU count!"
+
+    with open(filePath, 'rb') as file, open(
+        outputFilePath, 'wb'
+    ) as compressedFile, concurrent.futures.ThreadPoolExecutor(parallelization) as pool:
+        results = []
+        while True:
+            toCompress = file.read(frameSize)
+            if not toCompress:
+                break
+            results.append(pool.submit(compressZstd, toCompress))
+            while len(results) >= parallelization:
+                compressedData = results.pop(0).result()
+                compressedFile.write(compressedData)
+
+        while results:
+            compressedFile.write(results.pop(0).result())

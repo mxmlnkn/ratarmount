@@ -115,7 +115,7 @@ jobs:
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade wheel
         python3 -m pip install --upgrade setuptools
-        python3 -m pip install --upgrade-strategy eager --upgrade cython twine build
+        python3 -m pip install --upgrade-strategy eager --upgrade cython twine build zstandard
 
     - name: Test Startup With Only One Compression Dependency
       run: |
@@ -218,7 +218,7 @@ jobs:
         python3.9 -m pip install --no-cache-dir --upgrade pip
         python3.9 -m pip install --no-cache-dir --upgrade wheel
         python3.9 -m pip install --no-cache-dir --upgrade setuptools
-        python3.9 -m pip install --no-cache-dir --upgrade-strategy eager --upgrade cython twine build
+        python3.9 -m pip install --no-cache-dir --upgrade-strategy eager --upgrade cython twine build zstandard
 
     - name: Test ratarmountcore Installation From Tarball
       working-directory: core

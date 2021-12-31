@@ -9,6 +9,8 @@ mypy
 pandas
 pylint
 pytest
+python-xz
 pytype
 twine
 wheel
+zstandard
