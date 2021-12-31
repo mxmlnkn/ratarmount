@@ -67,7 +67,6 @@ class MountSource(ABC):
         Should return True if the mount source is known to not change over time in order to allow for optimizations.
         Meaning, all interface methods should return the same results given the same arguments at any time.
         """
-        pass
 
     def getMountSource(self, fileInfo: FileInfo):
         """
