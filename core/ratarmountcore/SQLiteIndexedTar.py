@@ -1229,6 +1229,7 @@ class SQLiteIndexedTar(MountSource):
             if self.printDebug >= 3:
                 print(f"Did not find any file in the given TAR: {self.tarFileName}. Assuming a compressed file.")
 
+            tarInfo: Optional[Any] = None
             try:
                 tarInfo = os.fstat(fileObject.fileno())
             except io.UnsupportedOperation:
