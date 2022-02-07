@@ -1182,6 +1182,40 @@ checkGnuIncremental()
     return 0
 }
 
+
+checkTruncated()
+{
+    local archive="$1"; shift
+    local fileInTar="$1"; shift
+    local correctChecksum="$1"
+
+    rm -f ratarmount.{stdout,stderr}.log
+
+    local mountFolder
+    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+
+    local args=( -P "$parallelization" -c "$archive" "$mountFolder" )
+    {
+        # Avoid runAndCheckRatarmount because it checks for warnings
+        $RATARMOUNT_CMD "${args[@]}" &&
+        checkStat "$mountFolder/$fileInTar"
+        # Different checksum on macOS? But it is in a broken state anyway, so I wouldn't guarantee anything.
+        echo -n "Contents of $mountFolder/$fileInTar: "
+        cat "$mountFolder/$fileInTar"
+        echo
+        #verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+    funmount "$mountFolder"
+
+    safeRmdir "$mountFolder"
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully '$fileInTar' in '$archive' for checksum $correctChecksum"
+
+    return 0
+}
+
+
 rm -f ratarmount.{stdout,stderr}.log
 
 # Linting only to be done locally because in CI it is in separate steps
@@ -1301,6 +1335,9 @@ tests+=(
     b3de7534cbc8b8a7270c996235d0c2da tests/concatenated.tar                       foo/fighter
     2709a3348eb2c52302a7606ecf5860bc tests/concatenated.tar                       foo/bar
 
+    2709a3348eb2c52302a7606ecf5860bc tests/nested-symlinks.tar                    foo/foo
+    2709a3348eb2c52302a7606ecf5860bc tests/nested-symlinks.tar                    foo/fighter/foo
+
     b3de7534cbc8b8a7270c996235d0c2da tests/updated-file.tar                       foo/fighter/ufo
     b3de7534cbc8b8a7270c996235d0c2da tests/updated-file.tar                       foo/fighter/ufo.versions/3
     9a12be5ebb21d497bd1024d159f2cc5f tests/updated-file.tar                       foo/fighter/ufo.versions/2
@@ -1334,16 +1371,16 @@ tests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/nested-directly-compressed.tar.bz2     directly-compressed/ufo.gz/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/nested-directly-compressed.tar.bz2     directly-compressed/ufo.xz/ufo
 
-    c157a79031e1c40f85931829bc5fc552    tests/absolute-file-incremental.tar           14130612002/tmp/foo
-    8ddd8be4b179a529afa5f2ffae4b9858    tests/incremental-backup.level.0.tar          root-file.txt
-    5bbf5a52328e7439ae6e719dfe712200    tests/incremental-backup.level.0.tar          foo/1
-    c193497a1a06b2c72230e6146ff47080    tests/incremental-backup.level.0.tar          foo/2
-    febe6995bad457991331348f7b9c85fa    tests/incremental-backup.level.0.tar          foo/3
-    3d45efe945446cd53a944972bf60810c    tests/incremental-backup.level.1.tar          foo/3
-    5bbf5a52328e7439ae6e719dfe712200    tests/incremental-backup.level.1.tar          foo/moved
-    c157a79031e1c40f85931829bc5fc552    tests/single-file-incremental-mockup.tar      14130613451/foo
-    c157a79031e1c40f85931829bc5fc552    tests/single-file-incremental-long-name-mockup.tar 14130613451/000000000100000000020000000003000000000400000000050000000006000000000700000000080000000009000000000A000000000B000000000C
-    c157a79031e1c40f85931829bc5fc552    tests/single-file-incremental-long-name.tar 000000000100000000020000000003000000000400000000050000000006000000000700000000080000000009000000000A000000000B000000000C
+    c157a79031e1c40f85931829bc5fc552 tests/absolute-file-incremental.tar          14130612002/tmp/foo
+    8ddd8be4b179a529afa5f2ffae4b9858 tests/incremental-backup.level.0.tar         root-file.txt
+    5bbf5a52328e7439ae6e719dfe712200 tests/incremental-backup.level.0.tar         foo/1
+    c193497a1a06b2c72230e6146ff47080 tests/incremental-backup.level.0.tar         foo/2
+    febe6995bad457991331348f7b9c85fa tests/incremental-backup.level.0.tar         foo/3
+    3d45efe945446cd53a944972bf60810c tests/incremental-backup.level.1.tar         foo/3
+    5bbf5a52328e7439ae6e719dfe712200 tests/incremental-backup.level.1.tar         foo/moved
+    c157a79031e1c40f85931829bc5fc552 tests/single-file-incremental-mockup.tar     14130613451/foo
+    c157a79031e1c40f85931829bc5fc552 tests/single-file-incremental-long-name-mockup.tar 14130613451/000000000100000000020000000003000000000400000000050000000006000000000700000000080000000009000000000A000000000B000000000C
+    c157a79031e1c40f85931829bc5fc552 tests/single-file-incremental-long-name.tar 000000000100000000020000000003000000000400000000050000000006000000000700000000080000000009000000000A000000000B000000000C
 
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   01.sparse1.bin
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   02.normal1.bin
@@ -1364,6 +1401,8 @@ export parallelization
 if [[ ! -f tests/2k-recursive-tars.tar ]]; then
     bzip2 -q -d -k tests/2k-recursive-tars.tar.bz2
 fi
+
+checkTruncated tests/truncated.tar foo/foo 5753d2a2da40d04ad7f3cc7a024b6e90
 
 # GNU inremental TARs without directory entries cannot be reliably recognized as such. GNU TAR seems to use the
 # heuristic of the prefix but the prefix can also be validly set without it being an incremental TAR.

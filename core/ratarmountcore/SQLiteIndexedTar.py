@@ -269,22 +269,31 @@ class _TarFileMetadataReader:
             except tarfile.ReadError:
                 return fileInfos, filesToMountRecursively, isGnuIncremental
 
-            for tarInfo in loadedTarFile:
-                loadedTarFile.members = []  # Clear this in order to limit memory usage by tarfile
-                newFileInfos, mightBeTar, isGnuIncremental = _TarFileMetadataReader._processTarInfo(
-                    tarInfo,
-                    pathPrefix=pathPrefix,
-                    streamOffset=streamOffset + startOffset,
-                    fileObject=fileObject,
-                    isGnuIncremental=isGnuIncremental,
-                    mountRecursively=mountRecursively,
-                    printDebug=printDebug,
-                )
+            try:
+                for tarInfo in loadedTarFile:
+                    loadedTarFile.members = []  # Clear this in order to limit memory usage by tarfile
+                    newFileInfos, mightBeTar, isGnuIncremental = _TarFileMetadataReader._processTarInfo(
+                        tarInfo,
+                        pathPrefix=pathPrefix,
+                        streamOffset=streamOffset + startOffset,
+                        fileObject=fileObject,
+                        isGnuIncremental=isGnuIncremental,
+                        mountRecursively=mountRecursively,
+                        printDebug=printDebug,
+                    )
 
-                if mightBeTar:
-                    filesToMountRecursively.extend(newFileInfos)
-                else:
-                    fileInfos.extend(newFileInfos)
+                    if mightBeTar:
+                        filesToMountRecursively.extend(newFileInfos)
+                    else:
+                        fileInfos.extend(newFileInfos)
+            except tarfile.ReadError as e:
+                if 'unexpected end of data' in str(e):
+                    print(
+                        "[Warning] The TAR file is incomplete. Ratarmount will work but some files might be cut off. "
+                        "If the TAR file size changes, ratarmount will recreate the index during the next mounting."
+                    )
+                    if printDebug >= 3:
+                        traceback.print_exc()
 
         return fileInfos, filesToMountRecursively, isGnuIncremental
 
@@ -476,36 +485,39 @@ class _TarFileMetadataReader:
         # therefore is not suitable. If time.time is indeed an issue, then it should be better to use _processParallel.
         self._lastUpdateTime = time.time()
 
-        for tarInfo in loadedTarFile:
-            loadedTarFile.members = []  # Clear this in order to limit memory usage by tarfile
+        try:
+            for tarInfo in loadedTarFile:
+                loadedTarFile.members = []  # Clear this in order to limit memory usage by tarfile
 
-            # ProgressBar does a similar check like this inside 'update' but doing this outside avoids huge
-            # call stacks and also avoids calling tell() on the file object in each loop iteration.
-            # I could observe 10% shorter runtimes because of this with the test file:
-            #     tar-with-1000-folders-with-1000-files-0B-files.tar
-            if time.time() - self._lastUpdateTime >= 2:
-                self._lastUpdateTime = time.time()
-                self._updateProgressBar()
+                # ProgressBar does a similar check like this inside 'update' but doing this outside avoids huge
+                # call stacks and also avoids calling tell() on the file object in each loop iteration.
+                # I could observe 10% shorter runtimes because of this with the test file:
+                #     tar-with-1000-folders-with-1000-files-0B-files.tar
+                if time.time() - self._lastUpdateTime >= 2:
+                    self._lastUpdateTime = time.time()
+                    self._updateProgressBar()
 
-            newFileInfos, mightBeTar, self._parent.isGnuIncremental = _TarFileMetadataReader._processTarInfo(
-                tarInfo,
-                fileObject=fileObject,
-                pathPrefix=pathPrefix,
-                streamOffset=streamOffset,
-                isGnuIncremental=self._parent.isGnuIncremental,
-                mountRecursively=self._parent.mountRecursively,
-                printDebug=self._parent.printDebug,
-            )
+                newFileInfos, mightBeTar, self._parent.isGnuIncremental = _TarFileMetadataReader._processTarInfo(
+                    tarInfo,
+                    fileObject=fileObject,
+                    pathPrefix=pathPrefix,
+                    streamOffset=streamOffset,
+                    isGnuIncremental=self._parent.isGnuIncremental,
+                    mountRecursively=self._parent.mountRecursively,
+                    printDebug=self._parent.printDebug,
+                )
 
-            if mightBeTar:
-                filesToMountRecursively.extend(newFileInfos)
-            else:
-                fileInfos.extend(newFileInfos)
-                if len(fileInfos) > 1000:
-                    self._setFileInfos(fileInfos)
-                    fileInfos.clear()
+                if mightBeTar:
+                    filesToMountRecursively.extend(newFileInfos)
+                else:
+                    fileInfos.extend(newFileInfos)
+                    if len(fileInfos) > 1000:
+                        self._setFileInfos(fileInfos)
+                        fileInfos.clear()
 
-        self._setFileInfos(fileInfos)
+        finally:
+            self._setFileInfos(fileInfos)
+
         return filesToMountRecursively
 
     def process(self, fileObject: IO[bytes], pathPrefix: str, streamOffset: int) -> Iterable[Tuple]:

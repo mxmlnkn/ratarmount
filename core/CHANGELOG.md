@@ -1,4 +1,8 @@
 
+# Version 0.2.1 built on 2022-02-07
+
+ - Fix (the last 1000) files not showing for truncated / incomplete TAR files.
+
 # Version 0.2.0 built on 2022-01-15
 
  - Add support for GNU incremental TAR file format.
