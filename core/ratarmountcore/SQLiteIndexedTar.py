@@ -1862,7 +1862,10 @@ class SQLiteIndexedTar(MountSource):
             and os.path.isfile(fileobj.name)
             and platform.system() == 'Linux'
         ):
-            tar_file = ParallelXZReader(fileobj.name, parallelization=parallelization)
+            tar_file = cinfo.open(fileobj)
+            if len(tar_file.block_boundaries) > 1:
+                tar_file.close()
+                tar_file = ParallelXZReader(fileobj.name, parallelization=parallelization)
         else:
             tar_file = cinfo.open(fileobj)
 
