@@ -115,7 +115,9 @@ python3 -m pip install --user lzmaffi
    This algorithm scales **linearly** for ratarmount and fuse-archive but seems to scale worse than even quadratically for archives containing more than 1M files when using archivemount.
    Ratarmount 0.10.0 improves upon earlier versions by batching SQLite insertions.
  - Mounting **bzip2** and **xz** archives has actually become **faster** than archivemount and fuse-archive with `ratarmount -P 0` on most modern processors because it actually uses more than one core for decoding those compressions. `indexed_bzip2` supports block **parallel decoding** since version 1.2.0.
- - **Gzip** compressed TAR files are roughly one order of magnitude **slower** with ratarmount than archivemount during first time mounting. I opened an [issue](https://github.com/pauldmccarthy/indexed_gzip/issues/89) at the backend and I'm also experimenting with parallelized gzip compression like the prototype [pugz](https://github.com/Piezoid/pugz) offers for non-binary files only.
+ - **Gzip** compressed TAR files are two times slower than archivemount during first time mounting.
+   It is not totally clear to me why that is because streaming the file contents after the archive being mounted is comparably fast, see the next benchmarks below.
+   In order to have superior speeds for both of these, I am [experimenting](https://github.com/mxmlnkn/indexed_bzip2/tree/parallelgz) with a parallelized gzip decompressor like the prototype [pugz](https://github.com/Piezoid/pugz) offers for non-binary files only.
  - For the other cases, mounting times become roughly the same compared to archivemount for archives with 2M files in an approximately 100GB archive.
  - **Getting a lot of metadata** for archive contents as demonstrated by calling `find` on the mount point is an order of magnitude **slower** compared to archivemount. Because the C-based fuse-archive is even slower than ratarmount, the difference is very likely that archivemount uses the low-level FUSE interface while ratarmount and fuse-archive use the high-level FUSE interface.
 
@@ -128,11 +130,10 @@ python3 -m pip install --user lzmaffi
    Meaning, the scaling is `O( (sizeOfFileToBeCopiedFromArchive / readChunkSize)^2 )`.
    Both, ratarmount and fuse-archive avoid this behavior.
    Because of this quadratic scaling, the average bandwidth with archivemount seems like it decreases with the file size.
+ - Reading bz2 and xz are both an order of magnitude faster, as tested on my 12/24-core Ryzen 3900X, thanks to parallelization.
  - Memory is bounded in these tests for all programs but ratarmount is a lot more lax with memory because it uses a Python stack and because it needs to hold caches for a constant amount of blocks for parallel decoding of bzip2 and xz files.
    The zstd backend in ratarmount looks unbounded because it uses mmap, whose memory usage will automatically stop and be freed if the memory limit has been reached.
- - Both, the xz and gzip ratarmount backends show a maximum bandwidth peak instead of plateau, indicating that something might go wrong there which could be improved.
-   For gzip, an [issue](https://github.com/pauldmccarthy/indexed_gzip/issues/89) has been opened.
-   For xz, further analysis might be necessary, but the reached decompression speeds are still comparable to pixz and therefore not as pressing as the gzip issue. It might be some synchronization issue in the block cache.
+ - The peak for the xz decoder reading speeds happens because some blocks will be cached when loading the index, which is not included in the benchmark for technical reasons. The value for the 1 GiB file size is more realistic.
 
 
 Further benchmarks can be viewed [here](benchmarks/BENCHMARKS.md).
