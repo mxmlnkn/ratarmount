@@ -387,6 +387,36 @@ def plotRatarmountParallelComparison(fileName, compression):
     print("Written out:", fileName)
     return True
 
+def plotAccessLatency(fileName):
+    fileName = dataFile
+    labels, data = loadData(fileName)
+
+    availableTools = data.keys()
+    tools = [
+        'archivemount',
+        'ratarmount -P 24' if 'ratarmount -P 24' in availableTools else 'ratarmount',
+        'fuse-archive',
+    ]
+
+    fig = plt.figure(figsize=(6, 4))
+    ax = fig.add_subplot(
+        111,
+        title="Time Required to Get Contents of One File",
+        xlabel="Number of Files in Archive",
+        ylabel="Runtime / s",
+        xscale='log',
+        yscale='log',
+    )
+
+    plotBenchmark(labels, data, ax, "cat", "duration/s", tools)
+
+    ax.legend(loc='best')
+
+    fig.tight_layout()
+    fileName = 'cat-file-latency.png'
+    fig.savefig(fileName, dpi=150)
+    print("Written out:", fileName)
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 2 or not os.path.isfile(sys.argv[1]):
@@ -395,6 +425,7 @@ if __name__ == "__main__":
 
     dataFile = sys.argv[1]
 
+    plotAccessLatency(dataFile)
     plotComparison(dataFile)
     for compression in ['', 'bz2', 'xz', 'find']:
         plotRatarmountParallelComparison(dataFile, compression)

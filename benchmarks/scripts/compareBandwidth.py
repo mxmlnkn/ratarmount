@@ -378,6 +378,37 @@ def plotReadingComparison(fileName):
     print("Written out:", fileName)
 
 
+def plotBandiwdths(fileName):
+    labels, data = loadData(fileName)
+
+    tools = [
+        'archivemount',
+        'ratarmount -P 24',
+        'fuse-archive',
+    ]
+
+    fig = plt.figure(figsize=(6, 4))
+
+    ax = fig.add_subplot(
+        111,
+        title="Reading Speeds",
+        xlabel="Decompressed File Size In Archive / kB",
+        ylabel="Decompressed Bandwidth / (MB/s)",
+        xscale='log',
+        yscale='log',
+    )
+
+    plotBenchmark(labels, data, ax, "bandwidth", "duration/s", tools, xScalingFactor = 1.0 / 1000,
+                  scalingFactor = 1.0 / 1000**2 )
+    ax.grid(axis='y')
+    ax.legend(loc='best')
+
+    fig.tight_layout()
+    fileName = 'pure-bandwidth-comparison.png'
+    fig.savefig(fileName, dpi=150)
+    print("Written out:", fileName)
+
+
 if __name__ == "__main__":
     if len(sys.argv) != 2 or not os.path.isfile(sys.argv[1]):
         print("First argument must be path to data file")
@@ -385,4 +416,5 @@ if __name__ == "__main__":
 
     dataFile = sys.argv[1]
 
+    plotBandiwdths(dataFile)
     plotReadingComparison(dataFile)
