@@ -1850,8 +1850,17 @@ class SQLiteIndexedTar(MountSource):
             )
 
         if compression == 'gz':
+            # The buffer size must be much larger than the spacing or else there will be large performance penalties
+            # even for reading sequentially, see https://github.com/pauldmccarthy/indexed_gzip/issues/89
+            # Use 4x spacing because each raw read seeks from the last index point even if the position did not change
+            # since the last read call. On average, this incurs an overhead of spacing / 2. For 3x spacing, this
+            # overhead would be 1/6 = 17%, which should be negligible. The increased memory-usage is not an issue
+            # because internally many buffers are allocated with 4 * spacing size.
+            bufferSize = max(3 * 1024 * 1024, 3 * gzipSeekPointSpacing)
             # drop_handles keeps a file handle opening as is required to call tell() during decoding
-            tar_file = indexed_gzip.IndexedGzipFile(fileobj=fileobj, drop_handles=False, spacing=gzipSeekPointSpacing)
+            tar_file = indexed_gzip.IndexedGzipFile(
+                fileobj=fileobj, drop_handles=False, spacing=gzipSeekPointSpacing, buffer_size=bufferSize
+            )
         elif compression == 'bz2':
             tar_file = indexed_bzip2.open(fileobj, parallelization=parallelization)
         elif (
