@@ -1,18 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import bisect
 import concurrent.futures
-import io
 import lzma
-import math
-import multiprocessing.pool
 import os
 import resource
 import sys
 import time
-
-from typing import Iterable
 
 import indexed_zstd
 import numpy as np
@@ -107,7 +101,8 @@ def simpleParallelZstdReading(filename):
 
 if __name__ == '__main__':
     for module in ('zstandard', 'indexed_zstd', 'ratarmountcore'):
-        print(module, "version:", sys.modules[module].__version__)
+        if hasattr( sys.modules[module], '__version__' ):
+            print(module, "version:", getattr(sys.modules[module], '__version__'))
     print()
 
     filename = sys.argv[1]

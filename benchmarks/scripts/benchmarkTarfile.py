@@ -4,14 +4,9 @@
 import gc
 import os
 import pprint
-import re
 import resource
-import sqlite3
 import sys
 import time
-
-import numpy as np
-import matplotlib.pyplot as plt
 
 
 def byteSizeFormat( size, decimal_places = 3 ):
@@ -24,17 +19,17 @@ def byteSizeFormat( size, decimal_places = 3 ):
 def memoryUsage():
     statm_labels = [ 'size', 'resident', 'shared', 'text', 'lib', 'data', 'dirty pages' ]
     values = [ int( x ) * resource.getpagesize()
-               for x in open( '/proc/{}/statm'.format( os.getpid() ), 'rt' ).read().split( ' ' ) ]
+               for x in open( f'/proc/{os.getpid()}/statm', 'rt' ).read().split( ' ' ) ]
     return dict( zip( statm_labels, values ) )
 
 def printMemDiff( mem0, mem1, action_message = None ):
     if action_message:
-        print( "Memory change after '{}'".format( action_message ) )
+        print( f"Memory change after '{action_message}'" )
     memdiff = mem1.copy()
     for key, value in mem0.items():
         memdiff[key] -= value
     pprint.pprint( memdiff )
-    print( "Total size: {} B for process {}".format( byteSizeFormat( mem1[ 'size' ] ), os.getpid() ) )
+    print( f"Total size: {byteSizeFormat( mem1[ 'size' ] )} B for process {os.getpid()}" )
     print()
 
 class MemoryLogger:
@@ -44,7 +39,7 @@ class MemoryLogger:
         if not self.quiet:
             print( self.memlog[0][0] )
             pprint.pprint( self.memlog[0][1] )
-            print( "Total size: {} B".format( byteSizeFormat( self.memlog[0][1][ 'size' ] ) ) )
+            print( f"Total size: {byteSizeFormat( self.memlog[0][1][ 'size' ] )} B" )
             print()
 
     def log( self, action_message = None ):
@@ -86,7 +81,7 @@ def benchmarkTarfile( filename ):
     printMemDiff( mem2, mem3, 'with open TAR file' )
 
     t1 = time.time()
-    print( "Reading TAR took {:.2f} s".format( t1 - t0 ) )
+    print( f"Reading TAR took {t1 - t0:.2f} s" )
 
     # Check garbage collector object states
     after = {}

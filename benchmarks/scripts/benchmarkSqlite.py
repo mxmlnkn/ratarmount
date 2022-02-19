@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import os
-import pprint
 import re
 import sqlite3
 import sys
@@ -23,20 +22,20 @@ labels = [ 'varchar primary key', 'integer primary key', 'varchar,integer primar
 def benchmarkCacheSizes( nFiles = 1000 * 1000 ):
     rowsPerInsert = 1000
     assert nFiles % rowsPerInsert == 0
-    fname = "sqlite cache size benchmark {}k files".format( nFiles // 1000 )
+    fname = f"sqlite cache size benchmark {nFiles // 1000}k files"
 
     cacheSizes = [ 2, 4, 16, 32, 64, 128, 256, 512 ]
     insertionTimes = []
     for cacheSize in cacheSizes:
         databaseFile = tempfile.mkstemp()[1]
         db = sqlite3.connect( databaseFile ) #'1m-names-test.sqlite3' )
-        db.executescript( """
+        db.executescript( f"""
             PRAGMA LOCKING_MODE = EXCLUSIVE;
             PRAGMA TEMP_STORE = MEMORY;
             PRAGMA JOURNAL_MODE = OFF;
             PRAGMA SYNCHRONOUS = OFF;
-            PRAGMA CACHE_SIZE = -{};
-        """.format( cacheSize * 1000 ) )
+            PRAGMA CACHE_SIZE = -{cacheSize * 1000};
+        """ )
         # use this schema as it represents the (path,name) primary key currently used in ratarmount
         db.execute( 'CREATE TABLE "files" ( "path" VARCHAR(65535), "hash" VARCHAR(65535), PRIMARY KEY (path,hash) );' )
 
@@ -67,20 +66,20 @@ def benchmarkCacheSizes( nFiles = 1000 * 1000 ):
 def benchmarkCacheSizesSortAfter( nFiles = 1000 * 1000 ):
     rowsPerInsert = 1000
     assert nFiles % rowsPerInsert == 0
-    fname = "sqlite using intermediary table order by cache size benchmark {}k files".format( nFiles // 1000 )
+    fname = f"sqlite using intermediary table order by cache size benchmark {nFiles // 1000}k files"
 
     cacheSizes = [ 2, 4, 16, 32, 64, 128, 192, 256, 320, 384, 448, 512 ]
     insertionTimes = []
     for cacheSize in cacheSizes:
         databaseFile = tempfile.mkstemp()[1]
         db = sqlite3.connect( databaseFile ) #'1m-names-test.sqlite3' )
-        db.executescript( """
+        db.executescript( f"""
             PRAGMA LOCKING_MODE = EXCLUSIVE;
             PRAGMA TEMP_STORE = MEMORY;
             PRAGMA JOURNAL_MODE = OFF;
             PRAGMA SYNCHRONOUS = OFF;
-            PRAGMA CACHE_SIZE = -{};
-        """.format( cacheSize * 1000 ) )
+            PRAGMA CACHE_SIZE = -{cacheSize * 1000};
+        """ )
         # use this schema as it represents the (path,name) primary key currently used in ratarmount
         db.execute( """
             CREATE TABLE "files_tmp" (
@@ -271,7 +270,7 @@ for nFiles in [ 1000*1000 ]:
     if nFiles > 2 * 1000 * 1000:
         nFilesSelect = 4
 
-    fname = "sqlite primary key benchmark {}k files".format( nFiles // 1000 )
+    fname = f"sqlite primary key benchmark {nFiles // 1000}k files"
 
     fig = plt.figure( figsize = ( 12, 10 ) )
     axi = plt.subplot( 221, xscale = 'log', yscale = 'log', title = 'INSERT' )
@@ -286,9 +285,9 @@ for nFiles in [ 1000*1000 ]:
         logFile.write( line + '\n' )
         logFile.flush()
 
-    log( "file name length: {}".format( fileNameLength ) )
-    log( "rows per insert: {}".format( rowsPerInsert ) )
-    log( "number of rows to insert: {}".format( nFiles ) )
+    log( f"file name length: {fileNameLength}" )
+    log( f"rows per insert: {rowsPerInsert}" )
+    log( f"number of rows to insert: {nFiles}" )
 
     for iSchema, schema in enumerate( schemas ):
         log( schema )
@@ -322,28 +321,27 @@ for nFiles in [ 1000*1000 ]:
             db.executemany( 'INSERT INTO files VALUES (?,?)', rows )
             #db.commit() # data is written to disk automatically when it becomes too much
             t1 = time.time()
-            #print( "Inserting {} rows with {} character file names took {:.3f} s".format( rowsPerInsert, fileNameLength, t1 - t0 ) )
+            #print( f"Inserting {rowsPerInsert} rows with {fileNameLength} character file names took {t1 - t0:.3f} s" )
             insertTimes += [ t1 - t0 ]
 
         t1InsertAll = time.time()
-        log( "Inserting {} file names with {} characters took {:.3f} s".
-             format( nFiles, fileNameLength, t1InsertAll - t0InsertAll ) )
+        log( f"Inserting {nFiles} file names with {fileNameLength} characters took {t1InsertAll - t0InsertAll:.3f} s" )
 
         t0Commit = time.time()
         db.commit()
         t1Commit = time.time()
-        log( "Commit took {:.3f} s".format( t1Commit - t0Commit ) )
+        log( f"Commit took {t1Commit - t0Commit:.3f} s" )
 
         tTotalInsert = sum( insertTimes ) + t1Commit - t0Commit
         log( "Inserting {} file names with {} characters took {:.3f} s when excluding PRNG time".
              format( nFiles, fileNameLength, tTotalInsert ) )
 
-        with open( "{} {} insert.dat".format( fname, labels[iSchema] ), 'wt' ) as dataFile:
+        with open( f"{fname} {labels[iSchema]} insert.dat", 'wt' ) as dataFile:
             for t in insertTimes:
                 dataFile.write( str( t ) + '\n' )
 
         axi.plot( insertTimes, linestyle = '', marker = '.',
-                  label = labels[iSchema] + ', total time: {:.3f}s'.format( tTotalInsert ) )
+                  label = f'{labels[iSchema]}, total time: {tTotalInsert:.3f}s' )
 
         ########### SELECT benchmarks ###########
 
@@ -363,12 +361,12 @@ for nFiles in [ 1000*1000 ]:
             log( "Selecting {} {} took {:.3f} s excluding PRNG time".
                  format( nFilesSelect, entity, tTotalSelectTime ) )
 
-            with open( "{} {} select {}.dat".format( fname, labels[iSchema], entity ), 'wt' ) as dataFile:
+            with open( f"{fname} {labels[iSchema]} select {entity}.dat", 'wt' ) as dataFile:
                 for t in selectTimes:
                     dataFile.write( str( t ) + '\n' )
 
             ax.plot( selectTimes, linestyle = '', marker = '.',
-                     label = labels[iSchema] + ', total time: {:.3f}s'.format( tTotalSelectTime ) )
+                     label = f'labels[iSchema], total time: {tTotalSelectTime:.3f}s' )
 
         benchmarkSelect( 'paths', 'SELECT hash FROM files WHERE path == (?)',
                          lambda j : ( os.urandom( fileNameLength // 2 ).hex(), ), axs )
@@ -384,7 +382,7 @@ for nFiles in [ 1000*1000 ]:
         #db.execute( 'VACUUM' )  # does not help because we don't delete anything but still adds significant time overhead
         db.close()
         stats = os.stat( databaseFile )
-        log( "SQL database size in bytes: {}".format( stats.st_size ) )
+        log( f"SQL database size in bytes: {stats.st_size}" )
         os.remove( databaseFile )
 
         log( "" )

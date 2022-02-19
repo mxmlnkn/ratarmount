@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 
-import fnmatch
 import os
-import re
 import sys
-from itertools import cycle
 
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-import pandas as pd
 
 
 lineStyles = ['-', ':', (0, (1, 7)), (0, (4, 3, 1, 3)), '--']
@@ -18,8 +14,6 @@ markers = ['+', 'o', '*', 'x']
 
 
 def axisValueReduction(ax, axis, reduction, init):
-    import numpy as np
-
     result = init
     # this is bugged when using axvline or axhline, because it doesn't ignore
     # the huge values set by those functions. Workaround: Call autoRange
@@ -267,8 +261,8 @@ def plotStandardTools(labels, data, ax, command, metric, scalingFactor=1, xScali
             ax.plot(x, y, linestyle=lineStyles[j], color=color, marker=marker, zorder=zorder, label=tool)
         else:
             ymedian = np.array([np.median(y[x == xi]) for xi in xu])
-            ymean = np.array([np.mean(y[x == xi]) for xi in xu])
-            ymin = np.array([np.min(y[x == xi]) for xi in xu])
+            #ymean = np.array([np.mean(y[x == xi]) for xi in xu])
+            #ymin = np.array([np.min(y[x == xi]) for xi in xu])
             ymax = np.array([np.max(y[x == xi]) for xi in xu])
 
             # ymedian? ymin? ymax? ymean?
@@ -285,11 +279,8 @@ def plotStandardTools(labels, data, ax, command, metric, scalingFactor=1, xScali
 def plotReadingComparison(fileName):
     labels, data = loadData(fileName)
 
-    availableTools = data.keys()
     tools = [
         'archivemount',
-        #'ratarmount -P 24' if 'ratarmount -P 24' in availableTools else 'ratarmount',
-        #'ratarmount -P 1',
         'ratarmount -P 24',
         'fuse-archive',
     ]

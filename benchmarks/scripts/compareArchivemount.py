@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 
-import fnmatch
 import os
-import re
 import sys
-from itertools import cycle
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,8 +15,6 @@ markers = ['+', 'o', '*', 'x']
 
 
 def axisValueReduction(ax, axis, reduction, init):
-    import numpy as np
-
     result = init
     # this is bugged when using axvline or axhline, because it doesn't ignore
     # the huge values set by those functions. Workaround: Call autoRange
@@ -205,7 +200,7 @@ def plotBenchmark(labels, data, ax, command, metric, tools, scalingFactor=1):
             linestyle='',
             marker=markers[k],
             color='0.5',
-            label="{}B per File".format(int(nBytesPerFile)),
+            label=f"{int(nBytesPerFile)}B per File",
         )
 
 
@@ -316,7 +311,7 @@ def plotRatarmountParallelComparison(fileName, compression):
         return False
 
     if compression == 'find':
-        df = df.loc[df.loc[:, 'command'].str.contains('find')]
+        df = df.loc[df.loc[:, 'command'].str.contains('find')]  #
         if df.empty:
             print("[Warning] Could not find 'find' command")
             return False

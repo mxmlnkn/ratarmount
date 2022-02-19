@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 
+import fnmatch
+import os
+import re
+import sys
+from collections import OrderedDict
+from itertools import cycle
+
 import numpy as np
 import matplotlib.pyplot as plt
-import sys, os, fnmatch, re
-from itertools import cycle
 
 def loadMemoryTracingData( fileName ):
     labels = None
@@ -17,9 +22,10 @@ def loadMemoryTracingData( fileName ):
                 elif line[1:].strip().split( '=' )[0] == 'pageSize':
                     pageSize = int( line[1:].strip().split( '=' )[1] )
 
-    assert( 'seconds' in labels )
+    assert labels is not None
+    assert 'seconds' in labels
     iSeconds = labels.index( 'seconds' )
-    assert( 'resident' in labels )
+    assert 'resident' in labels
     iResident = labels.index( 'resident' )
 
     data = np.genfromtxt( fileName, skip_footer = 1 ).transpose()
@@ -29,7 +35,7 @@ def loadMemoryTracingData( fileName ):
 def plotMemoryOverTime( fileNames, plotFileName = 'memory-over-time', fileNameSizeMiB = 64 ):
     fig = plt.figure()
     ax = fig.add_subplot( 111,
-        title = "Approximately {} MiB File Name Metadata".format( fileNameSizeMiB ),
+        title = f"Approximately {fileNameSizeMiB} MiB File Name Metadata",
         xlabel = 'Time / s',
         ylabel = 'Resident Memory / MiB'
     )
@@ -76,7 +82,7 @@ def plotMemoryOverTime( fileNames, plotFileName = 'memory-over-time', fileNameSi
 
     ax.legend( loc = 'best' )
     fig.tight_layout()
-    fig.savefig( plotFileName + '-{}-MiB-metadata.png'.format( fileNameSizeMiB ) )
+    fig.savefig( f'{plotFileName}-{fileNameSizeMiB}-MiB-metadata.png' )
 
 def plotPerformanceComparison( fileName, fileNameSizeMiB = 64 ):
     widthBetweenBars = 1
@@ -109,7 +115,6 @@ def plotPerformanceComparison( fileName, fileNameSizeMiB = 64 ):
             compressionGroups.append( compression )
     compressionBackgrounds = { '' : '', 'gz' : '//', 'lz4' : 'o' }
 
-    from collections import OrderedDict
     # get unique backend "list" with same ordering as read [ 'custom', 'json', 'sqlite', ... ]
     backends = list( OrderedDict.fromkeys( [ x.split( '.' )[0] for x in backendLabels ] ) )
 
@@ -147,7 +152,7 @@ def plotPerformanceComparison( fileName, fileNameSizeMiB = 64 ):
                           backendLabels[i].endswith( compression if compression else backend ) ]
                 if not ys:
                     continue
-                assert( len( ys ) == 1 )
+                assert len( ys ) == 1
                 bar, = ax.bar( len( compressionGroups ) * ( j + widthBetweenBars ) + k, ys[0],
                                hatch = compressionBackgrounds[compression],
                                color = bar.get_facecolor() if bar else None, label = backend if k == 0 else None )
@@ -160,7 +165,7 @@ def plotPerformanceComparison( fileName, fileNameSizeMiB = 64 ):
 
     ax.legend( loc = 'center left',  bbox_to_anchor = ( 1, 0.5 ) )
     fig.tight_layout()
-    fig.savefig( 'performance-comparison-{}-MiB-metadata.png'.format( fileNameSizeMiB ) )
+    fig.savefig( f'performance-comparison-{fileNameSizeMiB}-MiB-metadata.png' )
 
 if len( sys.argv ) != 2 or not os.path.isdir( sys.argv[1] ):
     print( "First argument must be path to data directory" )
