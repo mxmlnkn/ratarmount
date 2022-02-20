@@ -66,13 +66,6 @@ function benchmarkCommand()
         while ! command mountpoint -q "$mountPoint"; do sleep 0.1; done
         stat -- "$mountPoint"  &>/dev/null
     else
-        if [[ "${commandToBenchmark[0]}" == 'cat' ]]; then
-            # Reset Max RSS (VmHWM) (Virtual Memory High Water Mark) so that we more or less only benchmark
-            # the memory overhead for reading a file not for mounting the whole archive.
-            # Then again, there should hardly be any difference because the whole archive consists only of this single file.
-            printf 5 > /proc/$mountPid/clear_refs
-        fi
-
         duration=$( { /bin/time -f '%e s %M kiB max rss' \
                           "${commandToBenchmark[@]}"; } 2>&1 1>/dev/null |
                           'grep' 'max rss' )
@@ -97,20 +90,35 @@ function benchmarkCommand()
 }
 
 
-function benchmarkMountedCat()
+function waitForMountPoint()
 {
-    # Run and time mounting of TAR file. Do not unmount because we need it for further benchmarks!
-    find . -maxdepth 1 -name "tar-with*.index.sqlite" -delete
-    benchmarkCommand $cmd "${tarFile}${compression}" "$mountFolder"
-
     sleep 0.1s
     for (( i = 0; i < 30; ++i )); do
-        if mountpoint -q "$mountFolder"; then
+        if mountpoint -q "$1"; then
             break
         fi
         sleep 1s
         echoerr "Waiting for mountpoint"
     done # throw error after timeout?
+}
+
+
+function benchmarkMountedCat()
+{
+    # Run and time mounting of TAR file. Do not unmount because we need it for further benchmarks!
+    find . -maxdepth 1 -name "tar-with*.index.sqlite" -delete
+
+    echo "Create index first and load it later to avoid benchmarking mounting"
+    echo "Run $cmd ${tarFile}${compression} $mountFolder"
+    $cmd "${tarFile}${compression}" "$mountFolder" 2>&1 1>/dev/null
+    waitForMountPoint "$mountFolder"
+
+    fusermount -u "$mountFolder"
+    sleep 0.1s
+
+    # Load index, i.e., skip first decoding so that the ParallelXZReader cache is empty!
+    benchmarkCommand $cmd "${tarFile}${compression}" "$mountFolder"
+    waitForMountPoint "$mountFolder"
 
     benchmarkCommand cat "$mountFolder/large"
     catDuration=$duration  # set by benchmarkCommand!
@@ -152,6 +160,8 @@ for compression in '' '.bz2' '.gz' '.xz' '.zst'; do
             '.bz2') lbzip2 --keep "$tarFile"; ;;
             '.gz' ) pigz --keep "$tarFile"; ;;
             # Use same block sizes for zstd as for xz for a fair comparison!
+            # And maybe even for gzip, which has spacing 16 MiB. However, gzip only has this large spacing because
+            # the seek point metadata is ten thousand times larger!
             '.xz' ) xz -T 0 --block-size=$(( 1024*1024 )) --keep "$tarFile"; ;;
             '.zst') createMultiFrameZstd "$tarFile" "$(( 1024*1024 ))"; ;;
         esac
