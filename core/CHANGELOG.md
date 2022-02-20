@@ -1,4 +1,9 @@
 
+# Version 0.2.2 built on 2022-02-20
+
+ - Improve performance for gzip files significantly by using a larger buffer.
+ - Do not use ParallelXZReader for single-block xz files to avoid memory issues.
+
 # Version 0.2.1 built on 2022-02-07
 
  - Fix (the last 1000) files not showing for truncated / incomplete TAR files.
@@ -12,6 +17,10 @@
  - Fix file objects returned by SQLiteIndexedTar to be thread-safe when reading and seeking.
  - Improve performance of index creation for uncompressed TARs by batching SQLite index insertions among others.
  - Add elapsed time output to progress indicator.
+
+# Version 0.1.5 built on 2022-02-20
+
+ - Improve performance for gzip files significantly by using a larger buffer.
 
 # Version 0.1.4 built on 2021-12-21
 
