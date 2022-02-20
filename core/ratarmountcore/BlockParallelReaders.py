@@ -30,7 +30,15 @@ class BlockParallelReader(io.BufferedIOBase):
 
     # Using a thread pool, slowed down ParallelXZReader by 50%
 
-    def __init__(self, filename: str, fileobj, blockBoundaries: List[int], parallelization: Optional[int] = None):
+    def __init__(
+        self,
+        filename: str,
+        fileobj,
+        blockBoundaries: List[int],
+        parallelization: Optional[int],
+        initWorker=None,
+        initArgs=(),
+    ):
         """
         blockBoundaries:
             All but the last block boundary are also the uncompressed offsets at which new blocks begin
@@ -47,6 +55,8 @@ class BlockParallelReader(io.BufferedIOBase):
         self.filename = filename
         self.fileobj = fileobj
         self.blockBoundaries: List[int] = blockBoundaries
+        self.initWorker = BlockParallelReader._initWorker if initWorker is None else initWorker
+        self.initArgs = initArgs
 
         self._pool = None
         self._offset = 0
@@ -68,7 +78,7 @@ class BlockParallelReader(io.BufferedIOBase):
 
     def _getPool(self):
         if not self._pool:
-            self._pool = multiprocessing.pool.Pool(self.parallelization, BlockParallelReader._initWorker)
+            self._pool = multiprocessing.pool.Pool(self.parallelization, self.initWorker, self.initArgs)
         return self._pool
 
     @staticmethod
@@ -248,11 +258,31 @@ class ParallelXZReader(BlockParallelReader):
         blockBoundaries = fileObject.block_boundaries.copy()
         blockBoundaries.append(len(fileObject))
 
-        super().__init__(filename, fileObject, blockBoundaries, parallelization)
+        super().__init__(
+            filename, fileObject, blockBoundaries, parallelization, ParallelXZReader._initWorker2, (filename,)
+        )
         self._openFiles()
 
+    def _openFiles(self):
+        # Opening the pool and and the files on each worker at this point might be a point to discuss
+        # but it leads to uniform latencies for the subsequent read calls.
+        pool = self._getPool()
+
+        results = []
+        for _ in range(self.parallelization * 4):
+            results.append(pool.apply_async(os.getpid))  # will triger worker initialization, i.e., _tryOpenGlobalFile
+
+        pids = set()
+        for result in results:
+            pids.add(result.get())
+
     @staticmethod
-    def _openFile(filename):
+    def _initWorker2(filename):
+        BlockParallelReader._initWorker()
+        ParallelXZReader._tryOpenGlobalFile(filename)
+
+    @staticmethod
+    def _tryOpenGlobalFile(filename):
         # This is not thread-safe! But it will be executed in a process pool, in which each worker has its own
         # global variable set. Using a global variable for this is safe because we know that there is one process pool
         # per BlockParallelReader, meaning the filename is a constant for each worker.
@@ -260,24 +290,9 @@ class ParallelXZReader(BlockParallelReader):
         if _parallelXzReaderFile is None:
             _parallelXzReaderFile = xz.open(filename, 'rb')
 
-    def _openFiles(self):
-        # Opening the pool and and the files on each worker at this point might be a point to discuss
-        # but it leads to uniform latencies for the subsequent read calls.
-        pool = self._getPool()
-        for _ in range(self.parallelization):
-            pool.apply_async(ParallelXZReader._openFile, (self.filename,))
-
-    @overrides(BlockParallelReader)
-    def _getPool(self):
-        needToOpenFiles = not self._pool
-        pool = super()._getPool()
-        if needToOpenFiles:
-            self._openFiles()
-        return pool
-
     @staticmethod
     def _decodeBlock(filename, offset, size):
-        ParallelXZReader._openFile(filename)
+        ParallelXZReader._tryOpenGlobalFile(filename)
         _parallelXzReaderFile.seek(offset)
         return _parallelXzReaderFile.read(size)
 
