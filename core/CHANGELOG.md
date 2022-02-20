@@ -1,4 +1,8 @@
 
+# Version 0.1.5 built on 2022-02-20
+
+ - Improve performance for gzip files significantly by using a larger buffer.
+
 # Version 0.1.4 built on 2021-12-21
 
  - Fix mounting of TAR fails if there are special characters like '#' in the path.
