@@ -1424,6 +1424,7 @@ checkNestedRecursiveFolderMounting tests/single-file.tar bar d3b07384d113edec49e
 checkTarEncoding tests/single-file.tar utf-8 bar d3b07384d113edec49eaa6238ad5ff00
 checkTarEncoding tests/single-file.tar latin1 bar d3b07384d113edec49eaa6238ad5ff00
 checkTarEncoding tests/special-char.tar latin1 'Datei-mit-dämlicher-Kodierung.txt' 2709a3348eb2c52302a7606ecf5860bc
+checkTarEncoding tests/nested-special-char.tar latin1 'Ördner-mìt-dämlicher-Ködierúng/Datei-mit-dämlicher-Kodierung.txt' 2709a3348eb2c52302a7606ecf5860bc
 
 checkLinkInTAR tests/symlinks.tar foo ../foo
 checkLinkInTAR tests/symlinks.tar python /usr/bin/python

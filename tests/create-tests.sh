@@ -184,3 +184,22 @@ rm "$octalMTime"
 
 echo bar > /tmp/foo
 tar -c --absolute-names --owner=user --group=group --numeric -f 'absolute-file-incremental.tar' --incremental /tmp/foo
+
+
+# special-char.tar
+mkdir mimi momo
+echo iriya > 'mimi/Datei-mit-dämlicher-Kodierung.txt'
+ratarmount -o modules=iconv,to_code=ISO-8859-1 mimi momo
+tar -c --owner=0 --group=0 --numeric-owner -f special-char.tar momo/*
+fusermount -u momo
+rm -r mimi momo
+
+
+# nested special-char.tar
+mkdir -p 'mimi/Ördner-mìt-dämlicher-Ködierúng'
+file='Ördner-mìt-dämlicher-Ködierúng/Datei-mit-dämlicher-Kodierung.txt'
+echo iriya > "mimi/$file"
+ratarmount -o modules=iconv,to_code=ISO-8859-1 mimi momo
+( cd momo && tar -c --owner=0 --group=0 --numeric-owner -f ../nested-special-char.tar "$file"; )
+fusermount -u momo
+rm -r mimi momo

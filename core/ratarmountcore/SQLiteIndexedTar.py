@@ -1569,6 +1569,14 @@ class SQLiteIndexedTar(MountSource):
         for row in rows:
             self._tryAddParentFolders(row[0], row[2], row[3])
 
+    @staticmethod
+    def _escapeInvalidCharacters(toEscape: str, encoding: str):
+        try:
+            toEscape.encode()
+            return toEscape
+        except UnicodeEncodeError:
+            return toEscape.encode(encoding, 'surrogateescape').decode(encoding, 'backslashreplace')
+
     def _setFileInfo(self, row: tuple) -> None:
         if not self.sqlConnection:
             raise IndexNotOpenError("This method can not be called without an opened index database!")
@@ -1586,16 +1594,7 @@ class SQLiteIndexedTar(MountSource):
             checkedRow = []
             for x in list(row):  # check strings
                 if isinstance(x, str):
-                    try:
-                        x.encode()
-                        checkedRow += [x]
-                    except UnicodeEncodeError:
-                        # fmt: off
-                        checkedRow += [
-                            x.encode( self.encoding, 'surrogateescape' )
-                             .decode( self.encoding, 'backslashreplace' )
-                         ]
-                        # fmt: on
+                    checkedRow += [self._escapeInvalidCharacters(x, self.encoding)]
                 else:
                     checkedRow += [x]
 
@@ -1604,6 +1603,9 @@ class SQLiteIndexedTar(MountSource):
             )
             print("[Warning] The escaped inserted row is now:", row)
             print()
+
+            self._tryAddParentFolders(self._escapeInvalidCharacters(row[0], self.encoding), row[2], row[3])
+            return
 
         self._tryAddParentFolders(row[0], row[2], row[3])
 
