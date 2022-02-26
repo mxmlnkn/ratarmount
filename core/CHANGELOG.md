@@ -1,4 +1,8 @@
 
+# Version 0.2.3 built on 2022-04-03
+
+ - Fix uncaught exception when a folder contains an invalid character.
+
 # Version 0.2.2 built on 2022-02-20
 
  - Improve performance for gzip files significantly by using a larger buffer.
