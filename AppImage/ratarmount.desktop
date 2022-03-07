@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=ratarmount
+Exec=ratarmount
+Icon=ratarmount
+Comment=A Python {{ python-fullversion }} runtime with {{ requirements }}
+# Lists must end with semicolon!
+Categories=Utility;Archiving;Compression;Filesystem;System;FileTools;
+Keywords=zip;rar;tar;bzip2;gzip;zstd;xz;extract;unpack;mount;
+Terminal=true

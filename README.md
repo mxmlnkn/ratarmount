@@ -32,28 +32,46 @@ In [contrast](https://github.com/libarchive/libarchive#notes-about-the-library-d
 # Table of Contents
 
 1. [Installation](#installation)
+   1. [Installation via AppImage](#installation-via-appimage)
+   2. [System Dependencies for PIP Installation (Rarely Necessary)](#system-dependencies-for-pip-installation-rarely-necessary)
+   3. [PIP Package Installation](#pip-package-installation)
 2. [Benchmarks](#benchmarks)
 3. [The Problem](#the-problem)
 4. [The Solution](#the-solution)
 5. [Usage](#usage)
-    1. [Metadata Index Cache](#metadata-index-cache)
-    2. [Bind Mounting](#bind-mounting)
-    3. [Union Mounting](#union-mounting)
-    4. [File versions](#file-versions)
-    5. [Compressed non-TAR files](#compressed-non-tar-files)
-    6. [Xz and Zst Files](#xz-and-zst-files)
+   1. [Metadata Index Cache](#metadata-index-cache)
+   2. [Bind Mounting](#bind-mounting)
+   3. [Union Mounting](#union-mounting)
+   4. [File versions](#file-versions)
+   5. [Compressed non-TAR files](#compressed-non-tar-files)
+   6. [Xz and Zst Files](#xz-and-zst-files)
 
 
 # Installation
 
-## Dependencies
+You can install ratarmount either by simply downloading the AppImage or via pip. The latter might require installing additional dependencies.
 
-Python 3.6+, preferably pip 19.0+, and FUSE are required.
+## Installation via AppImage
+
+The [AppImage](https://appimage.org/) files are attached under "Assets" on the [releases  page](https://github.com/mxmlnkn/ratarmount/releases).
+They require no installation and can be simply executed like a portable executable.
+If you want to install it, you can simply copy it into any of the folders listed in your `PATH`.
+
+```bash
+wget 'https://github.com/mxmlnkn/ratarmount/releases/download/v0.10.0/ratarmount-manylinux2014_x86_64.AppImage'
+chmod u+x 'ratarmount-manylinux2014_x86_64.AppImage'
+./ratarmount-manylinux2014_x86_64.AppImage --help  # Simple test run
+sudo cp ratarmount-manylinux2014_x86_64.AppImage /usr/local/bin/ratarmount  # Example installation
+```
+
+## System Dependencies for PIP Installation (Rarely Necessary)
+
+Python 3.6+, preferably pip 19.0+, FUSE, and sqlite3 are required.
 These should be preinstalled on most systems.
 On Debian-like systems like Ubuntu, you can install/update all dependencies using:
 
 ```bash
-sudo apt install python3 python3-pip fuse
+sudo apt install python3 python3-pip fuse sqlite3 unar
 ```
 
 On macOS, you have to install [macFUSE](https://osxfuse.github.io/) with:
@@ -96,7 +114,7 @@ python3 -m pip install --user lzmaffi
 ```
 
 
-## Benchmarks
+# Benchmarks
 
 ![Benchmark comparison between ratarmount, archivemount, and fuse-archive](benchmarks/plots/archivemount-comparison.png)
 
@@ -530,6 +548,5 @@ If ratarmount helped you out and satisfied you so much that you can't help but w
 | Type | Address                                    |
 |------|--------------------------------------------|
 | BTC  | bc1qkc7stljxazpkk5lzcj4gqu2tvh0dh4exz4563t |
-| ETH  | 0xb049e3aC04f08c85A1A12e0e199adECb045C76C8 |
 | LTC  | LTRbWdUY576MNkhXhXEXNpt3NuY2ecR9F9         |
 | XMR  | 44DcWgDNxvUJav5zKHprJLJyKx11RyMgEfv3yuuqeUGGec26jRqA9UnaKc2uoKf5TyCVx3CmfZhyQiXtZP1kbdYCRCXNyJS |

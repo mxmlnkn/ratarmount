@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+    <id>ratarmount</id>
+    <metadata_license>MIT</metadata_license>
+    <project_license>MIT</project_license>
+    <name>Ratarmount</name>
+    <summary>A Python {{ python-fullversion }} runtime with {{ requirements }}</summary>
+    <description>
+        <p>  A relocated Python {{ python-fullversion }} installation containing
+             the ratarmount packages suite ({{ requirements }}) and running from an
+             AppImage.
+        </p>
+    </description>
+    <launchable type="desktop-id">ratarmount.desktop</launchable>
+    <url type="homepage">https://github.com/mxmlnkn/ratarmount</url>
+    <provides>
+        <binary>ratarmount</binary>
+    </provides>
+</component>
