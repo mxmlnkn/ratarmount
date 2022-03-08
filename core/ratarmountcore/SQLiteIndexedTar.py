@@ -915,8 +915,8 @@ class SQLiteIndexedTar(MountSource):
             ]
 
             for _, cinfo in supportedCompressions.items():
-                if cinfo.moduleName in globals():
-                    module = globals()[cinfo.moduleName]
+                if cinfo.moduleName in sys.modules:
+                    module = sys.modules[cinfo.moduleName]
                     # zipfile has no __version__ attribute and PEP 396 ensuring that was rejected 2021-04-14
                     # in favor of 'version' from importlib.metadata which does not even work with zipfile.
                     # Probably, because zipfile is a built-in module whose version would be the Python version.
@@ -925,7 +925,7 @@ class SQLiteIndexedTar(MountSource):
                     # there is no generic way to get the "python-xz" name from the "xz" runtime module object
                     # and importlib.metadata.version will require "python-xz" as argument.
                     if hasattr(module, '__version__'):
-                        versions += [makeVersionRow(cinfo.moduleName, module.__version__)]
+                        versions += [makeVersionRow(cinfo.moduleName, getattr(module, '__version__'))]
 
             connection.executemany('INSERT OR REPLACE INTO "versions" VALUES (?,?,?,?,?)', versions)
         except Exception as exception:

@@ -2,10 +2,13 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import importlib
 import json
 import os
 import re
 import stat
+import sqlite3
+import subprocess
 import sys
 import tarfile
 import traceback
@@ -674,6 +677,44 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
     if '--version' in tmpArgs or '-v' in tmpArgs:
         print("ratarmount", __version__)
         print("ratarmountcore", core.__version__)
+
+        print()
+        print("System Software:")
+        print()
+        print("Python", sys.version.split(' ')[0])
+
+        try:
+            fusermountVersion = subprocess.run(
+                ["fusermount", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False
+            ).stdout.strip()
+            print("FUSE", re.sub('.* ([0-9][.][0-9.]+).*', r'\1', fusermountVersion.decode()))
+        except Exception:
+            pass
+
+        print("libsqlite3", sqlite3.sqlite_version)
+
+        print()
+        print("Compression Backends:")
+        print()
+
+        for _, cinfo in supportedCompressions.items():
+            try:
+                importlib.import_module(cinfo.moduleName)
+            except ImportError:
+                pass
+
+            if cinfo.moduleName in sys.modules:
+                module = sys.modules[cinfo.moduleName]
+                # zipfile has no __version__ attribute and PEP 396 ensuring that was rejected 2021-04-14
+                # in favor of 'version' from importlib.metadata which does not even work with zipfile.
+                # Probably, because zipfile is a built-in module whose version would be the Python version.
+                # https://www.python.org/dev/peps/pep-0396/
+                # The "python-xz" project is imported as an "xz" module, which complicates things because
+                # there is no generic way to get the "python-xz" name from the "xz" runtime module object
+                # and importlib.metadata.version will require "python-xz" as argument.
+                if hasattr(module, '__version__'):
+                    print(cinfo.moduleName, getattr(module, '__version__'))
+
         return
 
     # tmpArgs are only for the manual parsing. In general, rawArgs is None, meaning it reads sys.argv,
