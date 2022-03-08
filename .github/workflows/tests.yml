@@ -156,11 +156,7 @@ jobs:
         ls -la mimi
         sleep 1s
         # MacOS does not have fusermount!
-        if command -v fusermount > /dev/null 2>&1; then
-            fusermount -u mimi
-        else
-            umount mimi
-        fi
+        ratarmount -u mimi
 
     - name: Test Startup Without Compression Dependencies
       run: |

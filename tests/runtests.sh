@@ -9,21 +9,7 @@ if [[ -z "$RATARMOUNT_CMD" ]]; then
 fi
 
 
-# MAC does not have fusermount!
-if ! command -v fusermount &>/dev/null; then
-    fusermount()
-    {
-        if [[ "$1" == '-u' ]]; then
-            shift
-            umount "$@"
-        else
-            echo "fusermount without -u makes no sense"
-        fi
-    }
-    export -f fusermount
-fi
-
-# MAC does not have fusermount!
+# MAC does not have mountpoint check!
 if ! command -v mountpoint &>/dev/null; then
     mountpoint()
     {
@@ -177,7 +163,7 @@ funmount()
 
     while mountpoint -- "$mountFolder" &>/dev/null; do
         sleep 0.2s
-        fusermount -u "$mountFolder"
+        $RATARMOUNT_CMD -u "$mountFolder"
     done
 }
 
@@ -430,7 +416,7 @@ testLargeTar()
     local memoryUsagePid="$!"
 
     while ! mountpoint -- "$mountFolder"; do sleep 1s; done
-    fusermount -u "$mountFolder"
+    $RATARMOUNT_CMD -u "$mountFolder"
     wait "$memoryUsagePid"
     wait "$ratarmountPid"
 
@@ -444,7 +430,7 @@ testLargeTar()
     local memoryUsagePid="$!"
 
     while ! mountpoint -- "$mountFolder"; do sleep 1s; done
-    fusermount -u "$mountFolder"
+    $RATARMOUNT_CMD -u "$mountFolder"
     wait "$memoryUsagePid"
     wait "$ratarmountPid"
 

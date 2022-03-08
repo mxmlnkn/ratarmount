@@ -349,6 +349,8 @@ optional arguments:
                         to folders of the same name being overwritten, so use
                         with care. The index needs to be (re)created to apply
                         this option! (default: False)
+  -u, --unmount         Unmount the given mount point. Equivalent to calling
+                        "fusermount -u". (default: False)
   -v, --version         Print version string. (default: False)
 ```
 

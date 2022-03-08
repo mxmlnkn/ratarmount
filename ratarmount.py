@@ -589,6 +589,10 @@ seeking capabilities when opening that file.
                'Example: --fuse "allow_other,entry_timeout=2.8,gid=0". ' )
 
     parser.add_argument(
+        '-u', '--unmount', action = 'store_true',
+        help = 'Unmount the given mount point. Equivalent to calling "fusermount -u".' )
+
+    parser.add_argument(
         '-P', '--parallelization', type = int, default = 1,
         help = 'If an integer other than 1 is specified, then the threaded parallel bzip2 decoder will be used '
                'specified amount of block decoder threads. Further threads with lighter work may be started. '
@@ -611,6 +615,15 @@ seeking capabilities when opening that file.
     # fmt: on
 
     args = parser.parse_args(rawArgs)
+
+    if args.unmount:
+        if not args.mount_source or not args.mount_source[0]:
+            raise argparse.ArgumentTypeError("Unmounting requires a path to the mount point!")
+
+        args.unmount = args.mount_source[0]
+        if not os.path.ismount(args.unmount):
+            raise argparse.ArgumentTypeError(f"The given path to unmount ({args.unmount}) must be a mount point!")
+        return args
 
     args.gzipSeekPointSpacing = args.gzip_seek_point_spacing * 1024 * 1024
 
@@ -721,6 +734,15 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
     # and maybe sometimes contains arguments when used programmatically. In that case the first argument
     # should not be the path to the script!
     args = _parseArgs(rawArgs)
+
+    if args.unmount:
+        try:
+            subprocess.run(
+                ["fusermount", "-u", args.unmount], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
+        except Exception:
+            subprocess.run(["umount", args.unmount], check=False)
+        return
 
     # Convert the comma separated list of key[=value] options into a dictionary for fusepy
     fusekwargs = (
