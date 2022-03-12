@@ -129,35 +129,37 @@ class _TarFileMetadataReader:
         if the prefix is an octal number indicating an incremental archive prefix.
         """
 
+        if '/' not in tarInfo.name:
+            return
+
         fixedPath = None
-        if '/' in tarInfo.name:
-            prefix, name = tarInfo.name.split('/', 1)
-            octalMTime = re.fullmatch("^[0-7]+$", prefix)
+        prefix, name = tarInfo.name.split('/', 1)
+        octalMTime = re.fullmatch("^[0-7]+$", prefix)
 
-            realPrefix = _TarFileMetadataReader._getTarPrefix(fileObject, tarInfo, printDebug)
+        realPrefix = _TarFileMetadataReader._getTarPrefix(fileObject, tarInfo, printDebug)
 
-            # For names longer than 100B, GNU tar will store it using a ././@LongLink named file.
-            # In this case, tarfile will ignore the truncated filename AND the octal timestamp prefix!
-            # However, for long symbolic links, the prefix WILL be prepended to the @LongLink contents!
-            # In order to not strip folders erroneously, test against this prefix. Unfortunately, this is
-            # not perfect either because tarfile removes trailing slashes for names. So we have to
-            # read the TAR information ourselves.
-            # Note that the prefix contains two not always identical octal timestamps! E.g.,
-            #   b'13666753432\x0013666377326\x00\x00\x00...
-            # We only test for the first here as I'm not sure what the second one is.
-            if octalMTime and realPrefix and realPrefix.startswith(prefix.encode() + b"\0"):
-                secondTimestamp = re.match(b"^[0-7]+(\x00|)", realPrefix[len(prefix.encode()) + 1 :])
-                if secondTimestamp:
-                    fixedPath = name
-                elif printDebug >= 2:
-                    print("[Info] Second timestamp is not octal!", realPrefix[len(prefix.encode()) + 1 :])
+        # For names longer than 100B, GNU tar will store it using a ././@LongLink named file.
+        # In this case, tarfile will ignore the truncated filename AND the octal timestamp prefix!
+        # However, for long symbolic links, the prefix WILL be prepended to the @LongLink contents!
+        # In order to not strip folders erroneously, test against this prefix. Unfortunately, this is
+        # not perfect either because tarfile removes trailing slashes for names. So we have to
+        # read the TAR information ourselves.
+        # Note that the prefix contains two not always identical octal timestamps! E.g.,
+        #   b'13666753432\x0013666377326\x00\x00\x00...
+        # We only test for the first here as I'm not sure what the second one is.
+        if octalMTime and realPrefix and realPrefix.startswith(prefix.encode() + b"\0"):
+            secondTimestamp = re.match(b"^[0-7]+(\x00|)", realPrefix[len(prefix.encode()) + 1 :])
+            if secondTimestamp:
+                fixedPath = name
+            elif printDebug >= 2:
+                print("[Info] Second timestamp is not octal!", realPrefix[len(prefix.encode()) + 1 :])
 
-            if octalMTime and fixedPath is None and printDebug >= 1:
-                print(f"[Warning] ignored prefix '{prefix}' because it was not found in TAR header prefix.")
-                print("[Warning]", realPrefix[:30] if realPrefix else realPrefix)
-                print(f"[Info] TAR header offset: {tarInfo.offset}, type: {str(tarInfo.type)}")
-                print("[Info] name:", tarInfo.name)
-                print()
+        if octalMTime and fixedPath is None and printDebug >= 1:
+            print(f"[Warning] ignored prefix '{prefix}' because it was not found in TAR header prefix.")
+            print("[Warning]", realPrefix[:30] if realPrefix else realPrefix)
+            print(f"[Info] TAR header offset: {tarInfo.offset}, type: {str(tarInfo.type)}")
+            print("[Info] name:", tarInfo.name)
+            print()
 
         if fixedPath is not None:
             tarInfo.name = fixedPath
