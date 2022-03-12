@@ -1,4 +1,12 @@
 
+# Version 0.11.0 built on 2022-04-xx
+
+ - Add -u option for more consistent mount/unmount call signatures.
+ - (ratarmountcore 0.2.1) Fix (the last 1000) files not showing for truncated / incomplete TAR files.
+ - (ratarmountcore 0.2.2) Improve performance for gzip files significantly by using a larger buffer.
+ - (ratarmountcore 0.2.2) Do not use ParallelXZReader for single-block xz files to avoid memory issues.
+ - (ratarmountcore 0.2.3) Fix uncaught exception when a folder contains an invalid character.
+
 # Version 0.10.0 built on 2022-01-15
 
  - Split ratarmount into ratarmount, which contains the CLI, and ratarmountcore.
