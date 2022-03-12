@@ -134,7 +134,6 @@ class _TarFileMetadataReader:
 
         fixedPath = None
         prefix, name = tarInfo.name.split('/', 1)
-        octalMTime = re.fullmatch("^[0-7]+$", prefix)
 
         realPrefix = _TarFileMetadataReader._getTarPrefix(fileObject, tarInfo, printDebug)
         encodedPrefix = prefix.encode('utf8', 'surrogateescape')
@@ -148,14 +147,12 @@ class _TarFileMetadataReader:
         # Note that the prefix contains two not always identical octal timestamps! E.g.,
         #   b'13666753432\x0013666377326\x00\x00\x00...
         # We only test for the first here as I'm not sure what the second one is.
-        if octalMTime and realPrefix and realPrefix.startswith(encodedPrefix + b"\0"):
-            secondTimestamp = re.match(b"^[0-7]+(\x00|)", realPrefix[len(encodedPrefix) + 1 :])
-            if secondTimestamp:
-                fixedPath = name
-            elif printDebug >= 2:
-                print("[Info] Second timestamp is not octal!", realPrefix[len(encodedPrefix) + 1 :])
+        # In some cases instead of the octal timestamp there will be unknown binary data!
+        # Because of this the data is not asserted to be octal.
+        if realPrefix and realPrefix.startswith(encodedPrefix + b"\0"):
+            fixedPath = name
 
-        if octalMTime and fixedPath is None and printDebug >= 1:
+        if fixedPath is None and printDebug >= 1:
             print(f"[Warning] ignored prefix '{encodedPrefix!r}' because it was not found in TAR header prefix.")
             print("[Warning]", realPrefix[:30] if realPrefix else realPrefix)
             print(f"[Info] TAR header offset: {tarInfo.offset}, type: {str(tarInfo.type)}")
