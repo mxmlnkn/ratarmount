@@ -137,6 +137,7 @@ class _TarFileMetadataReader:
         octalMTime = re.fullmatch("^[0-7]+$", prefix)
 
         realPrefix = _TarFileMetadataReader._getTarPrefix(fileObject, tarInfo, printDebug)
+        encodedPrefix = prefix.encode('utf8', 'surrogateescape')
 
         # For names longer than 100B, GNU tar will store it using a ././@LongLink named file.
         # In this case, tarfile will ignore the truncated filename AND the octal timestamp prefix!
@@ -147,15 +148,15 @@ class _TarFileMetadataReader:
         # Note that the prefix contains two not always identical octal timestamps! E.g.,
         #   b'13666753432\x0013666377326\x00\x00\x00...
         # We only test for the first here as I'm not sure what the second one is.
-        if octalMTime and realPrefix and realPrefix.startswith(prefix.encode() + b"\0"):
-            secondTimestamp = re.match(b"^[0-7]+(\x00|)", realPrefix[len(prefix.encode()) + 1 :])
+        if octalMTime and realPrefix and realPrefix.startswith(encodedPrefix + b"\0"):
+            secondTimestamp = re.match(b"^[0-7]+(\x00|)", realPrefix[len(encodedPrefix) + 1 :])
             if secondTimestamp:
                 fixedPath = name
             elif printDebug >= 2:
-                print("[Info] Second timestamp is not octal!", realPrefix[len(prefix.encode()) + 1 :])
+                print("[Info] Second timestamp is not octal!", realPrefix[len(encodedPrefix) + 1 :])
 
         if octalMTime and fixedPath is None and printDebug >= 1:
-            print(f"[Warning] ignored prefix '{prefix}' because it was not found in TAR header prefix.")
+            print(f"[Warning] ignored prefix '{encodedPrefix!r}' because it was not found in TAR header prefix.")
             print("[Warning]", realPrefix[:30] if realPrefix else realPrefix)
             print(f"[Info] TAR header offset: {tarInfo.offset}, type: {str(tarInfo.type)}")
             print("[Info] name:", tarInfo.name)
