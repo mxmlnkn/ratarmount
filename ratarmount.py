@@ -11,9 +11,10 @@ import stat
 import subprocess
 import sys
 import tarfile
+import time
 import traceback
 import zipfile
-from typing import Any, Dict, Iterable, IO, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, IO, List, Optional, Tuple, Union
 import fuse
 
 try:
@@ -57,6 +58,21 @@ class WritableFolderMountSource(fuse.Operations):
     This class manages one folder as mount source offering methods for reading and modification.
     """
 
+    _overlayMetadataSchema = """
+        CREATE TABLE "files" (
+            "path"          VARCHAR(65535) NOT NULL,  /* path with leading and without trailing slash */
+            "name"          VARCHAR(65535) NOT NULL,
+            /* Some file systems may not support some metadata like permissions on NTFS, so also save them. */
+            "mtime"         INTEGER,
+            "mode"          INTEGER,
+            "uid"           INTEGER,
+            "gid"           INTEGER,
+            PRIMARY KEY (path,name)
+        );
+    """
+
+    _hiddenDatabaseName = '.ratarmount.overlay.sqlite'
+
     def __init__(self, path: str, mountSource: MountSource) -> None:
         if os.path.exists(path):
             if not os.path.isdir(path):
@@ -66,6 +82,35 @@ class WritableFolderMountSource(fuse.Operations):
 
         self.root: str = path
         self.mountSource = mountSource
+        self.sqlConnection = self._openSqlDb(os.path.join(path, self._hiddenDatabaseName))
+
+        # Add table if necessary
+        tables = [row[0] for row in self.sqlConnection.execute('SELECT name FROM sqlite_master WHERE type = "table";')]
+        if "files" not in tables:
+            self.sqlConnection.executescript(WritableFolderMountSource._overlayMetadataSchema)
+
+        # Check that the mount source contains this overlay folder with top priority
+        databaseFileInfo = self.mountSource.getFileInfo('/' + self._hiddenDatabaseName)
+        assert databaseFileInfo is not None
+        path, databaseMountSource, fileInfo = self.mountSource.getMountSource(databaseFileInfo)
+        assert stat.S_ISREG(fileInfo.mode)
+        assert isinstance(databaseMountSource, FolderMountSource)
+        assert databaseMountSource.root == self.root
+
+    @staticmethod
+    def _openSqlDb(path: str, **kwargs) -> sqlite3.Connection:
+        # isolation_level None is important so that changes are autocommitted because there is no manual commit call.
+        sqlConnection = sqlite3.connect(path, isolation_level=None, **kwargs)
+        sqlConnection.row_factory = sqlite3.Row
+        sqlConnection.executescript(
+            # Locking mode exclusive leads to a measurable speedup. E.g., find on 2k recursive files tar
+            # improves from ~1s to ~0.4s!
+            # https://blog.devart.com/increasing-sqlite-performance.html
+            """
+            PRAGMA LOCKING_MODE = EXCLUSIVE;
+            """
+        )
+        return sqlConnection
 
     def setFolderDescriptor(self, fd: int) -> None:
         """
@@ -94,24 +139,126 @@ class WritableFolderMountSource(fuse.Operations):
         if not os.path.exists(self._realpath(parentPath)) and self.mountSource.isdir(parentPath):
             os.makedirs(self._realpath(parentPath), exist_ok=True)
 
+    def _open(self, path: str, mode):
+        self._ensureParentExists(path)
+        folder, name = self._splitPath(path)
+        self.sqlConnection.execute(
+            'INSERT OR IGNORE INTO "files" (path,name,mode) VALUES (?,?,?)', (folder, name, mode)
+        )
+
+    def _remove(self, path: str) -> bool:
+        folder, name = self._splitPath(path)
+        self.sqlConnection.execute('DELETE FROM "files" WHERE (path,name) == (?,?)', (folder, name))
+        return True
+
+    def _setMetadata(self, path: str, metadata: Dict[str, Any]):
+        if not metadata:
+            raise ValueError("Need arguments to know what to update.")
+
+        allowedKeys = ["path", "name", "mtime", "mode", "uid", "gid"]
+        for key in metadata:
+            if key not in allowedKeys:
+                raise ValueError(f"Invalid metadata key ({key}) specified")
+
+        folder, name = self._splitPath(path)
+
+        # https://stackoverflow.com/questions/31277027/using-placeholder-in-sqlite3-statements
+        assignments = []
+        values = []
+        for key, value in metadata.items():
+            values.append(value)
+            assignments.append(f"{key} = (?)")
+
+        self.sqlConnection.execute(
+            f"""UPDATE "files" SET {', '.join(assignments)} WHERE "path" == ? and "name" == ?""",
+            tuple(values) + (folder, name),
+        )
+
+    def _initFileMetadata(self, path: str):
+        # Note that we do not have to check the overlay folder assuming that it is inside the (union) mount source!
+        sourceFileInfo = self.mountSource.getFileInfo(path)
+        if not sourceFileInfo:
+            raise fuse.FuseOSError(fuse.errno.ENOENT)
+
+        # Initialize new metadata entry from existing file
+        _, mountSource, sfi = self.mountSource.getMountSource(sourceFileInfo)
+        if not isinstance(mountSource, FolderMountSource) or mountSource.root != self.root:
+            raise fuse.FuseOSError(fuse.errno.ENOENT)
+        folder, name = self._splitPath(path)
+
+        self.sqlConnection.execute(
+            f'INSERT OR REPLACE INTO "files" VALUES ({",".join(["?"]*6)})',
+            (folder, name, sfi.mtime, sfi.mode, sfi.uid, sfi.gid),
+        )
+
+    def _setFileMetadata(self, path: str, applyMetadataToFile: Callable[[str], None], metadata: Dict[str, Any]):
+        folder, name = self._splitPath(path)
+
+        existsInMetadata = self.sqlConnection.execute(
+            'SELECT COUNT(*) > 1 FROM "files" WHERE "path" == (?) and "name" == (?)', (folder, name)
+        ).fetchone()[0]
+
+        if not existsInMetadata:
+            self._initFileMetadata(path)
+        self._setMetadata(path, metadata)
+
+        # Apply the metadata change for the file in the overlay folder if it exists there.
+        # This is only because it might be confusing for the user else but in general, the metadata in the SQLite
+        # database should take precedence if e.g. the underlying file systems does not support them.
+        try:
+            if os.path.exists(self._realpath(path)):
+                applyMetadataToFile(self._realpath(path))
+        except Exception:
+            traceback.print_exc()
+            print("[Info] Caught exception when trying to apply metadata to real file.")
+            print("[Info] It was applied in the metadata database!")
+
+    def updateFileInfo(self, path: str, fileInfo: FileInfo):
+        folder, name = self._splitPath(path)
+        row = self.sqlConnection.execute(
+            """SELECT * FROM "files" WHERE "path" == (?) AND "name" == (?);""", (folder, name)
+        ).fetchone()
+
+        if not row:
+            return fileInfo
+
+        return FileInfo(
+            # fmt: off
+            size     = fileInfo.size,
+            mtime    = row['mtime'] if row['mtime'] else fileInfo.mtime,
+            mode     = row['mode'] if row['mode'] else fileInfo.mode,
+            linkname = fileInfo.linkname,
+            uid      = row['uid'] if row['uid'] else fileInfo.uid,
+            gid      = row['gid'] if row['gid'] else fileInfo.gid,
+            userdata = fileInfo.userdata,
+            # fmt: on
+        )
+
     # Metadata modification
 
     @overrides(fuse.Operations)
     def chmod(self, path, mode):
-        os.chmod(self._realpath(path), mode)
+        self._setFileMetadata(path, lambda p: os.chmod(p, mode), {'mode': mode})
 
     @overrides(fuse.Operations)
     def chown(self, path, uid, gid):
-        os.chown(self._realpath(path), uid, gid)
+        self._setFileMetadata(path, lambda p: os.chown(p, uid, gid), {'uid': uid, 'gid': gid})
 
     @overrides(fuse.Operations)
     def utimens(self, path, times=None):
         """Argument "times" is a (atime, mtime) tuple. If "times" is None, use the current time."""
-        os.utime(self._realpath(path), times)
+
+        if times is None:
+            mtime = time.time()
+        else:
+            mtime = times[1]
+
+        self._setFileMetadata(path, lambda p: os.utime(p, times), {'mtime': mtime})
 
     @overrides(fuse.Operations)
     def rename(self, old, new):
-        os.rename(self._realpath(old), self._realpath(new))
+        folder, name = self._splitPath(new)
+        self._setFileMetadata(old, lambda p: os.rename(p, self._realpath(new)), {'path': folder, 'name': name})
 
     # Links
 
@@ -134,12 +281,13 @@ class WritableFolderMountSource(fuse.Operations):
 
     @overrides(fuse.Operations)
     def mkdir(self, path, mode):
-        self._ensureParentExists(path)
+        self._open(path, mode | stat.S_IFDIR)
         os.mkdir(self._realpath(path), mode)
 
     @overrides(fuse.Operations)
     def rmdir(self, path):
-        os.rmdir(self._realpath(path))
+        os.rmdir(self._realpath(path))  # Raises OSError if folder is not empty
+        self._remove(path)  # Only set folder metadata to "deleted" if folder is actually empty
 
     # Files
 
@@ -149,11 +297,12 @@ class WritableFolderMountSource(fuse.Operations):
 
     @overrides(fuse.Operations)
     def create(self, path, mode, fi=None):
-        self._ensureParentExists(path)
+        self._open(path, mode)
         return os.open(self._realpath(path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
 
     @overrides(fuse.Operations)
     def unlink(self, path):
+        self._remove(path)
         # Note that despite the name this is called for removing both, files and links.
         os.unlink(self._realpath(path))
 
@@ -361,6 +510,23 @@ class FuseMount(fuse.Operations):
         fileInfo = self.mountSource.getFileInfo(path)
         if fileInfo is None:
             raise fuse.FuseOSError(fuse.errno.ENOENT)
+
+        if not self.writeOverlay:
+            return fileInfo
+
+        # Request exact metadata from write overlay, e.g., if the actual file in the folder
+        # does not support permission changes
+        result = self.mountSource.getMountSource(fileInfo)
+        subMountPoint = result[0]
+        subMountSource = result[1]
+        if (
+            fileInfo
+            and isinstance(subMountSource, FolderMountSource)
+            and subMountSource.root == self.writeOverlay.root
+            and path.startswith(subMountPoint)
+        ):
+            return self.writeOverlay.updateFileInfo(path[len(subMountPoint) :], fileInfo)
+
         return fileInfo
 
     @overrides(fuse.Operations)

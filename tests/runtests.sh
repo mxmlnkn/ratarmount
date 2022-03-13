@@ -1242,6 +1242,9 @@ checkWriteOverlayWithNewFiles()
 
     local overlayFolder;
     overlayFolder=$( mktemp -d )
+    # Create the overlay folder on some filesystem, e.g., NTFS FUSE, which does not support
+    # permission changes for testing the metadata database.
+    #overlayFolder=$( mktemp -d -p "$( pwd )" )
 
     local args=( -P "$parallelization" -c --write-overlay "$overlayFolder" "$archive" "$mountFolder" )
     {
