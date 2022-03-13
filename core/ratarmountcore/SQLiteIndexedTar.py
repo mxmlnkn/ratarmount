@@ -1022,7 +1022,7 @@ class SQLiteIndexedTar(MountSource):
         sqlConnection = sqlite3.connect(path, **kwargs)
         sqlConnection.row_factory = sqlite3.Row
         sqlConnection.executescript(
-            # Looking mode exclusive leads to a measurable speedup. E.g., find on 2k recursive files tar
+            # Locking mode exclusive leads to a measurable speedup. E.g., find on 2k recursive files tar
             # improves from ~1s to ~0.4s!
             # https://blog.devart.com/increasing-sqlite-performance.html
             """
