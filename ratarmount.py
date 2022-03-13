@@ -6,8 +6,8 @@ import importlib
 import json
 import os
 import re
-import stat
 import sqlite3
+import stat
 import subprocess
 import sys
 import tarfile
@@ -52,15 +52,148 @@ def hasNonEmptySupport() -> bool:
     return False  # On macOS, fusermount does not exist and macfuse also seems to complain with nonempty option.
 
 
+class WritableFolderMountSource(fuse.Operations):
+    """
+    This class manages one folder as mount source offering methods for reading and modification.
+    """
+
+    def __init__(self, path: str, mountSource: MountSource) -> None:
+        if os.path.exists(path):
+            if not os.path.isdir(path):
+                raise ValueError("Overlay path must be a folder!")
+        else:
+            os.makedirs(path, exist_ok=True)
+
+        self.root: str = path
+        self.mountSource = mountSource
+
+    def setFolderDescriptor(self, fd: int) -> None:
+        """
+        Make this mount source manage the special "." folder by changing to that directory.
+        Because we change to that directory, it may only be used for one mount source but it also works
+        when that mount source is mounted on!
+        """
+        os.fchdir(fd)
+        self.root = '.'
+
+    def _realpath(self, path: str) -> str:
+        """Path given relative to folder root. Leading '/' is acceptable"""
+        return os.path.join(self.root, path.lstrip(os.path.sep))
+
+    # Metadata modification
+
+    @overrides(fuse.Operations)
+    def chmod(self, path, mode):
+        os.chmod(self._realpath(path), mode)
+
+    @overrides(fuse.Operations)
+    def chown(self, path, uid, gid):
+        os.chown(self._realpath(path), uid, gid)
+
+    @overrides(fuse.Operations)
+    def utimens(self, path, times=None):
+        """Argument "times" is a (atime, mtime) tuple. If "times" is None, use the current time."""
+        os.utime(self._realpath(path), times)
+
+    @overrides(fuse.Operations)
+    def rename(self, old, new):
+        os.rename(self._realpath(old), self._realpath(new))
+
+    # Links
+
+    @overrides(fuse.Operations)
+    def symlink(self, target, source):
+        os.symlink(source, self._realpath(target))
+
+    @overrides(fuse.Operations)
+    def link(self, target, source):
+        # Can only hardlink to files which are also in the overlay folder.
+        overlaySource = self._realpath(source)
+        if not os.path.exists(overlaySource) and self.mountSource.getFileInfo(source):
+            raise fuse.FuseOSError(fuse.errno.EXDEV)
+
+        target = self._realpath(target)
+
+        os.link(overlaySource, target)
+
+    # Folders
+
+    @overrides(fuse.Operations)
+    def mkdir(self, path, mode):
+        os.mkdir(self._realpath(path), mode)
+
+    @overrides(fuse.Operations)
+    def rmdir(self, path):
+        os.rmdir(self._realpath(path))
+
+    # Files
+
+    @overrides(fuse.Operations)
+    def open(self, path, flags):
+        return os.open(self._realpath(path), flags)
+
+    @overrides(fuse.Operations)
+    def create(self, path, mode, fi=None):
+        return os.open(self._realpath(path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+
+    @overrides(fuse.Operations)
+    def unlink(self, path):
+        # Note that despite the name this is called for removing both, files and links.
+        os.unlink(self._realpath(path))
+
+    @overrides(fuse.Operations)
+    def mknod(self, path, mode, dev):
+        os.mknod(self._realpath(path), mode, dev)
+
+    @overrides(fuse.Operations)
+    def truncate(self, path, length, fh=None):
+        # TODO Should copy the file from the mount source if it exists
+        os.truncate(self._realpath(path), length)
+
+    # Actual writing
+
+    @overrides(fuse.Operations)
+    def write(self, path, data, offset, fh):
+        os.lseek(fh, offset, 0)
+        return os.write(fh, data)
+
+    # Flushing
+
+    @overrides(fuse.Operations)
+    def flush(self, path, fh):
+        return os.fsync(fh)
+
+    @overrides(fuse.Operations)
+    def fsync(self, path, datasync, fh):
+        return os.fsync(fh) if datasync == 0 else os.fdatasync(fh)
+
+    @overrides(fuse.Operations)
+    def statfs(self, path):
+        stv = os.statvfs(self._realpath(path))
+        return dict(
+            (key, getattr(stv, key))
+            for key in (
+                'f_bavail',
+                'f_bfree',
+                'f_blocks',
+                'f_bsize',
+                'f_favail',
+                'f_ffree',
+                'f_files',
+                'f_flag',
+                'f_frsize',
+                'f_namemax',
+            )
+        )
+
+
 class FuseMount(fuse.Operations):
     """
     This class implements the fusepy interface in order to create a mounted file system view to a MountSource.
-    Tasks of this class itself:
-       - Changes all file permissions to read-only
-       - Get actual file contents either by directly reading from the TAR or by using StenciledFile and tarfile
-       - Enabling FolderMountSource to bind to the nonempty folder under the mountpoint itself.
-    Other functionalities like file versioning, hard link resolving, and union mounting are implemented by using
-    the respective MountSource derived classes.
+    This class itself is a relatively thin wrapper around the ratarmountcore mount sources.
+    It also handles the write overlay because it does not fit into the MountSource interface and because it
+    must be part of the UnionMountSource for correct file versioning but at the same time it must know of the
+    union mount source.
 
     Documentation for FUSE methods can be found in the fusepy or libfuse headers. There seems to be no complete
     rendered documentation aside from the header comments.
@@ -81,9 +214,20 @@ class FuseMount(fuse.Operations):
             except Exception:
                 pass
 
+        assert isinstance(pathToMount, list)
+
         options['writeIndex'] = True
 
         self.printDebug = options.get('printDebug', 0)
+        self.writeOverlay: Optional[WritableFolderMountSource] = None
+        self.overlayPath: Optional[str] = None
+
+        # Add write overlay as folder mount source to read from with highest priority.
+        if 'writeOverlay' in options and isinstance(options['writeOverlay'], str) and options['writeOverlay']:
+            self.overlayPath = options['writeOverlay']
+            if not os.path.exists(self.overlayPath):
+                os.makedirs(self.overlayPath, exist_ok=True)
+            pathToMount.append(self.overlayPath)
 
         # This also will create or load the block offsets for compressed formats
         mountSources = [openMountSource(path, **options) for path in pathToMount]
@@ -108,8 +252,29 @@ class FuseMount(fuse.Operations):
 
         self.rootFileInfo = FuseMount._makeMountPointFileInfoFromStats(os.stat(pathToMount[0]))
 
-        self.openedFiles: Dict[int, IO[bytes]] = {}
+        # Maps handles to either opened I/O objects or os module file handles for the writeOverlay.
+        self.openedFiles: Dict[int, Union[IO[bytes], int]] = {}
         self.lastFileHandle: int = 0  # It will be incremented before being returned. It can't hurt to never return 0.
+
+        if self.overlayPath:
+            self.writeOverlay = WritableFolderMountSource(os.path.realpath(self.overlayPath), self.mountSource)
+
+            self.chmod = self.writeOverlay.chmod
+            self.chown = self.writeOverlay.chown
+            self.utimens = self.writeOverlay.utimens
+            self.rename = self.writeOverlay.rename
+
+            self.symlink = self.writeOverlay.symlink
+            self.link = self.writeOverlay.link
+            self.unlink = self.writeOverlay.unlink
+
+            self.mkdir = self.writeOverlay.mkdir
+            self.rmdir = self.writeOverlay.rmdir
+
+            self.mknod = self.writeOverlay.mknod
+            self.truncate = self.writeOverlay.truncate
+
+            self.statfs = self.writeOverlay.statfs
 
         # Create mount point if it does not exist
         self.mountPointWasCreated = False
@@ -122,7 +287,7 @@ class FuseMount(fuse.Operations):
         self.mountPointInfo = {key: getattr(statResults, key) for key in dir(statResults) if key.startswith('st_')}
 
         # Take care that bind-mounting folders to itself works
-        self.mountPointFd = None
+        self.mountPointFd: Optional[int] = None
         self.selfBindMount: Optional[FolderMountSource] = None
         for mountSource in mountSources:
             if isinstance(mountSource, FolderMountSource) and mountSource.root == self.mountPoint:
@@ -141,6 +306,13 @@ class FuseMount(fuse.Operations):
                 os.close(self.mountPointFd)
         except Exception:
             pass
+
+    def _addNewHandle(self, handle):
+        # Note that fh in fuse_common.h is 64-bit and Python also supports 64-bit (long integers) out of the box.
+        # So, there should practically be no overflow and file handle reuse possible.
+        self.lastFileHandle += 1
+        self.openedFiles[self.lastFileHandle] = handle
+        return self.lastFileHandle
 
     @staticmethod
     def _makeMountPointFileInfoFromStats(stats: os.stat_result) -> FileInfo:
@@ -178,6 +350,8 @@ class FuseMount(fuse.Operations):
     def init(self, path) -> None:
         if self.selfBindMount is not None and self.mountPointFd is not None:
             self.selfBindMount.setFolderDescriptor(self.mountPointFd)
+            if self.writeOverlay and self.writeOverlay.root == self.mountPoint:
+                self.writeOverlay.setFolderDescriptor(self.mountPointFd)
 
     @staticmethod
     def _fileInfoToDict(fileInfo: FileInfo):
@@ -238,9 +412,15 @@ class FuseMount(fuse.Operations):
         fileInfo = self._getFileInfo(path)
 
         try:
-            self.lastFileHandle += 1
-            self.openedFiles[self.lastFileHandle] = self.mountSource.open(fileInfo)
-            return self.lastFileHandle
+            # If the flags indicate "open for modification", then only look for the file in the overlay or fail.
+            # @see https://man7.org/linux/man-pages/man2/open.2.html
+            # > The argument flags must include one of the following access modes: O_RDONLY, O_WRONLY, or O_RDWR.
+            if flags & (os.O_WRONLY | os.O_RDWR):
+                if not self.writeOverlay:
+                    return super().open(path, flags)
+                return self._addNewHandle(self.writeOverlay.open(path, flags))
+
+            return self._addNewHandle(self.mountSource.open(fileInfo))
         except Exception as exception:
             traceback.print_exc()
             print("Caught exception when trying to open file.", fileInfo)
@@ -251,15 +431,25 @@ class FuseMount(fuse.Operations):
         if fh not in self.openedFiles:
             raise fuse.FuseOSError(fuse.errno.ESTALE)
 
-        self.openedFiles[fh].close()
-        del self.openedFiles[fh]
+        openedFile = self.openedFiles[fh]
+        if isinstance(openedFile, int):
+            os.close(openedFile)
+        else:
+            openedFile.close()
+            del openedFile
+
         return fh
 
     @overrides(fuse.Operations)
     def read(self, path: str, size: int, offset: int, fh: int) -> bytes:
         if fh in self.openedFiles:
-            self.openedFiles[fh].seek(offset, os.SEEK_SET)
-            return self.openedFiles[fh].read(size)
+            openedFile = self.openedFiles[fh]
+            if isinstance(openedFile, int):
+                os.lseek(openedFile, offset, os.SEEK_SET)
+                return os.read(openedFile, size)
+
+            openedFile.seek(offset, os.SEEK_SET)
+            return openedFile.read(size)
 
         # As far as I understand FUSE and my own file handle cache, this should never happen. But you never know.
         if self.printDebug >= 1:
@@ -273,6 +463,35 @@ class FuseMount(fuse.Operations):
             traceback.print_exc()
             print("Caught exception when trying to read data from underlying TAR file! Returning errno.EIO.")
             raise fuse.FuseOSError(fuse.errno.EIO) from exception
+
+    # Methods for the write overlay which require file handle translations
+
+    def _isWriteOverlayHandle(self, fh):
+        return self.writeOverlay and fh in self.openedFiles and isinstance(self.openedFiles[fh], int)
+
+    @overrides(fuse.Operations)
+    def create(self, path, mode, fi=None):
+        if self.writeOverlay:
+            return self._addNewHandle(self.writeOverlay.create(path, mode, fi))
+        return super().create(path, mode, fi)
+
+    @overrides(fuse.Operations)
+    def write(self, path, data, offset, fh):
+        if self._isWriteOverlayHandle(fh):
+            return self.writeOverlay.write(path, data, offset, self.openedFiles[fh])
+        return super().write(path, data, offset, fh)
+
+    @overrides(fuse.Operations)
+    def flush(self, path, fh):
+        if self._isWriteOverlayHandle(fh):
+            self.writeOverlay.flush(path, self.openedFiles[fh])
+        return super().flush(path, fh)
+
+    @overrides(fuse.Operations)
+    def fsync(self, path, datasync, fh):
+        if self._isWriteOverlayHandle(fh):
+            self.writeOverlay.fsync(path, datasync, self.openedFiles[fh])
+        return super().fsync(path, datasync, fh)
 
 
 class TarFileType:
@@ -584,6 +803,12 @@ seeking capabilities when opening that file.
                'Instead, it will first try ~/.ratarmount and the folder "foo,9000". ' )
 
     parser.add_argument(
+        '-w', '--write-overlay',
+        help = 'Specify an existing folder to be used as a write overlay. The folder itself will be union-mounted '
+               'on top such that files in this folder take precedence over all other existing ones. Furthermore, '
+               'all file creations and modifications will be forwarded to files in this folder. ' )
+
+    parser.add_argument(
         '-o', '--fuse', type = str, default = '',
         help = 'Comma separated FUSE options. See "man mount.fuse" for help. '
                'Example: --fuse "allow_other,entry_timeout=2.8,gid=0". ' )
@@ -775,6 +1000,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         passwords                  = args.passwords,
         parallelization            = args.parallelization,
         isGnuIncremental           = args.gnu_incremental,
+        writeOverlay               = args.write_overlay,
         printDebug                 = args.debug,
         # fmt: on
     )

@@ -24,11 +24,13 @@ fi
 
 if uname | 'grep' -q -i darwin; then
     getFileSize() { stat -f %z -- "$1"; }
+    getFileMode() { stat -f %OLp -- "$1"; }
     getFileMtime() { stat -f %m -- "$1"; }
     setFileMTime() { touch -m -t "$( date -r "$1" +%Y%m%d%H%M.%S )" "$2"; }
     safeRmdir() { if [[ -z "$( find "$1" -maxdepth 1 )" ]]; then rmdir "$1"; fi; }
 else
     getFileSize() { stat -c %s -- "$1"; }
+    getFileMode() { stat -c %a -- "$1"; }
     getFileMtime() { stat -c %Y -- "$1"; }
     setFileMTime() { touch -d "@$1" "$2"; }
     safeRmdir() { rmdir --ignore-fail-on-non-empty -- "$1"; }
@@ -1141,6 +1143,167 @@ checkSelfReferencingHardLinks()
     return 0
 }
 
+checkWriteOverlayFileMetadataModifications()
+{
+    local fileSubPath="$1"
+    local filePath="$mountFolder/$1"
+
+    ## Change modification time
+
+    setFileMTime 1234567890 "$filePath"
+    if [[ "$( getFileMtime "$filePath" )" != 1234567890 ]]; then
+        returnError "$LINENO" 'Modification time did not change'
+    fi
+
+    ## Change permissions
+
+    chmod 777 "$filePath"
+    local mode
+    mode=$( getFileMode "$filePath" )
+    if [[ "$mode" != 777 ]]; then
+        returnError "$LINENO" "Permissions could not be changed ($mode != 777)"
+    fi
+
+    ## Change permissions again (in case they already were 777 for the first test)
+
+    chmod 700 "$filePath"
+    mode=$( getFileMode "$filePath" )
+    if [[ "$mode" != 700 ]]; then
+        returnError "$LINENO" "Permissions could not be changed ($mode != 700)"
+    fi
+
+    ## Rename file
+
+    'mv' "$filePath" "${filePath}.new"
+    if [[ -e "$filePath" ]]; then returnError "$LINENO" 'File should have been renamed'; fi
+    if [[ ! -e "${filePath}.new" ]]; then returnError "$LINENO" 'Renamed file should exist'; fi
+    if [[ -f "${filePath}.new" ]]; then
+        verifyCheckSum "$mountFolder" "${fileSubPath}.new" '[write overlay]' d95778027cdefb2416a93446c9892992 ||
+            returnError "$LINENO" 'Mismatching checksum'
+    fi
+
+    ## Rename file back
+
+    'mv' "${filePath}.new" "$filePath"
+    if [[ -e "${filePath}.new" ]]; then returnError "$LINENO" 'File should have been renamed'; fi
+    if [[ ! -e "$filePath" ]]; then returnError "$LINENO" 'Renamed file should exist'; fi
+    if [[ -f "${filePath}.new" ]]; then
+        verifyCheckSum "$mountFolder" "$fileSubPath" '[write overlay]' d95778027cdefb2416a93446c9892992 ||
+            returnError "$LINENO" 'Mismatching checksum'
+    fi
+}
+
+checkWriteOverlayFile()
+{
+    local fileSubPath="$1"
+    local filePath="$mountFolder/$1"
+
+    ## Create file
+
+    touch "$filePath"
+    verifyCheckSum "$mountFolder" "$fileSubPath" '[write overlay]' d41d8cd98f00b204e9800998ecf8427e ||
+        returnError "$LINENO" 'Mismatching checksum'
+
+    ## Write into file
+
+    echo "summer" > "$filePath"
+    verifyCheckSum "$mountFolder" "$fileSubPath" '[write overlay]' e75e33e14332df297c9ef5ea0cdcd006 ||
+        returnError "$LINENO" 'Mismatching checksum'
+
+    ## Append to file
+
+    echo "sky" >> "$filePath"
+    verifyCheckSum "$mountFolder" "$fileSubPath" '[write overlay]' d95778027cdefb2416a93446c9892992 ||
+        returnError "$LINENO" 'Mismatching checksum'
+
+    checkWriteOverlayFileMetadataModifications "$fileSubPath"
+
+    ## Delete file
+
+    'rm' "$filePath"
+    if [[ -f "$filePath" ]]; then returnError "$LINENO" 'File should have been deleted'; fi
+}
+
+
+checkWriteOverlayWithNewFiles()
+{
+    local archive='tests/single-nested-folder.tar'
+
+    rm -f ratarmount.{stdout,stderr}.log
+
+    local mountFolder
+    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+
+    local overlayFolder;
+    overlayFolder=$( mktemp -d )
+
+    local args=( -P "$parallelization" -c --write-overlay "$overlayFolder" "$archive" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}"
+        if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then returnError "$LINENO" 'Expected files in mount point'; fi
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+
+    verifyCheckSum "$mountFolder" 'foo/fighter/ufo' 'tests/single-nested-folder.tar' 2709a3348eb2c52302a7606ecf5860bc ||
+        returnError "$LINENO" 'Mismatching checksum'
+
+    # Check for file directly in the write overlay root
+    checkWriteOverlayFile 'iriya'
+
+    ## Test folder creation, modification, and deletion
+
+    mkdir "$mountFolder/base"
+    if [[ ! -d "$mountFolder/base" ]]; then returnError "$LINENO" 'Folder could not be created'; fi
+    checkWriteOverlayFileMetadataModifications 'base'
+    rmdir "$mountFolder/base"
+    if [[ -d "$mountFolder/base" ]]; then returnError "$LINENO" 'Folder could not be removed'; fi
+
+    ## Create symbolic link between overlay files
+
+    echo 'summer' > "$mountFolder/iriya"
+    ( cd "$mountFolder" && ln -s "iriya" "twin-iriya"; )
+    verifyCheckSum "$mountFolder" 'iriya' '[write overlay]' e75e33e14332df297c9ef5ea0cdcd006 ||
+        returnError "$LINENO" 'Mismatching checksum'
+    verifyCheckSum "$mountFolder" 'twin-iriya' '[write overlay]' e75e33e14332df297c9ef5ea0cdcd006 ||
+        returnError "$LINENO" 'Mismatching checksum'
+    if [[ "$( readlink -- "$mountFolder/twin-iriya" )" != "iriya" ]]; then
+        returnError "$LINENO" 'Expected different link target for created symbolic link'
+    fi
+
+    ## Delete symbolic link
+
+    unlink "$mountFolder/twin-iriya"
+    if [[ -f "$mountFolder/twin-iriya" ]]; then returnError "$LINENO" 'Symbolic link should have been deleted'; fi
+
+    ## Create hard link between overlay files
+
+    ( cd "$mountFolder" && ln "iriya" "twin-iriya"; ) || returnError "$LINENO" 'Could not create hardlink'
+    verifyCheckSum "$mountFolder" 'iriya' '[write overlay]' e75e33e14332df297c9ef5ea0cdcd006 ||
+        returnError "$LINENO" 'Mismatching checksum'
+    verifyCheckSum "$mountFolder" 'twin-iriya' '[write overlay]' e75e33e14332df297c9ef5ea0cdcd006 ||
+        returnError "$LINENO" 'Mismatching checksum'
+
+    ## Delete hard link
+
+    unlink "$mountFolder/twin-iriya"
+    if [[ -f "$mountFolder/twin-iriya" ]]; then returnError "$LINENO" 'Symbolic link should have been deleted'; fi
+
+    ## Create symbolic link to file in archive
+
+    ( cd "$mountFolder" && ln -s "foo/fighter/ufo" "sighting"; )
+    verifyCheckSum "$mountFolder" 'foo/fighter/ufo' 'tests/single-nested-folder.tar' 2709a3348eb2c52302a7606ecf5860bc ||
+        returnError "$LINENO" 'Mismatching checksum'
+    verifyCheckSum "$mountFolder" 'sighting' 'tests/single-nested-folder.tar' 2709a3348eb2c52302a7606ecf5860bc ||
+        returnError "$LINENO" 'Mismatching checksum'
+    if [[ "$( readlink -- "$mountFolder/sighting" )" != "foo/fighter/ufo" ]]; then
+        returnError "$LINENO" 'Expected different link target for created symbolic link'
+    fi
+
+    rm "$mountFolder/iriya"
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully file modifications for overlay files."
+}
+
 
 checkGnuIncremental()
 {
@@ -1386,6 +1549,8 @@ export parallelization
 if [[ ! -f tests/2k-recursive-tars.tar ]]; then
     bzip2 -q -d -k tests/2k-recursive-tars.tar.bz2
 fi
+
+checkWriteOverlayWithNewFiles || returnError "$LINENO" 'Write overlay tests failed!'
 
 checkTruncated tests/truncated.tar foo/foo 5753d2a2da40d04ad7f3cc7a024b6e90
 
