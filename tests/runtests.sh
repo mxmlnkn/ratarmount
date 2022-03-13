@@ -1172,14 +1172,20 @@ checkWriteOverlayFileMetadataModifications()
         returnError "$LINENO" "Permissions could not be changed ($mode != 700)"
     fi
 
+    # Make copy to compare moved file
+    local tmpCopy
+    if [[ -f "$filePath" ]]; then
+        tmpCopy=$( mktemp )
+        'cp' "$filePath" "$tmpCopy"
+    fi
+
     ## Rename file
 
     'mv' "$filePath" "${filePath}.new"
     if [[ -e "$filePath" ]]; then returnError "$LINENO" 'File should have been renamed'; fi
     if [[ ! -e "${filePath}.new" ]]; then returnError "$LINENO" 'Renamed file should exist'; fi
-    if [[ -f "${filePath}.new" ]]; then
-        verifyCheckSum "$mountFolder" "${fileSubPath}.new" '[write overlay]' d95778027cdefb2416a93446c9892992 ||
-            returnError "$LINENO" 'Mismatching checksum'
+    if [[ -n "$tmpCopy" ]]; then
+        diff -q "$tmpCopy" "${filePath}.new" || returnError "$LINENO" 'Mismatching contents'
     fi
 
     ## Rename file back
@@ -1187,9 +1193,8 @@ checkWriteOverlayFileMetadataModifications()
     'mv' "${filePath}.new" "$filePath"
     if [[ -e "${filePath}.new" ]]; then returnError "$LINENO" 'File should have been renamed'; fi
     if [[ ! -e "$filePath" ]]; then returnError "$LINENO" 'Renamed file should exist'; fi
-    if [[ -f "${filePath}.new" ]]; then
-        verifyCheckSum "$mountFolder" "$fileSubPath" '[write overlay]' d95778027cdefb2416a93446c9892992 ||
-            returnError "$LINENO" 'Mismatching checksum'
+    if [[ -n "$tmpCopy" ]]; then
+        diff -q "$tmpCopy" "$filePath" || returnError "$LINENO" 'Mismatching contents'
     fi
 }
 
@@ -1250,13 +1255,22 @@ checkWriteOverlayWithNewFiles()
     # Check for file directly in the write overlay root
     checkWriteOverlayFile 'iriya'
 
-    ## Test folder creation, modification, and deletion
+    # Check file inside an archive folder which does not exist in the overlay (yet)
+    checkWriteOverlayFile 'foo/iriya'
 
+    ## Test folder creation, modification, and deletion
     mkdir "$mountFolder/base"
     if [[ ! -d "$mountFolder/base" ]]; then returnError "$LINENO" 'Folder could not be created'; fi
     checkWriteOverlayFileMetadataModifications 'base'
     rmdir "$mountFolder/base"
     if [[ -d "$mountFolder/base" ]]; then returnError "$LINENO" 'Folder could not be removed'; fi
+
+    ## Test folder creation inside nested path not existing in overlay (yet)
+    mkdir "$mountFolder/foo/base"
+    if [[ ! -d "$mountFolder/foo/base" ]]; then returnError "$LINENO" 'Folder could not be created'; fi
+    checkWriteOverlayFileMetadataModifications 'base'
+    rmdir "$mountFolder/foo/base"
+    if [[ -d "$mountFolder/foo/base" ]]; then returnError "$LINENO" 'Folder could not be removed'; fi
 
     ## Create symbolic link between overlay files
 
@@ -1299,7 +1313,7 @@ checkWriteOverlayWithNewFiles()
         returnError "$LINENO" 'Expected different link target for created symbolic link'
     fi
 
-    rm "$mountFolder/iriya"
+    'rm' "$mountFolder/iriya"
 
     echoerr "[${FUNCNAME[0]}] Tested successfully file modifications for overlay files."
 }

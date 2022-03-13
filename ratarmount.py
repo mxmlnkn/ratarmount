@@ -76,9 +76,23 @@ class WritableFolderMountSource(fuse.Operations):
         os.fchdir(fd)
         self.root = '.'
 
+    @staticmethod
+    def _splitPath(path: str) -> Tuple[str, str]:
+        result = ('/' + os.path.normpath(path).lstrip('/')).rsplit('/', 1)
+        assert len(result) == 2
+        return result[0], result[1]
+
     def _realpath(self, path: str) -> str:
         """Path given relative to folder root. Leading '/' is acceptable"""
         return os.path.join(self.root, path.lstrip(os.path.sep))
+
+    def _ensureParentExists(self, path):
+        """
+        Creates parent folders for given path inside overlay folder if and only if they exist in the mount source.
+        """
+        parentPath = self._splitPath(path)[0]
+        if not os.path.exists(self._realpath(parentPath)) and self.mountSource.isdir(parentPath):
+            os.makedirs(self._realpath(parentPath), exist_ok=True)
 
     # Metadata modification
 
@@ -120,6 +134,7 @@ class WritableFolderMountSource(fuse.Operations):
 
     @overrides(fuse.Operations)
     def mkdir(self, path, mode):
+        self._ensureParentExists(path)
         os.mkdir(self._realpath(path), mode)
 
     @overrides(fuse.Operations)
@@ -134,6 +149,7 @@ class WritableFolderMountSource(fuse.Operations):
 
     @overrides(fuse.Operations)
     def create(self, path, mode, fi=None):
+        self._ensureParentExists(path)
         return os.open(self._realpath(path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
 
     @overrides(fuse.Operations)
@@ -143,6 +159,7 @@ class WritableFolderMountSource(fuse.Operations):
 
     @overrides(fuse.Operations)
     def mknod(self, path, mode, dev):
+        self._ensureParentExists(path)
         os.mknod(self._realpath(path), mode, dev)
 
     @overrides(fuse.Operations)
