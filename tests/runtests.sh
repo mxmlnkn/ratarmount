@@ -1321,6 +1321,63 @@ checkWriteOverlayWithNewFiles()
     echoerr "[${FUNCNAME[0]}] Tested successfully file modifications for overlay files."
 }
 
+checkWriteOverlayWithArchivedFiles()
+{
+    local archive='tests/single-nested-folder.tar'
+
+    rm -f ratarmount.{stdout,stderr}.log
+
+    local mountFolder
+    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+
+    local overlayFolder;
+    overlayFolder=$( mktemp -d )
+
+    local args=( -P "$parallelization" -c --write-overlay "$overlayFolder" "$archive" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}"
+        if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then returnError "$LINENO" 'Expected files in mount point'; fi
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+
+    verifyCheckSum "$mountFolder" 'foo/fighter/ufo' 'tests/single-nested-folder.tar' 2709a3348eb2c52302a7606ecf5860bc ||
+        returnError "$LINENO" 'Mismatching checksum'
+
+    # Checks for modifying files "in the" archive (this requires special handling to simulate modifications!)
+
+    local file
+    file="$mountFolder/foo/fighter/ufo"
+
+    ## Delete archive file
+
+    if [[ ! -f "$file" ]]; then returnError "$LINENO" 'File should exist'; fi
+    'rm' "$file"
+    if [[ -e "$file" ]]; then returnError "$LINENO" 'File should have been deleted'; fi
+
+    ## Overwrite deleted file with new one
+
+    echo 'summer' > "$file"
+    verifyCheckSum "$mountFolder" 'foo/fighter/ufo' '[write overlay]' e75e33e14332df297c9ef5ea0cdcd006 ||
+        returnError "$LINENO" 'Mismatching checksum'
+
+    ## Delete new file again
+
+    'rm' "$file"
+    if [[ -e "$file" ]]; then returnError "$LINENO" 'File should have been deleted'; fi
+
+    ## Remove folder
+
+    if [[ ! -d "$mountFolder/foo/fighter" ]]; then returnError "$LINENO" 'Folder should exist'; fi
+    rmdir "$mountFolder/foo/fighter"
+    if [[ -e "$mountFolder/foo/fighter" ]]; then returnError "$LINENO" 'Folder could not be removed'; fi
+    if [[ -e "$mountFolder/foo/fighter/ufo" ]]; then returnError "$LINENO" 'Folder could not be removed'; fi
+
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully file modifications for archive files using the overlay."
+
+
+    'rm' -r -- "$overlayFolder"
+}
 
 checkGnuIncremental()
 {
@@ -1568,6 +1625,7 @@ if [[ ! -f tests/2k-recursive-tars.tar ]]; then
 fi
 
 checkWriteOverlayWithNewFiles || returnError "$LINENO" 'Write overlay tests failed!'
+checkWriteOverlayWithArchivedFiles || returnError "$LINENO" 'Write overlay tests for archive files failed!'
 
 checkTruncated tests/truncated.tar foo/foo 5753d2a2da40d04ad7f3cc7a024b6e90
 

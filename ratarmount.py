@@ -67,6 +67,7 @@ class WritableFolderMountSource(fuse.Operations):
             "mode"          INTEGER,
             "uid"           INTEGER,
             "gid"           INTEGER,
+            "deleted"       BOOL,
             PRIMARY KEY (path,name)
         );
     """
@@ -142,14 +143,40 @@ class WritableFolderMountSource(fuse.Operations):
     def _open(self, path: str, mode):
         self._ensureParentExists(path)
         folder, name = self._splitPath(path)
+
         self.sqlConnection.execute(
-            'INSERT OR IGNORE INTO "files" (path,name,mode) VALUES (?,?,?)', (folder, name, mode)
+            'INSERT OR IGNORE INTO "files" (path,name,mode,deleted) VALUES (?,?,?,?)', (folder, name, mode, False)
+        )
+        self.sqlConnection.execute(
+            'UPDATE "files" SET deleted=0 WHERE path == (?) AND name == (?)',
+            (folder, name),
         )
 
-    def _remove(self, path: str) -> bool:
+    def _markAsDeleted(self, path: str):
+        """Hides the given path if it exists in the underlying mount source."""
         folder, name = self._splitPath(path)
-        self.sqlConnection.execute('DELETE FROM "files" WHERE (path,name) == (?,?)', (folder, name))
-        return True
+
+        if self.mountSource.exists(path):
+            self.sqlConnection.execute(
+                'INSERT OR REPLACE INTO "files" (path,name,deleted) VALUES (?,?,?)', (folder, name, True)
+            )
+        else:
+            self.sqlConnection.execute('DELETE FROM "files" WHERE (path,name) == (?,?)', (folder, name))
+
+    def listDeleted(self, path: str) -> List[str]:
+        """Return list of files markes as deleted in the given path."""
+        result = self.sqlConnection.execute('SELECT name FROM "files" WHERE path == (?) AND deleted == 1', (path,))
+
+        # For temporary SQLite file suffixes, see https://www.sqlite.org/tempfiles.html
+        suffixes = ['', '-journal', '-shm', '-wal']
+        return [x[0] for x in result] + [self._hiddenDatabaseName + suffix for suffix in suffixes]
+
+    def isDeleted(self, path: str) -> bool:
+        folder, name = self._splitPath(path)
+        result = self.sqlConnection.execute(
+            'SELECT name FROM "files" WHERE path == (?) AND name == (?) AND deleted == 1', (folder, name)
+        )
+        return bool(result.fetchall())
 
     def _setMetadata(self, path: str, metadata: Dict[str, Any]):
         if not metadata:
@@ -187,8 +214,8 @@ class WritableFolderMountSource(fuse.Operations):
         folder, name = self._splitPath(path)
 
         self.sqlConnection.execute(
-            f'INSERT OR REPLACE INTO "files" VALUES ({",".join(["?"]*6)})',
-            (folder, name, sfi.mtime, sfi.mode, sfi.uid, sfi.gid),
+            f'INSERT OR REPLACE INTO "files" VALUES ({",".join(["?"]*7)})',
+            (folder, name, sfi.mtime, sfi.mode, sfi.uid, sfi.gid, False),
         )
 
     def _setFileMetadata(self, path: str, applyMetadataToFile: Callable[[str], None], metadata: Dict[str, Any]):
@@ -286,8 +313,20 @@ class WritableFolderMountSource(fuse.Operations):
 
     @overrides(fuse.Operations)
     def rmdir(self, path):
-        os.rmdir(self._realpath(path))  # Raises OSError if folder is not empty
-        self._remove(path)  # Only set folder metadata to "deleted" if folder is actually empty
+        if not self.mountSource.exists(path) or self.isDeleted(path):
+            raise fuse.FuseOSError(fuse.errno.ENOENT)
+
+        if set(self.mountSource.listDir(path).keys()) - set(self.listDeleted(path)):
+            raise fuse.FuseOSError(fuse.errno.ENOTEMPTY)
+
+        try:
+            if os.path.exists(self._realpath(path)):
+                os.rmdir(self._realpath(path))
+        except Exception as exception:
+            traceback.print_exc()
+            raise fuse.FuseOSError(fuse.errno.EIO) from exception
+        finally:
+            self._markAsDeleted(path)
 
     # Files
 
@@ -302,9 +341,21 @@ class WritableFolderMountSource(fuse.Operations):
 
     @overrides(fuse.Operations)
     def unlink(self, path):
-        self._remove(path)
         # Note that despite the name this is called for removing both, files and links.
-        os.unlink(self._realpath(path))
+
+        if not self.mountSource.exists(path) or self.isDeleted(path):
+            # This is for the rare case that the file only exists in the overlay metadata database.
+            self._markAsDeleted(path)
+            raise fuse.FuseOSError(fuse.errno.ENOENT)
+
+        try:
+            if os.path.exists(self._realpath(path)):
+                os.unlink(self._realpath(path))
+        except Exception as exception:
+            traceback.print_exc()
+            raise fuse.FuseOSError(fuse.errno.EIO) from exception
+        finally:
+            self._markAsDeleted(path)
 
     @overrides(fuse.Operations)
     def mknod(self, path, mode, dev):
@@ -507,6 +558,9 @@ class FuseMount(fuse.Operations):
         return fileInfo
 
     def _getFileInfo(self, path: str) -> FileInfo:
+        if self.writeOverlay and self.writeOverlay.isDeleted(path):
+            raise fuse.FuseOSError(fuse.errno.ENOENT)
+
         fileInfo = self.mountSource.getFileInfo(path)
         if fileInfo is None:
             raise fuse.FuseOSError(fuse.errno.ENOENT)
@@ -577,12 +631,16 @@ class FuseMount(fuse.Operations):
             yield '.'
             yield '..'
 
+        deletedFiles = self.writeOverlay.listDeleted(path) if self.writeOverlay else []
+
         if isinstance(files, dict):
             for key, fileInfo in files.items():
-                yield key, self._fileInfoToDict(fileInfo), 0
+                if key not in deletedFiles:
+                    yield key, self._fileInfoToDict(fileInfo), 0
         elif files is not None:
             for key in files:
-                yield key
+                if key not in deletedFiles:
+                    yield key
 
     @overrides(fuse.Operations)
     def readlink(self, path: str) -> str:
