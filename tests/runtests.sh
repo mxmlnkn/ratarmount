@@ -1390,6 +1390,38 @@ checkWriteOverlayWithArchivedFiles()
     verifyCheckSum "$mountFolder" 'foo/lighter.tar' '[write overlay]' e75e33e14332df297c9ef5ea0cdcd006 ||
         returnError "$LINENO" 'Mismatching checksum'
 
+    # Remount to reset state
+    funmount "$mountFolder"
+    'rm' -rf "$overlayFolder"
+    {
+        runAndCheckRatarmount "${args[@]}"
+        if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then returnError "$LINENO" 'Expected files in mount point'; fi
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+
+
+    ## Change modification time
+
+    file="$mountFolder/foo/fighter/ufo"
+    verifyCheckSum "$mountFolder" 'foo/fighter/ufo' '[write overlay]' 2709a3348eb2c52302a7606ecf5860bc ||
+        returnError "$LINENO" 'Mismatching checksum'
+    setFileMTime 1234567890 "$file"
+    if [[ "$( getFileMtime "$file" )" != 1234567890 ]]; then
+        returnError "$LINENO" 'Modification time did not change'
+    fi
+
+    ## Change permissions
+
+    chmod 777 "$file"
+    local mode
+    mode=$( getFileMode "$file" )
+    if [[ "$mode" != 777 ]]; then
+        returnError "$LINENO" "Permissions could not be changed ($mode != 777)"
+    fi
+    chmod 700 "$file"
+    mode=$( getFileMode "$file" )
+    if [[ "$mode" != 700 ]]; then
+        returnError "$LINENO" "Permissions could not be changed ($mode != 700)"
+    fi
 
     echoerr "[${FUNCNAME[0]}] Tested successfully file modifications for archive files using the overlay."
 

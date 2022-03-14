@@ -217,8 +217,6 @@ class WritableFolderMountSource(fuse.Operations):
 
         # Initialize new metadata entry from existing file
         _, mountSource, sfi = self.mountSource.getMountSource(sourceFileInfo)
-        if not isinstance(mountSource, FolderMountSource) or mountSource.root != self.root:
-            raise fuse.FuseOSError(fuse.errno.ENOENT)
         folder, name = self._splitPath(path)
 
         self.sqlConnection.execute(
