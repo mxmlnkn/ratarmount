@@ -6,6 +6,7 @@ import importlib
 import json
 import os
 import re
+import shutil
 import sqlite3
 import stat
 import subprocess
@@ -139,6 +140,13 @@ class WritableFolderMountSource(fuse.Operations):
         parentPath = self._splitPath(path)[0]
         if not os.path.exists(self._realpath(parentPath)) and self.mountSource.isdir(parentPath):
             os.makedirs(self._realpath(parentPath), exist_ok=True)
+
+    def _ensureFileIsModifiable(self, path):
+        self._ensureParentExists(path)
+        with self.mountSource.open(self.mountSource.getFileInfo(path)) as sourceObject, open(
+            self._realpath(path), 'wb'
+        ) as targetObject:
+            shutil.copyfileobj(sourceObject, targetObject)
 
     def _open(self, path: str, mode):
         self._ensureParentExists(path)
@@ -332,6 +340,15 @@ class WritableFolderMountSource(fuse.Operations):
 
     @overrides(fuse.Operations)
     def open(self, path, flags):
+        # if flags & os.O_CREAT != 0:  # I hope that FUSE simple calls create in this case.
+        #    self._open(path)   # what would the default mode even be?
+        if not os.path.exists(self._realpath(path)):
+            if not self.mountSource.exists(path):
+                raise fuse.FuseOSError(fuse.errno.ENOENT)
+
+            if flags & (os.O_WRONLY | os.O_RDWR):
+                self._ensureFileIsModifiable(path)
+
         return os.open(self._realpath(path), flags)
 
     @overrides(fuse.Operations)
@@ -364,7 +381,7 @@ class WritableFolderMountSource(fuse.Operations):
 
     @overrides(fuse.Operations)
     def truncate(self, path, length, fh=None):
-        # TODO Should copy the file from the mount source if it exists
+        self._ensureFileIsModifiable(path)
         os.truncate(self._realpath(path), length)
 
     # Actual writing
@@ -1047,7 +1064,10 @@ seeking capabilities when opening that file.
         '-w', '--write-overlay',
         help = 'Specify an existing folder to be used as a write overlay. The folder itself will be union-mounted '
                'on top such that files in this folder take precedence over all other existing ones. Furthermore, '
-               'all file creations and modifications will be forwarded to files in this folder. ' )
+               'all file creations and modifications will be forwarded to files in this folder. '
+               'Modifying a file inside a TAR will copy that file to the overlay folder and apply the modification '
+               'to that writable copy. Deleting files or folders will update the hidden metadata database inside '
+               'the overlay folder.')
 
     parser.add_argument(
         '-o', '--fuse', type = str, default = '',

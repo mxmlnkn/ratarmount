@@ -1323,7 +1323,7 @@ checkWriteOverlayWithNewFiles()
 
 checkWriteOverlayWithArchivedFiles()
 {
-    local archive='tests/single-nested-folder.tar'
+    local archive='tests/nested-tar.tar'
 
     rm -f ratarmount.{stdout,stderr}.log
 
@@ -1340,7 +1340,9 @@ checkWriteOverlayWithArchivedFiles()
         if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then returnError "$LINENO" 'Expected files in mount point'; fi
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
 
-    verifyCheckSum "$mountFolder" 'foo/fighter/ufo' 'tests/single-nested-folder.tar' 2709a3348eb2c52302a7606ecf5860bc ||
+    verifyCheckSum "$mountFolder" 'foo/fighter/ufo' 'tests/nested-tar.tar' 2709a3348eb2c52302a7606ecf5860bc ||
+        returnError "$LINENO" 'Mismatching checksum'
+    verifyCheckSum "$mountFolder" 'foo/lighter.tar' 'tests/nested-tar.tar' 2a06cc391128d74e685a6cb7cfe9f94d ||
         returnError "$LINENO" 'Mismatching checksum'
 
     # Checks for modifying files "in the" archive (this requires special handling to simulate modifications!)
@@ -1348,7 +1350,7 @@ checkWriteOverlayWithArchivedFiles()
     local file
     file="$mountFolder/foo/fighter/ufo"
 
-    ## Delete archive file
+    ## Delete archived file
 
     if [[ ! -f "$file" ]]; then returnError "$LINENO" 'File should exist'; fi
     'rm' "$file"
@@ -1371,6 +1373,22 @@ checkWriteOverlayWithArchivedFiles()
     rmdir "$mountFolder/foo/fighter"
     if [[ -e "$mountFolder/foo/fighter" ]]; then returnError "$LINENO" 'Folder could not be removed'; fi
     if [[ -e "$mountFolder/foo/fighter/ufo" ]]; then returnError "$LINENO" 'Folder could not be removed'; fi
+
+    ## Append to archived file
+
+    printf '%512s' ' ' | tr ' ' '\0' >> "$mountFolder/foo/lighter.tar"
+    verifyCheckSum "$mountFolder" 'foo/lighter.tar' 'tests/nested-tar.tar' 7a534382c5b51762f072fe0d3a916e29 ||
+        returnError "$LINENO" 'Mismatching checksum'
+
+    # Roll back modification for further tests
+
+    'rm' "$overlayFolder/foo/lighter.tar"
+
+    ## Write into file
+
+    echo "summer" > "$mountFolder/foo/lighter.tar"
+    verifyCheckSum "$mountFolder" 'foo/lighter.tar' '[write overlay]' e75e33e14332df297c9ef5ea0cdcd006 ||
+        returnError "$LINENO" 'Mismatching checksum'
 
 
     echoerr "[${FUNCNAME[0]}] Tested successfully file modifications for archive files using the overlay."
