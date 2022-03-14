@@ -182,9 +182,9 @@ class WritableFolderMountSource(fuse.Operations):
     def isDeleted(self, path: str) -> bool:
         folder, name = self._splitPath(path)
         result = self.sqlConnection.execute(
-            'SELECT name FROM "files" WHERE path == (?) AND name == (?) AND deleted == 1', (folder, name)
+            'SELECT COUNT(*) > 0 FROM "files" WHERE path == (?) AND name == (?) AND deleted == 1', (folder, name)
         )
-        return bool(result.fetchall())
+        return bool(result.fetchone()[0])
 
     def _setMetadata(self, path: str, metadata: Dict[str, Any]):
         if not metadata:
@@ -216,7 +216,7 @@ class WritableFolderMountSource(fuse.Operations):
             raise fuse.FuseOSError(fuse.errno.ENOENT)
 
         # Initialize new metadata entry from existing file
-        _, mountSource, sfi = self.mountSource.getMountSource(sourceFileInfo)
+        sfi = self.mountSource.getMountSource(sourceFileInfo)[2]
         folder, name = self._splitPath(path)
 
         self.sqlConnection.execute(
@@ -502,8 +502,8 @@ class FuseMount(fuse.Operations):
 
         self.rootFileInfo = FuseMount._makeMountPointFileInfoFromStats(os.stat(pathToMount[0]))
 
-        # Maps handles to either opened I/O objects or os module file handles for the writeOverlay.
-        self.openedFiles: Dict[int, Union[IO[bytes], int]] = {}
+        # Maps handles to either opened I/O objects or os module file handles for the writeOverlay and the open flags.
+        self.openedFiles: Dict[int, Tuple[int, Union[IO[bytes], int]]] = {}
         self.lastFileHandle: int = 0  # It will be incremented before being returned. It can't hurt to never return 0.
 
         if self.overlayPath:
@@ -557,11 +557,11 @@ class FuseMount(fuse.Operations):
         except Exception:
             pass
 
-    def _addNewHandle(self, handle):
+    def _addNewHandle(self, handle, flags):
         # Note that fh in fuse_common.h is 64-bit and Python also supports 64-bit (long integers) out of the box.
         # So, there should practically be no overflow and file handle reuse possible.
         self.lastFileHandle += 1
-        self.openedFiles[self.lastFileHandle] = handle
+        self.openedFiles[self.lastFileHandle] = (flags, handle)
         return self.lastFileHandle
 
     @staticmethod
@@ -605,19 +605,10 @@ class FuseMount(fuse.Operations):
         # does not support permission changes
         result = self.mountSource.getMountSource(fileInfo)
         subMountPoint = result[0]
-        subMountSource = result[1]
-        if (
-            fileInfo
-            and isinstance(subMountSource, FolderMountSource)
-            and subMountSource.root == self.writeOverlay.root
-            and path.startswith(subMountPoint)
-        ):
-            # TODO Note that if the path contains special .version versioning, then it will most likely fail
-            #      to find the path in the write overlay, which is problematic for things like foo.versions/0.
-            #      Would be really helpful if the file info would contain the actual path and name, too :/
-            return self.writeOverlay.updateFileInfo(path[len(subMountPoint) :], fileInfo)
-
-        return fileInfo
+        # TODO Note that if the path contains special .version versioning, then it will most likely fail
+        #      to find the path in the write overlay, which is problematic for things like foo.versions/0.
+        #      Would be really helpful if the file info would contain the actual path and name, too :/
+        return self.writeOverlay.updateFileInfo(path[len(subMountPoint) :], fileInfo)
 
     @overrides(fuse.Operations)
     def init(self, path) -> None:
@@ -689,15 +680,11 @@ class FuseMount(fuse.Operations):
         fileInfo = self._getFileInfo(path)
 
         try:
-            # If the flags indicate "open for modification", then only look for the file in the overlay or fail.
+            # If the flags indicate "open for modification", then still open it as read-only through the mount source
+            # but store information to reopen it for write access on write calls.
             # @see https://man7.org/linux/man-pages/man2/open.2.html
             # > The argument flags must include one of the following access modes: O_RDONLY, O_WRONLY, or O_RDWR.
-            if flags & (os.O_WRONLY | os.O_RDWR):
-                if not self.writeOverlay:
-                    return super().open(path, flags)
-                return self._addNewHandle(self.writeOverlay.open(path, flags))
-
-            return self._addNewHandle(self.mountSource.open(fileInfo))
+            return self._addNewHandle(self.mountSource.open(fileInfo), flags)
         except Exception as exception:
             traceback.print_exc()
             print("Caught exception when trying to open file.", fileInfo)
@@ -708,7 +695,7 @@ class FuseMount(fuse.Operations):
         if fh not in self.openedFiles:
             raise fuse.FuseOSError(fuse.errno.ESTALE)
 
-        openedFile = self.openedFiles[fh]
+        openedFile = self._resolveFileHandle(fh)
         if isinstance(openedFile, int):
             os.close(openedFile)
         else:
@@ -720,7 +707,7 @@ class FuseMount(fuse.Operations):
     @overrides(fuse.Operations)
     def read(self, path: str, size: int, offset: int, fh: int) -> bytes:
         if fh in self.openedFiles:
-            openedFile = self.openedFiles[fh]
+            openedFile = self._resolveFileHandle(fh)
             if isinstance(openedFile, int):
                 os.lseek(openedFile, offset, os.SEEK_SET)
                 return os.read(openedFile, size)
@@ -744,30 +731,39 @@ class FuseMount(fuse.Operations):
     # Methods for the write overlay which require file handle translations
 
     def _isWriteOverlayHandle(self, fh):
-        return self.writeOverlay and fh in self.openedFiles and isinstance(self.openedFiles[fh], int)
+        return self.writeOverlay and fh in self.openedFiles and isinstance(self._resolveFileHandle(fh), int)
+
+    def _resolveFileHandle(self, fh):
+        return self.openedFiles[fh][1]
 
     @overrides(fuse.Operations)
     def create(self, path, mode, fi=None):
         if self.writeOverlay:
-            return self._addNewHandle(self.writeOverlay.create(path, mode, fi))
+            return self._addNewHandle(self.writeOverlay.create(path, mode, fi), 0)
         return super().create(path, mode, fi)
 
     @overrides(fuse.Operations)
     def write(self, path, data, offset, fh):
+        if not self._isWriteOverlayHandle(fh):
+            flags, openedFile = self.openedFiles[fh]
+            if self.writeOverlay and not isinstance(openedFile, int) and (flags & (os.O_WRONLY | os.O_RDWR)):
+                openedFile.close()
+                self.openedFiles[fh] = (flags, self.writeOverlay.open(path, flags))
+
         if self._isWriteOverlayHandle(fh):
-            return self.writeOverlay.write(path, data, offset, self.openedFiles[fh])
+            return self.writeOverlay.write(path, data, offset, self._resolveFileHandle(fh))
         return super().write(path, data, offset, fh)
 
     @overrides(fuse.Operations)
     def flush(self, path, fh):
         if self._isWriteOverlayHandle(fh):
-            self.writeOverlay.flush(path, self.openedFiles[fh])
+            self.writeOverlay.flush(path, self._resolveFileHandle(fh))
         return super().flush(path, fh)
 
     @overrides(fuse.Operations)
     def fsync(self, path, datasync, fh):
         if self._isWriteOverlayHandle(fh):
-            self.writeOverlay.fsync(path, datasync, self.openedFiles[fh])
+            self.writeOverlay.fsync(path, datasync, self._resolveFileHandle(fh))
         return super().fsync(path, datasync, fh)
 
 

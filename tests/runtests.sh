@@ -1375,6 +1375,8 @@ checkWriteOverlayWithArchivedFiles()
         returnError "$LINENO" 'Modification time did not change'
     fi
 
+    if [[ -e "$overlayFolder/foo/fighter/ufo" ]]; then returnError "$LINENO" 'Touch should not copy file to overlay'; fi
+
     ## Change permissions
 
     chmod 777 "$file"
