@@ -239,6 +239,10 @@ positional arguments:
                         extension. (default: None)
 
 optional arguments:
+  --gnu-incremental     Will strip octal modification time prefixes from file
+                        paths, which appear in GNU incremental backups
+                        created with GNU tar with the --incremental or
+                        --listed-incremental options. (default: None)
   --index-file INDEX_FILE
                         Specify a path to the .index.sqlite file. Setting this
                         will disable fallback index folders. If the given path
@@ -262,6 +266,9 @@ optional arguments:
                         storage location and nothing else. Instead, it will
                         first try ~/.ratarmount and the folder "foo,9000".
                         (default: ,~/.ratarmount)
+  --no-gnu-incremental  If specified, will never strip octal modification
+                        prefixes and will also not do automatic detection.
+                        (default: True)
   --password PASSWORD   Specify a single password which shall be used for RAR
                         and ZIP files. (default: )
   --password-file PASSWORD_FILE
