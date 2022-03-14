@@ -370,6 +370,17 @@ optional arguments:
   -u, --unmount         Unmount the given mount point. Equivalent to calling
                         "fusermount -u". (default: False)
   -v, --version         Print version string. (default: False)
+  -w WRITE_OVERLAY, --write-overlay WRITE_OVERLAY
+                        Specify an existing folder to be used as a write
+                        overlay. The folder itself will be union-mounted on
+                        top such that files in this folder take precedence
+                        over all over existing ones. Furthermore, all file
+                        creations and modifications will be forwarded to
+                        files in this folder. Modifying a file inside a TAR
+                        will copy that file to the overlay folder and apply
+                        the modification to that writable copy. Deleting
+                        files or folders will update the hidden metadata
+                        database inside the overlay folder. (default: None)
 ```
 
 ## Metadata Index Cache

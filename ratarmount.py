@@ -612,6 +612,9 @@ class FuseMount(fuse.Operations):
             and subMountSource.root == self.writeOverlay.root
             and path.startswith(subMountPoint)
         ):
+            # TODO Note that if the path contains special .version versioning, then it will most likely fail
+            #      to find the path in the write overlay, which is problematic for things like foo.versions/0.
+            #      Would be really helpful if the file info would contain the actual path and name, too :/
             return self.writeOverlay.updateFileInfo(path[len(subMountPoint) :], fileInfo)
 
         return fileInfo
