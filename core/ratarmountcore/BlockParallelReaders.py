@@ -172,7 +172,7 @@ class BlockParallelReader(io.BufferedIOBase):
             self._offset += len(result)
             return result
 
-        pendingBlocks = sum(not block.ready() for block in self._blockCache.values())
+        pendingBlocks: int = sum(0 if block.ready() else 1 for block in self._blockCache.values())
         pool = self._getPool()
 
         # TODO do not fetch blocks which do not fit into memory and instead seek directly to them!
