@@ -1423,6 +1423,29 @@ checkWriteOverlayWithArchivedFiles()
         returnError "$LINENO" "Permissions could not be changed ($mode != 700)"
     fi
 
+    # Remount to reset state
+    funmount "$mountFolder"
+    'rm' -rf "$overlayFolder"
+    {
+        runAndCheckRatarmount "${args[@]}"
+        if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then returnError "$LINENO" 'Expected files in mount point'; fi
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+
+    ## Rename archive file
+
+    'mv' "$file" "$mountFolder/foo/fighter/ugo"
+    if [[ -f "$file" ]]; then returnError "$LINENO" 'File should have been renamed'; fi
+    verifyCheckSum "$mountFolder" 'foo/fighter/ugo' '[write overlay]' 2709a3348eb2c52302a7606ecf5860bc ||
+        returnError "$LINENO" 'Mismatching checksum'
+
+    ## Undo the rename
+
+    'mv' "$mountFolder/foo/fighter/ugo" "$file"
+    if [[ -f "$mountFolder/iriya" ]]; then returnError "$LINENO" 'File should have been renamed'; fi
+    verifyCheckSum "$mountFolder" 'foo/fighter/ufo' '[write overlay]' 2709a3348eb2c52302a7606ecf5860bc ||
+        returnError "$LINENO" 'Mismatching checksum'
+
+
     echoerr "[${FUNCNAME[0]}] Tested successfully file modifications for archive files using the overlay."
 
 

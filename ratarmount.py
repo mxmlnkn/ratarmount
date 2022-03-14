@@ -290,8 +290,26 @@ class WritableFolderMountSource(fuse.Operations):
 
     @overrides(fuse.Operations)
     def rename(self, old, new):
+        if not self.mountSource.exists(old) or self.isDeleted(old):
+            raise fuse.FuseOSError(fuse.errno.ENOENT)
+
         folder, name = self._splitPath(new)
-        self._setFileMetadata(old, lambda p: os.rename(p, self._realpath(new)), {'path': folder, 'name': name})
+
+        # Delete target path from metadata database to avoid uniqueness restraint being invalidated
+        self.sqlConnection.execute('DELETE FROM "files" WHERE "path" == (?) and "name" == (?)', (folder, name))
+        self._setFileMetadata(old, lambda p: None, {'path': folder, 'name': name})
+
+        if os.path.exists(self._realpath(old)):
+            os.rename(self._realpath(old), self._realpath(new))
+        else:
+            self._ensureParentExists(new)
+
+            with self.mountSource.open(self.mountSource.getFileInfo(old)) as sourceObject, open(
+                self._realpath(new), 'wb'
+            ) as targetObject:
+                shutil.copyfileobj(sourceObject, targetObject)
+
+            self._markAsDeleted(old)
 
     # Links
 
