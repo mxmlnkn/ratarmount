@@ -12,8 +12,10 @@ import stat
 import subprocess
 import sys
 import tarfile
+import tempfile
 import time
 import traceback
+import urllib.parse
 import zipfile
 from typing import Any, Callable, Dict, Iterable, IO, List, Optional, Tuple, Union
 import fuse
@@ -73,7 +75,7 @@ class WritableFolderMountSource(fuse.Operations):
         );
     """
 
-    _hiddenDatabaseName = '.ratarmount.overlay.sqlite'
+    hiddenDatabaseName = '.ratarmount.overlay.sqlite'
 
     def __init__(self, path: str, mountSource: MountSource) -> None:
         if os.path.exists(path):
@@ -84,7 +86,7 @@ class WritableFolderMountSource(fuse.Operations):
 
         self.root: str = path
         self.mountSource = mountSource
-        self.sqlConnection = self._openSqlDb(os.path.join(path, self._hiddenDatabaseName))
+        self.sqlConnection = self._openSqlDb(os.path.join(path, self.hiddenDatabaseName))
 
         # Add table if necessary
         tables = [row[0] for row in self.sqlConnection.execute('SELECT name FROM sqlite_master WHERE type = "table";')]
@@ -92,7 +94,7 @@ class WritableFolderMountSource(fuse.Operations):
             self.sqlConnection.executescript(WritableFolderMountSource._overlayMetadataSchema)
 
         # Check that the mount source contains this overlay folder with top priority
-        databaseFileInfo = self.mountSource.getFileInfo('/' + self._hiddenDatabaseName)
+        databaseFileInfo = self.mountSource.getFileInfo('/' + self.hiddenDatabaseName)
         assert databaseFileInfo is not None
         path, databaseMountSource, fileInfo = self.mountSource.getMountSource(databaseFileInfo)
         assert stat.S_ISREG(fileInfo.mode)
@@ -177,7 +179,7 @@ class WritableFolderMountSource(fuse.Operations):
 
         # For temporary SQLite file suffixes, see https://www.sqlite.org/tempfiles.html
         suffixes = ['', '-journal', '-shm', '-wal']
-        return [x[0] for x in result] + [self._hiddenDatabaseName + suffix for suffix in suffixes]
+        return [x[0] for x in result] + [self.hiddenDatabaseName + suffix for suffix in suffixes]
 
     def isDeleted(self, path: str) -> bool:
         folder, name = self._splitPath(path)
@@ -1090,6 +1092,10 @@ seeking capabilities when opening that file.
                'the overlay folder.')
 
     parser.add_argument(
+        '--commit-overlay', action='store_true', default = False,
+        help = 'Apply deletions and content modifications done in the write overlay to the archive.' )
+
+    parser.add_argument(
         '-o', '--fuse', type = str, default = '',
         help = 'Comma separated FUSE options. See "man mount.fuse" for help. '
                'Example: --fuse "allow_other,entry_timeout=2.8,gid=0". ' )
@@ -1255,6 +1261,159 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
             )
         except Exception:
             subprocess.run(["umount", args.unmount], check=False)
+        return
+
+    if args.commit_overlay:
+        if not os.path.isdir(args.write_overlay):
+            print("[Error] Need an existing write overlay folder for commiting changes.")
+            return
+
+        if len(args.mount_source) != 1:
+            print("[Error] Currently, only modifications to a single TAR may be commited.")
+            sys.exit(1)
+
+        tarFile = args.mount_source[0]
+        compression = None
+        try:
+            compression = TarFileType(encoding=args.encoding, printDebug=args.debug)(tarFile)[1]
+        except Exception:
+            print("[Error] Currently, only modifications to a single TAR may be commited.")
+            sys.exit(1)
+
+        if compression is not None:
+            print("[Error] Currently, only modifications to an uncompressed TAR may be commited.")
+            sys.exit(1)
+
+        try:
+            with os.popen('tar --version') as pipe:
+                if not re.search(r'GNU tar', pipe.read()):
+                    raise RuntimeError("GNU tar is required")
+        except Exception:
+            print("[Error] Currently, GNU tar must be installed and discoverable as 'tar'.")
+            if args.printDebug >= 3:
+                traceback.print_exc()
+            sys.exit(1)
+
+        # Delete all files marked for deletion
+        tmpFolder = tempfile.mkdtemp()
+        deletionList = os.path.join(tmpFolder, "deletions.lst")
+        appendList = os.path.join(tmpFolder, "append.lst")
+
+        databasePath = os.path.join(args.write_overlay, WritableFolderMountSource.hiddenDatabaseName)
+        if os.path.exists(databasePath):
+            uriPath = urllib.parse.quote(databasePath)
+            sqlConnection = sqlite3.connect(f"file:{uriPath}?mode=ro", uri=True)
+
+            with open(deletionList, 'at', encoding=args.encoding) as file:
+                for path, name in sqlConnection.execute("SELECT path,name FROM files WHERE deleted == 1;"):
+                    file.write(f"{path}/{name}\0")
+
+        # Delete all files to be replaced with other files
+        with open(deletionList, 'at', encoding=args.encoding) as deletionListFile, open(
+            appendList, 'at', encoding=args.encoding
+        ) as appendListFile:
+            # For temporary SQLite file suffixes, see https://www.sqlite.org/tempfiles.html
+            suffixes = ['', '-journal', '-shm', '-wal']
+            toBeIgnored = [WritableFolderMountSource.hiddenDatabaseName + suffix for suffix in suffixes]
+
+            for dirpath, _, filenames in os.walk(args.write_overlay, topdown=False):
+                writeOverlay = args.write_overlay
+                if not writeOverlay.endswith('/'):
+                    writeOverlay += '/'
+
+                # dirpath should be a relative path (without leading slash) as seen from the overlay folder
+                if dirpath.startswith(args.write_overlay):
+                    dirpath = dirpath[len(args.write_overlay) :]
+
+                for name in filenames:
+                    pathRelativeToRoot = f"{dirpath}/{name}".lstrip('/')
+                    if pathRelativeToRoot in toBeIgnored:
+                        continue
+
+                    # Delete with and without leading slash because GNU tar matches exactly while
+                    # ratarmount does not discern between these two cases.
+                    deletionListFile.write(f"{pathRelativeToRoot}\0")
+                    deletionListFile.write(f"/{pathRelativeToRoot}\0")
+
+                    appendListFile.write(f"{pathRelativeToRoot}\0")
+
+        # TODO Support compressed archives by maybe using tarfile to read from the original and write to a temporary?
+        #      GNU tar does not support --delete on compressed archives unfortunately:
+        #      > This option does not operate on compressed archives.
+        # Suppress file not found errors because the alternative would be to manually check all files
+        # to be updated whether they already exist in the archive or not.
+        print("To commit the overlay folder to the archive, these commands have to be executed:")
+        print()
+
+        if os.stat(deletionList).st_size > 0:
+            print(f"    tar --delete --null --verbatim-files-from --files-from='{deletionList}' \\")
+            print(f"        --file '{tarFile}' 2>&1 |")
+            print("       sed '/^tar: Exiting with failure/d; /^tar.*Not found in archive/d'")
+
+        if os.stat(appendList).st_size > 0:
+            print(
+                f"    tar --append -C '{args.write_overlay}' --null --verbatim-files-from --files-from='{appendList}' "
+                f"--file '{tarFile}'"
+            )
+
+        print()
+        print("Committing is an experimental feature!")
+        print(f'Please confirm by entering "commit". Any other input will cancel.')
+        print("> ", end='')
+        try:
+            if input() == 'commit':
+                if os.stat(deletionList).st_size > 0:
+                    tarDelete = subprocess.run(
+                        [
+                            "tar",
+                            "--delete",
+                            "--null",
+                            "--verbatim-files-from",
+                            f"--files-from={deletionList}",
+                            "--file",
+                            tarFile,
+                        ],
+                        check=False,
+                        stderr=subprocess.PIPE,
+                    )
+
+                    unfilteredLines = []
+                    for line in tarDelete.stderr.decode().split("\n"):
+                        if (
+                            'tar: Exiting with failure' not in line
+                            and 'Not found in archive' not in line
+                            and line.strip()
+                        ):
+                            unfilteredLines.append(line)
+
+                    if unfilteredLines:
+                        for line in unfilteredLines:
+                            print(line)
+                        print("[Error] There were problems when trying to delete files.")
+                        sys.exit(1)
+
+                if os.stat(appendList).st_size > 0:
+                    subprocess.run(
+                        [
+                            "tar",
+                            "--append",
+                            "-C",
+                            args.write_overlay,
+                            "--null",
+                            "--verbatim-files-from",
+                            f"--files-from={appendList}",
+                            "--file",
+                            tarFile,
+                        ],
+                        check=True,
+                    )
+
+                print(f"Committed successfully. You can now remove the overlay folder at {args.write_overlay}.")
+            else:
+                print("Canceled")
+        finally:
+            shutil.rmtree(tmpFolder)
+
         return
 
     # Convert the comma separated list of key[=value] options into a dictionary for fusepy

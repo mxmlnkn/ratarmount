@@ -14,7 +14,7 @@ import tarfile
 import threading
 import time
 import traceback
-import urllib
+import urllib.parse
 
 from timeit import default_timer as timer
 from typing import Any, AnyStr, Callable, cast, Dict, Generator, IO, Iterable, List, Optional, Tuple, Union
