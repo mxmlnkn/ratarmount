@@ -37,6 +37,7 @@ except ImportError:
 from .version import __version__
 from .MountSource import FileInfo, MountSource
 from .ProgressBar import ProgressBar
+from .SQLiteBlobFile import SQLiteBlobsFile
 from .StenciledFile import StenciledFile
 from .compressions import supportedCompressions
 from .utils import RatarmountError, IndexNotOpenError, InvalidIndexError, CompressionError, overrides, ceilDiv
@@ -1695,8 +1696,8 @@ class SQLiteIndexedTar(MountSource):
                             "to this SQLite index has changed (" + str(tarStats.st_mtime) + ")",
                         )
 
-                # Check arguments used to create the found index. These are only warnings and not forcing a rebuild
-                # by default.
+                # Check arguments used to create the found index.
+                # These are only warnings and not forcing a rebuild by default.
                 # TODO: Add --force options?
                 if 'arguments' in metadata:
                     indexArgs = json.loads(metadata['arguments'])
@@ -1945,46 +1946,47 @@ class SQLiteIndexedTar(MountSource):
         ):
             tables = [x[0] for x in db.execute('SELECT name FROM sqlite_master WHERE type="table"')]
 
-            # indexed_gzip index only has a file based API, so we need to write all the index data from the SQL
-            # database out into a temporary file. For that, let's first try to use the same location as the SQLite
-            # database because it should have sufficient writing rights and free disk space.
-            gzindex = None
-            for tmpDir in [os.path.dirname(self.indexFilePath), None]:
-                if 'gzipindex' not in tables and 'gzipindexes' not in tables:
-                    break
+            # The maximum blob size configured by SQLite is exactly 1 GB, see https://www.sqlite.org/limits.html
+            # Therefore, this should be smaller. Another argument for making it smaller is that this blob size
+            # will be held fully in memory temporarily.
+            # But, making it too small would result in too many non-backwards compatible indexes being created.
+            maxBlobSize = 256 * 1024 * 1024  # 256 MiB
 
-                # Try to export data from SQLite database. Note that no error checking against the existence of
-                # gzipindex table is done because the exported data itself might also be wrong and we can't check
-                # against this. Therefore, collate all error checking by catching exceptions.
-
+            if 'gzipindex' in tables or 'gzipindexes' in tables:
                 try:
-                    gzindex = tempfile.mkstemp(dir=tmpDir)[1]
-                    with open(gzindex, 'wb') as file:
-                        if 'gzipindexes' in tables:
-                            # Try to read index files containing very large gzip indexes
-                            rows = db.execute('SELECT data FROM gzipindexes ORDER BY ROWID')
-                            for row in rows:
-                                file.write(row[0])
-                        elif 'gzipindex' in tables:
-                            # Try to read legacy index files with exactly one blob.
-                            # This is how old ratarmount version read it. I.e., if there were simply more than one
-                            # blob in the same table, then it would ignore all but the first(?!) and I am not sure
-                            # what would happen in that case.
-                            # So, use a differently named table if there are multiple blobs.
-                            file.write(db.execute('SELECT data FROM gzipindex').fetchone()[0])
-                    break
-                except Exception:
-                    self._uncheckedRemove(gzindex)
-                    gzindex = None
+                    t0 = time.time()
+                    # indexed_gzip 1.5.0 added support for pure Python file objects as arguments for the index!
+                    table = 'gzipindexes' if 'gzipindexes' in tables else 'gzipindex'
+                    fileObject.import_index(fileobj=SQLiteBlobsFile(db, table, 'data', buffer_size=maxBlobSize))
 
-            if gzindex:
-                try:
-                    fileObject.import_index(filename=gzindex)
+                    # SQLiteBlobFile is rather slow to get parts of a large blob by using substr.
+                    # Here are some timings for 4x256 MiB blobs:
+                    #   buffer size / MiB | time / s
+                    #                 512 | 1.94 1.94 1.90 1.92 1.95
+                    #                 256 | 1.94 1.98 1.92 2.02 1.91
+                    #                 128 | 2.44 2.37 2.38 2.44 2.47
+                    #                  64 | 3.51 3.44 3.47 3.47 3.42
+                    #                  32 | 5.66 5.71 5.62 5.57 5.61
+                    #                  16 | 10.22 9.88 9.73 9.75 9.91
+                    # Writing out blobs to file / s         : 9.40 8.71 8.49 10.60 9.13
+                    # Importing block offsets from file / s : 0.47 0.46 0.47 0.46 0.41
+                    #   => With proper buffer sizes, avoiding writing out the block offsets can be 5x faster!
+                    # It seems to me like substr on blobs does not actually support true seeking :/
+                    # The blob is probably always loaded fully into memory and only then is the substring being
+                    # calculated. For C, there actually is an incremental blob reading interface but not for python:
+                    #   https://www.sqlite.org/c3ref/blob_open.html
+                    #   https://bugs.python.org/issue24905
+                    print(f"Loading gzip block offsets took {time.time() - t0:.2f}s")
                     return
-                except Exception:
-                    pass
-                finally:
-                    self._uncheckedRemove(gzindex)
+
+                except Exception as exception:
+                    if self.printDebug >= 1:
+                        print(
+                            "[Warning] Encountered exception when trying to load gzip block offsets from database",
+                            exception,
+                        )
+                    if self.printDebug >= 3:
+                        traceback.print_exc()
 
             # Store the offsets into a temporary file and then into the SQLite database
             if self.printDebug >= 2:
@@ -2021,12 +2023,6 @@ class SQLiteIndexedTar(MountSource):
                 db.execute('DROP TABLE gzipindex')
             if 'gzipindexes' in tables:
                 db.execute('DROP TABLE gzipindexes')
-
-            # The maximum blob size configured by SQLite is exactly 1 GB, see https://www.sqlite.org/limits.html
-            # Therefore, this should be smaller. Another argument for making it smaller is that this blob size
-            # will be held fully in memory temporarily.
-            # But, making it too small would result in too many non-backwards compatible indexes being created.
-            maxBlobSize = 256 * 1024 * 1024  # 128 MiB
 
             # Store contents of temporary file into the SQLite database
             if os.stat(gzindex).st_size > maxBlobSize:
