@@ -13,7 +13,7 @@ import threading
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore import StenciledFile  # noqa: E402
+from ratarmountcore import JoinedFile, RawStenciledFile, StenciledFile  # noqa: E402
 
 
 testData = b"1234567890"
@@ -33,7 +33,7 @@ class TestStenciledFile:
 
     @staticmethod
     def test_findStencil():
-        stenciledFile = StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2), (4, 4), (1, 8), (0, 1)])
+        stenciledFile = RawStenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2), (4, 4), (1, 8), (0, 1)])
         expectedResults = [0, 0, 1, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 5]
         for offset, iExpectedStencil in enumerate(expectedResults):
             assert stenciledFile._findStencil(offset) == iExpectedStencil
@@ -114,3 +114,55 @@ class TestStenciledFile:
                 results.append(pool.submit(TestStenciledFile.test_successive_reads, lock))
             for result in results:
                 result.result()
+
+
+class TestJoinedFile:
+    @staticmethod
+    def test_empty_file():
+        assert JoinedFile([io.BytesIO(b"")]).read() == b""
+
+    @staticmethod
+    def test_single_file():
+        assert JoinedFile([io.BytesIO(b"f")]).read() == b"f"
+        assert JoinedFile([io.BytesIO(b"fo")]).read() == b"fo"
+        assert JoinedFile([io.BytesIO(b"foo")]).read() == b"foo"
+
+    @staticmethod
+    def test_single_file_non_complete_read():
+        assert JoinedFile([io.BytesIO(b"f")]).read(1) == b"f"
+        assert JoinedFile([io.BytesIO(b"fo")]).read(1) == b"f"
+        assert JoinedFile([io.BytesIO(b"foo")]).read(1) == b"f"
+
+    @staticmethod
+    def test_single_file_seek_read():
+        file = JoinedFile([io.BytesIO(b"foobar")])
+        assert file.seek(1) == 1
+        assert file.read(1) == b"o"
+        assert file.read() == b"obar"
+        assert file.seek(-1, io.SEEK_END) == 5
+        assert file.read() == b"r"
+
+    @staticmethod
+    def test_two_files_full_read():
+        assert JoinedFile([io.BytesIO(b""), io.BytesIO(b"")]).read() == b""
+        assert JoinedFile([io.BytesIO(b""), io.BytesIO(b"foo")]).read() == b"foo"
+        assert JoinedFile([io.BytesIO(b"foo"), io.BytesIO(b"")]).read() == b"foo"
+        assert JoinedFile([io.BytesIO(b"bar"), io.BytesIO(b"foo")]).read() == b"barfoo"
+
+    @staticmethod
+    def test_two_files_seak_and_read():
+        file = JoinedFile([io.BytesIO(b"bar"), io.BytesIO(b"foo")])
+        assert file.read(1) == b"b"
+        assert file.tell() == 1
+
+        assert file.seek(3) == 3
+        assert file.tell() == 3
+
+        assert file.read(2) == b"fo"
+        assert file.tell() == 5
+
+        assert file.seek(-4, io.SEEK_END) == 2
+        assert file.tell() == 2
+
+        assert file.read() == b"rfoo"
+        assert file.tell() == 6

@@ -32,6 +32,14 @@ def overrides(parentClass):
     return overrider
 
 
+class _DummyContext:
+    def __enter__(self):
+        pass
+
+    def __exit__(self, *args):
+        pass
+
+
 def ceilDiv(dividend, divisor):
     return -(dividend // -divisor)
 
