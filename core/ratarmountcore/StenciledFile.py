@@ -4,7 +4,7 @@
 import bisect
 import io
 
-from typing import IO, List, Optional, Tuple
+from typing import Callable, IO, List, Optional, Tuple
 
 from .utils import overrides, _DummyContext
 
@@ -219,3 +219,74 @@ class JoinedFile(io.BufferedReader):
 
         fileStencils = [(fobj, 0, size if size else 0) for fobj, size in zip(file_objects, sizes)]
         super().__init__(RawStenciledFile(fileStencils=fileStencils, fileobjLock=file_lock), buffer_size=buffer_size)
+
+
+class LambdaReaderFile(io.RawIOBase):
+    """Creates a file abstraction from a single read(offset, size) function."""
+
+    def __init__(self, rawRead: Callable[[int, int], bytes], size: int) -> None:
+        """rawRead: Function which returns bytes for (offset, size) input."""
+
+        self.offset = 0
+        self.rawRead = rawRead
+        self.size = size
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        pass
+
+    @overrides(io.RawIOBase)
+    def close(self) -> None:
+        pass
+
+    @overrides(io.RawIOBase)
+    def fileno(self) -> int:
+        # This is a virtual Python level file object and therefore does not have a valid OS file descriptor!
+        raise io.UnsupportedOperation()
+
+    @overrides(io.RawIOBase)
+    def seekable(self) -> bool:
+        return True
+
+    @overrides(io.RawIOBase)
+    def readable(self) -> bool:
+        return True
+
+    @overrides(io.RawIOBase)
+    def writable(self) -> bool:
+        return False
+
+    @overrides(io.RawIOBase)
+    def readinto(self, buffer):
+        with memoryview(buffer) as view, view.cast("B") as byteView:  # type: ignore
+            readBytes = self.read(len(byteView))
+            byteView[: len(readBytes)] = readBytes
+        return len(readBytes)
+
+    @overrides(io.RawIOBase)
+    def read(self, size: int = -1) -> bytes:
+        result = self.rawRead(self.offset, self.size if size == -1 else size)
+        self.offset += len(result)
+        return result
+
+    @overrides(io.RawIOBase)
+    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
+        if whence == io.SEEK_CUR:
+            self.offset += offset
+        elif whence == io.SEEK_END:
+            self.offset = self.size + offset
+        elif whence == io.SEEK_SET:
+            self.offset = offset
+
+        if self.offset < 0:
+            raise ValueError("Trying to seek before the start of the file!")
+        if self.offset >= self.size:
+            return self.offset
+
+        return self.offset
+
+    @overrides(io.RawIOBase)
+    def tell(self) -> int:
+        return self.offset

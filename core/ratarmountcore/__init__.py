@@ -44,7 +44,8 @@ from .version import __version__
 
 from .compressions import supportedCompressions, stripSuffixFromTarFile, compressZstd
 from .utils import RatarmountError, IndexNotOpenError, InvalidIndexError, CompressionError, overrides
-from .StenciledFile import RawStenciledFile, StenciledFile, JoinedFile
+from .StenciledFile import LambdaReaderFile, RawStenciledFile, StenciledFile, JoinedFile
+from .SQLiteBlobFile import SQLiteBlobFile, SQLiteBlobsFile
 from .BlockParallelReaders import BlockParallelReader, ParallelXZReader, ParallelZstdReader
 
 from .MountSource import FileInfo, MountSource
