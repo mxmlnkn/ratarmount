@@ -14,6 +14,8 @@ import sys
 import tarfile
 import tempfile
 
+import indexed_bzip2
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import pytest  # noqa: E402
@@ -290,7 +292,7 @@ class TestSQLiteIndexedTarParallelized:
                     file.close()
 
     @staticmethod
-    def test_appending(parallelization, tmpdir):
+    def test_appending_to_small_archive(parallelization, tmpdir):
         createFile = TestSQLiteIndexedTarParallelized._createFile
         makeFolder = TestSQLiteIndexedTarParallelized._makeFolder
 
@@ -326,7 +328,7 @@ class TestSQLiteIndexedTarParallelized:
             indexFilePath=indexFilePath,
             parallelization=parallelization,
         ) as indexedTar:
-            assert indexedTar.hasBeenAppendedTo
+            assert not indexedTar.hasBeenAppendedTo
             assert indexedTar.exists("/foo")
             assert indexedTar.exists("/bar")
             assert not indexedTar.exists("/folder")
@@ -344,18 +346,18 @@ class TestSQLiteIndexedTarParallelized:
             indexFilePath=indexFilePath,
             parallelization=parallelization,
         ) as indexedTar:
-            assert indexedTar.hasBeenAppendedTo
+            assert not indexedTar.hasBeenAppendedTo
             assert indexedTar.exists("/foo")
             assert indexedTar.exists("/bar")
             assert indexedTar.exists("/folder")
 
         # Append a sparse file
         sparsePath = os.path.join(tmpdir, "sparse")
-        with open(sparsePath, "w") as file:
+        with open(sparsePath, "wb"):
             pass
         os.truncate(sparsePath, 1024 * 1024)
         # The tarfile module only has read support for sparse files, therefore use GNU tar to do it
-        subprocess.run(["tar", "--append", "-f", tarPath, sparsePath])
+        subprocess.run(["tar", "--append", "-f", tarPath, sparsePath], check=True)
 
         # Create index. Because of the sparse file at the end, it might be recreated from scratch.
         indexFilePath = os.path.join(tmpdir, "foo.tar.index")
@@ -366,7 +368,143 @@ class TestSQLiteIndexedTarParallelized:
             indexFilePath=indexFilePath,
             parallelization=parallelization,
         ) as indexedTar:
-            # assert indexedTar.hasBeenAppendedTo  # TODO
+            assert not indexedTar.hasBeenAppendedTo
             assert indexedTar.exists("/foo")
             assert indexedTar.exists("/bar")
             assert indexedTar.exists("/folder")
+
+        # Append small file to TAR after sparse file!
+        with tarfile.open(name=tarPath, mode="a:") as tarFile:
+            createFile(tarFile, "bar2", "foo")
+
+        # Create index but only go over new files
+        print("=== Update Index With New File After Sparse File ===")
+        indexFilePath = os.path.join(tmpdir, "foo.tar.index")
+        with SQLiteIndexedTar(
+            tarFileName=tarPath,
+            writeIndex=True,
+            clearIndexCache=False,
+            indexFilePath=indexFilePath,
+            parallelization=parallelization,
+        ) as indexedTar:
+            assert not indexedTar.hasBeenAppendedTo
+            assert indexedTar.exists("/foo")
+            assert indexedTar.exists("/bar")
+            assert indexedTar.exists("/folder")
+            assert indexedTar.exists("/bar2")
+
+    @staticmethod
+    def test_appending_to_large_archive(parallelization, tmpdir):
+        createFile = TestSQLiteIndexedTarParallelized._createFile
+        makeFolder = TestSQLiteIndexedTarParallelized._makeFolder
+
+        # Create a TAR large in size as well as file count
+        tarPath = os.path.join(tmpdir, "foo.tar")
+        with indexed_bzip2.open("tests/tar-with-300-folders-with-1000-files-0B-files.tar.bz2") as file, open(
+            tarPath, 'wb'
+        ) as extracted:
+            while True:
+                data = file.read(1024 * 1024)
+                if not data:
+                    break
+                extracted.write(data)
+
+        # Create index
+        print("\n=== Create Index ===")
+        indexFilePath = os.path.join(tmpdir, "foo.tar.index")
+        with SQLiteIndexedTar(
+            tarFileName=tarPath,
+            writeIndex=True,
+            clearIndexCache=True,
+            indexFilePath=indexFilePath,
+            parallelization=os.cpu_count(),
+            printDebug=3,
+        ) as indexedTar:
+            assert not indexedTar.hasBeenAppendedTo
+            assert indexedTar.exists("/00000000000000000000000000000282/00000000000000000000000000000976")
+            assert not indexedTar.exists("/bar")
+            assert not indexedTar.exists("/folder")
+
+        # Append small file to TAR
+        with tarfile.open(name=tarPath, mode="a:") as tarFile:
+            createFile(tarFile, "bar", "foo")
+
+        # Create index but only go over new files
+        print("\n=== Update Index With New File ===")
+        indexFilePath = os.path.join(tmpdir, "foo.tar.index")
+        with SQLiteIndexedTar(
+            tarFileName=tarPath,
+            writeIndex=True,
+            clearIndexCache=False,
+            indexFilePath=indexFilePath,
+            parallelization=parallelization,
+            printDebug=3,
+        ) as indexedTar:
+            assert indexedTar.hasBeenAppendedTo
+            assert indexedTar.exists("/00000000000000000000000000000282/00000000000000000000000000000976")
+            assert indexedTar.exists("/bar")
+            assert not indexedTar.exists("/folder")
+
+        # Append empty folder to TAR
+        with tarfile.open(name=tarPath, mode="a:") as tarFile:
+            makeFolder(tarFile, "folder")
+
+        # Create index but only go over new files
+        print("\n=== Update Index With New Folder ===")
+        indexFilePath = os.path.join(tmpdir, "foo.tar.index")
+        with SQLiteIndexedTar(
+            tarFileName=tarPath,
+            writeIndex=True,
+            clearIndexCache=False,
+            indexFilePath=indexFilePath,
+            parallelization=parallelization,
+            printDebug=3,
+        ) as indexedTar:
+            assert indexedTar.hasBeenAppendedTo
+            assert indexedTar.exists("/00000000000000000000000000000282/00000000000000000000000000000976")
+            assert indexedTar.exists("/bar")
+            assert indexedTar.exists("/folder")
+
+        # Append a sparse file
+        sparsePath = os.path.join(tmpdir, "sparse")
+        with open(sparsePath, "wb"):
+            pass
+        os.truncate(sparsePath, 1024 * 1024)
+        # The tarfile module only has read support for sparse files, therefore use GNU tar to do it
+        subprocess.run(["tar", "--append", "-f", tarPath, sparsePath], check=True)
+
+        # Create index. Because of the sparse file at the end, it might be recreated from scratch.
+        print("\n=== Update Index With Sparse File ===")
+        indexFilePath = os.path.join(tmpdir, "foo.tar.index")
+        with SQLiteIndexedTar(
+            tarFileName=tarPath,
+            writeIndex=True,
+            clearIndexCache=False,
+            indexFilePath=indexFilePath,
+            parallelization=parallelization,
+            printDebug=3,
+        ) as indexedTar:
+            assert indexedTar.hasBeenAppendedTo
+            assert indexedTar.exists("/00000000000000000000000000000282/00000000000000000000000000000976")
+            assert indexedTar.exists("/bar")
+            assert indexedTar.exists("/folder")
+
+        # Append small file to TAR after sparse file!
+        with tarfile.open(name=tarPath, mode="a:") as tarFile:
+            createFile(tarFile, "bar2", "foo")
+
+        # Create index but only go over new files
+        print("\n=== Update Index With New File After Sparse File ===")
+        indexFilePath = os.path.join(tmpdir, "foo.tar.index")
+        with SQLiteIndexedTar(
+            tarFileName=tarPath,
+            writeIndex=True,
+            clearIndexCache=False,
+            indexFilePath=indexFilePath,
+            parallelization=parallelization,
+        ) as indexedTar:
+            # assert indexedTar.hasBeenAppendedTo  # TODO
+            assert indexedTar.exists("/00000000000000000000000000000282/00000000000000000000000000000976")
+            assert indexedTar.exists("/bar")
+            assert indexedTar.exists("/folder")
+            assert indexedTar.exists("/bar2")
