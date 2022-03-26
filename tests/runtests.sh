@@ -239,7 +239,7 @@ checkFileInTAR()
     funmount "$mountFolder"
 
     if [[ "$archive" =~ .tar ]]; then
-        'grep' -q 'Loading offset dictionary' ratarmount.stdout.log ratarmount.stderr.log ||
+        'grep' -q 'Successfully loaded offset dictionary' ratarmount.stdout.log ratarmount.stderr.log ||
             returnError "$LINENO" "Looks like index was not loaded while executing: $RATARMOUNT_CMD ${args[*]}"
     fi
 
@@ -448,40 +448,6 @@ getPeakMemoryFromFile()
     python3 -c "import sys, numpy as np
 data = np.genfromtxt( sys.argv[1], skip_footer = 1 ).transpose()
 print( int( np.max( data[1] ) ), int( np.max( data[2] ) ) )" "$1"
-}
-
-benchmarkSerialization()
-{
-    local benchmarksFolder=benchmarks/data
-    local logFile="$benchmarksFolder/serializationBenchmark.dat"
-    touch "$logFile"
-    echo '# tarMiB indexCreationTime serializationTime serializedSize deserializationTime peakVmSizeCreation peakRssSizeCreation peakVmSizeLoading peakRssSizeLoading' >> "$logFile"
-    mkdir -p -- "$benchmarksFolder"
-
-    local mib
-    for mib in 1 8 64 256; do
-        echoerr "Benchmarking ${mib}MiB TAR metadata ..."
-
-        printf '%i ' "$mib" >> "$logFile"
-
-        testLargeTar "$mib" | sed -n -r '
-            s|Creating offset dictionary for /[^:]*.tar took ([0-9.]+)s|\1|p;
-            s|Writing out TAR.* took ([0-9.]+)s and is sized ([0-9]+) B|\1 \2|p;
-            s|Loading offset dictionary.* took ([0-9.]+)s|\1|p;
-        ' | sed -z 's|\n| |g' >> "$logFile"
-
-        # not nice but hard to do differently as the pipe opens testLargeTar in a subshell and tee
-        # redirects it directly to tty, so we can't store an output!
-        local timeSeriesFile="benchmark-memory-${mib}-MiB-saving.dat"
-        printf '%s ' "$( getPeakMemoryFromFile "$timeSeriesFile" )" >> "$logFile"
-        'mv' "$timeSeriesFile" "$benchmarksFolder/$timeSeriesFile"
-
-        local timeSeriesFile="benchmark-memory-${mib}-MiB-loading.dat"
-        printf '%s ' "$( getPeakMemoryFromFile "$timeSeriesFile" )" >> "$logFile"
-        'mv' "$timeSeriesFile" "$benchmarksFolder/$timeSeriesFile"
-
-        echo >> "$logFile"
-    done
 }
 
 checkAutomaticIndexRecreation()
@@ -1792,7 +1758,6 @@ done  # for parallelization
 
 
 benchmarkDecoderBackends
-#benchmarkSerialization # takes quite long, and a benchmark is not a test ...
 
 
 echo -e '\e[32mAll tests ran successfully.\e[0m'

@@ -1627,7 +1627,6 @@ class SQLiteIndexedTar(MountSource):
         if self.indexIsLoaded():
             return
 
-        t0 = time.time()
         self.sqlConnection = self._openSqlDb(indexFilePath)
         tables = [x[0] for x in self.sqlConnection.execute('SELECT name FROM sqlite_master WHERE type="table"')]
         versions = None
@@ -1730,8 +1729,7 @@ class SQLiteIndexedTar(MountSource):
             raise e
 
         if self.printDebug >= 1:
-            # Legacy output for automated tests
-            print(f"Loading offset dictionary from {str(indexFilePath)} took {time.time() - t0:.2f}s")
+            print(f"Successfully loaded offset dictionary from {str(indexFilePath)}")
 
     def _tryLoadIndex(self, indexFilePath: AnyStr) -> bool:
         """calls loadIndex if index is not loaded already and provides extensive error handling"""
