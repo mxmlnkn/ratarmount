@@ -9,6 +9,7 @@ import concurrent.futures
 import io
 import os
 import stat
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -82,7 +83,7 @@ class TestSQLiteIndexedTarParallelized:
         with tempfile.TemporaryDirectory() as tmpDirectory:
             oldCurrentWorkingDirectory = os.getcwd()
 
-            # Try with a writable directory and an non-wirtable current working directory
+            # Try with a writable directory and a non-writable current working directory
             # because FUSE also changes to root after mounting and forking to background.
             for directory in [tmpDirectory, '/']:
                 os.chdir(directory)
@@ -287,3 +288,85 @@ class TestSQLiteIndexedTarParallelized:
 
                 for file in files:
                     file.close()
+
+    @staticmethod
+    def test_appending(parallelization, tmpdir):
+        createFile = TestSQLiteIndexedTarParallelized._createFile
+        makeFolder = TestSQLiteIndexedTarParallelized._makeFolder
+
+        # Create a simple small TAR
+        tarPath = os.path.join(tmpdir, "foo.tar")
+        with tarfile.open(name=tarPath, mode="w:") as tarFile:
+            createFile(tarFile, "foo", "bar")
+
+        # Create index
+        indexFilePath = os.path.join(tmpdir, "foo.tar.index")
+        with SQLiteIndexedTar(
+            tarFileName=tarPath,
+            writeIndex=True,
+            clearIndexCache=True,
+            indexFilePath=indexFilePath,
+            parallelization=parallelization,
+        ) as indexedTar:
+            assert not indexedTar.hasBeenAppendedTo
+            assert indexedTar.exists("/foo")
+            assert not indexedTar.exists("/bar")
+            assert not indexedTar.exists("/folder")
+
+        # Append small file to TAR
+        with tarfile.open(name=tarPath, mode="a:") as tarFile:
+            createFile(tarFile, "bar", "foo")
+
+        # Create index but only go over new files
+        indexFilePath = os.path.join(tmpdir, "foo.tar.index")
+        with SQLiteIndexedTar(
+            tarFileName=tarPath,
+            writeIndex=True,
+            clearIndexCache=False,
+            indexFilePath=indexFilePath,
+            parallelization=parallelization,
+        ) as indexedTar:
+            assert indexedTar.hasBeenAppendedTo
+            assert indexedTar.exists("/foo")
+            assert indexedTar.exists("/bar")
+            assert not indexedTar.exists("/folder")
+
+        # Append empty folder to TAR
+        with tarfile.open(name=tarPath, mode="a:") as tarFile:
+            makeFolder(tarFile, "folder")
+
+        # Create index but only go over new files
+        indexFilePath = os.path.join(tmpdir, "foo.tar.index")
+        with SQLiteIndexedTar(
+            tarFileName=tarPath,
+            writeIndex=True,
+            clearIndexCache=False,
+            indexFilePath=indexFilePath,
+            parallelization=parallelization,
+        ) as indexedTar:
+            assert indexedTar.hasBeenAppendedTo
+            assert indexedTar.exists("/foo")
+            assert indexedTar.exists("/bar")
+            assert indexedTar.exists("/folder")
+
+        # Append a sparse file
+        sparsePath = os.path.join(tmpdir, "sparse")
+        with open(sparsePath, "w") as file:
+            pass
+        os.truncate(sparsePath, 1024 * 1024)
+        # The tarfile module only has read support for sparse files, therefore use GNU tar to do it
+        subprocess.run(["tar", "--append", "-f", tarPath, sparsePath])
+
+        # Create index. Because of the sparse file at the end, it might be recreated from scratch.
+        indexFilePath = os.path.join(tmpdir, "foo.tar.index")
+        with SQLiteIndexedTar(
+            tarFileName=tarPath,
+            writeIndex=True,
+            clearIndexCache=False,
+            indexFilePath=indexFilePath,
+            parallelization=parallelization,
+        ) as indexedTar:
+            # assert indexedTar.hasBeenAppendedTo  # TODO
+            assert indexedTar.exists("/foo")
+            assert indexedTar.exists("/bar")
+            assert indexedTar.exists("/folder")

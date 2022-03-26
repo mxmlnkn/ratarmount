@@ -676,6 +676,7 @@ class SQLiteIndexedTar(MountSource):
         self.printDebug                 = printDebug
         self.isFileObject               = fileObject is not None
         self.isGnuIncremental           = isGnuIncremental
+        self.hasBeenAppendedTo          = False
         # fmt: on
 
         # Determine an archive file name to show for debug output
@@ -721,6 +722,11 @@ class SQLiteIndexedTar(MountSource):
             except Exception:
                 pass
 
+        # TODO This does and did not work correctly for recursive TARs because the outermost layer will change None to
+        #      a hard value and from then on it would have been fixed to that value even then called inside createIndex.
+        if self.isGnuIncremental is None:
+            self.isGnuIncremental = self._isGnuIncremental(self.tarFileObject)
+
         # will be used for storing indexes if current path is read-only
         if self.isFileObject:
             possibleIndexFilePaths = []
@@ -763,6 +769,7 @@ class SQLiteIndexedTar(MountSource):
             if self._tryLoadIndex(indexPath):
                 self.indexFilePath = indexPath
                 break
+
         if self.indexIsLoaded() and self.sqlConnection:
             try:
                 indexVersion = self.sqlConnection.execute(
@@ -776,9 +783,42 @@ class SQLiteIndexedTar(MountSource):
             except Exception:
                 pass
 
-            self._loadOrStoreCompressionOffsets()
-            self._reloadIndexReadOnly()
-            return
+            if not self.hasBeenAppendedTo:  # indirectly set by a successful call to _tryLoadIndex
+                self._loadOrStoreCompressionOffsets()  # load
+                self._reloadIndexReadOnly()
+                return
+
+            # TODO Handling appended files to compressed archives would have to account for dropping the offsets,
+            #      seeking to the first appended file while not processing any metadata and still showing a progress
+            #      bar as well as saving the block offsets out after reading and possibly other things.
+            if self.compression:
+                # When loading compression offsets, the backends assume they are complete, so we have to clear them.
+                self._clearCompressionOffsets()
+
+            pastEndOffset = self._getPastEndOffset(self.sqlConnection)
+            if not self.compression and pastEndOffset and self._checkIndexValidity():
+                archiveSize = self.tarFileObject.seek(0, io.SEEK_END)
+
+                newShare = (archiveSize - pastEndOffset) / archiveSize
+                print(f"Detected TAR being appended to. Will only analyze the newly added {newShare:.3f} % of data.")
+
+                appendedPartAsFile = StenciledFile(
+                    fileStencils=[(self.tarFileObject, pastEndOffset, archiveSize - pastEndOffset)]
+                )
+                self._createIndex(appendedPartAsFile, None, "", pastEndOffset)
+
+                self._loadOrStoreCompressionOffsets()  # store
+
+                self.sqlConnection.execute("DROP TABLE IF EXISTS metadata;")
+                self.sqlConnection.execute("DROP TABLE IF EXISTS versions;")
+                self._storeMetadata(self.sqlConnection)
+
+                self._reloadIndexReadOnly()
+                return
+
+            self.sqlConnection.close()
+            self.sqlConnection = None
+            print("[Warning] The loaded index does not match the archive. Will recreate it.")
 
         # Find a suitable (writable) location for the index database
         if writeIndex and indexFilePath != ':memory:':
@@ -1121,14 +1161,14 @@ class SQLiteIndexedTar(MountSource):
     def _createIndex(
         self,
         # fmt: off
-        fileObject  : Any,
-        progressBar : Any = None,
+        fileObject  : IO[bytes],
+        progressBar : Optional[Any] = None,
         pathPrefix  : str = '',
         streamOffset: int = 0
         # fmt: on
     ) -> None:
         if self.printDebug >= 1:
-            print("Creating offset dictionary for", self.tarFileName, "...")
+            print(f"Creating offset dictionary for {self.tarFileName} ...")
         t0 = timer()
 
         # 1. If no SQL connection was given (by recursive call), open a new database file
@@ -1136,9 +1176,6 @@ class SQLiteIndexedTar(MountSource):
         if not self.indexIsLoaded() or not self.sqlConnection:
             openedConnection = True
             self.sqlConnection = self._initializeSqlDb(self.indexFilePath, printDebug=self.printDebug)
-
-        if self.isGnuIncremental is None:
-            self.isGnuIncremental = self._isGnuIncremental(fileObject)
 
         if progressBar is None:
             fileSize = None
@@ -1622,8 +1659,149 @@ class SQLiteIndexedTar(MountSource):
 
         return True
 
+    @staticmethod
+    def _getPastEndOffset(sqlConnection: sqlite3.Connection) -> Optional[int]:
+        """
+        Returns None if it cannot determine where the archive should end. Currently, because of implementation
+        limitations, this may happen if the last entry in the archive is a sparse file.
+        """
+        # TODO Make it work with sparse files by analyzing those sparse blocks manually or maybe get tarfile to do it
+
+        # Note that we cannot use the recorded archive file size to determine from which we need to resume
+        # reading because it is not specified how many zero-byte blocks there may be at the end:
+        # > At the end of the archive file there shall be two 512-byte blocks filled with binary zeros,
+        # > interpreted as an end-of-archive indicator.
+        # For example, GNU tar rounds up to 10 KiB for very small archives but will (have to) append further
+        # files right after the the last non-zero block, which might be at offset 512 for empty files.
+        # > The user can specify a blocking factor, which is the number of blocks per record.
+        # > The default is 20, producing 10 KiB records.
+        pastEndOffset, isSparse = sqlConnection.execute(
+            "SELECT offset + size, issparse FROM files ORDER BY offset DESC LIMIT 1"
+        ).fetchone()
+
+        if isSparse:
+            return None
+
+        # Round up to next TAR block
+        if pastEndOffset % 512 != 0:
+            pastEndOffset += 512 - (pastEndOffset % 512)
+
+        return pastEndOffset
+
+    def _checkArchiveSize(self, storedStats: Dict[str, Any], archiveStats: os.stat_result) -> None:
+        """
+        Raises an exception if the archive differs too much from what the index expects.
+        Sets self.hasBeenAppendedTo to True and returns normally if the archive has increased but still
+        contains all (approximation) of the original content.
+        Else, returns normally without side effects.
+        """
+
+        if (
+            not hasattr(archiveStats, "st_size")
+            or 'st_size' not in storedStats
+            or archiveStats.st_size == storedStats['st_size']
+        ):
+            return
+
+        archiveIsMoreRecent = (
+            hasattr(archiveStats, "st_mtime")
+            and 'st_mtime' in storedStats
+            and archiveStats.st_mtime > storedStats['st_mtime']
+        )
+        archiveIsLarger = archiveStats.st_size > storedStats['st_size']
+
+        # There is one very specific usecase for which recreating the complete index would be a waste:
+        #  - When an uncompressed archive got appended to with a rather small amount of files.
+        #
+        # Checking is expensive and would basically do the same work as creating the database anyway.
+        # Therefore, only bother with the added complexity and uncertainty of the randomized index check
+        # if the additional part to analyze makes up less than 66% of the total archive.
+        #
+        # Ignore small (<64 MiB) archives that don't take up much absolute time anyway.
+        # The threshold is motivated by the benchmarks for "First Mounting". Even for the worst case,
+        # i.e., only empty files inside the archive, would (only) allow ~131k files inside a 64 MiB
+        # uncompressed TAR, which would take less than a second to mount.
+        #
+        # Note that the xz compressed version of 100k zero-byte files is only ~200KB!
+        # But this should be an edge-case and with a compression ratio of ~2, even compressed archives
+        # of this size should not take more than 10s, so pretty negligible in my opinion.
+        # Furthermore, compressed archives would make checking the archive validity a lot slower!
+        #
+        # If the archive more than tripled, then the already existing part isn't all that much in
+        # comparison to the work that would have to be done anyway. And because the validity check
+        # would have to only be an approximation, simply allow the up to 33% overhead to recreate
+        # everything from scratch, just to be sure.
+        if archiveIsMoreRecent and archiveIsLarger and archiveStats.st_size >= 64 * 1024 * 1024:
+            if archiveStats.st_size > 3 * storedStats['st_size']:
+                raise InvalidIndexError(
+                    f"TAR file for this SQLite index has more than tripled its size from "
+                    f"{storedStats['st_size']} to {archiveStats.st_size}"
+                )
+
+            # For compressed archives, detecting appended archives does not help much because the bottleneck is
+            # the decompression not the indexing of files. And because indexed_bzip2 and indexed_gzip probably
+            # assume that the index is complete once import_index has been called, we have to recreate the full
+            # block offsets anyway.
+            if not self.compression:
+                if self.printDebug >= 2:
+                    print("[Info] Archive has probably been appended to because it is larger and more recent.")
+                self.hasBeenAppendedTo = True
+                return
+
+        raise InvalidIndexError(
+            f"TAR file for this SQLite index has changed size from "
+            f"{storedStats['st_size']} to {archiveStats.st_size}"
+        )
+
+    def _checkMetadata(self, metadata: Dict[str, Any]) -> None:
+        """
+        Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible.
+        Returns nomally and sets self.hasBeenAppendedTo to True if the size of the archive increased but still fits.
+        """
+
+        if 'tarstats' in metadata:
+            values = json.loads(metadata['tarstats'])
+            tarStats = os.stat(self.tarFileName)
+
+            self._checkArchiveSize(values, tarStats)
+
+            if (
+                not self.hasBeenAppendedTo
+                and self.verifyModificationTime
+                and hasattr(tarStats, "st_mtime")
+                and 'st_mtime' in values
+                and tarStats.st_mtime != values['st_mtime']
+            ):
+                raise InvalidIndexError(
+                    f"The modification date for the TAR file {values['st_mtime']} "
+                    f"to this SQLite index has changed ({str(tarStats.st_mtime)})",
+                )
+
+        # Check arguments used to create the found index.
+        # These are only warnings and not forcing a rebuild by default.
+        # TODO: Add --force options?
+        if 'arguments' in metadata:
+            indexArgs = json.loads(metadata['arguments'])
+            argumentsToCheck = [
+                'mountRecursively',
+                'gzipSeekPointSpacing',
+                'encoding',
+                'stripRecursiveTarExtension',
+                'ignoreZeros',
+            ]
+            differingArgs = []
+            for arg in argumentsToCheck:
+                if arg in indexArgs and hasattr(self, arg) and indexArgs[arg] != getattr(self, arg):
+                    differingArgs.append((arg, indexArgs[arg], getattr(self, arg)))
+            if differingArgs:
+                print("[Warning] The arguments used for creating the found index differ from the arguments ")
+                print("[Warning] given for mounting the archive now. In order to apply these changes, ")
+                print("[Warning] recreate the index using the --recreate-index option!")
+                for arg, oldState, newState in differingArgs:
+                    print(f"[Warning] {arg}: index: {oldState}, current: {newState}")
+
     def loadIndex(self, indexFilePath: AnyStr) -> None:
-        """Loads the given index SQLite database and checks it for validity."""
+        """Loads the given index SQLite database and checks it for validity raising an exception if it is invalid."""
         if self.indexIsLoaded():
             return
 
@@ -1668,55 +1846,7 @@ class SQLiteIndexedTar(MountSource):
 
             if 'metadata' in tables:
                 metadata = dict(self.sqlConnection.execute('SELECT * FROM metadata;'))
-
-                if 'tarstats' in metadata:
-                    values = json.loads(metadata['tarstats'])
-                    tarStats = os.stat(self.tarFileName)
-
-                    # fmt: off
-                    if (
-                        hasattr( tarStats, "st_size" )
-                        and 'st_size' in values
-                        and tarStats.st_size != values['st_size']
-                    ):
-                        raise InvalidIndexError( "TAR file for this SQLite index has changed size from",
-                                                 values['st_size'], "to", tarStats.st_size)
-                    # fmt: on
-
-                    if (
-                        self.verifyModificationTime
-                        and hasattr(tarStats, "st_mtime")
-                        and 'st_mtime' in values
-                        and tarStats.st_mtime != values['st_mtime']
-                    ):
-                        raise InvalidIndexError(
-                            "The modification date for the TAR file",
-                            values['st_mtime'],
-                            "to this SQLite index has changed (" + str(tarStats.st_mtime) + ")",
-                        )
-
-                # Check arguments used to create the found index.
-                # These are only warnings and not forcing a rebuild by default.
-                # TODO: Add --force options?
-                if 'arguments' in metadata:
-                    indexArgs = json.loads(metadata['arguments'])
-                    argumentsToCheck = [
-                        'mountRecursively',
-                        'gzipSeekPointSpacing',
-                        'encoding',
-                        'stripRecursiveTarExtension',
-                        'ignoreZeros',
-                    ]
-                    differingArgs = []
-                    for arg in argumentsToCheck:
-                        if arg in indexArgs and hasattr(self, arg) and indexArgs[arg] != getattr(self, arg):
-                            differingArgs.append((arg, indexArgs[arg], getattr(self, arg)))
-                    if differingArgs:
-                        print("[Warning] The arguments used for creating the found index differ from the arguments ")
-                        print("[Warning] given for mounting the archive now. In order to apply these changes, ")
-                        print("[Warning] recreate the index using the --recreate-index option!")
-                        for arg, oldState, newState in differingArgs:
-                            print(f"[Warning] {arg}: index: {oldState}, current: {newState}")
+                self._checkMetadata(metadata)
 
         except Exception as e:
             # indexIsLoaded checks self.sqlConnection, so close it before returning because it was found to be faulty
@@ -1772,6 +1902,60 @@ class SQLiteIndexedTar(MountSource):
             print("Loaded index", indexFilePath)
 
         return self.indexIsLoaded()
+
+    def _checkIndexValidity(self) -> bool:
+        if not self.sqlConnection:
+            raise IndexNotOpenError("This method can not be called without an opened index database!")
+
+        # Check some of the first and last files in the archive and some random selection in between.
+        result = self.sqlConnection.execute(
+            """
+            SELECT * FROM ( SELECT * FROM files ORDER BY offset ASC LIMIT 10 )
+            UNION
+            SELECT * FROM ( SELECT * FROM files ORDER BY RANDOM() LIMIT 10 )
+            UNION
+            SELECT * FROM ( SELECT * FROM files ORDER BY offset DESC LIMIT 10 )
+            ORDER BY offset
+        """
+        )
+
+        oldOffset = self.tarFileObject.tell()
+        try:
+            for row in result:
+                # As for the stencil size, 512 B (one TAR block) would be enough for most cases except for
+                # features like GNU LongLink which store additional metadata in further TAR blocks.
+                offset_header = int(row[2])
+                with StenciledFile(fileStencils=[(self.tarFileObject, offset_header, 2 * 512)]) as file:
+                    with tarfile.open(fileobj=file, mode='r|', ignore_zeros=True, encoding=self.encoding) as archive:
+                        tarInfo = next(iter(archive))
+                        realFileInfos, _, _ = _TarFileMetadataReader._processTarInfo(
+                            tarInfo,
+                            file,  # only used for isGnuIncremental == True
+                            "",  # pathPrefix
+                            offset_header,  # will be added to all offsets to get the real offset
+                            self.isGnuIncremental,
+                            False,  # mountRecursively
+                            self.printDebug,
+                        )
+
+                        # Bool columns will have been converted to int 0 or 1 when reading from SQLite.
+                        # In order to compare with the read result correctly, we need to convert them to bool, too.
+                        storedFileInfo = list(row)
+                        for index in [-1, -2]:
+                            if storedFileInfo[index] not in [0, 1]:
+                                return False
+                            storedFileInfo[index] = bool(storedFileInfo[index])
+
+                        if tuple(storedFileInfo) != realFileInfos[0]:
+                            return False
+            return True
+        except tarfile.TarError:
+            # Not even worth warning because this simply might happen if the index is not valid anymore.
+            return False
+        finally:
+            self.tarFileObject.seek(oldOffset)
+
+        return False
 
     @staticmethod
     def _detectCompression(fileobj: IO[bytes], printDebug: int = 0) -> Optional[str]:
@@ -1893,7 +2077,18 @@ class SQLiteIndexedTar(MountSource):
         except Exception:
             print("[Warning] Could not remove:", path)
 
+    def _clearCompressionOffsets(self):
+        if not self.sqlConnection:
+            raise IndexNotOpenError("This method can not be called without an opened index database!")
+
+        for table in ['bzip2blocks', 'gzipindex', 'gzipindexes', 'zstdblocks']:
+            self.sqlConnection.execute(f"DROP TABLE IF EXISTS {table}")
+
     def _loadOrStoreCompressionOffsets(self):
+        """
+        Will load block offsets from SQLite database to backend if a fitting table exists.
+        Else it will force creation and store the block offsets of the compression backend into a new table.
+        """
         if not self.indexFilePath or self.indexFilePath == ':memory:':
             if self.printDebug >= 2:
                 print("[Info] Will skip storing compression seek data because the database is in memory.")

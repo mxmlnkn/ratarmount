@@ -85,4 +85,4 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
             if hasattr(fileOrPath, 'seek'):
                 fileOrPath.seek(0)  # type: ignore
 
-    raise CompressionError("Archive to open has unrecognized format!")
+    raise CompressionError(f"Archive to open ({str(fileOrPath)}) has unrecognized format!")
