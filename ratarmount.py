@@ -1285,15 +1285,21 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         # fmt: on
     )
 
-    fuse.FUSE(
-        # fmt: on
-        operations=fuseOperationsObject,
-        mountpoint=args.mount_point,
-        foreground=args.foreground,
-        nothreads=True,  # Can't access SQLite database connection object from multiple threads
-        # fmt: off
-        **fusekwargs
-    )
+    try:
+        fuse.FUSE(
+            # fmt: on
+            operations=fuseOperationsObject,
+            mountpoint=args.mount_point,
+            foreground=args.foreground,
+            nothreads=True,  # Can't access SQLite database connection object from multiple threads
+            # fmt: off
+            **fusekwargs
+        )
+    except RuntimeError:
+        print("[Error] FUSE mountpoint could not be created. See previous output for more information.")
+        if args.debug >= 3:
+            traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == '__main__':
