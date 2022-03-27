@@ -1046,7 +1046,7 @@ class SQLiteIndexedTar(MountSource):
                 "offsetheader"  INTEGER,  /* seek offset from TAR file where the TAR metadata for this file resides */
                 "offset"        INTEGER,  /* seek offset from TAR file where these file's contents resides */
                 "size"          INTEGER,
-                "mtime"         INTEGER,
+                "mtime"         REAL,
                 "mode"          INTEGER,
                 "type"          INTEGER,
                 "linkname"      VARCHAR(65535),
