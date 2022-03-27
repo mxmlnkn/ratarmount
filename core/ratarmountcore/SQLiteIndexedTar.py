@@ -11,7 +11,6 @@ import sqlite3
 import stat
 import sys
 import tarfile
-import tempfile
 import threading
 import time
 import traceback
@@ -37,7 +36,7 @@ except ImportError:
 from .version import __version__
 from .MountSource import FileInfo, MountSource
 from .ProgressBar import ProgressBar
-from .SQLiteBlobFile import SQLiteBlobsFile
+from .SQLiteBlobFile import SQLiteBlobsFile, WriteSQLiteBlobs
 from .StenciledFile import StenciledFile
 from .compressions import supportedCompressions
 from .utils import RatarmountError, IndexNotOpenError, InvalidIndexError, CompressionError, overrides, ceilDiv
@@ -1973,7 +1972,7 @@ class SQLiteIndexedTar(MountSource):
                     #   => With proper buffer sizes, avoiding writing out the block offsets can be 5x faster!
                     # It seems to me like substr on blobs does not actually support true seeking :/
                     # The blob is probably always loaded fully into memory and only then is the substring being
-                    # calculated. For C, there actually is an incremental blob reading interface but not for python:
+                    # calculated. For C, there actually is an incremental blob reading interface but not for Python:
                     #   https://www.sqlite.org/c3ref/blob_open.html
                     #   https://bugs.python.org/issue24905
                     print(f"Loading gzip block offsets took {time.time() - t0:.2f}s")
@@ -1997,55 +1996,37 @@ class SQLiteIndexedTar(MountSource):
             while fileObject.read(1024 * 1024):
                 pass
 
-            # The created index can unfortunately be pretty large and /tmp might actually run out of memory!
-            # Therefore, try different paths, starting with the location where the index resides.
-            gzindex = None
-            for tmpDir in [os.path.dirname(self.indexFilePath), None]:
-                gzindex = tempfile.mkstemp(dir=tmpDir)[1]
-                try:
-                    fileObject.export_index(filename=gzindex)
-                    break
-                except indexed_gzip.ZranError:
-                    self._uncheckedRemove(gzindex)
-                    gzindex = None
+            # Old implementation using a temporary file before copying parts of it into blobs.
+            # Tested on 1 GiB of gzip block offset data (32 GiB file with block seek point spacing 1 MiB)
+            #   Time / s: 23.251 22.251 23.697 23.230 22.484
+            # Timings when using WriteSQLiteBlobs to write directly into the SQLite database.
+            #   Time / s: 13.029 14.884 14.110 14.229 13.807
 
-            if not gzindex or not os.path.isfile(gzindex):
-                print("[Warning] The GZip index required for seeking could not be stored in a temporary file!")
+            db.execute('CREATE TABLE gzipindexes ( data BLOB )')
+
+            try:
+                with WriteSQLiteBlobs(db, 'gzipindexes', blob_size=maxBlobSize) as gzindex:
+                    fileObject.export_index(fileobj=gzindex)
+            except indexed_gzip.ZranError:
+                db.execute('DROP TABLE IF EXISTS "gzipindexes"')
+
+                print("[Warning] The GZip index required for seeking could not be written to the database!")
                 print("[Info] This might happen when you are out of space in your temporary file and at the")
                 print("[Info] the index file location. The gzipindex size takes roughly 32kiB per 4MiB of")
                 print("[Info] uncompressed(!) bytes (0.8% of the uncompressed data) by default.")
-                raise RuntimeError("Could not initialize the GZip seek cache.")
-            if self.printDebug >= 2:
-                print("Exported GZip index size:", os.stat(gzindex).st_size)
 
-            # Clean up unreadable older data.
-            if 'gzipindex' in tables:
-                db.execute('DROP TABLE gzipindex')
-            if 'gzipindexes' in tables:
-                db.execute('DROP TABLE gzipindexes')
+                raise RuntimeError("Could not wrote out the gzip seek database.")
 
-            # Store contents of temporary file into the SQLite database
-            if os.stat(gzindex).st_size > maxBlobSize:
-                db.execute('CREATE TABLE gzipindexes ( data BLOB )')
-                with open(gzindex, 'rb') as file:
-                    while True:
-                        data = file.read(maxBlobSize)
-                        if not data:
-                            break
-
-                        # I'm pretty sure that the rowid can be used to query the rows with the insertion order:
-                        # https://www.sqlite.org/autoinc.html
-                        # > The usual algorithm is to give the newly created row a ROWID that is one larger than the
-                        #   largest ROWID in the table prior to the insert.
-                        # The "usual" makes me worry a bit, but I think it is in reference to the AUTOINCREMENT feature.
-                        db.execute('INSERT INTO gzipindexes VALUES (?)', (data,))
-            else:
-                db.execute('CREATE TABLE gzipindex ( data BLOB )')
-                with open(gzindex, 'rb') as file:
-                    db.execute('INSERT INTO gzipindex VALUES (?)', (file.read(),))
+            blobCount = db.execute('SELECT COUNT(*) FROM gzipindexes;').fetchone()[0]
+            if blobCount == 0:
+                if self.printDebug >= 2:
+                    print("[Warning] Did not write out any gzip seek data. This should only happen if the gzip ")
+                    print("[Warning] size is smaller than the gzip seek point spacing.")
+            elif blobCount == 1:
+                # For downwards compatibility
+                db.execute('ALTER TABLE gzipindexes RENAME TO gzipindex;')
 
             db.commit()
-            os.remove(gzindex)
             return
 
         # Note that for xz seeking, loading and storing block indexes is unnecessary because it has an index included!

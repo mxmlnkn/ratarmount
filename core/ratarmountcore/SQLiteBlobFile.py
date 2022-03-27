@@ -6,6 +6,7 @@ import sqlite3
 
 from typing import cast, IO, Optional
 
+from .utils import overrides
 from .StenciledFile import JoinedFile, LambdaReaderFile
 
 
@@ -50,3 +51,60 @@ class SQLiteBlobsFile(JoinedFile):
             ],
             buffer_size=buffer_size,
         )
+
+
+class WriteSQLiteBlobs(io.RawIOBase):
+    def __init__(self, connection: sqlite3.Connection, table: str, blob_size: int = io.DEFAULT_BUFFER_SIZE) -> None:
+        self.connection = connection
+        self.table = table
+        self.blob_size = blob_size
+        self.blob = io.BytesIO()
+
+    def _flushBlob(self):
+        if self.blob.tell() > 0:
+            self.connection.execute(f'INSERT INTO {self.table} VALUES (?)', (self.blob.getbuffer(),))
+        self.blob = io.BytesIO()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        self._flushBlob()
+
+    @overrides(io.RawIOBase)
+    def close(self) -> None:
+        self._flushBlob()
+
+    @overrides(io.RawIOBase)
+    def fileno(self) -> int:
+        # This is a virtual Python level file object and therefore does not have a valid OS file descriptor!
+        raise io.UnsupportedOperation()
+
+    @overrides(io.RawIOBase)
+    def seekable(self) -> bool:
+        return False
+
+    @overrides(io.RawIOBase)
+    def readable(self) -> bool:
+        return False
+
+    @overrides(io.RawIOBase)
+    def writable(self) -> bool:
+        return True
+
+    @overrides(io.RawIOBase)
+    def write(self, buffer) -> int:
+        freeBytesInBlob = self.blob_size - self.blob.tell()
+        writtenCount = 0
+
+        if len(buffer) < freeBytesInBlob:
+            writtenCount += self.blob.write(buffer)
+        else:
+            writtenCount += self.blob.write(buffer[:freeBytesInBlob])
+            self._flushBlob()
+            writtenCount += self.blob.write(buffer[freeBytesInBlob:])
+
+        if writtenCount != len(buffer):
+            raise RuntimeError("Failed to write all of the given data out!")
+
+        return len(buffer)
