@@ -1059,6 +1059,14 @@ seeking capabilities when opening that file.
                'The index needs to be (re)created to apply this option!' )
 
     parser.add_argument(
+        '--transform-recursive-mount-point', type=str, nargs = 2,
+        help = "Specify a regex pattern and a replacement string, which will be applied via Python\'s re module "
+               "to the full path of the archive to be recursively mounted. E.g., if there are recursive archives: "
+               "/folder/archive.tar.gz, you can substitute '[.][^/]+$' to '' and it will be mounted to "
+               "/folder/archive.tar. Or you can replace '^.*/([^/]+).tar.gz$' to '/\1' to mount all recursive folders "
+               "under the top-level without extensions.")
+
+    parser.add_argument(
         '--index-file', type = str,
         help = 'Specify a path to the .index.sqlite file. Setting this will disable fallback index folders. '
                'If the given path is ":memory:", then the index will not be written out to disk.' )
@@ -1127,6 +1135,13 @@ seeking capabilities when opening that file.
         return args
 
     args.gzipSeekPointSpacing = args.gzip_seek_point_spacing * 1024 * 1024
+
+    if (args.strip_recursive_tar_extension or args.transform_recursive_mount_point) and not args.recursive:
+        print("[Warning] The options --strip-recursive-tar-extension and --transform-recursive-mount-point")
+        print("[Warning] only have an effect when used with --recursive.")
+
+    if args.transform_recursive_mount_point:
+        args.transform_recursive_mount_point = tuple(args.transform_recursive_mount_point)
 
     # This is a hack but because we have two positional arguments (and want that reflected in the auto-generated help),
     # all positional arguments, including the mountpath will be parsed into the tarfilepaths namespace and we have to
@@ -1261,23 +1276,24 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
 
     fuseOperationsObject = FuseMount(
         # fmt: off
-        pathToMount                = args.mount_source,
-        clearIndexCache            = args.recreate_index,
-        recursive                  = args.recursive,
-        gzipSeekPointSpacing       = args.gzipSeekPointSpacing,
-        mountPoint                 = args.mount_point,
-        encoding                   = args.encoding,
-        ignoreZeros                = args.ignore_zeros,
-        verifyModificationTime     = args.verify_mtime,
-        stripRecursiveTarExtension = args.strip_recursive_tar_extension,
-        indexFilePath              = args.index_file,
-        indexFolders               = args.index_folders,
-        lazyMounting               = args.lazy,
-        passwords                  = args.passwords,
-        parallelization            = args.parallelization,
-        isGnuIncremental           = args.gnu_incremental,
-        writeOverlay               = args.write_overlay,
-        printDebug                 = args.debug,
+        pathToMount                  = args.mount_source,
+        clearIndexCache              = args.recreate_index,
+        recursive                    = args.recursive,
+        gzipSeekPointSpacing         = args.gzipSeekPointSpacing,
+        mountPoint                   = args.mount_point,
+        encoding                     = args.encoding,
+        ignoreZeros                  = args.ignore_zeros,
+        verifyModificationTime       = args.verify_mtime,
+        stripRecursiveTarExtension   = args.strip_recursive_tar_extension,
+        indexFilePath                = args.index_file,
+        indexFolders                 = args.index_folders,
+        lazyMounting                 = args.lazy,
+        passwords                    = args.passwords,
+        parallelization              = args.parallelization,
+        isGnuIncremental             = args.gnu_incremental,
+        writeOverlay                 = args.write_overlay,
+        printDebug                   = args.debug,
+        transformRecursiveMountPoint = args.transform_recursive_mount_point,
         # fmt: on
     )
 

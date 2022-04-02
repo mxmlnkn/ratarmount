@@ -38,7 +38,7 @@ from .MountSource import FileInfo, MountSource
 from .ProgressBar import ProgressBar
 from .SQLiteBlobFile import SQLiteBlobsFile, WriteSQLiteBlobs
 from .StenciledFile import StenciledFile
-from .compressions import supportedCompressions
+from .compressions import getGzipInfo, supportedCompressions
 from .utils import RatarmountError, IndexNotOpenError, InvalidIndexError, CompressionError, overrides, ceilDiv
 from .BlockParallelReaders import ParallelXZReader
 
@@ -509,11 +509,11 @@ class _TarFileMetadataReader:
 
                 if mightBeTar:
                     filesToMountRecursively.extend(newFileInfos)
-                else:
-                    fileInfos.extend(newFileInfos)
-                    if len(fileInfos) > 1000:
-                        self._setFileInfos(fileInfos)
-                        fileInfos.clear()
+
+                fileInfos.extend(newFileInfos)
+                if len(fileInfos) > 1000:
+                    self._setFileInfos(fileInfos)
+                    fileInfos.clear()
 
         finally:
             self._setFileInfos(fileInfos)
@@ -605,21 +605,22 @@ class SQLiteIndexedTar(MountSource):
     def __init__(
         # fmt: off
         self,
-        tarFileName                : Optional[str]       = None,
-        fileObject                 : Optional[IO[bytes]] = None,
-        writeIndex                 : bool                = False,
-        clearIndexCache            : bool                = False,
-        indexFilePath              : Optional[str]       = None,
-        indexFolders               : Optional[List[str]] = None,
-        recursive                  : bool                = False,
-        gzipSeekPointSpacing       : int                 = 4*1024*1024,
-        encoding                   : str                 = tarfile.ENCODING,
-        stripRecursiveTarExtension : bool                = False,
-        ignoreZeros                : bool                = False,
-        verifyModificationTime     : bool                = False,
-        parallelization            : int                 = 1,
-        isGnuIncremental           : Optional[bool]      = None,
-        printDebug                 : int                 = 0,
+        tarFileName                  : Optional[str]             = None,
+        fileObject                   : Optional[IO[bytes]]       = None,
+        writeIndex                   : bool                      = False,
+        clearIndexCache              : bool                      = False,
+        indexFilePath                : Optional[str]             = None,
+        indexFolders                 : Optional[List[str]]       = None,
+        recursive                    : bool                      = False,
+        gzipSeekPointSpacing         : int                       = 4*1024*1024,
+        encoding                     : str                       = tarfile.ENCODING,
+        stripRecursiveTarExtension   : bool                      = False,
+        ignoreZeros                  : bool                      = False,
+        verifyModificationTime       : bool                      = False,
+        parallelization              : int                       = 1,
+        isGnuIncremental             : Optional[bool]            = None,
+        printDebug                   : int                       = 0,
+        transformRecursiveMountPoint : Optional[Tuple[str, str]] = None,
         # pylint: disable=unused-argument
         **kwargs
         # fmt: on
@@ -652,6 +653,9 @@ class SQLiteIndexedTar(MountSource):
                       read concatenated tars.
         stripRecursiveTarExtension : If true and if recursive is also true, then a <file>.tar inside the current
                                      tar will be mounted at <file>/ instead of <file>.tar/.
+        transformRecursiveMountPoint : If specified, then a <path>.tar inside the current tar will be matched with the
+                                       first argument of the tuple and replaced by the second argument. This new
+                                       modified path is used as recursive mount point. See also Python's re.sub.
         verifyModificationTime : If true, then the index will be recreated automatically if the TAR archive has a more
                                  recent modification time than the index file.
         isGnuIncremental : If None, then it will be determined automatically. Behavior can be overwritten by setting
@@ -666,18 +670,19 @@ class SQLiteIndexedTar(MountSource):
         self.indexFilePath = None
 
         # fmt: off
-        self.mountRecursively           = recursive
-        self.encoding                   = encoding
-        self.stripRecursiveTarExtension = stripRecursiveTarExtension
-        self.ignoreZeros                = ignoreZeros
-        self.verifyModificationTime     = verifyModificationTime
-        self.gzipSeekPointSpacing       = gzipSeekPointSpacing
-        self.parallelization            = parallelization
-        self.printDebug                 = printDebug
-        self.isFileObject               = fileObject is not None
-        self.isGnuIncremental           = isGnuIncremental
-        self.hasBeenAppendedTo          = False
-        self.numberOfMetadataToVerify   = 1000  # shouldn't take more than 1 second according to benchmarks
+        self.mountRecursively             = recursive
+        self.encoding                     = encoding
+        self.stripRecursiveTarExtension   = stripRecursiveTarExtension
+        self.transformRecursiveMountPoint = transformRecursiveMountPoint
+        self.ignoreZeros                  = ignoreZeros
+        self.verifyModificationTime       = verifyModificationTime
+        self.gzipSeekPointSpacing         = gzipSeekPointSpacing
+        self.parallelization              = parallelization
+        self.printDebug                   = printDebug
+        self.isFileObject                 = fileObject is not None
+        self.isGnuIncremental             = isGnuIncremental
+        self.hasBeenAppendedTo            = False
+        self.numberOfMetadataToVerify     = 1000  # shouldn't take more than 1 second according to benchmarks
         # fmt: on
 
         # Determine an archive file name to show for debug output
@@ -997,6 +1002,7 @@ class SQLiteIndexedTar(MountSource):
             'gzipSeekPointSpacing',
             'encoding',
             'stripRecursiveTarExtension',
+            'transformRecursiveMountPoint',
             'ignoreZeros',
         ]
 
@@ -1221,8 +1227,10 @@ class SQLiteIndexedTar(MountSource):
         oldPos = fileObject.tell()
         oldPrintName = self.tarFileName
         for fileInfo in filesToMountRecursively:
-            # Strip file extension for mount point if so configured
+            modifiedFolder = fileInfo[0]
             modifiedName = fileInfo[1]
+
+            # Strip file extension for mount point if so configured
             tarExtension = '.tar'
             if (
                 self.stripRecursiveTarExtension
@@ -1230,6 +1238,13 @@ class SQLiteIndexedTar(MountSource):
                 and modifiedName.lower().endswith(tarExtension.lower())
             ):
                 modifiedName = modifiedName[: -len(tarExtension)]
+
+            # Apply regex transformation to get mount point
+            pattern = self.transformRecursiveMountPoint
+            modifiedPath = '/' + ('/'.join([modifiedFolder, modifiedName])).lstrip('/')
+            if (isinstance(pattern, tuple) or isinstance(pattern, list)) and len(pattern) == 2:
+                modifiedPath = '/' + re.sub(pattern[0], pattern[1], modifiedPath).lstrip('/')
+                modifiedFolder, modifiedName = modifiedPath.rsplit('/', 1)
 
             # Temporarily change tarFileName for the info output of the recursive call
             self.tarFileName = os.path.join(fileInfo[0], fileInfo[1])
@@ -1248,7 +1263,7 @@ class SQLiteIndexedTar(MountSource):
             try:
                 # Do not use os.path.join here because the leading / might be missing.
                 # This should instead be seen as the reverse operation of the rsplit further above.
-                self._createIndex(tarFileObject, progressBar, "/".join([fileInfo[0], modifiedName]), globalOffset)
+                self._createIndex(tarFileObject, progressBar, modifiedPath, globalOffset)
                 isTar = True
             except tarfile.ReadError:
                 pass
@@ -1269,14 +1284,21 @@ class SQLiteIndexedTar(MountSource):
                     | (stat.S_IXOTH if mode & stat.S_IROTH != 0 else 0)
                 )
 
-                modifiedFileInfo[0] = fileInfo[0]
-                modifiedFileInfo[1] = modifiedName
+                if modifiedFolder != modifiedFileInfo[0] or modifiedName != modifiedFileInfo[1]:
+                    modifiedFileInfo[0] = modifiedFolder
+                    modifiedFileInfo[1] = modifiedName
+                else:
+                    # Increment offset and offsetheader such that the new folder is seen as a more recent version
+                    # of the already existing file path for the archive if it has the same path. Else, it would
+                    # be undetermined which version is to be counted as more recent when using ORDER BY offsetheader.
+                    # Note that offset and offsetheader contain a lot of redundant bits anyway because they are known
+                    # to be 0 modulo 512, so the original offsets can be reconstructed even after adding 1.
+                    modifiedFileInfo[2] = modifiedFileInfo[2] + 1
+                    modifiedFileInfo[3] = modifiedFileInfo[3] + 1
                 modifiedFileInfo[6] = mode
                 modifiedFileInfo[11] = isTar
 
                 self._setFileInfo(tuple(modifiedFileInfo))
-            else:
-                self._setFileInfo(fileInfo)
 
         fileObject.seek(oldPos)
         self.tarFileName = oldPrintName
@@ -1296,11 +1318,30 @@ class SQLiteIndexedTar(MountSource):
                 # If fileObject doesn't have a fileno, we set tarInfo to None
                 # and set the relevant statistics (such as st_mtime) to sensible defaults.
                 tarInfo = None
+
             fname = os.path.basename(self.tarFileName)
             for suffix in ['.gz', '.bz2', '.bzip2', '.gzip', '.xz', '.zst', '.zstd']:
                 if fname.lower().endswith(suffix) and len(fname) > len(suffix):
                     fname = fname[: -len(suffix)]
                     break
+
+            # Try to get original file name from gzip
+            mtime = 0
+            if self.rawFileObject:
+                oldPos = self.rawFileObject.tell()
+                self.rawFileObject.seek(0)
+                try:
+                    info = getGzipInfo(self.rawFileObject)
+                    if info:
+                        fname, mtime = info
+                except Exception:
+                    if self.printDebug >= 2:
+                        print("[Info] Could not determine an original gzip file name probably because it is not a gzip")
+                    if self.printDebug >= 3:
+                        traceback.print_exc()
+                finally:
+                    # TODO Why does tell return negative numbers!? Problem with indexed_gzip?
+                    self.rawFileObject.seek(max(0, oldPos))
 
             # If the file object is actually an IndexedBzip2File or such, we can't directly use the file size
             # from os.stat and instead have to gather it from seek. Unfortunately, indexed_gzip does not support
@@ -1313,17 +1354,17 @@ class SQLiteIndexedTar(MountSource):
 
             # fmt: off
             fileInfo = (
-                ""                                   ,  # 0 path
-                fname                                ,  # 1
-                None                                 ,  # 2 header offset
-                0                                    ,  # 3 data offset
-                fileSize                             ,  # 4
-                tarInfo.st_mtime if tarInfo else 0   ,  # 5
-                tarInfo.st_mode if tarInfo else mode ,  # 6
-                None                                 ,  # 7 TAR file type. Currently unused. Overlaps with mode
-                None                                 ,  # 8 linkname
-                tarInfo.st_uid if tarInfo else 0     ,  # 9
-                tarInfo.st_gid if tarInfo else 0     ,  # 10
+                ""                                    ,  # 0 path
+                fname                                 ,  # 1
+                None                                  ,  # 2 header offset
+                0                                     ,  # 3 data offset
+                fileSize                              ,  # 4
+                tarInfo.st_mtime if tarInfo else mtime,  # 5
+                tarInfo.st_mode if tarInfo else mode  ,  # 6
+                None                                  ,  # 7 TAR file type. Currently unused. Overlaps with mode
+                None                                  ,  # 8 linkname
+                tarInfo.st_uid if tarInfo else 0      ,  # 9
+                tarInfo.st_gid if tarInfo else 0      ,  # 10
                 False              ,  # 11 isTar
                 False              ,  # 12 isSparse, don't care if it is actually sparse or not because it is not in TAR
             )
@@ -1846,6 +1887,7 @@ class SQLiteIndexedTar(MountSource):
                 'gzipSeekPointSpacing',
                 'encoding',
                 'stripRecursiveTarExtension',
+                'transformRecursiveMountPoint',
                 'ignoreZeros',
             ]
             differingArgs = []

@@ -1525,7 +1525,15 @@ if [[ -z "$CI" ]]; then
 
     shellcheck tests/*.sh || returnError "$LINENO" 'shellcheck failed!'
 
-    pytest "${testFiles[@]}" || returnError "$LINENO" 'pytest failed!'
+    # Pytest has serious performance issues. It does collect all tests beforehand and does not free memory
+    # after tests have finished it seems. Or maybe that memory is a bug with indexed_gzip but the problem is
+    # that after that all tests after that one outlier also run slower. Maybe because of a Python garbage collector
+    # bug? For that reason, run each test file separately.
+    for testFile in "${testFiles[@]}"; do
+        if [[ "${testFile//test_//}" != "$testFile" ]]; then
+            pytest "$testFile" || returnError "$LINENO" 'pytest failed!'
+        fi
+    done
 fi
 
 

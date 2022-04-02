@@ -4,8 +4,9 @@
 import collections
 import concurrent.futures
 import os
+import struct
 import sys
-from typing import Optional
+from typing import IO, Optional, Tuple
 
 try:
     import indexed_bzip2
@@ -162,3 +163,22 @@ def compressZstd(filePath: str, outputFilePath: str, frameSize: int, paralleliza
 
         while results:
             compressedFile.write(results.pop(0).result())
+
+
+def getGzipInfo(fileobj: IO[bytes]) -> Optional[Tuple[str, int]]:
+    id1, id2, compression, flags, mtime, _, _ = struct.unpack('<BBBBLBB', fileobj.read(10))
+    if id1 != 0x1F or id2 != 0x8B or compression != 0x08:
+        return None
+
+    if flags & (1 << 2) != 0:
+        fileobj.read(struct.unpack('<U', fileobj.read(2))[0])
+
+    if flags & (1 << 3) != 0:
+        name = b''
+        c = fileobj.read(1)
+        while c != b'\0':
+            name += c
+            c = fileobj.read(1)
+        return name.decode(), mtime
+
+    return None

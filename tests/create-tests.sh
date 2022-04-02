@@ -203,3 +203,49 @@ ratarmount -o modules=iconv,to_code=ISO-8859-1 mimi momo
 ( cd momo && tar -c --owner=0 --group=0 --numeric-owner -f ../nested-special-char.tar "$file"; )
 fusermount -u momo
 rm -r mimi momo
+
+
+# 1000 times packed
+echo iriya > ufo
+tar -O -c -f ufo_00.tar ufo
+for (( i=1; i < 100; ++i )); do
+    tar -O -c -f "ufo_$( printf %02i "$i" ).tar" "ufo_$( printf %02i "$(( i-1 ))" ).tar"
+    'rm' "ufo_$( printf %02i "$(( i-1 ))" ).tar"
+done
+mv ufo_99.tar packed-100-times.tar
+
+
+echo iriya > ufo
+tar -O --gzip -c -f ufo_00.tar.gz ufo
+for (( i=1; i < 100; ++i )); do
+    tar -O --gzip -c -f "ufo_$( printf %02i "$i" ).tar.gz" "ufo_$( printf %02i "$(( i-1 ))" ).tar.gz"
+    'rm' "ufo_$( printf %02i "$(( i-1 ))" ).tar.gz"
+done
+mv ufo_99.tar.gz compressed-100-times.tar.gz
+
+
+echo iriya > ufo
+tar -O --gzip -c -f ufo_000.tar.gz ufo
+for (( i=1; i < 1000; ++i )); do
+    tar -O --gzip -c -f "ufo_$( printf %03i "$i" ).tar.gz" "ufo_$( printf %03i "$(( i-1 ))" ).tar.gz"
+    'rm' "ufo_$( printf %03i "$(( i-1 ))" ).tar.gz"
+done
+mv ufo_999.tar.gz compressed-1000-times.tar.gz
+
+
+echo iriya > ufo
+gzip -c ufo > ufo_000.gz
+for (( i=1; i < 1000; ++i )); do
+    gzip -c "ufo_$( printf %03i "$(( i-1 ))" ).gz" > "ufo_$( printf %03i "$i" ).gz"
+    'rm' "ufo_$( printf %03i "$(( i-1 ))" ).gz"
+done
+mv ufo_999.gz compressed-1000-times.gz
+
+
+echo iriya > ufo
+gzip -c ufo > ufo_00.gz
+for (( i=1; i < 100; ++i )); do
+    gzip -c "ufo_$( printf %02i "$(( i-1 ))" ).gz" > "ufo_$( printf %02i "$i" ).gz"
+    'rm' "ufo_$( printf %02i "$(( i-1 ))" ).gz"
+done
+mv ufo_99.gz compressed-100-times.gz

@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import re
 import stat
 import time
 import traceback
@@ -101,6 +102,12 @@ class AutoMountLayer(MountSource):
             return None
 
         mountPoint = strippedFilePath if self.options.get('stripRecursiveTarExtension', False) else path
+        # https://unix.stackexchange.com/questions/655155/how-to-repeatedly-unpack-tar-gz-files-that-are-within-the-tar-gz-itself
+        if 'transformRecursiveMountPoint' in self.options:
+            pattern = self.options['transformRecursiveMountPoint']
+            if (isinstance(pattern, tuple) or isinstance(pattern, list)) and len(pattern) == 2:
+                mountPoint = '/' + re.sub(pattern[0], pattern[1], mountPoint).lstrip('/')
+
         if mountPoint in self.mounted:
             return None
 
@@ -203,7 +210,10 @@ class AutoMountLayer(MountSource):
             files = set(files)
 
         # Check whether we need to add recursive mount points to this directory listing
-        if self.options.get('recursive', False) and self.options.get('stripRecursiveTarExtension', False):
+        if self.options.get('recursive', False) and (
+            self.options.get('stripRecursiveTarExtension', False)
+            or self.options.get('transformRecursiveMountPoint', False)
+        ):
             for mountPoint, mountInfo in self.mounted.items():
                 folder, folderName = os.path.split(mountPoint)
                 if folder == path and folderName and folderName not in files:
