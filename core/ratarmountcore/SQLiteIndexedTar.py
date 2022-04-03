@@ -1239,7 +1239,10 @@ class SQLiteIndexedTar(MountSource):
             # whether tarfile has streaming access or seeking access!
             globalOffset = fileInfo[3]
             size = fileInfo[4]
-            tarFileObject = StenciledFile(fileObject, [(globalOffset, size)])
+            # fileObject already effectively applies streamOffset, so we can't use the globalOffset here!
+            # For all supported cases, it should be fine to directly use self.tarFileObject instead of fileObject.
+            # This would also save some indirections to speed up accesses.
+            tarFileObject = StenciledFile(self.tarFileObject, [(globalOffset, size)])
 
             isTar = False
             try:

@@ -81,6 +81,24 @@ class TestSQLiteIndexedTarParallelized:
             assert info.userdata[0].offset == 1248768
 
     @staticmethod
+    def test_deep_recursive(parallelization):
+        with SQLiteIndexedTar(
+            "tests/packed-5-times.tar.gz",
+            clearIndexCache=True,
+            recursive=True,
+            parallelization=parallelization,
+        ) as mountSource:
+            assert mountSource.listDir('/')
+            assert mountSource.listDir('/ufo_03.tar')
+            assert mountSource.listDir('/ufo_03.tar/ufo_02.tar')
+            assert mountSource.listDir('/ufo_03.tar/ufo_02.tar/ufo_01.tar')
+            assert mountSource.listDir('/ufo_03.tar/ufo_02.tar/ufo_01.tar/ufo_00.tar')
+
+            fileInfo = mountSource.getFileInfo('/ufo_03.tar/ufo_02.tar/ufo_01.tar/ufo_00.tar/ufo')
+            assert fileInfo
+            assert mountSource.open(fileInfo).read() == b'iriya\n'
+
+    @staticmethod
     def test_index_creation_and_loading(parallelization):
         with tempfile.TemporaryDirectory() as tmpDirectory:
             oldCurrentWorkingDirectory = os.getcwd()
