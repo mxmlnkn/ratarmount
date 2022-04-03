@@ -1,12 +1,28 @@
 
-# Version 0.11.0 built on 2022-04-xx
+# Version 0.11.0 built on 2022-04-06
 
- - Add -u option for more consistent mount/unmount call signatures.
  - Add --write-overlay option to enable write support at the mount point.
+ - Add -u option for more consistent mount/unmount call signatures.
+ - Add output for versions of all dependencies to --version.
+ - Add support for AppImage builds which will be offered on the GitHub Releases page.
+ - Add --transform-recursive-mount-point option to control the mount path of recursively mounted archives.
+ - Change default for --parallelization from 1 to 0, i.e., maximum number of cores.
  - (ratarmountcore 0.2.1) Fix (the last 1000) files not showing for truncated / incomplete TAR files.
  - (ratarmountcore 0.2.2) Improve performance for gzip files significantly by using a larger buffer.
  - (ratarmountcore 0.2.2) Do not use ParallelXZReader for single-block xz files to avoid memory issues.
  - (ratarmountcore 0.2.3) Fix uncaught exception when a folder contains an invalid character.
+ - (ratarmountcore 0.2.4) Recursive mounting of nested uncompressed TARs did skip some files for depth > 2.
+ - (ratarmountcore 0.3.0) Relax the check for GNU incremental TAR detection because the prefix field
+   might contain binary data.
+ - (ratarmountcore 0.3.0) Improve performance by factor ~5 and avoid storage requirements for index
+   reading for gzip compressed archives.
+ - (ratarmountcore 0.3.0) Improve performance by ~40% and avoid storage requirements for index
+   writing for gzip compressed archives.
+ - (ratarmountcore 0.3.0) Improve performance for indexing uncompressed TARs that have been
+   appended to by only analyzing the new files.
+ - (ratarmountcore 0.3.0) Fix uncompressed archives having been appended very small files (<10 KiB)
+   were not detected as changed by default.
+ - (ratarmountcore 0.3.0) Fix problem triggered by combining --recursive and -P 0 with a recursive bzip2 archive.
 
 # Version 0.10.0 built on 2022-01-15
 

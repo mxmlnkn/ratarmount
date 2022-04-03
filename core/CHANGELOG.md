@@ -1,4 +1,18 @@
 
+# Version 0.3.0 built on 2022-04-03
+
+ - Relax the check for GNU incremental TAR detection because the prefix field
+   might contain binary data.
+ - Improve performance by factor ~5 and avoid storage requirements for index
+   reading for gzip compressed archives.
+ - Improve performance by ~40% and avoid storage requirements for index
+   writing for gzip compressed archives.
+ - Improve performance for indexing uncompressed TARs that have been
+   appended to by only analyzing the new files.
+ - Fix uncompressed archives having been appended very small files (<10 KiB)
+   were not detected as changed by default.
+ - Fix problem triggered by combining --recursive and -P 0 with a recursive bzip2 archive.
+
 # Version 0.2.4 built on 2022-04-04
 
  - Recursive mounting of nested uncompressed TARs did skip some files for depth > 2.
