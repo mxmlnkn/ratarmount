@@ -1099,7 +1099,7 @@ seeking capabilities when opening that file.
         help = 'Unmount the given mount point. Equivalent to calling "fusermount -u".' )
 
     parser.add_argument(
-        '-P', '--parallelization', type = int, default = 1,
+        '-P', '--parallelization', type = int, default = 0,
         help = 'If an integer other than 1 is specified, then the threaded parallel bzip2 decoder will be used '
                'specified amount of block decoder threads. Further threads with lighter work may be started. '
                f'A value of 0 will use all the available cores ({os.cpu_count()}).')
