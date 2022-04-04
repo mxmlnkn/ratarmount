@@ -1,4 +1,8 @@
 
+# Version 0.2.4 built on 2022-04-04
+
+ - Recursive mounting of nested uncompressed TARs did skip some files for depth > 2.
+
 # Version 0.2.3 built on 2022-04-03
 
  - Fix uncaught exception when a folder contains an invalid character.
