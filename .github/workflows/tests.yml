@@ -166,7 +166,9 @@ jobs:
     - name: Unit Tests
       run: |
         python3 -m pip install pytest
-        pytest core/tests/*.py
+        for file in core/tests/test_*.py; do
+            pytest "$file"
+        done
 
     - name: Regression Tests
       run: |
@@ -241,7 +243,9 @@ jobs:
     - name: Unit Tests
       run: |
         python3.9 -m pip install pytest
-        pytest core/tests/*.py
+        for file in core/tests/test_*.py; do
+            pytest "$file"
+        done
 
 
   Manylinux-Appimage:
