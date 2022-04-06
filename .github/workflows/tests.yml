@@ -249,6 +249,7 @@ jobs:
 
 
   Manylinux-Appimage:
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     container: quay.io/pypa/manylinux2014_x86_64
     env:
