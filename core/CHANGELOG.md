@@ -1,5 +1,5 @@
 
-# Version 0.3.0 built on 2022-04-03
+# Version 0.3.0 built on 2022-04-06
 
  - Relax the check for GNU incremental TAR detection because the prefix field
    might contain binary data.
