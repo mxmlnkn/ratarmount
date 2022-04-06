@@ -8,7 +8,7 @@
 [![Discord](https://img.shields.io/discord/783411320354766878?label=discord)](https://discord.gg/Wra6t6akh2)
 [![Telegram](https://img.shields.io/badge/Chat-Telegram-%2330A3E6)](https://t.me/joinchat/FUdXxkXIv6c4Ib8bgaSxNg)
 
-Combines the random access indexing idea from [tarindexer](https://github.com/devsnd/tarindexer) and then **mounts** the **TAR** using [fusepy](https://github.com/fusepy/fusepy) for easy read-only access just like [archivemount](https://github.com/cybernoid/archivemount/).
+Combines the random access indexing idea from [tarindexer](https://github.com/devsnd/tarindexer) and then **mounts** the **TAR** using [fusepy](https://github.com/fusepy/fusepy) for read access just like [archivemount](https://github.com/cybernoid/archivemount/).
 In [contrast](https://github.com/libarchive/libarchive#notes-about-the-library-design) to [libarchive](https://github.com/libarchive/libarchive), on which archivemount is based, random access and true seeking is supported.
 
 *Other capabilities:*
@@ -18,6 +18,7 @@ In [contrast](https://github.com/libarchive/libarchive#notes-about-the-library-d
  - **Mount Compressed Files:** You may also mount files with one of the supported compression schemes. Even if these files do not contain a TAR, you can leverage ratarmount's true seeking capabilities when opening the mounted uncompressed view of such a file.
  - **Read-Only Bind Mounting:** Folders may be mounted read-only to other folders for usecases like merging a backup TAR with newer versions of those files residing in a normal folder.
  - **Union Mounting:** Multiple TARs, compressed files, and bind mounted folders can be mounted under the same mountpoint.
+ - **Write Overlay:** A folder can be specified as write overlay. All changes below the mountpoint will be redirected to this folder and deletions are tracked so that all changes can be applied back to the archive.
 
 *Compressions supported for random access:*
 
@@ -232,9 +233,12 @@ Here is a more recent test for version 0.2.0 with the new default SQLite backend
 usage: ratarmount [-h] [-f] [-d DEBUG] [-c] [-r] [-l]
                   [-gs GZIP_SEEK_POINT_SPACING] [-p PREFIX]
                   [--password PASSWORD] [--password-file PASSWORD_FILE]
-                  [-e ENCODING] [-i] [--verify-mtime] [-s]
+                  [-e ENCODING] [-i] [--gnu-incremental]
+                  [--no-gnu-incremental] [--verify-mtime] [-s]
+                  [--transform-recursive-mount-point TRANSFORM_RECURSIVE_MOUNT_POINT TRANSFORM_RECURSIVE_MOUNT_POINT]
                   [--index-file INDEX_FILE] [--index-folders INDEX_FOLDERS]
-                  [-o FUSE] [-P PARALLELIZATION] [-v]
+                  [-w WRITE_OVERLAY] [--commit-overlay] [-o FUSE] [-u]
+                  [-P PARALLELIZATION] [-v]
                   mount_source [mount_source ...] [mount_point]
 
 With ratarmount, you can:
@@ -257,10 +261,12 @@ positional arguments:
                         extension. (default: None)
 
 optional arguments:
+  --commit-overlay      Apply deletions and content modifications done in the
+                        write overlay to the archive. (default: False)
   --gnu-incremental     Will strip octal modification time prefixes from file
-                        paths, which appear in GNU incremental backups
-                        created with GNU tar with the --incremental or
-                        --listed-incremental options. (default: None)
+                        paths, which appear in GNU incremental backups created
+                        with GNU tar with the --incremental or --listed-
+                        incremental options. (default: None)
   --index-file INDEX_FILE
                         Specify a path to the .index.sqlite file. Setting this
                         will disable fallback index folders. If the given path
@@ -293,6 +299,16 @@ optional arguments:
                         Specify a file with newline separated passwords for
                         RAR and ZIP files. The passwords will be tried out in
                         order of appearance in the file. (default: )
+  --transform-recursive-mount-point TRANSFORM_RECURSIVE_MOUNT_POINT TRANSFORM_RECURSIVE_MOUNT_POINT
+                        Specify a regex pattern and a replacement string,
+                        which will be applied via Python's re module to the
+                        full path of the archive to be recursively mounted.
+                        E.g., if there are recursive archives:
+                        /folder/archive.tar.gz, you can substitute '[.][^/]+$'
+                        to '' and it will be mounted to /folder/archive.tar.
+                        Or you can replace '^.*/([^/]+).tar.gz$' to '/' to
+                        mount all recursive folders under the top-level
+                        without extensions. (default: None)
   --verify-mtime        By default, only the TAR file size is checked to match
                         the one in the found existing ratarmount index. If
                         this option is specified, then also check the
@@ -305,7 +321,7 @@ optional arguments:
                         threaded parallel bzip2 decoder will be used specified
                         amount of block decoder threads. Further threads with
                         lighter work may be started. A value of 0 will use all
-                        the available cores (24). (default: 1)
+                        the available cores (24). (default: 0)
   -c, --recreate-index  If specified, pre-existing .index files will be
                         deleted and newly created. (default: False)
   -d DEBUG, --debug DEBUG
@@ -374,13 +390,13 @@ optional arguments:
                         Specify an existing folder to be used as a write
                         overlay. The folder itself will be union-mounted on
                         top such that files in this folder take precedence
-                        over all over existing ones. Furthermore, all file
-                        creations and modifications will be forwarded to
-                        files in this folder. Modifying a file inside a TAR
-                        will copy that file to the overlay folder and apply
-                        the modification to that writable copy. Deleting
-                        files or folders will update the hidden metadata
-                        database inside the overlay folder. (default: None)
+                        over all other existing ones. Furthermore, all file
+                        creations and modifications will be forwarded to files
+                        in this folder. Modifying a file inside a TAR will
+                        copy that file to the overlay folder and apply the
+                        modification to that writable copy. Deleting files or
+                        folders will update the hidden metadata database
+                        inside the overlay folder. (default: None)
 ```
 
 ## Metadata Index Cache
