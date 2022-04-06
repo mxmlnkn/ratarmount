@@ -214,3 +214,8 @@ class UnionMountSource(MountSource):
         # Because all mount sources are mounted at '/', we do not have to append
         # the mount point path returned by getMountSource to the mount point '/'.
         return mountSource.getMountSource(sourceFileInfo)
+
+    def joinThreads(self):
+        for mountSource in self.mountSources:
+            if hasattr(mountSource, 'joinThreads'):
+                mountSource.joinThreads()

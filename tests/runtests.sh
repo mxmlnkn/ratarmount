@@ -975,7 +975,7 @@ checkIndexArgumentChangeDetection()
     [ -s "$indexFile" ] || returnError "$LINENO" "Index '$indexFile' was not created."
 
     # Check for warnings when loading that index with different index-influencing arguments
-    args=( --recursive --ignore-zeros --index-file "$indexFile" "$archive" "$mountFolder" )
+    args=( -P "$parallelization" --recursive --ignore-zeros --index-file "$indexFile" "$archive" "$mountFolder" )
     {
         $RATARMOUNT_CMD "${args[@]}" >ratarmount.stdout.log 2>ratarmount.stderr.log &&
         checkStat "$mountFolder/$fileInTar" &&
@@ -1032,7 +1032,7 @@ checkRecursiveFolderMounting()
     for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
         'cp' -- "${tests[iTest+1]}" "$archiveFolder"
     done
-    runAndCheckRatarmount -c --ignore-zeros --recursive "$@" "$archiveFolder" "$mountFolder"
+    runAndCheckRatarmount -P "$parallelization" -c --ignore-zeros --recursive "$@" "$archiveFolder" "$mountFolder"
 
     local nChecks=0
     for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
@@ -1067,7 +1067,10 @@ checkNestedRecursiveFolderMounting()
 
     mkdir -- "$archiveFolder/nested-folder"
     cp -- "$archive" "$archiveFolder/nested-folder"
-    local args=( -P "$parallelization" -c --ignore-zeros --recursive --strip-recursive-tar-extension "$archiveFolder" "$mountFolder" )
+    local args=(
+        -P "$parallelization" -c --ignore-zeros --recursive --strip-recursive-tar-extension
+        "$archiveFolder" "$mountFolder"
+    )
     {
         recursiveMountFolder="$mountFolder/nested-folder/$( basename -- "${archive%.tar}" )"
         runAndCheckRatarmount "${args[@]}" &&

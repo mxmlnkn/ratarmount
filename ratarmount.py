@@ -482,22 +482,19 @@ class FuseMount(fuse.Operations):
         # This also will create or load the block offsets for compressed formats
         mountSources = [openMountSource(path, **options) for path in pathToMount]
 
+        self.mountSource: MountSource = UnionMountSource(mountSources, printDebug=self.printDebug)
+        if options.get('recursive', False):
+            self.mountSource = AutoMountLayer(self.mountSource, **options)
+
         # No threads should be created and still be open before FUSE forks.
         # Instead, they should be created in 'init'.
         # Therefore, close threads opened by the ParallelBZ2Reader for creating the block offsets.
         # Those threads will be automatically recreated again on the next read call.
         # Without this, the ratarmount background process won't quit even after unmounting!
-        for mountSource in mountSources:
-            if (
-                isinstance(mountSource, SQLiteIndexedTar)
-                and hasattr(mountSource, 'tarFileObject')
-                and hasattr(mountSource.tarFileObject, 'join_threads')
-            ):
-                mountSource.tarFileObject.join_threads()
+        joinThreads = getattr(self.mountSource, 'joinThreads', None)
+        if joinThreads:
+            joinThreads()
 
-        self.mountSource: MountSource = UnionMountSource(mountSources, printDebug=self.printDebug)
-        if options.get('recursive', False):
-            self.mountSource = AutoMountLayer(self.mountSource, **options)
         self.mountSource = FileVersionLayer(self.mountSource)
 
         self.rootFileInfo = FuseMount._makeMountPointFileInfoFromStats(os.stat(pathToMount[0]))

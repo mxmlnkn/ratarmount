@@ -1242,7 +1242,7 @@ class SQLiteIndexedTar(MountSource):
             # Apply regex transformation to get mount point
             pattern = self.transformRecursiveMountPoint
             modifiedPath = '/' + ('/'.join([modifiedFolder, modifiedName])).lstrip('/')
-            if (isinstance(pattern, tuple) or isinstance(pattern, list)) and len(pattern) == 2:
+            if isinstance(pattern, (tuple, list)) and len(pattern) == 2:
                 modifiedPath = '/' + re.sub(pattern[0], pattern[1], modifiedPath).lstrip('/')
                 modifiedFolder, modifiedName = modifiedPath.rsplit('/', 1)
 
@@ -2340,3 +2340,7 @@ class SQLiteIndexedTar(MountSource):
             f"Could not load or store block offsets for {self.compression} "
             "probably because adding support was forgotten!"
         )
+
+    def joinThreads(self):
+        if hasattr(self.tarFileObject, 'join_threads'):
+            self.tarFileObject.join_threads()

@@ -105,7 +105,7 @@ class AutoMountLayer(MountSource):
         # https://unix.stackexchange.com/questions/655155/how-to-repeatedly-unpack-tar-gz-files-that-are-within-the-tar-gz-itself
         if 'transformRecursiveMountPoint' in self.options:
             pattern = self.options['transformRecursiveMountPoint']
-            if (isinstance(pattern, tuple) or isinstance(pattern, list)) and len(pattern) == 2:
+            if isinstance(pattern, (tuple, list)) and len(pattern) == 2:
                 mountPoint = '/' + re.sub(pattern[0], pattern[1], mountPoint).lstrip('/')
 
         if mountPoint in self.mounted:
@@ -250,3 +250,8 @@ class AutoMountLayer(MountSource):
 
         deeperMountPoint, deeperMountSource, deeperFileInfo = mountSource.getMountSource(sourceFileInfo)
         return os.path.join(mountPoint, deeperMountPoint.lstrip('/')), deeperMountSource, deeperFileInfo
+
+    def joinThreads(self):
+        for _, mountInfo in self.mounted.items():
+            if hasattr(mountInfo.mountSource, 'joinThreads'):
+                mountInfo.mountSource.joinThreads()
