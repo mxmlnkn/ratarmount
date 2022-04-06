@@ -1358,7 +1358,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
 
         print()
         print("Committing is an experimental feature!")
-        print(f'Please confirm by entering "commit". Any other input will cancel.')
+        print('Please confirm by entering "commit". Any other input will cancel.')
         print("> ", end='')
         try:
             if input() == 'commit':
