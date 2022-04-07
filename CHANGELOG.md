@@ -1,4 +1,9 @@
 
+# Version 0.11.0 built on 2022-04-10
+
+ - Fix compatibility of --commit-overlay with older GNU tar versions by removing the redundant
+   --verbatim-file option.
+
 # Version 0.11.0 built on 2022-04-06
 
  - Add --write-overlay option to enable write support at the mount point.
