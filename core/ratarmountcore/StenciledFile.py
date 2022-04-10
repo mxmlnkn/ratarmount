@@ -4,7 +4,7 @@
 import bisect
 import io
 
-from typing import Callable, IO, List, Optional, Tuple
+from typing import Callable, IO, List, Tuple
 
 from .utils import overrides, _DummyContext
 
@@ -20,10 +20,8 @@ class RawStenciledFile(io.RawIOBase):
 
     def __init__(
         self,
-        fileobj: Optional[IO] = None,
-        stencils: Optional[List[Tuple[int, int]]] = None,
-        fileobjLock=None,
-        fileStencils: Optional[List[Tuple[IO, int, int]]] = None,
+        fileStencils: List[Tuple[IO, int, int]],
+        fileObjectLock=None,
     ) -> None:
         """
         stencils: A list tuples specifying the offset and length of the underlying file to use.
@@ -48,30 +46,12 @@ class RawStenciledFile(io.RawIOBase):
         io.RawIOBase.__init__(self)
 
         self.offset = 0
-        self.fileobjLock = fileobjLock
+        self.fileObjectLock = fileObjectLock
         self.offsets: List[int] = []
         self.sizes: List[int] = []
         self.fileObjects: List[IO] = []
 
-        # Convert stencils to internal format
-        if fileStencils:
-            if stencils or fileobj:
-                raise ValueError(
-                    "Either the deprecated combination of fileobj and stencils or the new interface using "
-                    "fileStencils may be specified, not both!"
-                )
-            self.fileObjects, self.offsets, self.sizes = zip(*fileStencils)
-        else:
-            if stencils:
-                if not fileobj:
-                    raise ValueError("Stencils may not be specified without a valid file object!")
-
-                self.offsets = [x[0] for x in stencils]
-                self.sizes = [x[1] for x in stencils]
-                self.fileObjects = [fileobj] * len(self.sizes)
-            else:
-                self.offsets = []
-                self.fileObjects = []
+        self.fileObjects, self.offsets, self.sizes = zip(*fileStencils)
 
         # Check whether values make sense
         for offset in self.offsets:
@@ -160,7 +140,7 @@ class RawStenciledFile(io.RawIOBase):
         if i >= len(self.sizes):
             return result
 
-        with self.fileobjLock if self.fileobjLock else _DummyContext():
+        with self.fileObjectLock if self.fileObjectLock else _DummyContext():
             # Note that seek and read of the file object itself do not seem to check against this and
             # instead lead to a segmentation fault in the multithreading tests.
             if self.fileObjects[i].closed:
@@ -203,12 +183,10 @@ class RawStenciledFile(io.RawIOBase):
 class StenciledFile(io.BufferedReader):
     def __init__(
         self,
-        fileobj: Optional[IO] = None,
-        stencils: Optional[List[Tuple[int, int]]] = None,
-        fileobjLock=None,
-        fileStencils: Optional[List[Tuple[IO, int, int]]] = None,
+        fileStencils: List[Tuple[IO, int, int]],
+        fileObjectLock=None,
     ) -> None:
-        super().__init__(RawStenciledFile(fileobj, stencils, fileobjLock, fileStencils))
+        super().__init__(RawStenciledFile(fileStencils, fileObjectLock))
 
 
 class JoinedFile(io.BufferedReader):
@@ -219,7 +197,7 @@ class JoinedFile(io.BufferedReader):
                 raise ValueError("Failed to query size of file object:", fobj)
 
         fileStencils = [(fobj, 0, size if size else 0) for fobj, size in zip(file_objects, sizes)]
-        super().__init__(RawStenciledFile(fileStencils=fileStencils, fileobjLock=file_lock), buffer_size=buffer_size)
+        super().__init__(RawStenciledFile(fileStencils=fileStencils, fileObjectLock=file_lock), buffer_size=buffer_size)
 
 
 class LambdaReaderFile(io.RawIOBase):

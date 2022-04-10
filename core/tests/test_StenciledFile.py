@@ -28,53 +28,59 @@ randomTmpFile.write(randomTestData)
 
 class TestStenciledFile:
     @staticmethod
+    def _createStenciledFile(file, stencils):
+        return StenciledFile(fileStencils=[(file,) + stencil for stencil in stencils])
+
+    @staticmethod
     def test_empty_file():
-        assert StenciledFile(tmpFile, [(0, 0)]).read() == b""
+        assert StenciledFile([(tmpFile, 0, 0)]).read() == b""
 
     @staticmethod
     def test_findStencil():
-        stenciledFile = RawStenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2), (4, 4), (1, 8), (0, 1)])
+        stenciledFile = RawStenciledFile(
+            [(tmpFile,) + stencil for stencil in [(1, 2), (2, 2), (0, 2), (4, 4), (1, 8), (0, 1)]]
+        )
         expectedResults = [0, 0, 1, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 5]
         for offset, iExpectedStencil in enumerate(expectedResults):
             assert stenciledFile._findStencil(offset) == iExpectedStencil
 
     @staticmethod
     def test_single_stencil():
-        assert StenciledFile(tmpFile, [(0, 1)]).read() == b"1"
-        assert StenciledFile(tmpFile, [(0, 2)]).read() == b"12"
-        assert StenciledFile(tmpFile, [(0, 3)]).read() == b"123"
-        assert StenciledFile(tmpFile, [(0, len(testData))]).read() == testData
+        assert StenciledFile([(tmpFile, 0, 1)]).read() == b"1"
+        assert StenciledFile([(tmpFile, 0, 2)]).read() == b"12"
+        assert StenciledFile([(tmpFile, 0, 3)]).read() == b"123"
+        assert StenciledFile([(tmpFile, 0, len(testData))]).read() == testData
 
     @staticmethod
     def test_1B_stencils():
-        assert StenciledFile(tmpFile, [(0, 1), (1, 1)]).read() == b"12"
-        assert StenciledFile(tmpFile, [(0, 1), (2, 1)]).read() == b"13"
-        assert StenciledFile(tmpFile, [(1, 1), (0, 1)]).read() == b"21"
-        assert StenciledFile(tmpFile, [(0, 1), (1, 1), (2, 1)]).read() == b"123"
-        assert StenciledFile(tmpFile, [(1, 1), (2, 1), (0, 1)]).read() == b"231"
+        assert TestStenciledFile._createStenciledFile(tmpFile, [(0, 1), (1, 1)]).read() == b"12"
+        assert TestStenciledFile._createStenciledFile(tmpFile, [(0, 1), (2, 1)]).read() == b"13"
+        assert TestStenciledFile._createStenciledFile(tmpFile, [(1, 1), (0, 1)]).read() == b"21"
+        assert TestStenciledFile._createStenciledFile(tmpFile, [(0, 1), (1, 1), (2, 1)]).read() == b"123"
+        assert TestStenciledFile._createStenciledFile(tmpFile, [(1, 1), (2, 1), (0, 1)]).read() == b"231"
 
     @staticmethod
     def test_2B_stencils():
-        assert StenciledFile(tmpFile, [(0, 2), (1, 2)]).read() == b"1223"
-        assert StenciledFile(tmpFile, [(0, 2), (2, 2)]).read() == b"1234"
-        assert StenciledFile(tmpFile, [(1, 2), (0, 2)]).read() == b"2312"
-        assert StenciledFile(tmpFile, [(0, 2), (1, 2), (2, 2)]).read() == b"122334"
-        assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read() == b"233412"
+        assert TestStenciledFile._createStenciledFile(tmpFile, [(0, 2), (1, 2)]).read() == b"1223"
+        assert TestStenciledFile._createStenciledFile(tmpFile, [(0, 2), (2, 2)]).read() == b"1234"
+        assert TestStenciledFile._createStenciledFile(tmpFile, [(1, 2), (0, 2)]).read() == b"2312"
+        assert TestStenciledFile._createStenciledFile(tmpFile, [(0, 2), (1, 2), (2, 2)]).read() == b"122334"
+        assert TestStenciledFile._createStenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read() == b"233412"
 
     @staticmethod
     def test_read_with_size():
-        assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(0) == b""
-        assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(1) == b"2"
-        assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(2) == b"23"
-        assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(3) == b"233"
-        assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(4) == b"2334"
-        assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(5) == b"23341"
-        assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(6) == b"233412"
-        assert StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(7) == b"233412"
+        assert TestStenciledFile._createStenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(0) == b""
+        assert TestStenciledFile._createStenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(1) == b"2"
+        assert TestStenciledFile._createStenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(2) == b"23"
+        assert TestStenciledFile._createStenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(3) == b"233"
+        assert TestStenciledFile._createStenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(4) == b"2334"
+        assert TestStenciledFile._createStenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(5) == b"23341"
+        assert TestStenciledFile._createStenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(6) == b"233412"
+        assert TestStenciledFile._createStenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)]).read(7) == b"233412"
 
     @staticmethod
     def test_seek_and_tell():
-        stenciledFile = StenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)])
+        stenciledFile = TestStenciledFile._createStenciledFile(tmpFile, [(1, 2), (2, 2), (0, 2)])
         for i in range(7):
             assert stenciledFile.tell() == i
             stenciledFile.read(1)
@@ -91,15 +97,15 @@ class TestStenciledFile:
 
     @staticmethod
     def test_reading_from_shared_file():
-        stenciledFile1 = StenciledFile(tmpFile, [(0, len(testData))])
-        stenciledFile2 = StenciledFile(tmpFile, [(0, len(testData))])
+        stenciledFile1 = StenciledFile([(tmpFile, 0, len(testData))])
+        stenciledFile2 = StenciledFile([(tmpFile, 0, len(testData))])
         for i in range(len(testData)):
             assert stenciledFile1.read(1) == testData[i : i + 1]
             assert stenciledFile2.read(1) == testData[i : i + 1]
 
     @staticmethod
     def test_successive_reads(lock=None):
-        stenciledFile = StenciledFile(randomTmpFile, [(0, len(randomTestData))], lock)
+        stenciledFile = StenciledFile([(randomTmpFile, 0, len(randomTestData))], lock)
         batchSize = 1024
         for i in range(len(randomTestData) // batchSize):
             assert stenciledFile.read(batchSize) == randomTestData[i * batchSize : (i + 1) * batchSize]

@@ -261,7 +261,7 @@ class _TarFileMetadataReader:
         fileInfos: List[Tuple] = []
 
         with open(pathToTar, 'rb') as rawFileObject:
-            fileObject = cast(IO[bytes], StenciledFile(rawFileObject, [(startOffset, size)]))
+            fileObject = cast(IO[bytes], StenciledFile([(rawFileObject, startOffset, size)]))
             try:
                 loadedTarFile: Any = tarfile.open(
                     fileobj=fileObject, mode='r:', ignore_zeros=ignoreZeros, encoding=encoding
@@ -1257,7 +1257,7 @@ class SQLiteIndexedTar(MountSource):
             # fileObject already effectively applies streamOffset, so we can't use the globalOffset here!
             # For all supported cases, it should be fine to directly use self.tarFileObject instead of fileObject.
             # This would also save some indirections to speed up accesses.
-            tarFileObject = StenciledFile(self.tarFileObject, [(globalOffset, size)])
+            tarFileObject = StenciledFile([(self.tarFileObject, globalOffset, size)])
 
             isTar = False
             try:
@@ -1561,7 +1561,7 @@ class SQLiteIndexedTar(MountSource):
         # Furthermore, non-sparse files should be the much more likely case anyway.
         if not tarFileInfo.issparse:
             return cast(
-                IO[bytes], StenciledFile(self.tarFileObject, [(tarFileInfo.offset, fileInfo.size)], self.fileObjectLock)
+                IO[bytes], StenciledFile([(self.tarFileObject, tarFileInfo.offset, fileInfo.size)], self.fileObjectLock)
             )
 
         # The TAR file format is very simple. It's just a concatenation of TAR blocks. There is not even a
@@ -1569,7 +1569,7 @@ class SQLiteIndexedTar(MountSource):
         # the sparse file using StenciledFile and then use tarfile on it to expand the sparse file correctly.
         tarBlockSize = tarFileInfo.offset - tarFileInfo.offsetheader + fileInfo.size
 
-        tarSubFile = StenciledFile(self.tarFileObject, [(tarFileInfo.offsetheader, tarBlockSize)], self.fileObjectLock)
+        tarSubFile = StenciledFile([(self.tarFileObject, tarFileInfo.offsetheader, tarBlockSize)], self.fileObjectLock)
         # TODO It might be better to somehow call close on tarFile but the question is where and how.
         #      It would have to be appended to the __exit__ method of fileObject like if being decorated.
         #      For now this seems to work either because fileObject does not require tarFile to exist
