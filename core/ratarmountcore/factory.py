@@ -21,7 +21,7 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
 
     if isinstance(fileOrPath, str):
         if not os.path.exists(fileOrPath):
-            raise Exception("Mount source does not exist!")
+            raise RatarmountError(f"Mount source does not exist: {fileOrPath}")
 
         if os.path.isdir(fileOrPath):
             return FolderMountSource('.' if fileOrPath == '.' else os.path.realpath(fileOrPath))

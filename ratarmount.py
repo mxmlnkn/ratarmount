@@ -37,6 +37,7 @@ from ratarmountcore import (
     overrides,
     supportedCompressions,
     stripSuffixFromTarFile,
+    RatarmountError,
     FileInfo,
 )
 
@@ -1284,7 +1285,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         tarFile = args.mount_source[0]
         compression = None
         try:
-            compression = checkInputFileType(tarFile, encoding=args.encoding, printDebug=args.debug)[1]
+            compression = TarFileType(encoding=args.encoding, printDebug=args.debug)(tarFile)[0]
         except Exception as exception:
             raise RatarmountError("Currently, only modifications to a single TAR may be commited.") from exception
 
@@ -1482,7 +1483,7 @@ def main():
 
     try:
         cli(args)
-    except (FileNotFoundError, core.RatarmountError, argparse.ArgumentTypeError) as exception:
+    except (FileNotFoundError, RatarmountError, argparse.ArgumentTypeError) as exception:
         print("[Error]", exception)
         if debug >= 3:
             traceback.print_exc()

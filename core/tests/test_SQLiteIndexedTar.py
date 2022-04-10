@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 import pytest  # noqa: E402
 
-from ratarmountcore import SQLiteIndexedTar  # noqa: E402
+from ratarmountcore import RatarmountError, SQLiteIndexedTar  # noqa: E402
 
 
 @pytest.mark.parametrize("parallelization", [1, 2, 4])
@@ -129,11 +129,11 @@ class TestSQLiteIndexedTarParallelized:
                     #  - fileObject: Optional[IO]
                     # => 3*2*2 = 12 cases
 
-                    with pytest.raises(ValueError):
+                    with pytest.raises(RatarmountError):
                         testIndex(None, None, ':memory:')
-                    with pytest.raises(ValueError):
+                    with pytest.raises(RatarmountError):
                         testIndex(None, None, indexPath)
-                    with pytest.raises(ValueError):
+                    with pytest.raises(RatarmountError):
                         testIndex(None, None, None)
 
                     testIndex(archiveName, None, ':memory:')

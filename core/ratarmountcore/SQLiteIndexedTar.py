@@ -431,7 +431,7 @@ class _TarFileMetadataReader:
                 break
 
         if processedFiles == 0:
-            raise ValueError("Could not any find TAR blocks!")
+            raise RatarmountError("Could not any find TAR blocks!")
 
         while self._futures:
             self._processFuture(self._futures.pop(0))
@@ -693,7 +693,7 @@ class SQLiteIndexedTar(MountSource):
             if tarFileName:
                 self.tarFileName = os.path.abspath(tarFileName)
             else:
-                raise ValueError("At least one of tarFileName and fileObject arguments should be set!")
+                raise RatarmountError("At least one of tarFileName and fileObject arguments should be set!")
 
         # If no fileObject given, then self.tarFileName is the path to the archive to open.
         if not fileObject:
@@ -1486,7 +1486,7 @@ class SQLiteIndexedTar(MountSource):
         # TODO cache last listDir as most often a stat over all entries will soon follow
 
         if not isinstance(fileVersion, int):
-            raise TypeError("The specified file version must be an integer!")
+            raise RatarmountError("The specified file version must be an integer!")
         if not self.sqlConnection:
             raise IndexNotOpenError("This method can not be called without an opened index database!")
 
@@ -2326,7 +2326,7 @@ class SQLiteIndexedTar(MountSource):
                 print("[Info] the index file location. The gzipindex size takes roughly 32kiB per 4MiB of")
                 print("[Info] uncompressed(!) bytes (0.8% of the uncompressed data) by default.")
 
-                raise RuntimeError("Could not wrote out the gzip seek database.") from exception
+                raise RatarmountError("Could not wrote out the gzip seek database.") from exception
 
             blobCount = db.execute('SELECT COUNT(*) FROM gzipindexes;').fetchone()[0]
             if blobCount == 0:
