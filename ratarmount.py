@@ -1147,14 +1147,15 @@ seeking capabilities when opening that file.
         args.transform_recursive_mount_point = tuple(args.transform_recursive_mount_point)
 
     # This is a hack but because we have two positional arguments (and want that reflected in the auto-generated help),
-    # all positional arguments, including the mountpath will be parsed into the tarfilepaths namespace and we have to
+    # all positional arguments, including the mountpath will be parsed into the tar file path's namespace and we have to
     # manually separate them depending on the type.
     if os.path.isdir(args.mount_source[-1]) or not os.path.exists(args.mount_source[-1]):
         args.mount_point = args.mount_source[-1]
         args.mount_source = args.mount_source[:-1]
     if not args.mount_source:
-        print("[Error] You must at least specify one path to a valid TAR file or union mount source directory!")
-        sys.exit(1)
+        raise argparse.ArgumentTypeError(
+            "You must at least specify one path to a valid TAR file or union mount source directory!"
+        )
 
     # Manually check that all specified TARs and folders exist
     def checkMountSource(path):
@@ -1162,7 +1163,16 @@ seeking capabilities when opening that file.
             return os.path.realpath(path)
         return TarFileType(encoding=args.encoding, printDebug=args.debug)(path)[0]
 
-    args.mount_source = [checkMountSource(path) for path in args.mount_source]
+    mountSources: List[str] = []
+    for path in args.mount_source:
+        fixedPath = checkMountSource(path)
+        # Skip neighboring duplicates
+        if mountSources and mountSources[-1] == fixedPath:
+            if args.debug >= 2:
+                print(f"[Info] Skip duplicate mount source: {fixedPath}")
+            continue
+        mountSources.append(fixedPath)
+    args.mount_source = mountSources
 
     # Automatically generate a default mount path
     if not args.mount_point:
@@ -1213,7 +1223,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         print()
         print("System Software:")
         print()
-        print("Python", sys.version.split(' ')[0])
+        print("Python", sys.version.split(' ', maxsplit=1)[0])
 
         try:
             fusermountVersion = subprocess.run(
@@ -1252,6 +1262,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
     # tmpArgs are only for the manual parsing. In general, rawArgs is None, meaning it reads sys.argv,
     # and maybe sometimes contains arguments when used programmatically. In that case the first argument
     # should not be the path to the script!
+
     args = _parseArgs(rawArgs)
 
     if args.unmount:
@@ -1265,34 +1276,27 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
 
     if args.commit_overlay:
         if not os.path.isdir(args.write_overlay):
-            print("[Error] Need an existing write overlay folder for commiting changes.")
-            return
+            raise RatarmountError("Need an existing write overlay folder for commiting changes.")
 
         if len(args.mount_source) != 1:
-            print("[Error] Currently, only modifications to a single TAR may be commited.")
-            sys.exit(1)
+            raise RatarmountError("Currently, only modifications to a single TAR may be commited.")
 
         tarFile = args.mount_source[0]
         compression = None
         try:
-            compression = TarFileType(encoding=args.encoding, printDebug=args.debug)(tarFile)[1]
-        except Exception:
-            print("[Error] Currently, only modifications to a single TAR may be commited.")
-            sys.exit(1)
+            compression = checkInputFileType(tarFile, encoding=args.encoding, printDebug=args.debug)[1]
+        except Exception as exception:
+            raise RatarmountError("Currently, only modifications to a single TAR may be commited.") from exception
 
         if compression is not None:
-            print("[Error] Currently, only modifications to an uncompressed TAR may be commited.")
-            sys.exit(1)
+            raise RatarmountError("Currently, only modifications to an uncompressed TAR may be commited.")
 
         try:
             with os.popen('tar --version') as pipe:
                 if not re.search(r'GNU tar', pipe.read()):
-                    raise RuntimeError("GNU tar is required")
-        except Exception:
-            print("[Error] Currently, GNU tar must be installed and discoverable as 'tar'.")
-            if args.printDebug >= 3:
-                traceback.print_exc()
-            sys.exit(1)
+                    raise RatarmountError("GNU tar is required")
+        except Exception as exception:
+            raise RatarmountError("Currently, GNU tar must be installed and discoverable as 'tar'.") from exception
 
         # Delete all files marked for deletion
         tmpFolder = tempfile.mkdtemp()
@@ -1388,8 +1392,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
                     if unfilteredLines:
                         for line in unfilteredLines:
                             print(line)
-                        print("[Error] There were problems when trying to delete files.")
-                        sys.exit(1)
+                        raise RatarmountError("There were problems when trying to delete files.")
 
                 if os.stat(appendList).st_size > 0:
                     subprocess.run(
@@ -1461,12 +1464,29 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
             # fmt: off
             **fusekwargs
         )
-    except RuntimeError:
-        print("[Error] FUSE mountpoint could not be created. See previous output for more information.")
-        if args.debug >= 3:
+    except RuntimeError as exception:
+        raise RuntimeError(
+            "FUSE mountpoint could not be created. See previous output for more information."
+        ) from exception
+
+
+def main():
+    args = sys.argv[1:]
+    debug = 1
+    for i in range(len(args) - 1):
+        if args[i] in ['-d', '--debug'] and args[i + 1].isdecimal():
+            try:
+                debug = int(args[i + 1])
+            except ValueError:
+                continue
+
+    try:
+        cli(args)
+    except (FileNotFoundError, core.RatarmountError, argparse.ArgumentTypeError) as exception:
+        print("[Error]", exception)
+        if debug >= 3:
             traceback.print_exc()
-        sys.exit(1)
 
 
 if __name__ == '__main__':
-    cli(sys.argv[1:])
+    main()
