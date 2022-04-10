@@ -2,6 +2,7 @@
 # Version 0.12.0 built on 2022-06-xx
 
  - Add --recursion-depth argument for more fine-grained recursion control.
+ - Add support to show a joined view of split files, e.g., <file>.001, and also support split archives.
  - (ratarmountcore 0.4.0) AutoMountLayer now takes a 'recursionDepth' argument instead of 'recursive'.
 
 # Version 0.11.2 built on 2022-05-27

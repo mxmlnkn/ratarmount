@@ -1048,6 +1048,10 @@ checkRecursiveFolderMounting()
         archive=${tests[iTest+1]}
         fileInTar=${tests[iTest+2]}
 
+        # TODO recursive mounting of split files is not yet working because we would have to do more
+        #      work detecting the wildly varying file extensions and joining virtual file objects.
+        if [[ $archive =~ split ]]; then continue; fi
+
         recursiveMountFolder="$mountFolder/$( basename -- "$archive" )"
         checkStat "$recursiveMountFolder/$fileInTar" || returnError "stat failed for: $recursiveMountFolder/$fileInTar"
         verifyCheckSum "$recursiveMountFolder" "$fileInTar" "$archive" "$checksum" || returnError 'checksum mismatch!'
@@ -1589,6 +1593,10 @@ tests+=(
 fi
 
 tests+=(
+    f47c75614087a8dd938ba4acff252494 tests/simple-file-split.001                  simple-file-split
+    f47c75614087a8dd938ba4acff252494 tests/simple-file-split.002                  simple-file-split
+    d3b07384d113edec49eaa6238ad5ff00 tests/single-file-split.tar.001              bar
+
     2709a3348eb2c52302a7606ecf5860bc tests/file-in-non-existing-folder.rar        foo2/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.rar                     foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.rar                     foo/jet/ufo

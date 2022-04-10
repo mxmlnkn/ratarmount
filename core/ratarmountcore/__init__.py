@@ -42,7 +42,7 @@ Example:
 
 from .version import __version__
 
-from .compressions import supportedCompressions, stripSuffixFromTarFile, compressZstd
+from .compressions import supportedCompressions, stripSuffixFromTarFile, checkForSplitFile, compressZstd, getGzipInfo
 from .utils import RatarmountError, IndexNotOpenError, InvalidIndexError, CompressionError, overrides
 from .StenciledFile import LambdaReaderFile, RawStenciledFile, StenciledFile, JoinedFile
 from .SQLiteBlobFile import SQLiteBlobFile, SQLiteBlobsFile

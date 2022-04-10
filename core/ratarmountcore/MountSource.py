@@ -50,16 +50,16 @@ class MountSource(ABC):
         pass
 
     @abstractmethod
-    def fileVersions(self, path: str) -> int:
-        pass
-
-    @abstractmethod
     def open(self, fileInfo: FileInfo) -> IO[bytes]:
         pass
 
-    @abstractmethod
+    def fileVersions(self, path: str) -> int:
+        return 1 if self.exists(path) else 0
+
     def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
-        pass
+        with self.open(fileInfo) as file:
+            file.seek(offset)
+            return file.read(size)
 
     @abstractmethod
     def isImmutable(self) -> bool:

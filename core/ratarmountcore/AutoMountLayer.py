@@ -164,7 +164,7 @@ class AutoMountLayer(MountSource):
                 mountSource = openMountSource(deepestMountSource.getFilePath(deepestFileInfo), **options)
             else:
                 # This will fail with StenciledFile objects as returned by SQLiteIndexedTar mount sources and when
-                # given to backends like indexed_xxx, which do expect the file object to have a valid fileno.
+                # given to backends like indexed_zstd, which do expect the file object to have a valid fileno.
                 mountSource = openMountSource(
                     parentMountSource.open(archiveFileInfo),
                     tarFileName=pathInsideParentMountPoint.rsplit('/', 1)[-1],

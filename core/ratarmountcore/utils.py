@@ -149,3 +149,32 @@ class Prefetcher:
         #   => logStep**consecutiveCount = exp(ln(maximumToPrefetch) * consecutiveCount/maxConsecutiveCount)
         prefetchCount = int(round(math.exp(math.log(maximumToPrefetch) * consecutiveCount / (self.memorySize - 1))))
         return range(self.lastFetched[-1] + 1, self.lastFetched[-1] + 1 + prefetchCount)
+
+
+ALPHA = ''.join(chr(ord('a') + i) for i in range(ord('z') - ord('a') + 1))
+DIGITS = ''.join(chr(ord('0') + i) for i in range(ord('9') - ord('0') + 1))
+HEX = DIGITS + ALPHA[:6]
+
+
+def isLatinAlpha(text: str):
+    return text and all(ord('a') <= ord(c) <= ord('z') for c in text)
+
+
+def isLatinDigit(text: str):
+    return text and all(ord('0') <= ord(c) <= ord('9') for c in text)
+
+
+def isLatinHexAlpha(text: str):
+    return text and all(ord('0') <= ord(c) <= ord('9') or ord('a') <= ord(c) <= ord('f') for c in text)
+
+
+def formatNumber(i: int, base: str, length: int = 0):
+    if len(base) <= 1:
+        raise ValueError("Base alphabet must contain more than one letter!")
+
+    result = ''
+    while i > 0 or length > 0 or not result:
+        result += base[i % len(base)]
+        i = i // len(base)
+        length = length - 1
+    return result[::-1]

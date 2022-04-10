@@ -769,70 +769,70 @@ class FuseMount(fuse.Operations):
         return super().fsync(path, datasync, fh)
 
 
-class TarFileType:
-    """
-    Similar to argparse.FileType but raises an exception if it is not a valid TAR file.
-    """
+def checkInputFileType(
+    tarFile: str, encoding: str = tarfile.ENCODING, printDebug: int = 0
+) -> Tuple[str, Optional[str]]:
+    """Raises an exception if it is not a accepted archive format else returns the real path and compression type."""
 
-    def __init__(self, encoding: str = tarfile.ENCODING, printDebug: int = 0) -> None:
-        self.encoding = encoding
-        self.printDebug = printDebug
+    if not os.path.isfile(tarFile):
+        raise argparse.ArgumentTypeError(f"File '{tarFile}' is not a file!")
+    tarFile = os.path.realpath(tarFile)
 
-    def __call__(self, tarFile: str) -> Tuple[str, Optional[str]]:
-        if not os.path.isfile(tarFile):
-            raise argparse.ArgumentTypeError(f"File '{tarFile}' is not a file!")
+    result = core.checkForSplitFile(tarFile)
+    if result:
+        return result[0][0], 'part' + result[1]
 
-        with open(tarFile, 'rb') as fileobj:
-            fileSize = os.stat(tarFile).st_size
+    with open(tarFile, 'rb') as fileobj:
+        fileSize = os.stat(tarFile).st_size
 
-            # Header checks are enough for this step.
-            oldOffset = fileobj.tell()
-            compression = None
-            for compressionId, compressionInfo in supportedCompressions.items():
-                try:
-                    if compressionInfo.checkHeader(fileobj):
-                        compression = compressionId
-                        break
-                finally:
-                    fileobj.seek(oldOffset)
-
+        # Header checks are enough for this step.
+        oldOffset = fileobj.tell()
+        compression = None
+        for compressionId, compressionInfo in supportedCompressions.items():
             try:
-                # Determining if there are many frames in zstd is O(1) with is_multiframe
-                if compression != 'zst' or supportedCompressions[compression].moduleName not in sys.modules:
-                    raise Exception()  # early exit because we catch it anyways
+                if compressionInfo.checkHeader(fileobj):
+                    compression = compressionId
+                    break
+            finally:
+                fileobj.seek(oldOffset)
 
-                zstdFile = supportedCompressions[compression].open(fileobj)
+        try:
+            # Determining if there are many frames in zstd is O(1) with is_multiframe
+            if compression != 'zst' or supportedCompressions[compression].moduleName not in sys.modules:
+                raise Exception()  # early exit because we catch it anyways
 
-                if not zstdFile.is_multiframe() and fileSize > 1024 * 1024:
-                    print(f"[Warning] The specified file '{tarFile}'")
-                    print("[Warning] is compressed using zstd but only contains one zstd frame. This makes it ")
-                    print("[Warning] impossible to use true seeking! Please (re)compress your TAR using multiple ")
-                    print("[Warning] frames in order for ratarmount to do be able to do fast seeking to requested ")
-                    print("[Warning] files. Else, each file access will decompress the whole TAR from the beginning!")
-                    print("[Warning] You can try out t2sz for creating such archives:")
-                    print("[Warning] https://github.com/martinellimarco/t2sz")
-                    print("[Warning] Here you can find a simple bash script demonstrating how to do this:")
-                    print("[Warning] https://github.com/mxmlnkn/ratarmount#xz-and-zst-files")
-                    print()
-            except Exception:
-                pass
+            zstdFile = supportedCompressions[compression].open(fileobj)
 
-            if compression not in supportedCompressions:
-                if SQLiteIndexedTar._detectTar(fileobj, self.encoding, printDebug=self.printDebug):
-                    return tarFile, compression
+            if not zstdFile.is_multiframe() and fileSize > 1024 * 1024:
+                print(f"[Warning] The specified file '{tarFile}'")
+                print("[Warning] is compressed using zstd but only contains one zstd frame. This makes it ")
+                print("[Warning] impossible to use true seeking! Please (re)compress your TAR using multiple ")
+                print("[Warning] frames in order for ratarmount to do be able to do fast seeking to requested ")
+                print("[Warning] files. Else, each file access will decompress the whole TAR from the beginning!")
+                print("[Warning] You can try out t2sz for creating such archives:")
+                print("[Warning] https://github.com/martinellimarco/t2sz")
+                print("[Warning] Here you can find a simple bash script demonstrating how to do this:")
+                print("[Warning] https://github.com/mxmlnkn/ratarmount#xz-and-zst-files")
+                print()
+        except Exception:
+            pass
 
-                if self.printDebug >= 2:
-                    print(f"Archive '{tarFile}' (compression: {compression}) can't be opened!")
+        if compression not in supportedCompressions:
+            if SQLiteIndexedTar._detectTar(fileobj, encoding, printDebug=printDebug):
+                return tarFile, compression
 
-                raise argparse.ArgumentTypeError(f"Archive '{tarFile}' can't be opened!\n")
+            if printDebug >= 2:
+                print(f"Archive '{tarFile}' (compression: {compression}) can't be opened!")
 
-        cinfo = supportedCompressions[compression]
-        if cinfo.moduleName not in sys.modules:
-            raise argparse.ArgumentTypeError(
-                f"Can't open a {compression} compressed TAR file '{fileobj.name}' without {cinfo.moduleName} module!"
-            )
+            raise argparse.ArgumentTypeError(f"Archive '{tarFile}' can't be opened!")
 
-        return tarFile, compression
+    cinfo = supportedCompressions[compression]
+    if cinfo.moduleName not in sys.modules:
+        raise argparse.ArgumentTypeError(
+            f"Can't open a {compression} compressed TAR file '{fileobj.name}' without {cinfo.moduleName} module!"
+        )
+
+    return tarFile, compression
 
 
 def _removeDuplicatesStable(iterable: Iterable):
@@ -1182,7 +1182,7 @@ seeking capabilities when opening that file.
     def checkMountSource(path):
         if os.path.isdir(path) or zipfile.is_zipfile(path) or ('rarfile' in sys.modules and rarfile.is_rarfile(path)):
             return os.path.realpath(path)
-        return TarFileType(encoding=args.encoding, printDebug=args.debug)(path)[0]
+        return checkInputFileType(path, encoding=args.encoding, printDebug=args.debug)[0]
 
     mountSources: List[str] = []
     for path in args.mount_source:
@@ -1309,7 +1309,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         tarFile = args.mount_source[0]
         compression = None
         try:
-            compression = TarFileType(encoding=args.encoding, printDebug=args.debug)(tarFile)[0]
+            compression = checkInputFileType(tarFile, encoding=args.encoding, printDebug=args.debug)[1]
         except Exception as exception:
             raise RatarmountError("Currently, only modifications to a single TAR may be commited.") from exception
 
