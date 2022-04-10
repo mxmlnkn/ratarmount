@@ -45,6 +45,7 @@ class RawStenciledFile(io.RawIOBase):
             stencil = [(0,3),(0,3)]
                 Make a 6B size file containing the first 3B of fileobj twice concatenated together.
         """
+        io.RawIOBase.__init__(self)
 
         self.offset = 0
         self.fileobjLock = fileobjLock

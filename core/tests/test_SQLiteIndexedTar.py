@@ -118,7 +118,7 @@ class TestSQLiteIndexedTarParallelized:
                     with bz2.open(archiveName, "wb") as bz2File:
                         bz2File.write(contents)
 
-                    def testIndex(tarFileName, fileObject, indexFilePath):
+                    def testIndex(tarFileName, fileObject, indexFilePath, contents=contents):
                         TestSQLiteIndexedTarParallelized._test_index_creation_and_loading(
                             tarFileName, fileObject, indexFilePath, contents, parallelization
                         )
