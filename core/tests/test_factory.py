@@ -40,6 +40,20 @@ class TestOpenMountSource:
             file.write(b"bar")
 
         mountSource = openMountSource(os.path.join(tmpdir, "foo.001"))
+        print("mountSource list:", mountSource.listDir("/"))
         fileInfo = mountSource.getFileInfo("/foo")
         assert fileInfo
         assert mountSource.open(fileInfo).read() == b"foobar"
+
+    @staticmethod
+    def test_joining_files_exceeding_handle_limit(tmpdir):
+        result = b''
+        for i in range(1100):  # Default on my system is 1024
+            with open(os.path.join(tmpdir, f"foo.{i:03}"), 'wb') as file:
+                file.write(str(i).encode())
+                result += str(i).encode()
+
+        mountSource = openMountSource(os.path.join(tmpdir, "foo.005"))
+        fileInfo = mountSource.getFileInfo("/foo")
+        assert fileInfo
+        assert mountSource.open(fileInfo).read() == result

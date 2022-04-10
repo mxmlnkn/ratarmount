@@ -209,7 +209,9 @@ def checkForSplitFile(path: str) -> Optional[Tuple[List[str], str]]:
     maxFormatSpecifier = ''
     maxExtensions: List[str] = []
     for formatSpecifier, baseDigits in [('a', ALPHA), ('0', DIGITS), ('x', HEX)]:
-        extensionSequence = checkForSequence(extensions, lambda i: formatNumber(i, baseDigits, len(extension)))
+        extensionSequence = checkForSequence(
+            extensions, lambda i, baseDigits=baseDigits: formatNumber(i, baseDigits, len(extension))  # type: ignore
+        )
         if len(extensionSequence) > len(maxExtensions):
             maxFormatSpecifier = formatSpecifier
             maxExtensions = extensionSequence

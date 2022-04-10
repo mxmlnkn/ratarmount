@@ -13,7 +13,12 @@ import threading
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore import JoinedFile, RawStenciledFile, StenciledFile  # noqa: E402
+from ratarmountcore.StenciledFile import (  # noqa: E402
+    JoinedFile,
+    JoinedFileFromFactory,
+    RawStenciledFile,
+    StenciledFile,
+)
 
 
 testData = b"1234567890"
@@ -172,3 +177,70 @@ class TestJoinedFile:
 
         assert file.read() == b"rfoo"
         assert file.tell() == 6
+
+
+class TestJoinedFileFromFactory:
+    @staticmethod
+    def test_empty_file():
+        assert JoinedFileFromFactory([lambda: io.BytesIO(b"")]).read() == b""
+
+    @staticmethod
+    def test_single_file():
+        assert JoinedFileFromFactory([lambda: io.BytesIO(b"f")]).read() == b"f"
+        assert JoinedFileFromFactory([lambda: io.BytesIO(b"fo")]).read() == b"fo"
+        assert JoinedFileFromFactory([lambda: io.BytesIO(b"foo")]).read() == b"foo"
+
+    @staticmethod
+    def test_single_file_non_complete_read():
+        assert JoinedFileFromFactory([lambda: io.BytesIO(b"f")]).read(1) == b"f"
+        assert JoinedFileFromFactory([lambda: io.BytesIO(b"fo")]).read(1) == b"f"
+        assert JoinedFileFromFactory([lambda: io.BytesIO(b"foo")]).read(1) == b"f"
+
+    @staticmethod
+    def test_single_file_seek_read():
+        file = JoinedFileFromFactory([lambda: io.BytesIO(b"foobar")])
+        assert file.seek(1) == 1
+        assert file.read(1) == b"o"
+        assert file.read() == b"obar"
+        assert file.seek(-1, io.SEEK_END) == 5
+        assert file.read() == b"r"
+
+    @staticmethod
+    def test_two_files_full_read():
+        assert JoinedFileFromFactory([lambda: io.BytesIO(b""), lambda: io.BytesIO(b"")]).read() == b""
+        assert JoinedFileFromFactory([lambda: io.BytesIO(b""), lambda: io.BytesIO(b"foo")]).read() == b"foo"
+        assert JoinedFileFromFactory([lambda: io.BytesIO(b"foo"), lambda: io.BytesIO(b"")]).read() == b"foo"
+        assert JoinedFileFromFactory([lambda: io.BytesIO(b"bar"), lambda: io.BytesIO(b"foo")]).read() == b"barfoo"
+
+    @staticmethod
+    def test_two_files_seak_and_read():
+        file = JoinedFileFromFactory([lambda: io.BytesIO(b"bar"), lambda: io.BytesIO(b"foo")])
+        assert file.read(1) == b"b"
+        assert file.tell() == 1
+
+        assert file.seek(3) == 3
+        assert file.tell() == 3
+
+        assert file.read(2) == b"fo"
+        assert file.tell() == 5
+
+        assert file.seek(-4, io.SEEK_END) == 2
+        assert file.tell() == 2
+
+        assert file.read() == b"rfoo"
+        assert file.tell() == 6
+
+    @staticmethod
+    def test_joining_files(tmpdir):
+        files = [os.path.join(tmpdir, name) for name in ["foo.001", "foo.002"]]
+        with open(files[0], 'wb') as file:
+            file.write(b"foo")
+        with open(files[1], 'wb') as file:
+            file.write(b"bar")
+
+        factories = [lambda file=file: open(file, 'rb') for file in files]
+        assert len(factories) == 2
+        assert factories[0]().read() == b"foo"
+        assert factories[1]().read() == b"bar"
+
+        assert JoinedFileFromFactory(factories).read() == b"foobar"

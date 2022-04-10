@@ -14,7 +14,7 @@ from .FolderMountSource import FolderMountSource
 from .RarMountSource import RarMountSource
 from .SingleFileMountSource import SingleFileMountSource
 from .SQLiteIndexedTar import SQLiteIndexedTar
-from .StenciledFile import JoinedFile
+from .StenciledFile import JoinedFileFromFactory
 from .ZipMountSource import ZipMountSource
 
 
@@ -31,16 +31,15 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
 
         splitFileResult = checkForSplitFile(fileOrPath)
         if splitFileResult:
-            # TODO what about closing files :/?
-            # TODO what if there are a lot of split files, more than the allowed number of opened handles!?
-            # I guess both of these problems can be solved by creating a specialized JoinedFile class :/
-            # That class would have to close all files not currently in the seek/read area and the input would
-            # be a path list not an object list.
             filesToJoin = splitFileResult[0]
             joinedFileName = os.path.basename(filesToJoin[0]).rsplit('.', maxsplit=1)[0]
             if 'indexFilePath' not in options or not options['indexFilePath']:
                 options['indexFilePath'] = filesToJoin[0] + ".index.sqlite"
-            fileOrPath = JoinedFile([open(file, 'rb') for file in filesToJoin])
+            # https://docs.python.org/3/faq/programming.html
+            # > Why do lambdas defined in a loop with different values all return the same result?
+            fileOrPath = JoinedFileFromFactory(
+                [(lambda file=file: open(file, 'rb')) for file in filesToJoin]  # type: ignore
+            )
 
     try:
         if 'rarfile' in sys.modules and rarfile.is_rarfile(fileOrPath):
