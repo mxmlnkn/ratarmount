@@ -30,6 +30,7 @@ class RawFileInsideRar(io.RawIOBase):
     """
 
     def __init__(self, reopen, file_size):
+        io.RawIOBase.__init__(self)
         self.reopen = reopen
         self.fileobj = reopen()
         self.file_size = file_size

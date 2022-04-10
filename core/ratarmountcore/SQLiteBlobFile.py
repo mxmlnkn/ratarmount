@@ -55,6 +55,7 @@ class SQLiteBlobsFile(JoinedFile):
 
 class WriteSQLiteBlobs(io.RawIOBase):
     def __init__(self, connection: sqlite3.Connection, table: str, blob_size: int = io.DEFAULT_BUFFER_SIZE) -> None:
+        io.RawIOBase.__init__(self)
         self.connection = connection
         self.table = table
         self.blob_size = blob_size
