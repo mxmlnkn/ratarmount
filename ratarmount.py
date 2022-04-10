@@ -1175,6 +1175,10 @@ seeking capabilities when opening that file.
         mountSources.append(fixedPath)
     args.mount_source = mountSources
 
+    for path in args.mount_source:
+        if args.mount_source.count(path) > 1:
+            raise argparse.ArgumentTypeError(f"Path may not appear multiple times at different locations: {path}")
+
     # Automatically generate a default mount path
     if not args.mount_point:
         autoMountPoint = stripSuffixFromTarFile(args.mount_source[0])

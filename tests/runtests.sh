@@ -633,9 +633,12 @@ checkUnionMountFileVersions()
 
     mkdir -p folder/foo/fighter
     echo 'untarred' > folder/foo/fighter/ufo
+    mkdir -p folder2/foo/fighter
+    echo 'untarred' > folder2/foo/fighter/ufo
     mkdir emptyFolder
+    mkdir emptyFolder2
 
-    runAndCheckRatarmount -c emptyFolder folder "$testsFolder/updated-file.tar" emptyFolder folder mountPoint
+    runAndCheckRatarmount -c emptyFolder folder "$testsFolder/updated-file.tar" emptyFolder2 folder2 mountPoint
 
     untarredFileMd5=$( md5sum folder/foo/fighter/ufo 2>/dev/null | sed 's| .*||' )
     verifyCheckSum mountPoint foo/fighter/ufo updated-file.tar "$untarredFileMd5" \
