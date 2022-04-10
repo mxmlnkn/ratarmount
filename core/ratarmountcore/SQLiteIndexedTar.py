@@ -1300,6 +1300,11 @@ class SQLiteIndexedTar(MountSource):
 
                 self._setFileInfo(tuple(modifiedFileInfo))
 
+                # Update isTar to True for the tar
+                modifiedFileInfo = list(fileInfo)
+                modifiedFileInfo[11] = isTar
+                self._setFileInfo(tuple(modifiedFileInfo))
+
         fileObject.seek(oldPos)
         self.tarFileName = oldPrintName
 

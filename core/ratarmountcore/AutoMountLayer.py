@@ -14,6 +14,7 @@ from .compressions import stripSuffixFromTarFile
 from .factory import openMountSource
 from .FolderMountSource import FolderMountSource
 from .MountSource import FileInfo, MountSource
+from .SQLiteIndexedTar import SQLiteIndexedTar, SQLiteIndexedTarUserData
 from .utils import overrides
 
 
@@ -115,11 +116,24 @@ class AutoMountLayer(MountSource):
         parentMountPoint, pathInsideParentMountPoint = self._simplyFindMounted(path)
         parentMountSource = self.mounted[parentMountPoint].mountSource
 
-        try:
-            archiveFileInfo = parentMountSource.getFileInfo(pathInsideParentMountPoint)
-            if archiveFileInfo is None:
-                return None
+        archiveFileInfo = parentMountSource.getFileInfo(pathInsideParentMountPoint)
+        if archiveFileInfo is None:
+            return None
 
+        # Do not mount uncompressed TARs inside SQLiteIndexedTar when they already were mounted recursively!
+        mountSourceResult = parentMountSource.getMountSource(archiveFileInfo)
+        if mountSourceResult:
+            realMountSource = mountSourceResult[1]
+            if (
+                isinstance(realMountSource, SQLiteIndexedTar)
+                and realMountSource.mountRecursively
+                and archiveFileInfo.userdata
+            ):
+                indexedTarData = archiveFileInfo.userdata[0]
+                if isinstance(indexedTarData, SQLiteIndexedTarUserData) and indexedTarData.istar:
+                    return None
+
+        try:
             _, deepestMountSource, deepestFileInfo = parentMountSource.getMountSource(archiveFileInfo)
             if isinstance(deepestMountSource, FolderMountSource):
                 # Open from file path on host file system in order to write out TAR index files.

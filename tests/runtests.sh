@@ -1661,6 +1661,7 @@ tests+=(
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   03.sparse1.bin
 
     b026324c6904b2a9cb4b88d6d61c81d1 tests/2k-recursive-tars.tar.bz2              mimi/00001.tar/foo
+    3059b91c3562cd29457192eb3c3fe376 tests/2k-recursive-tars.tar.bz2              mimi/01234.tar.versions/1
     8f30b20831bade7a2236edf09a55af60 tests/2k-recursive-tars.tar.bz2              mimi/01333.tar/foo
     f95f8943f6dcf7b3c1c8c2cab5455f8b tests/2k-recursive-tars.tar.bz2              mimi/02000.tar/foo
     c157a79031e1c40f85931829bc5fc552 tests/2k-recursive-tars.tar.bz2              mimi/foo
@@ -1696,6 +1697,7 @@ checkIndexPathOption tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
 checkIndexFolderFallback tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
 checkIndexArgumentChangeDetection tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
 checkSuffixStripping tests/2k-recursive-tars.tar mimi/00001/foo b026324c6904b2a9cb4b88d6d61c81d1
+checkSuffixStripping tests/2k-recursive-tars.tar mimi/01234.tar 3059b91c3562cd29457192eb3c3fe376
 checkNestedRecursiveFolderMounting tests/single-file.tar bar d3b07384d113edec49eaa6238ad5ff00
 
 checkTarEncoding tests/single-file.tar utf-8 bar d3b07384d113edec49eaa6238ad5ff00

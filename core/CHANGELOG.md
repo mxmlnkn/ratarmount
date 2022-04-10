@@ -1,4 +1,8 @@
 
+# Version 0.3.1 built on 2022-04-10
+
+ - Fix duplicate mounting of uncompressed TARs inside TARs when using --recursive.
+
 # Version 0.3.0 built on 2022-04-06
 
  - Relax the check for GNU incremental TAR detection because the prefix field
