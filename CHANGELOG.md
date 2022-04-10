@@ -1,5 +1,5 @@
 
-# Version 0.11.0 built on 2022-04-10
+# Version 0.11.1 built on 2022-04-10
 
  - Fix compatibility of --commit-overlay with older GNU tar versions by removing the redundant --verbatim-file option.
  - (ratarmountcore 0.3.1) Fix duplicate mounting of uncompressed TARs inside TARs when using --recursive.
