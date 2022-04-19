@@ -7,11 +7,13 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import IO, Any, Optional, Union
 
-from ratarmountcore.compressions import strip_suffix_from_archive
+from ratarmountcore.compressions import check_for_split_file_in, strip_suffix_from_archive
 from ratarmountcore.mountsource import FileInfo, MountSource, merge_statfs
+from ratarmountcore.mountsource.compositing.singlefile import SingleFileMountSource
 from ratarmountcore.mountsource.factory import open_mount_source
 from ratarmountcore.mountsource.formats.folder import FolderMountSource
 from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar, SQLiteIndexedTarUserData
+from ratarmountcore.StenciledFile import JoinedFileFromFactory
 from ratarmountcore.utils import RatarmountError, determine_recursion_depth, overrides
 
 
@@ -22,6 +24,8 @@ class AutoMountLayer(MountSource):
     """
 
     __slots__ = ('mounted', 'options')
+
+    _FIRST_SPLIT_EXTENSION_REGEX = re.compile("[.]([a]+|[A]+|0*[01])")
 
     @dataclass
     class MountInfo:
@@ -119,22 +123,29 @@ class AutoMountLayer(MountSource):
               Should contain a leading slash.
         """
 
-        # For better performance, only look at the suffix not at the magic bytes.
-        strippedFilePath = strip_suffix_from_archive(path)
-        if strippedFilePath == path:
-            return None
-
         recursionDepth = self.get_recursion_depth(path)
         if recursionDepth > self.maxRecursionDepth:
             return None
 
+        # For better performance, only look at the suffix not at the magic bytes.
+        strippedFilePath = strip_suffix_from_archive(path)
+        maybeSplitFile = strippedFilePath == path
+        if maybeSplitFile:
+            # Do this manual check first to avoid an expensive MountSource.list call.
+            strippedFilePath, extension = os.path.splitext(path)
+            if not AutoMountLayer._FIRST_SPLIT_EXTENSION_REGEX.fullmatch(extension):
+                return None
+        if strippedFilePath == path:
+            return None
+
+        # Determine the mount point and check whether it already is mounted!
         mountPoint = strippedFilePath if self.options.get('stripRecursiveTarExtension', False) else path
-        # https://unix.stackexchange.com/questions/655155/how-to-repeatedly-unpack-tar-gz-files-that-are-within-the-tar-gz-itself
+        # https://unix.stackexchange.com/questions/655155/
+        #   how-to-repeatedly-unpack-tar-gz-files-that-are-within-the-tar-gz-itself
         if 'transformRecursiveMountPoint' in self.options:
             pattern = self.options['transformRecursiveMountPoint']
             if isinstance(pattern, (tuple, list)) and len(pattern) == 2:
                 mountPoint = '/' + re.sub(pattern[0], pattern[1], mountPoint).lstrip('/')
-
         if mountPoint in self.mounted:
             return None
 
@@ -160,14 +171,40 @@ class AutoMountLayer(MountSource):
                 if isinstance(indexedTarData, SQLiteIndexedTarUserData) and indexedTarData.istar:
                     return None
 
-        recursionDepth = self.get_recursion_depth(path)
+        # Now comes the expensive final check for a split file after we did all the cheaper checks.
+        # We need to list the whole parent folder to successfully check for split files.
+        joinedFile: Optional[IO[bytes]] = None
+        if maybeSplitFile:
+            parentFolder, splitCandidateName = os.path.split(path)
+            listResult = parentMountSource.list_mode(parentFolder)
+            if not listResult:
+                return None
+
+            parentFolderList = listResult.keys() if isinstance(listResult, dict) else listResult
+            splitFileResult = check_for_split_file_in(splitCandidateName, parentFolderList)
+            if not splitFileResult:
+                return None
+
+            filePaths = ('/' + f'{parentFolder}/{part}'.lstrip('/') for part in splitFileResult[0])
+
+            def open_file(filePath: str):
+                fileInfo = parentMountSource.lookup(filePath)
+                if not fileInfo:
+                    raise RatarmountError(f"Could not open file {filePath} in mount source {mountSource}!")
+                return parentMountSource.open(fileInfo)
+
+            joinedFile = JoinedFileFromFactory(
+                [(lambda filePath=filePath: open_file(filePath)) for filePath in filePaths]  # type: ignore
+            )
 
         try:
             options = self.options.copy()
             options['recursionDepth'] = max(0, self.maxRecursionDepth - recursionDepth)
 
             _, deepestMountSource, deepestFileInfo = parentMountSource.get_mount_source(archiveFileInfo)
-            if isinstance(deepestMountSource, FolderMountSource):
+            if joinedFile:
+                mountSource: MountSource = SingleFileMountSource(os.path.split(mountPoint)[1], joinedFile)
+            elif isinstance(deepestMountSource, FolderMountSource):
                 # Open from file path on host file system in order to write out TAR index files.
                 # Care has to be taken if a folder is bind mounted onto itself because then it can happen that
                 # the file open triggers a recursive FUSE call, which then hangs up everything.
