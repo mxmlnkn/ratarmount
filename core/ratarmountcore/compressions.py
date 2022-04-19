@@ -234,7 +234,7 @@ def check_for_sequence(extensions: Iterable[str], numberFormatter: Callable[[int
     return suffixSequence
 
 
-def check_for_split_file(path: str) -> Optional[Tuple[List[str], str]]:
+def check_for_split_file_in_list(path: str, candidateNames: List[str]) -> Optional[Tuple[List[str], str]]:
     """
     Returns the paths to all files belonging to the split and a string identifying the format.
     The latter is one of: '', 'x', 'a' to specify the numbering system: decimal, hexadecimal, alphabetical.
@@ -269,7 +269,7 @@ def check_for_split_file(path: str) -> Optional[Tuple[List[str], str]]:
     basename, extension = filename.rsplit('.', maxsplit=1)
 
     # Collect all other files in the folder that might belong to the same split.
-    extensions = [name[len(basename) + 1 :] for name in os.listdir(folder) if name.startswith(basename + '.')]
+    extensions = [name[len(basename) + 1 :] for name in candidateNames if name.startswith(basename + '.')]
     extensions = [e for e in extensions if has_matching_alphabets(e, extension)]
     if not extensions:
         return None
@@ -291,6 +291,10 @@ def check_for_split_file(path: str) -> Optional[Tuple[List[str], str]]:
         return paths, maxFormatSpecifier
 
     return None
+
+
+def check_for_split_file_in_folder(path: str) -> Optional[Tuple[List[str], str]]:
+    return check_for_split_file_in_list(path, os.listdir(os.path.dirname(path)))
 
 
 def _compress_zstd(data):

@@ -335,8 +335,9 @@ rm -rf root
 echo foo >> simple-file-split.001
 echo bar >> simple-file-split.002
 
-split --numeric-suffixes=1 --number=2 --suffix-length=3 single-file.tar single-file-split.tar.
+tar -c --owner=user --group=group --numeric -f 'simple-file-split-in-archive.tar' simple-file-split.001 simple-file-split.002
 
+split --numeric-suffixes=1 --number=2 --suffix-length=3 single-file.tar single-file-split.tar.
 
 # Self-extracting archives
 echo iriya > ufo
