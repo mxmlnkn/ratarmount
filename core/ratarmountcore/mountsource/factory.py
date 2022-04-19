@@ -11,7 +11,7 @@ import warnings
 from pathlib import Path
 from typing import IO, Dict, Iterable, List, Union
 
-from ratarmountcore.compressions import COMPRESSION_BACKENDS, check_for_split_file
+from ratarmountcore.compressions import COMPRESSION_BACKENDS, check_for_split_file_in_folder
 from ratarmountcore.formats import FILE_FORMATS, FileFormatID
 from ratarmountcore.StenciledFile import JoinedFileFromFactory
 from ratarmountcore.utils import CompressionError, RatarmountError
@@ -299,7 +299,7 @@ def open_mount_source(fileOrPath: Union[str, IO[bytes], os.PathLike], **options)
         if path.is_dir():
             return FolderMountSource('.' if str(fileOrPath) == '.' else path.resolve())
 
-        splitFileResult = check_for_split_file(str(fileOrPath))
+        splitFileResult = check_for_split_file_in_folder(str(fileOrPath))
         if splitFileResult:
             filesToJoin = splitFileResult[0]
             joinedFileName = os.path.basename(filesToJoin[0]).rsplit('.', maxsplit=1)[0]

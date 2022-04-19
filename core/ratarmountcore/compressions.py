@@ -234,7 +234,7 @@ def check_for_sequence(extensions: Iterable[str], numberFormatter: Callable[[int
     return suffixSequence
 
 
-def check_for_split_file(path: str) -> Optional[Tuple[List[str], str]]:
+def check_for_split_file_in_list(path: str, candidateNames: List[str]) -> Optional[Tuple[List[str], str]]:
     """
     Returns the paths to all files belonging to the split and a string identifying the format.
     The latter is one of: '', 'x', 'a' to specify the numbering system: decimal, hexadecimal, alphabetical.
@@ -263,13 +263,13 @@ def check_for_split_file(path: str) -> Optional[Tuple[List[str], str]]:
     # These character tests are necessary because Python's built-in isalpha, isdigit and such
     # all also return true for a lot of Unicode alternatives like for the Thai zero.
 
-    folder, filename = os.path.split(os.path.realpath(path))  # Get file extensions
+    filename = os.path.split(os.path.realpath(path))[1]  # Get file extensions
     if '.' not in filename:
         return None
     basename, extension = filename.rsplit('.', maxsplit=1)
 
     # Collect all other files in the folder that might belong to the same split.
-    extensions = [name[len(basename) + 1 :] for name in os.listdir(folder) if name.startswith(basename + '.')]
+    extensions = [name[len(basename) + 1 :] for name in candidateNames if name.startswith(basename + '.')]
     extensions = [e for e in extensions if has_matching_alphabets(e, extension)]
     if not extensions:
         return None
@@ -291,6 +291,10 @@ def check_for_split_file(path: str) -> Optional[Tuple[List[str], str]]:
         return paths, maxFormatSpecifier
 
     return None
+
+
+def check_for_split_file_in_folder(path: str) -> Optional[Tuple[List[str], str]]:
+    return check_for_split_file_in_list(path, os.listdir(os.path.dirname(path)))
 
 
 def _compress_zstd(data):

@@ -171,6 +171,21 @@ class AutoMountLayer(MountSource):
                 # the file open triggers a recursive FUSE call, which then hangs up everything.
                 mountSource = open_mount_source(deepestMountSource.get_file_path(deepestFileInfo), **options)
             else:
+                # splitFileResult = check_for_split_file_in_folder(str(fileOrPath))
+                # if splitFileResult:
+                #     filesToJoin = splitFileResult[0]
+                #     joinedFileName = os.path.basename(filesToJoin[0]).rsplit('.', maxsplit=1)[0]
+                #     if 'indexFilePath' not in options or not options['indexFilePath']:
+                #         options['indexFilePath'] = filesToJoin[0] + ".index.sqlite"
+                #     # https://docs.python.org/3/faq/programming.html
+                #     # > Why do lambdas defined in a loop with different values all return the same result?
+                #     fileOrPath = JoinedFileFromFactory(
+                #         [(lambda file=file: open(file, 'rb')) for file in filesToJoin]  # type: ignore
+                #     )
+                # else:
+                #     fileOrPath = str(fileOrPath)
+                #     autoPrioritizedBackends = find_backends_by_extension(fileOrPath)
+
                 # This will fail with StenciledFile objects as returned by SQLiteIndexedTar mount sources and when
                 # given to backends like indexed_zstd, which do expect the file object to have a valid fileno.
                 mountSource = open_mount_source(
