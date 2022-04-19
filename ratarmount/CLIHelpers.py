@@ -4,7 +4,7 @@ import importlib
 import os
 import sys
 
-from ratarmountcore.compressions import COMPRESSION_BACKENDS, check_for_split_file
+from ratarmountcore.compressions import COMPRESSION_BACKENDS, check_for_split_file_in_folder
 from ratarmountcore.formats import FileFormatID, detect_formats
 from ratarmountcore.mountsource.archives import ARCHIVE_BACKENDS
 from ratarmountcore.utils import is_random
@@ -38,7 +38,7 @@ def check_input_file_type(path: str, printDebug: int = 0) -> str:
         raise argparse.ArgumentTypeError(f"File '{path}' is not a file!")
     path = os.path.realpath(path)
 
-    result = check_for_split_file(path)
+    result = check_for_split_file_in_folder(path)
     if result:
         return result[0][0]
 
