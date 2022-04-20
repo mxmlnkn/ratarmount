@@ -54,7 +54,9 @@ class AutoMountLayer(MountSource):
         # pylint: disable=used-before-assignment
         self.mounted: Dict[str, AutoMountLayer.MountInfo] = {'/': AutoMountLayer.MountInfo(mountSource, rootFileInfo)}
 
-        if not self.options.get('recursive', False) or self.options.get('lazyMounting', False):
+        eagerMounting = self.options.get('eagerFlag', False)
+        lazyMounting = True if eagerMounting else self.options.get('lazyMounting', False)
+        if not self.options.get('recursive', False) or not eagerMounting:
             return
 
         # Go over all files and mount archives and even archives in those archives
@@ -68,11 +70,13 @@ class AutoMountLayer(MountSource):
             for fileName in fileNames:
                 filePath = os.path.join(folder, fileName)
                 if self.isdir(filePath):
-                    foldersToWalk.append(filePath)
+                    if not lazyMounting:
+                        foldersToWalk.append(filePath)
                 else:
                     mountPoint = self._tryToMountFile(filePath)
                     if mountPoint:
-                        foldersToWalk.append(mountPoint)
+                        if not lazyMounting:
+                            foldersToWalk.append(mountPoint)
 
     def _simplyFindMounted(self, path: str) -> Tuple[str, str]:
         """See _findMounted. This is split off to avoid convoluted recursions during lazy mounting."""

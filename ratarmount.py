@@ -984,6 +984,11 @@ seeking capabilities when opening that file.
         help = 'When used with recursively bind-mounted folders, TAR files inside the mounted folder will only be '
                'mounted on first access to it.' )
 
+    parser.add_argument(
+        '-e', '--eager', action='store_true', default = False,
+        help = 'When used with lazy option, mount archives on the firts level eagerly '
+               'without waiting for first access.' )
+
     # Considerations for the default value:
     #   - seek times for the bz2 backend are between 0.01s and 0.1s
     #   - seek times for the gzip backend are roughly 1/10th compared to bz2 at a default spacing of 4MiB
@@ -1442,6 +1447,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         indexFilePath                = args.index_file,
         indexFolders                 = args.index_folders,
         lazyMounting                 = args.lazy,
+        eagerFlag                    = args.eager,
         passwords                    = args.passwords,
         parallelization              = args.parallelization,
         isGnuIncremental             = args.gnu_incremental,
