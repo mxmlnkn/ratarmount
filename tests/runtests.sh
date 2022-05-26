@@ -192,11 +192,24 @@ returnError()
     exit 1
 }
 
-runAndCheckRatarmount()
+runRatarmount()
 {
     MOUNT_POINTS_TO_CLEANUP+=( "${*: -1}" )
-    $RATARMOUNT_CMD "$@" >ratarmount.stdout.log 2>ratarmount.stderr.log &&
+    $RATARMOUNT_CMD "$@" >ratarmount.stdout.log 2>ratarmount.stderr.log.tmp &&
     checkStat "${@: -1}" # mount folder must exist and be stat-able after mounting
+
+    # Python 3.6 on macOS gives a warning:
+    # /opt/hostedtoolcache/Python/3.6.15/x64/lib/python3.6/site-packages/rarfile.py:71:
+    # CryptographyDeprecationWarning: Python 3.6 is no longer supported by the Python core team.
+    # Therefore, support for it is deprecated in cryptography and will be removed in a future release.
+    # from cryptography.hazmat.backends import default_backend
+    # sed -i does not work on macOS: "sed: -i may not be used with stdin".
+    sed '/CryptographyDeprecationWarning/d' ratarmount.stderr.log.tmp > ratarmount.stderr.log
+}
+
+runAndCheckRatarmount()
+{
+    runRatarmount "$@"
     ! 'grep' -C 5 -Ei '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
         returnError "$LINENO" "Found warnings while executing: $RATARMOUNT_CMD $*"
 }
@@ -466,20 +479,16 @@ checkAutomaticIndexRecreation()
     tar -cf "$archive" "$fileName"
 
     # 1. Check and create index
-    $RATARMOUNT_CMD "$archive" >ratarmount.stdout.log 2>ratarmount.stderr.log
-    ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "$LINENO" "Found warnings while executing: $RATARMOUNT_CMD $archive"
+    runAndCheckRatarmount "$archive"
     diff -- "$fileName" "$mountFolder/$fileName" || returnError "$LINENO" 'Files differ on simple mount!'
     funmount "$mountFolder"
 
     # 2. Check that index does not get recreated normally
     sleep 1 # because we are comparing timestamps with seconds precision ...
-    indexFile='momo.tar.index.sqlite'
+    indexFile="$archive.index.sqlite"
     [[ -f $indexFile ]] || returnError "$LINENO" 'Index file not found!'
     lastModification=$( getFileMtime "$indexFile" )
-    $RATARMOUNT_CMD "$archive" >ratarmount.stdout.log 2>ratarmount.stderr.log
-    ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "$LINENO" "Found warnings while executing: $RATARMOUNT_CMD $archive"
+    runAndCheckRatarmount "$archive"
     diff -- "$fileName" "$mountFolder/$fileName" || returnError "$LINENO" 'Files differ on simple remount!'
     funmount "$mountFolder"
     [[ $lastModification -eq $( getFileMtime "$indexFile" ) ]] ||
@@ -494,14 +503,12 @@ checkAutomaticIndexRecreation()
 
     # modification timestamp detection is turned off for now by default to facilitate index sharing because
     # the mtime check can proove problematic as the mtime changes when downloading a file.
-    $RATARMOUNT_CMD "$archive" >ratarmount.stdout.log 2>ratarmount.stderr.log
-    ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "$LINENO" "Found warnings while executing: $RATARMOUNT_CMD $archive"
+    runAndCheckRatarmount "$archive"
     ! [[ -f "$mountFolder/${fileName}" ]] ||
         returnError "$LINENO" 'Index should not have been recreated and therefore contain outdated file name!'
     funmount "$mountFolder"
 
-    $RATARMOUNT_CMD --verify-mtime "$archive" >ratarmount.stdout.log 2>ratarmount.stderr.log
+    runRatarmount --verify-mtime "$archive"
     'grep' -Eqi 'warn' ratarmount.stdout.log ratarmount.stderr.log ||
         returnError "$LINENO" "Found no warnings while executing: $RATARMOUNT_CMD --verify-mtime $archive"
     diff -- "$fileName" "$mountFolder/${fileName}" ||
@@ -519,7 +526,7 @@ checkAutomaticIndexRecreation()
     tar -cf "$archive" "$fileName"
     setFileMTime "$lastModification" "$archive"
 
-    $RATARMOUNT_CMD "$archive" >ratarmount.stdout.log 2>ratarmount.stderr.log
+    runRatarmount "$archive"
     'grep' -Eqi 'warn' ratarmount.stdout.log ratarmount.stderr.log ||
         returnError "$LINENO" "Found no warnings while executing: $RATARMOUNT_CMD $archive"
     diff -- "$fileName" "$mountFolder/${fileName}" || returnError "$LINENO" 'Files differ!'
@@ -660,9 +667,7 @@ checkAutoMountPointCreation()
     cd -- "$tmpFolder" || returnError "$LINENO" 'Failed to cd into temporary directory'
 
     cp "$testsFolder/single-nested-file.tar" .
-    $RATARMOUNT_CMD -- *.tar >ratarmount.stdout.log 2>ratarmount.stderr.log
-    ! 'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "$LINENO" "Found warnings while executing: $RATARMOUNT_CMD -- *.tar"
+    runAndCheckRatarmount -- *.tar
     command grep -q 'iriya' single-nested-file/foo/fighter/ufo ||
     returnError "$LINENO" 'Check for auto mount point creation failed!'
 
@@ -977,7 +982,7 @@ checkIndexArgumentChangeDetection()
     # Check for warnings when loading that index with different index-influencing arguments
     args=( -P "$parallelization" --recursive --ignore-zeros --index-file "$indexFile" "$archive" "$mountFolder" )
     {
-        $RATARMOUNT_CMD "${args[@]}" >ratarmount.stdout.log 2>ratarmount.stderr.log &&
+        runRatarmount "${args[@]}" &&
         checkStat "$mountFolder/$fileInTar" &&
         verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
@@ -1467,7 +1472,7 @@ checkTruncated()
     local args=( -P "$parallelization" -c "$archive" "$mountFolder" )
     {
         # Avoid runAndCheckRatarmount because it checks for warnings
-        $RATARMOUNT_CMD "${args[@]}" &&
+        runRatarmount "${args[@]}" &&
         checkStat "$mountFolder/$fileInTar"
         # Different checksum on macOS? But it is in a broken state anyway, so I wouldn't guarantee anything.
         echo -n "Contents of $mountFolder/$fileInTar: "
@@ -1475,9 +1480,8 @@ checkTruncated()
         echo
         #verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
-    funmount "$mountFolder"
 
-    safeRmdir "$mountFolder"
+    cleanup
 
     echoerr "[${FUNCNAME[0]}] Tested successfully '$fileInTar' in '$archive' for checksum $correctChecksum"
 
