@@ -2077,6 +2077,9 @@ class SQLiteIndexedTar(MountSource):
 
         oldOffset = fileobj.tell()
         for compressionId, compression in supportedCompressions.items():
+            if compressionId in ['rar', 'zip']:
+                continue
+
             # The header check is a necessary condition not a sufficient condition.
             # Especially for gzip, which only has 2 magic bytes, false positives might happen.
             # Therefore, only use the magic bytes based check if the module could not be found

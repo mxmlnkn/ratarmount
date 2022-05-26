@@ -57,7 +57,7 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
         if hasattr(fileOrPath, 'seek'):
             fileOrPath.seek(0)  # type: ignore
 
-    if 'zipfile' in sys.modules:
+    if 'zipfile' in sys.modules and zipfile is not None:
         try:
             # is_zipfile is much too lax when testing for ZIPs because it's only testing for the central directory
             # at the end of the file not the magic bits at the beginning. Meaning, if another non-ZIP archive has
