@@ -1,4 +1,8 @@
 
+# Version 0.11.2 built on 2022-05-27
+
+ - Fix --password option not working.
+
 # Version 0.11.1 built on 2022-04-10
 
  - Fix compatibility of --commit-overlay with older GNU tar versions by removing the redundant --verbatim-file option.
