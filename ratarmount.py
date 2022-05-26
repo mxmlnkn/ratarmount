@@ -1190,7 +1190,7 @@ seeking capabilities when opening that file.
     # Sanitize different ways to specify passwords into a simple list
     args.passwords = []
     if args.password:
-        args.passwords.append(args.password)
+        args.passwords.append(args.password.encode())
 
     if args.password_file:
         with open(args.password_file, 'rb') as file:

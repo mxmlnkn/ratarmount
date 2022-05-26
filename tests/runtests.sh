@@ -1538,7 +1538,9 @@ if [[ -z "$CI" ]]; then
     # bug? For that reason, run each test file separately.
     for testFile in "${testFiles[@]}"; do
         if [[ "${testFile//test_//}" != "$testFile" ]]; then
-            pytest "$testFile" || returnError "$LINENO" 'pytest failed!'
+            # Fusepy warns about usage of use_ns because the implicit behavior is deprecated.
+            # But there has been no development to fusepy for 4 years, so I think it should be fine to ignore.
+            pytest --disable-warnings "$testFile" || returnError "$LINENO" 'pytest failed!'
         fi
     done
 fi

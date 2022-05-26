@@ -21,7 +21,7 @@ jobs:
     - name: Install pip Dependencies
       run: |
         python3 -m pip install --upgrade pip
-        python3 -m pip install --user fusepy
+        python3 -m pip install --user fusepy pytest
 
     - name: Style Check With Black
       run: |
@@ -110,7 +110,12 @@ jobs:
       if: startsWith( matrix.os, 'macos' )
       run: |
         # coreutils is required for the tests written in shell, e.g., for the 'realpath' command
-        brew install macfuse coreutils pixz pbzip2 zstd
+        # unar is required for rar tests with passwords. By default, bsdtar is installed but that is the only
+        # one of the three supported tools (the third is unrar) that does not support passwords.
+        # And the error message is atrocious:
+        #   cmdline.extend(args)
+        #   TypeError: 'NoneType' object is not iterable
+        brew install macfuse coreutils pixz pbzip2 zstd unar
         # Add brew installation binary folder to PATH so that command line tools like zstd can be found
         export PATH="$PATH:/usr/local/bin"
 
@@ -170,8 +175,10 @@ jobs:
     - name: Unit Tests
       run: |
         python3 -m pip install pytest
-        for file in core/tests/test_*.py; do
-            pytest "$file"
+        for file in core/tests/test_*.py tests/test_*.py; do
+            # Fusepy warns about usage of use_ns because the implicit behavior is deprecated.
+            # But there has been no development to fusepy for 4 years, so I think it should be fine to ignore.
+            pytest --disable-warnings "$file"
         done
 
     - name: Regression Tests
