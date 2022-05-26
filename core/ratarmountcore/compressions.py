@@ -156,7 +156,7 @@ def compressZstd(filePath: str, outputFilePath: str, frameSize: int, paralleliza
             toCompress = file.read(frameSize)
             if not toCompress:
                 break
-            results.append(pool.submit(compressZstd, toCompress))
+            results.append(pool.submit(_compressZstd, toCompress))
             while len(results) >= parallelization:
                 compressedData = results.pop(0).result()
                 compressedFile.write(compressedData)
