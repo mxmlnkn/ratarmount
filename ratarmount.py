@@ -470,6 +470,8 @@ class FuseMount(fuse.Operations):
         assert isinstance(pathToMount, list)
 
         options['writeIndex'] = True
+        if 'recursive' not in options and options.get('recursionDepth', 0) != 0:
+            options['recursive'] = True
 
         self.printDebug: int = int(options.get('printDebug', 0))
         self.writeOverlay: Optional[WritableFolderMountSource] = None
@@ -486,7 +488,7 @@ class FuseMount(fuse.Operations):
         mountSources = [openMountSource(path, **options) for path in pathToMount]
 
         self.mountSource: MountSource = UnionMountSource(mountSources, printDebug=self.printDebug)
-        if options.get('recursive', False):
+        if options.get('recursionDepth', 0):
             self.mountSource = AutoMountLayer(self.mountSource, **options)
 
         # No threads should be created and still be open before FUSE forks.
@@ -975,7 +977,20 @@ seeking capabilities when opening that file.
 
     parser.add_argument(
         '-r', '--recursive', action='store_true', default = False,
-        help = 'Mount TAR archives inside the mounted TAR recursively. '
+        help = 'Mount archives inside archives recursively. Same as --recursion-depth -1.' )
+
+    # TODO The recursion depth is only heeded by AutoMountLayer but not by SQLiteIndexedTar.
+    #      One problem is that it requires an update to the index metadata information and
+    #      the other problem is that the AutoMountLayer would have to ask how deep the recursion
+    #      for a particular path is so that it can correctly stop recursive mounting and the
+    #      combined recursion depth.
+    parser.add_argument(
+        '--recursion-depth', type = int,
+        help = 'This option takes precedence over --recursive. '
+               'Mount archives inside the mounted archives recursively up to the given depth. '
+               'A negative value represents infinite depth. '
+               'A value of 0 will turn off recursion (same as not specifying --recursive in the first place). '
+               'A value of 1 will recursively mount all archives in the given archives but not any deeper. '
                'Note that this only has an effect when creating an index. '
                'If an index already exists, then this option will be effectively ignored. '
                'Recreate the index if you want change the recursive mounting policy anyways.' )
@@ -1140,9 +1155,14 @@ seeking capabilities when opening that file.
 
     args.gzipSeekPointSpacing = args.gzip_seek_point_spacing * 1024 * 1024
 
-    if (args.strip_recursive_tar_extension or args.transform_recursive_mount_point) and not args.recursive:
+    if args.recursive and args.recursion_depth is None:
+        args.recursion_depth = -1
+    if args.recursion_depth is None:
+        args.recursion_depth = 0
+
+    if (args.strip_recursive_tar_extension or args.transform_recursive_mount_point) and not args.recursion_depth:
         print("[Warning] The options --strip-recursive-tar-extension and --transform-recursive-mount-point")
-        print("[Warning] only have an effect when used with --recursive.")
+        print("[Warning] only have an effect when used with recursive mounting.")
 
     if args.transform_recursive_mount_point:
         args.transform_recursive_mount_point = tuple(args.transform_recursive_mount_point)
@@ -1441,6 +1461,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         pathToMount                  = args.mount_source,
         clearIndexCache              = bool(args.recreate_index),
         recursive                    = bool(args.recursive),
+        recursionDepth               = int(args.recursion_depth),
         gzipSeekPointSpacing         = args.gzipSeekPointSpacing,
         mountPoint                   = args.mount_point,
         encoding                     = args.encoding,

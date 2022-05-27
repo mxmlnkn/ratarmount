@@ -1,4 +1,8 @@
 
+# Version 0.4.0 built on 2022-06-xx
+
+ - AutoMountLayer now takes a 'recursionDepth' argument instead of 'recursive'.
+
 # Version 0.3.1 built on 2022-04-10
 
  - Fix duplicate mounting of uncompressed TARs inside TARs when using --recursive.
