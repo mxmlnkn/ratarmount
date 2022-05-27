@@ -1,4 +1,9 @@
 
+# Version 0.12.0 built on 2022-06-xx
+
+ - Add --recursion-depth argument for more fine-grained recursion control.
+ - (ratarmountcore 0.4.0) AutoMountLayer now takes a 'recursionDepth' argument instead of 'recursive'.
+
 # Version 0.11.2 built on 2022-05-27
 
  - Fix --password option not working.
