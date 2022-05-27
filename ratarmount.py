@@ -851,9 +851,55 @@ class _CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescr
         super().add_arguments(actions)
 
 
+class PrintVersionAction(argparse.Action):
+    def __call__(self, parser, args, values, option_string=None):
+        print("ratarmount", __version__)
+        print("ratarmountcore", core.__version__)
+
+        print()
+        print("System Software:")
+        print()
+        print("Python", sys.version.split(' ', maxsplit=1)[0])
+
+        try:
+            fusermountVersion = subprocess.run(
+                ["fusermount", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False
+            ).stdout.strip()
+            print("FUSE", re.sub('.* ([0-9][.][0-9.]+).*', r'\1', fusermountVersion.decode()))
+        except Exception:
+            pass
+
+        print("libsqlite3", sqlite3.sqlite_version)
+
+        print()
+        print("Compression Backends:")
+        print()
+
+        for _, cinfo in supportedCompressions.items():
+            try:
+                importlib.import_module(cinfo.moduleName)
+            except ImportError:
+                pass
+
+            if cinfo.moduleName in sys.modules:
+                module = sys.modules[cinfo.moduleName]
+                # zipfile has no __version__ attribute and PEP 396 ensuring that was rejected 2021-04-14
+                # in favor of 'version' from importlib.metadata which does not even work with zipfile.
+                # Probably, because zipfile is a built-in module whose version would be the Python version.
+                # https://www.python.org/dev/peps/pep-0396/
+                # The "python-xz" project is imported as an "xz" module, which complicates things because
+                # there is no generic way to get the "python-xz" name from the "xz" runtime module object
+                # and importlib.metadata.version will require "python-xz" as argument.
+                if hasattr(module, '__version__'):
+                    print(cinfo.moduleName, getattr(module, '__version__'))
+
+        sys.exit(0)
+
+
 def _parseArgs(rawArgs: Optional[List[str]] = None):
     parser = argparse.ArgumentParser(
         formatter_class=_CustomFormatter,
+        add_help=False,
         description='''\
 With ratarmount, you can:
   - Mount a (compressed) TAR file to a folder for read-only access
@@ -961,44 +1007,70 @@ seeking capabilities when opening that file.
 ''',
     )
 
+    commonGroup = parser.add_argument_group("Optional Arguments")
+    positionalGroup = parser.add_argument_group("Positional Options")
+    indexGroup = parser.add_argument_group("Index Options")
+    recursionGroup = parser.add_argument_group("Recursion Options")
+    tarGroup = parser.add_argument_group("Tar Options")
+    writeGroup = parser.add_argument_group("Write Overlay Options")
+    advancedGroup = parser.add_argument_group("Advanced Options")
+
     # fmt: off
-    parser.add_argument(
-        '-f', '--foreground', action='store_true', default = False,
-        help = 'Keeps the python program in foreground so it can print debug '
-               'output when the mounted path is accessed.' )
+    commonGroup.add_argument(
+        '-h', '--help', action='help', default=argparse.SUPPRESS,
+        help='Show this help message and exit.')
 
-    parser.add_argument(
-        '-d', '--debug', type = int, default = 1,
-        help = 'Sets the debugging level. Higher means more output. Currently, 3 is the highest.' )
+    advancedGroup.add_argument(
+        '-f', '--foreground', action='store_true', default=False,
+        help='Keeps the python program in foreground so it can print debug '
+             'output when the mounted path is accessed.')
 
-    parser.add_argument(
-        '-c', '--recreate-index', action='store_true', default = False,
-        help = 'If specified, pre-existing .index files will be deleted and newly created.' )
+    advancedGroup.add_argument(
+        '-d', '--debug', type=int, default=1,
+        help='Sets the debugging level. Higher means more output. Currently, 3 is the highest.')
 
-    parser.add_argument(
-        '-r', '--recursive', action='store_true', default = False,
-        help = 'Mount archives inside archives recursively. Same as --recursion-depth -1.' )
+    indexGroup.add_argument(
+        '-c', '--recreate-index', action='store_true', default=False,
+        help='If specified, pre-existing .index files will be deleted and newly created.')
+
+    commonGroup.add_argument(
+        '-r', '--recursive', action='store_true', default=False,
+        help='Mount archives inside archives recursively. Same as --recursion-depth -1.')
 
     # TODO The recursion depth is only heeded by AutoMountLayer but not by SQLiteIndexedTar.
     #      One problem is that it requires an update to the index metadata information and
     #      the other problem is that the AutoMountLayer would have to ask how deep the recursion
     #      for a particular path is so that it can correctly stop recursive mounting and the
     #      combined recursion depth.
-    parser.add_argument(
-        '--recursion-depth', type = int,
-        help = 'This option takes precedence over --recursive. '
-               'Mount archives inside the mounted archives recursively up to the given depth. '
-               'A negative value represents infinite depth. '
-               'A value of 0 will turn off recursion (same as not specifying --recursive in the first place). '
-               'A value of 1 will recursively mount all archives in the given archives but not any deeper. '
-               'Note that this only has an effect when creating an index. '
-               'If an index already exists, then this option will be effectively ignored. '
-               'Recreate the index if you want change the recursive mounting policy anyways.' )
+    recursionGroup.add_argument(
+        '--recursion-depth', type=int, default=None,
+        help='This option takes precedence over --recursive. '
+             'Mount archives inside the mounted archives recursively up to the given depth. '
+             'A negative value represents infinite depth. '
+             'A value of 0 will turn off recursion (same as not specifying --recursive in the first place). '
+             'A value of 1 will recursively mount all archives in the given archives but not any deeper. '
+             'Note that this only has an effect when creating an index. '
+             'If an index already exists, then this option will be effectively ignored. '
+             'Recreate the index if you want change the recursive mounting policy anyways.')
 
-    parser.add_argument(
-        '-l', '--lazy', action='store_true', default = False,
-        help = 'When used with recursively bind-mounted folders, TAR files inside the mounted folder will only be '
-               'mounted on first access to it.' )
+    recursionGroup.add_argument(
+        '-l', '--lazy', action='store_true', default=False,
+        help='When used with recursively bind-mounted folders, TAR files inside the mounted folder will only be '
+             'mounted on first access to it.')
+
+    recursionGroup.add_argument(
+        '-s', '--strip-recursive-tar-extension', action='store_true',
+        help='If true, then recursively mounted TARs named <file>.tar will be mounted at <file>/. '
+             'This might lead to folders of the same name being overwritten, so use with care. '
+             'The index needs to be (re)created to apply this option!')
+
+    recursionGroup.add_argument(
+        '--transform-recursive-mount-point', type=str, nargs=2, metavar=('REGEX_PATTERN', 'REPLACEMENT'),
+        help='Specify a regex pattern and a replacement string, which will be applied via Python\'s re module '
+             'to the full path of the archive to be recursively mounted. E.g., if there are recursive archives: '
+             '/folder/archive.tar.gz, you can substitute \'[.][^/]+$\' to \'\' and it will be mounted to '
+             '/folder/archive.tar. Or you can replace \'^.*/([^/]+).tar.gz$\' to \'/\1\' to mount all recursive '
+             'folders under the top-level without extensions.')
 
     # Considerations for the default value:
     #   - seek times for the bz2 backend are between 0.01s and 0.1s
@@ -1010,136 +1082,122 @@ seeking capabilities when opening that file.
     #   - the bzip2 index takes roughly 16B per 100-900kiB of compressed data
     #     -> for the gzip index to have the same space efficiency assuming a compression ratio of only 1,
     #        the spacing would have to be 1800MiB at which point it would become almost useless
-    parser.add_argument(
-        '-gs', '--gzip-seek-point-spacing', type = float, default = 16,
-        help =
-        'This only is applied when the index is first created or recreated with the -c option. '
-        'The spacing given in MiB specifies the seek point distance in the uncompressed data. '
-        'A distance of 16MiB means that archives smaller than 16MiB in uncompressed size will '
-        'not benefit from faster seek times. A seek point takes roughly 32kiB. '
-        'So, smaller distances lead to more responsive seeking but may explode the index size!' )
+    advancedGroup.add_argument(
+        '-gs', '--gzip-seek-point-spacing', type=float, default=16,
+        help='This only is applied when the index is first created or recreated with the -c option. '
+             'The spacing given in MiB specifies the seek point distance in the uncompressed data. '
+             'A distance of 16MiB means that archives smaller than 16MiB in uncompressed size will '
+             'not benefit from faster seek times. A seek point takes roughly 32kiB. '
+             'So, smaller distances lead to more responsive seeking but may explode the index size!')
 
-    parser.add_argument(
-        '-p', '--prefix', type = str, default = '',
-        help = '[deprecated] Use "-o modules=subdir,subdir=<prefix>" instead. '
-               'This standard way utilizes FUSE itself and will also work for other FUSE '
-               'applications. So, it is preferable even if a bit more verbose.'
-               'The specified path to the folder inside the TAR will be mounted to root. '
-               'This can be useful when the archive as created with absolute paths. '
-               'E.g., for an archive created with `tar -P cf /var/log/apt/history.log`, '
-               '-p /var/log/apt/ can be specified so that the mount target directory '
-               '>directly< contains history.log.' )
+    advancedGroup.add_argument(
+        '-p', '--prefix', type=str, default='',
+        help='[deprecated] Use "-o modules=subdir,subdir=<prefix>" instead. '
+             'This standard way utilizes FUSE itself and will also work for other FUSE '
+             'applications. So, it is preferable even if a bit more verbose.'
+             'The specified path to the folder inside the TAR will be mounted to root. '
+             'This can be useful when the archive as created with absolute paths. '
+             'E.g., for an archive created with `tar -P cf /var/log/apt/history.log`, '
+             '-p /var/log/apt/ can be specified so that the mount target directory '
+             '>directly< contains history.log.')
 
-    parser.add_argument(
-        '--password', type = str, default = '',
-        help = 'Specify a single password which shall be used for RAR and ZIP files.' )
+    commonGroup.add_argument(
+        '--password', type=str, default='',
+        help='Specify a single password which shall be used for RAR and ZIP files.')
 
-    parser.add_argument(
-        '--password-file', type = str, default = '',
-        help = 'Specify a file with newline separated passwords for RAR and ZIP files. '
-               'The passwords will be tried out in order of appearance in the file.' )
+    advancedGroup.add_argument(
+        '--password-file', type=str, default='',
+        help='Specify a file with newline separated passwords for RAR and ZIP files. '
+             'The passwords will be tried out in order of appearance in the file.')
 
-    parser.add_argument(
-        '-e', '--encoding', type = str, default = tarfile.ENCODING,
-        help = 'Specify an input encoding used for file names among others in the TAR. '
-               'This must be used when, e.g., trying to open a latin1 encoded TAR on an UTF-8 system. '
-               'Possible encodings: https://docs.python.org/3/library/codecs.html#standard-encodings' )
+    tarGroup.add_argument(
+        '-e', '--encoding', type=str, default=tarfile.ENCODING,
+        help='Specify an input encoding used for file names among others in the TAR. '
+             'This must be used when, e.g., trying to open a latin1 encoded TAR on an UTF-8 system. '
+             'Possible encodings: https://docs.python.org/3/library/codecs.html#standard-encodings')
 
-    parser.add_argument(
-        '-i', '--ignore-zeros', action = 'store_true',
-        help = 'Ignore zeroed blocks in archive. Normally, two consecutive 512-blocks filled with zeroes mean EOF '
-               'and ratarmount stops reading after encountering them. This option instructs it to read further and '
-               'is useful when reading archives created with the -A option.' )
+    tarGroup.add_argument(
+        '-i', '--ignore-zeros', action='store_true',
+        help='Ignore zeroed blocks in archive. Normally, two consecutive 512-blocks filled with zeroes mean EOF '
+             'and ratarmount stops reading after encountering them. This option instructs it to read further and '
+             'is useful when reading archives created with the -A option.')
 
-    parser.add_argument(
-        '--gnu-incremental', dest = 'gnu_incremental', action = 'store_true', default = None,
-        help = 'Will strip octal modification time prefixes from file paths, which appear in GNU incremental backups '
-               'created with GNU tar with the --incremental or --listed-incremental options.')
+    tarGroup.add_argument(
+        '--gnu-incremental', dest='gnu_incremental', action='store_true', default=None,
+        help='Will strip octal modification time prefixes from file paths, which appear in GNU incremental backups '
+             'created with GNU tar with the --incremental or --listed-incremental options.')
 
-    parser.add_argument(
-        '--no-gnu-incremental', dest = 'gnu_incremental', action = 'store_false',
-        help = 'If specified, will never strip octal modification prefixes and will also not do automatic detection.')
+    tarGroup.add_argument(
+        '--no-gnu-incremental', dest='gnu_incremental', action='store_false',
+        help='If specified, will never strip octal modification prefixes and will also not do automatic detection.')
 
-    parser.add_argument(
-        '--verify-mtime', action = 'store_true',
-        help = 'By default, only the TAR file size is checked to match the one in the found existing ratarmount index. '
-               'If this option is specified, then also check the modification timestamp. But beware that the mtime '
-               'might change during copying or downloading without the contents changing. So, this check might cause '
-               'false positives.' )
+    indexGroup.add_argument(
+        '--verify-mtime', action='store_true',
+        help='By default, only the TAR file size is checked to match the one in the found existing ratarmount index. '
+             'If this option is specified, then also check the modification timestamp. But beware that the mtime '
+             'might change during copying or downloading without the contents changing. So, this check might cause '
+             'false positives.')
 
-    parser.add_argument(
-        '-s', '--strip-recursive-tar-extension', action = 'store_true',
-        help = 'If true, then recursively mounted TARs named <file>.tar will be mounted at <file>/. '
-               'This might lead to folders of the same name being overwritten, so use with care. '
-               'The index needs to be (re)created to apply this option!' )
+    indexGroup.add_argument(
+        '--index-file', type=str,
+        help='Specify a path to the .index.sqlite file. Setting this will disable fallback index folders. '
+             'If the given path is ":memory:", then the index will not be written out to disk.')
 
-    parser.add_argument(
-        '--transform-recursive-mount-point', type=str, nargs = 2,
-        help = "Specify a regex pattern and a replacement string, which will be applied via Python\'s re module "
-               "to the full path of the archive to be recursively mounted. E.g., if there are recursive archives: "
-               "/folder/archive.tar.gz, you can substitute '[.][^/]+$' to '' and it will be mounted to "
-               "/folder/archive.tar. Or you can replace '^.*/([^/]+).tar.gz$' to '/\1' to mount all recursive folders "
-               "under the top-level without extensions.")
+    indexGroup.add_argument(
+        '--index-folders', default="," + os.path.join( "~", ".ratarmount"),
+        help='Specify one or multiple paths for storing .index.sqlite files. Paths will be tested for suitability '
+             'in the given order. An empty path will be interpreted as the location in which the TAR resides. '
+             'If the argument begins with a bracket "[", then it will be interpreted as a JSON-formatted list. '
+             'If the argument contains a comma ",", it will be interpreted as a comma-separated list of folders. '
+             'Else, the whole string will be interpreted as one folder path. Examples: '
+             '--index-folders ",~/.foo" will try to save besides the TAR and if that does not work, in ~/.foo. '
+             '--index-folders \'["~/.ratarmount", "foo,9000"]\' will never try to save besides the TAR. '
+             '--index-folder ~/.ratarmount will only test ~/.ratarmount as a storage location and nothing else. '
+             'Instead, it will first try ~/.ratarmount and the folder "foo,9000". ')
 
-    parser.add_argument(
-        '--index-file', type = str,
-        help = 'Specify a path to the .index.sqlite file. Setting this will disable fallback index folders. '
-               'If the given path is ":memory:", then the index will not be written out to disk.' )
-
-    parser.add_argument(
-        '--index-folders', default = "," + os.path.join( "~", ".ratarmount" ),
-        help = 'Specify one or multiple paths for storing .index.sqlite files. Paths will be tested for suitability '
-               'in the given order. An empty path will be interpreted as the location in which the TAR resides. '
-               'If the argument begins with a bracket "[", then it will be interpreted as a JSON-formatted list. '
-               'If the argument contains a comma ",", it will be interpreted as a comma-separated list of folders. '
-               'Else, the whole string will be interpreted as one folder path. Examples: '
-               '--index-folders ",~/.foo" will try to save besides the TAR and if that does not work, in ~/.foo. '
-               '--index-folders \'["~/.ratarmount", "foo,9000"]\' will never try to save besides the TAR. '
-               '--index-folder ~/.ratarmount will only test ~/.ratarmount as a storage location and nothing else. '
-               'Instead, it will first try ~/.ratarmount and the folder "foo,9000". ' )
-
-    parser.add_argument(
+    writeGroup.add_argument(
         '-w', '--write-overlay',
-        help = 'Specify an existing folder to be used as a write overlay. The folder itself will be union-mounted '
-               'on top such that files in this folder take precedence over all other existing ones. Furthermore, '
-               'all file creations and modifications will be forwarded to files in this folder. '
-               'Modifying a file inside a TAR will copy that file to the overlay folder and apply the modification '
-               'to that writable copy. Deleting files or folders will update the hidden metadata database inside '
-               'the overlay folder.')
+        help='Specify an existing folder to be used as a write overlay. The folder itself will be union-mounted '
+             'on top such that files in this folder take precedence over all other existing ones. Furthermore, '
+             'all file creations and modifications will be forwarded to files in this folder. '
+             'Modifying a file inside a TAR will copy that file to the overlay folder and apply the modification '
+             'to that writable copy. Deleting files or folders will update the hidden metadata database inside '
+             'the overlay folder.')
 
-    parser.add_argument(
-        '--commit-overlay', action='store_true', default = False,
-        help = 'Apply deletions and content modifications done in the write overlay to the archive.' )
+    writeGroup.add_argument(
+        '--commit-overlay', action='store_true', default=False,
+        help='Apply deletions and content modifications done in the write overlay to the archive.')
 
-    parser.add_argument(
-        '-o', '--fuse', type = str, default = '',
-        help = 'Comma separated FUSE options. See "man mount.fuse" for help. '
-               'Example: --fuse "allow_other,entry_timeout=2.8,gid=0". ' )
+    advancedGroup.add_argument(
+        '-o', '--fuse', type=str, default='',
+        help='Comma separated FUSE options. See "man mount.fuse" for help. '
+             'Example: --fuse "allow_other,entry_timeout=2.8,gid=0". ')
 
-    parser.add_argument(
-        '-u', '--unmount', action = 'store_true',
-        help = 'Unmount the given mount point. Equivalent to calling "fusermount -u".' )
+    commonGroup.add_argument(
+        '-u', '--unmount', action='store_true',
+        help='Unmount the given mount point. Equivalent to calling "fusermount -u".')
 
-    parser.add_argument(
-        '-P', '--parallelization', type = int, default = 0,
-        help = 'If an integer other than 1 is specified, then the threaded parallel bzip2 decoder will be used '
-               'specified amount of block decoder threads. Further threads with lighter work may be started. '
-               f'A value of 0 will use all the available cores ({os.cpu_count()}).')
+    commonGroup.add_argument(
+        '-P', '--parallelization', type=int, default=0,
+        help='If an integer other than 1 is specified, then the threaded parallel bzip2 decoder will be used '
+             'specified amount of block decoder threads. Further threads with lighter work may be started. '
+             f'A value of 0 will use all the available cores ({os.cpu_count()}).')
 
-    parser.add_argument(
-        '-v', '--version', action='store_true', help = 'Print version string.' )
+    commonGroup.add_argument(
+        '-v', '--version', action=PrintVersionAction, nargs=0, default=argparse.SUPPRESS,
+        help='Print version information and exit.')
 
-    parser.add_argument(
-        'mount_source', nargs = '+',
-        help = 'The path to the TAR archive to be mounted. '
-               'If multiple archives and/or folders are specified, then they will be mounted as if the arguments '
-               'coming first were updated with the contents of the archives or folders specified thereafter, '
-               'i.e., the list of TARs and folders will be union mounted.' )
-    parser.add_argument(
-        'mount_point', nargs = '?',
-        help = 'The path to a folder to mount the TAR contents into. '
-               'If no mount path is specified, the TAR will be mounted to a folder of the same name '
-               'but without a file extension.' )
+    positionalGroup.add_argument(
+        'mount_source', nargs='+',
+        help='The path to the TAR archive to be mounted. '
+             'If multiple archives and/or folders are specified, then they will be mounted as if the arguments '
+             'coming first were updated with the contents of the archives or folders specified thereafter, '
+             'i.e., the list of TARs and folders will be union mounted.')
+    positionalGroup.add_argument(
+        'mount_point', nargs='?',
+        help='The path to a folder to mount the TAR contents into. '
+             'If no mount path is specified, the TAR will be mounted to a folder of the same name '
+             'but without a file extension.')
     # fmt: on
 
     args = parser.parse_args(rawArgs)
@@ -1153,7 +1211,7 @@ seeking capabilities when opening that file.
             raise argparse.ArgumentTypeError(f"The given path to unmount ({args.unmount}) must be a mount point!")
         return args
 
-    args.gzipSeekPointSpacing = args.gzip_seek_point_spacing * 1024 * 1024
+    args.gzipSeekPointSpacing = int(args.gzip_seek_point_spacing * 1024 * 1024)
 
     if args.recursive and args.recursion_depth is None:
         args.recursion_depth = -1
@@ -1238,51 +1296,6 @@ seeking capabilities when opening that file.
 
 def cli(rawArgs: Optional[List[str]] = None) -> None:
     """Command line interface for ratarmount. Call with args = [ '--help' ] for a description."""
-
-    # The first argument, is the path to the script and should be ignored
-    tmpArgs = sys.argv[1:] if rawArgs is None else rawArgs
-    if '--version' in tmpArgs or '-v' in tmpArgs:
-        print("ratarmount", __version__)
-        print("ratarmountcore", core.__version__)
-
-        print()
-        print("System Software:")
-        print()
-        print("Python", sys.version.split(' ', maxsplit=1)[0])
-
-        try:
-            fusermountVersion = subprocess.run(
-                ["fusermount", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False
-            ).stdout.strip()
-            print("FUSE", re.sub('.* ([0-9][.][0-9.]+).*', r'\1', fusermountVersion.decode()))
-        except Exception:
-            pass
-
-        print("libsqlite3", sqlite3.sqlite_version)
-
-        print()
-        print("Compression Backends:")
-        print()
-
-        for _, cinfo in supportedCompressions.items():
-            try:
-                importlib.import_module(cinfo.moduleName)
-            except ImportError:
-                pass
-
-            if cinfo.moduleName in sys.modules:
-                module = sys.modules[cinfo.moduleName]
-                # zipfile has no __version__ attribute and PEP 396 ensuring that was rejected 2021-04-14
-                # in favor of 'version' from importlib.metadata which does not even work with zipfile.
-                # Probably, because zipfile is a built-in module whose version would be the Python version.
-                # https://www.python.org/dev/peps/pep-0396/
-                # The "python-xz" project is imported as an "xz" module, which complicates things because
-                # there is no generic way to get the "python-xz" name from the "xz" runtime module object
-                # and importlib.metadata.version will require "python-xz" as argument.
-                if hasattr(module, '__version__'):
-                    print(cinfo.moduleName, getattr(module, '__version__'))
-
-        return
 
     # tmpArgs are only for the manual parsing. In general, rawArgs is None, meaning it reads sys.argv,
     # and maybe sometimes contains arguments when used programmatically. In that case the first argument
@@ -1462,7 +1475,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         clearIndexCache              = bool(args.recreate_index),
         recursive                    = bool(args.recursive),
         recursionDepth               = int(args.recursion_depth),
-        gzipSeekPointSpacing         = args.gzipSeekPointSpacing,
+        gzipSeekPointSpacing         = int(args.gzipSeekPointSpacing),
         mountPoint                   = args.mount_point,
         encoding                     = args.encoding,
         ignoreZeros                  = bool(args.ignore_zeros),

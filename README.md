@@ -234,16 +234,14 @@ Here is a more recent test for version 0.2.0 with the new default SQLite backend
 # Usage
 
 ```
-usage: ratarmount [-h] [-f] [-d DEBUG] [-c] [-r] [-l]
-                  [-gs GZIP_SEEK_POINT_SPACING] [-p PREFIX]
-                  [--password PASSWORD] [--password-file PASSWORD_FILE]
-                  [-e ENCODING] [-i] [--gnu-incremental]
-                  [--no-gnu-incremental] [--verify-mtime] [-s]
-                  [--transform-recursive-mount-point TRANSFORM_RECURSIVE_MOUNT_POINT TRANSFORM_RECURSIVE_MOUNT_POINT]
-                  [--index-file INDEX_FILE] [--index-folders INDEX_FOLDERS]
-                  [-w WRITE_OVERLAY] [--commit-overlay] [-o FUSE] [-u]
-                  [-P PARALLELIZATION] [-v]
-                  mount_source [mount_source ...] [mount_point]
+usage: ratarmount.py [-h] [-f] [-d DEBUG] [-c] [-r] [--recursion-depth RECURSION_DEPTH] [-l] [-s]
+                     [--transform-recursive-mount-point REGEX_PATTERN REPLACEMENT]
+                     [-gs GZIP_SEEK_POINT_SPACING] [-p PREFIX] [--password PASSWORD]
+                     [--password-file PASSWORD_FILE] [-e ENCODING] [-i] [--gnu-incremental]
+                     [--no-gnu-incremental] [--verify-mtime] [--index-file INDEX_FILE]
+                     [--index-folders INDEX_FOLDERS] [-w WRITE_OVERLAY] [--commit-overlay]
+                     [-o FUSE] [-u] [-P PARALLELIZATION] [-v]
+                     mount_source [mount_source ...] [mount_point]
 
 With ratarmount, you can:
   - Mount a (compressed) TAR file to a folder for read-only access
@@ -252,155 +250,142 @@ With ratarmount, you can:
   - Union mount a list of TARs, compressed files, and folders to a mount point
     for read-only access
 
-positional arguments:
-  mount_source          The path to the TAR archive to be mounted. If multiple
-                        archives and/or folders are specified, then they will
-                        be mounted as if the arguments coming first were
-                        updated with the contents of the archives or folders
-                        specified thereafter, i.e., the list of TARs and
-                        folders will be union mounted.
-  mount_point           The path to a folder to mount the TAR contents into.
-                        If no mount path is specified, the TAR will be mounted
-                        to a folder of the same name but without a file
-                        extension. (default: None)
-
-optional arguments:
-  --commit-overlay      Apply deletions and content modifications done in the
-                        write overlay to the archive. (default: False)
-  --gnu-incremental     Will strip octal modification time prefixes from file
-                        paths, which appear in GNU incremental backups created
-                        with GNU tar with the --incremental or --listed-
-                        incremental options. (default: None)
-  --index-file INDEX_FILE
-                        Specify a path to the .index.sqlite file. Setting this
-                        will disable fallback index folders. If the given path
-                        is ":memory:", then the index will not be written out
-                        to disk. (default: None)
-  --index-folders INDEX_FOLDERS
-                        Specify one or multiple paths for storing
-                        .index.sqlite files. Paths will be tested for
-                        suitability in the given order. An empty path will be
-                        interpreted as the location in which the TAR resides.
-                        If the argument begins with a bracket "[", then it
-                        will be interpreted as a JSON-formatted list. If the
-                        argument contains a comma ",", it will be interpreted
-                        as a comma-separated list of folders. Else, the whole
-                        string will be interpreted as one folder path.
-                        Examples: --index-folders ",~/.foo" will try to save
-                        besides the TAR and if that does not work, in ~/.foo.
-                        --index-folders '["~/.ratarmount", "foo,9000"]' will
-                        never try to save besides the TAR. --index-folder
-                        ~/.ratarmount will only test ~/.ratarmount as a
-                        storage location and nothing else. Instead, it will
-                        first try ~/.ratarmount and the folder "foo,9000".
-                        (default: ,~/.ratarmount)
-  --no-gnu-incremental  If specified, will never strip octal modification
-                        prefixes and will also not do automatic detection.
-                        (default: True)
-  --password PASSWORD   Specify a single password which shall be used for RAR
-                        and ZIP files. (default: )
-  --password-file PASSWORD_FILE
-                        Specify a file with newline separated passwords for
-                        RAR and ZIP files. The passwords will be tried out in
-                        order of appearance in the file. (default: )
-  --transform-recursive-mount-point TRANSFORM_RECURSIVE_MOUNT_POINT TRANSFORM_RECURSIVE_MOUNT_POINT
-                        Specify a regex pattern and a replacement string,
-                        which will be applied via Python's re module to the
-                        full path of the archive to be recursively mounted.
-                        E.g., if there are recursive archives:
-                        /folder/archive.tar.gz, you can substitute '[.][^/]+$'
-                        to '' and it will be mounted to /folder/archive.tar.
-                        Or you can replace '^.*/([^/]+).tar.gz$' to '/' to
-                        mount all recursive folders under the top-level
-                        without extensions. (default: None)
-  --verify-mtime        By default, only the TAR file size is checked to match
-                        the one in the found existing ratarmount index. If
-                        this option is specified, then also check the
-                        modification timestamp. But beware that the mtime
-                        might change during copying or downloading without the
-                        contents changing. So, this check might cause false
-                        positives. (default: False)
+Optional Arguments:
+  --password PASSWORD   Specify a single password which shall be used for RAR and ZIP files.
+                        (default: )
   -P PARALLELIZATION, --parallelization PARALLELIZATION
-                        If an integer other than 1 is specified, then the
-                        threaded parallel bzip2 decoder will be used specified
-                        amount of block decoder threads. Further threads with
-                        lighter work may be started. A value of 0 will use all
-                        the available cores (24). (default: 0)
-  -c, --recreate-index  If specified, pre-existing .index files will be
-                        deleted and newly created. (default: False)
-  -d DEBUG, --debug DEBUG
-                        Sets the debugging level. Higher means more output.
-                        Currently, 3 is the highest. (default: 1)
-  -e ENCODING, --encoding ENCODING
-                        Specify an input encoding used for file names among
-                        others in the TAR. This must be used when, e.g.,
-                        trying to open a latin1 encoded TAR on an UTF-8
-                        system. Possible encodings: https://docs.python.org/3/
-                        library/codecs.html#standard-encodings (default:
-                        utf-8)
-  -f, --foreground      Keeps the python program in foreground so it can print
-                        debug output when the mounted path is accessed.
+                        If an integer other than 1 is specified, then the threaded parallel bzip2
+                        decoder will be used specified amount of block decoder threads. Further
+                        threads with lighter work may be started. A value of 0 will use all the
+                        available cores (24). (default: 0)
+  -h, --help            Show this help message and exit.
+  -r, --recursive       Mount archives inside archives recursively. Same as --recursion-depth -1.
                         (default: False)
-  -gs GZIP_SEEK_POINT_SPACING, --gzip-seek-point-spacing GZIP_SEEK_POINT_SPACING
-                        This only is applied when the index is first created
-                        or recreated with the -c option. The spacing given in
-                        MiB specifies the seek point distance in the
-                        uncompressed data. A distance of 16MiB means that
-                        archives smaller than 16MiB in uncompressed size will
-                        not benefit from faster seek times. A seek point takes
-                        roughly 32kiB. So, smaller distances lead to more
-                        responsive seeking but may explode the index size!
-                        (default: 16)
-  -h, --help            show this help message and exit
-  -i, --ignore-zeros    Ignore zeroed blocks in archive. Normally, two
-                        consecutive 512-blocks filled with zeroes mean EOF and
-                        ratarmount stops reading after encountering them. This
-                        option instructs it to read further and is useful when
-                        reading archives created with the -A option. (default:
+  -u, --unmount         Unmount the given mount point. Equivalent to calling "fusermount -u".
+                        (default: False)
+  -v, --version         Print version information and exit.
+
+Positional Options:
+  mount_source          The path to the TAR archive to be mounted. If multiple archives and/or
+                        folders are specified, then they will be mounted as if the arguments
+                        coming first were updated with the contents of the archives or folders
+                        specified thereafter, i.e., the list of TARs and folders will be union
+                        mounted.
+  mount_point           The path to a folder to mount the TAR contents into. If no mount path is
+                        specified, the TAR will be mounted to a folder of the same name but
+                        without a file extension. (default: None)
+
+Index Options:
+  --index-file INDEX_FILE
+                        Specify a path to the .index.sqlite file. Setting this will disable
+                        fallback index folders. If the given path is ":memory:", then the index
+                        will not be written out to disk. (default: None)
+  --index-folders INDEX_FOLDERS
+                        Specify one or multiple paths for storing .index.sqlite files. Paths will
+                        be tested for suitability in the given order. An empty path will be
+                        interpreted as the location in which the TAR resides. If the argument
+                        begins with a bracket "[", then it will be interpreted as a JSON-formatted
+                        list. If the argument contains a comma ",", it will be interpreted as a
+                        comma-separated list of folders. Else, the whole string will be
+                        interpreted as one folder path. Examples: --index-folders ",~/.foo" will
+                        try to save besides the TAR and if that does not work, in ~/.foo. --index-
+                        folders '["~/.ratarmount", "foo,9000"]' will never try to save besides the
+                        TAR. --index-folder ~/.ratarmount will only test ~/.ratarmount as a
+                        storage location and nothing else. Instead, it will first try
+                        ~/.ratarmount and the folder "foo,9000". (default: ,~/.ratarmount)
+  --verify-mtime        By default, only the TAR file size is checked to match the one in the
+                        found existing ratarmount index. If this option is specified, then also
+                        check the modification timestamp. But beware that the mtime might change
+                        during copying or downloading without the contents changing. So, this
+                        check might cause false positives. (default: False)
+  -c, --recreate-index  If specified, pre-existing .index files will be deleted and newly created.
+                        (default: False)
+
+Recursion Options:
+  --recursion-depth RECURSION_DEPTH
+                        This option takes precedence over --recursive. Mount archives inside the
+                        mounted archives recursively up to the given depth. A negative value
+                        represents infinite depth. A value of 0 will turn off recursion (same as
+                        not specifying --recursive in the first place). A value of 1 will
+                        recursively mount all archives in the given archives but not any deeper.
+                        Note that this only has an effect when creating an index. If an index
+                        already exists, then this option will be effectively ignored. Recreate the
+                        index if you want change the recursive mounting policy anyways. (default:
+                        None)
+  --transform-recursive-mount-point REGEX_PATTERN REPLACEMENT
+                        Specify a regex pattern and a replacement string, which will be applied
+                        via Python's re module to the full path of the archive to be recursively
+                        mounted. E.g., if there are recursive archives: /folder/archive.tar.gz,
+                        you can substitute '[.][^/]+$' to '' and it will be mounted to
+                        /folder/archive.tar. Or you can replace '^.*/([^/]+).tar.gz$' to '/' to
+                        mount all recursive folders under the top-level without extensions.
+                        (default: None)
+  -l, --lazy            When used with recursively bind-mounted folders, TAR files inside the
+                        mounted folder will only be mounted on first access to it. (default:
                         False)
-  -l, --lazy            When used with recursively bind-mounted folders, TAR
-                        files inside the mounted folder will only be mounted
-                        on first access to it. (default: False)
-  -o FUSE, --fuse FUSE  Comma separated FUSE options. See "man mount.fuse" for
-                        help. Example: --fuse
-                        "allow_other,entry_timeout=2.8,gid=0". (default: )
-  -p PREFIX, --prefix PREFIX
-                        [deprecated] Use "-o modules=subdir,subdir=<prefix>"
-                        instead. This standard way utilizes FUSE itself and
-                        will also work for other FUSE applications. So, it is
-                        preferable even if a bit more verbose.The specified
-                        path to the folder inside the TAR will be mounted to
-                        root. This can be useful when the archive as created
-                        with absolute paths. E.g., for an archive created with
-                        `tar -P cf /var/log/apt/history.log`, -p /var/log/apt/
-                        can be specified so that the mount target directory
-                        >directly< contains history.log. (default: )
-  -r, --recursive       Mount TAR archives inside the mounted TAR recursively.
-                        Note that this only has an effect when creating an
-                        index. If an index already exists, then this option
-                        will be effectively ignored. Recreate the index if you
-                        want change the recursive mounting policy anyways.
-                        (default: False)
   -s, --strip-recursive-tar-extension
-                        If true, then recursively mounted TARs named
-                        <file>.tar will be mounted at <file>/. This might lead
-                        to folders of the same name being overwritten, so use
-                        with care. The index needs to be (re)created to apply
-                        this option! (default: False)
-  -u, --unmount         Unmount the given mount point. Equivalent to calling
-                        "fusermount -u". (default: False)
-  -v, --version         Print version string. (default: False)
+                        If true, then recursively mounted TARs named <file>.tar will be mounted at
+                        <file>/. This might lead to folders of the same name being overwritten, so
+                        use with care. The index needs to be (re)created to apply this option!
+                        (default: False)
+
+Tar Options:
+  --gnu-incremental     Will strip octal modification time prefixes from file paths, which appear
+                        in GNU incremental backups created with GNU tar with the --incremental or
+                        --listed-incremental options. (default: None)
+  --no-gnu-incremental  If specified, will never strip octal modification prefixes and will also
+                        not do automatic detection. (default: True)
+  -e ENCODING, --encoding ENCODING
+                        Specify an input encoding used for file names among others in the TAR.
+                        This must be used when, e.g., trying to open a latin1 encoded TAR on an
+                        UTF-8 system. Possible encodings:
+                        https://docs.python.org/3/library/codecs.html#standard-encodings (default:
+                        utf-8)
+  -i, --ignore-zeros    Ignore zeroed blocks in archive. Normally, two consecutive 512-blocks
+                        filled with zeroes mean EOF and ratarmount stops reading after
+                        encountering them. This option instructs it to read further and is useful
+                        when reading archives created with the -A option. (default: False)
+
+Write Overlay Options:
+  --commit-overlay      Apply deletions and content modifications done in the write overlay to the
+                        archive. (default: False)
   -w WRITE_OVERLAY, --write-overlay WRITE_OVERLAY
-                        Specify an existing folder to be used as a write
-                        overlay. The folder itself will be union-mounted on
-                        top such that files in this folder take precedence
-                        over all other existing ones. Furthermore, all file
-                        creations and modifications will be forwarded to files
-                        in this folder. Modifying a file inside a TAR will
-                        copy that file to the overlay folder and apply the
-                        modification to that writable copy. Deleting files or
-                        folders will update the hidden metadata database
-                        inside the overlay folder. (default: None)
+                        Specify an existing folder to be used as a write overlay. The folder
+                        itself will be union-mounted on top such that files in this folder take
+                        precedence over all other existing ones. Furthermore, all file creations
+                        and modifications will be forwarded to files in this folder. Modifying a
+                        file inside a TAR will copy that file to the overlay folder and apply the
+                        modification to that writable copy. Deleting files or folders will update
+                        the hidden metadata database inside the overlay folder. (default: None)
+
+Advanced Options:
+  --password-file PASSWORD_FILE
+                        Specify a file with newline separated passwords for RAR and ZIP files. The
+                        passwords will be tried out in order of appearance in the file. (default:
+                        )
+  -d DEBUG, --debug DEBUG
+                        Sets the debugging level. Higher means more output. Currently, 3 is the
+                        highest. (default: 1)
+  -f, --foreground      Keeps the python program in foreground so it can print debug output when
+                        the mounted path is accessed. (default: False)
+  -gs GZIP_SEEK_POINT_SPACING, --gzip-seek-point-spacing GZIP_SEEK_POINT_SPACING
+                        This only is applied when the index is first created or recreated with the
+                        -c option. The spacing given in MiB specifies the seek point distance in
+                        the uncompressed data. A distance of 16MiB means that archives smaller
+                        than 16MiB in uncompressed size will not benefit from faster seek times. A
+                        seek point takes roughly 32kiB. So, smaller distances lead to more
+                        responsive seeking but may explode the index size! (default: 16)
+  -o FUSE, --fuse FUSE  Comma separated FUSE options. See "man mount.fuse" for help. Example:
+                        --fuse "allow_other,entry_timeout=2.8,gid=0". (default: )
+  -p PREFIX, --prefix PREFIX
+                        [deprecated] Use "-o modules=subdir,subdir=<prefix>" instead. This
+                        standard way utilizes FUSE itself and will also work for other FUSE
+                        applications. So, it is preferable even if a bit more verbose.The
+                        specified path to the folder inside the TAR will be mounted to root. This
+                        can be useful when the archive as created with absolute paths. E.g., for
+                        an archive created with `tar -P cf /var/log/apt/history.log`, -p
+                        /var/log/apt/ can be specified so that the mount target directory
+                        >directly< contains history.log. (default: )
 ```
 
 ## Metadata Index Cache
