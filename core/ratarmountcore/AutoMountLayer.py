@@ -33,8 +33,13 @@ class AutoMountLayer(MountSource):
 
     def __init__(self, mountSource: MountSource, **options) -> None:
         self.options = options
-        self.recursionDepth: int = self.options['recursionDepth'] if 'recursionDepth' in self.options \
-                                   else -1 if self.options.get('recursive', False) else 0
+        self.recursionDepth: int = (
+            self.options['recursionDepth']
+            if 'recursionDepth' in self.options
+            else -1
+            if self.options.get('recursive', False)
+            else 0
+        )
         self.lazyMounting: bool = self.options.get('lazyMounting', False)
         self.printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
 
@@ -63,7 +68,7 @@ class AutoMountLayer(MountSource):
         # Go over all files and mount archives and even archives in those archives
         foldersToWalk = ['/']
         recursionDepth = 0
-        while foldersToWalk and ( recursionDepth < self.recursionDepth or self.recursionDepth < 0 ):
+        while foldersToWalk and (recursionDepth < self.recursionDepth or self.recursionDepth < 0):
             newFoldersToWalk = []
             for folder in foldersToWalk:
                 fileNames = self.listDir(folder)
@@ -88,7 +93,7 @@ class AutoMountLayer(MountSource):
         for depth in range(len(parts)):
             if '/'.join(parts[:depth]) in self.mounted:
                 mountLayers += 1
-        return mountLayers;
+        return mountLayers
 
     def _simplyFindMounted(self, path: str) -> Tuple[str, str]:
         """See _findMounted. This is split off to avoid convoluted recursions during lazy mounting."""
@@ -252,8 +257,8 @@ class AutoMountLayer(MountSource):
 
         # Check whether we need to add recursive mount points to this directory listing
         # The outer if is only a performance optimization. In general, it should be possible to remove it.
-        if ( self.options.get('stripRecursiveTarExtension', False)
-             or self.options.get('transformRecursiveMountPoint', False)
+        if self.options.get('stripRecursiveTarExtension', False) or self.options.get(
+            'transformRecursiveMountPoint', False
         ):
             for mountPoint, mountInfo in self.mounted.items():
                 folder, folderName = os.path.split(mountPoint)
