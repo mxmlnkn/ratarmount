@@ -471,7 +471,7 @@ class FuseMount(fuse.Operations):
 
         options['writeIndex'] = True
 
-        self.printDebug: int = options.get('printDebug', 0)
+        self.printDebug: Optional[Union[Any, bool, int, list, tuple]] = options.get('printDebug', 0)
         self.writeOverlay: Optional[WritableFolderMountSource] = None
         self.overlayPath: Optional[str] = None
 
