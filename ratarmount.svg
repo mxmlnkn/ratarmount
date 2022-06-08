@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="610"
+     height="120"
+     viewBox="-5 -5 620 125"
+     version="1.1"
+     id="ratarmount-logo"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     xmlns="http://www.w3.org/2000/svg"
+     xmlns:svg="http://www.w3.org/2000/svg"
+>
+    <style>
+:root {
+    --color-ratar: #aa00cc;
+    --color-mount: #009900;
+}
+
+.text-stroke {
+    fill: none;
+    stroke-width: 10;
+    stroke-linecap: round;
+    stroke-miterlimit: 4;
+    stroke-dasharray: none;
+    stroke-opacity:1 ;
+}
+
+#ratar { stroke: var(--color-ratar); }
+#stop-ratar { stop-color: var(--color-ratar); }
+#mount { stroke: var(--color-mount); }
+#stop-mount { stop-color: var(--color-mount); }
+
+/* On hover does not work for this SVG when inlined into the rendered Github Readme.md. */
+.gloweffect:hover { filter: url(#glow); }
+/* .gloweffect { filter: url(#glow); } */
+    </style>
+    <defs id="definitions">
+        <linearGradient
+           xlink:href="#linearGradientStops"
+           id="linearGradient1"
+           gradientUnits="userSpaceOnUse"
+           x1="190" y1="0" x2="320" y2="0"/>
+        <linearGradient id="linearGradientStops">
+            <stop offset="0" id="stop-ratar"/>
+            <stop offset="1" id="stop-mount"/>
+        </linearGradient>
+        <filter id="animated-glow">
+            <feGaussianBlur stdDeviation="1" result="blur1">
+                <animate attributeName="stdDeviation" calcMode="linear" keyTimes="0.0; 0.96; 0.98; 1.0"
+                         values="0; 0; 1; 0" dur="20s" repeatCount="indefinite"/>
+            </feGaussianBlur>
+            <feGaussianBlur stdDeviation="2" result="blur2">
+                <animate attributeName="stdDeviation" calcMode="linear" keyTimes="0.0; 0.96; 0.98; 1.0"
+                         values="0; 0; 2; 0" dur="20s" repeatCount="indefinite"/>
+            </feGaussianBlur>
+            <feGaussianBlur stdDeviation="4" result="blur3">
+                <animate attributeName="stdDeviation" calcMode="linear" keyTimes="0.0; 0.96; 0.98; 1.0"
+                         values="0; 0; 4; 0" dur="20s" repeatCount="indefinite"/>
+            </feGaussianBlur>
+            <feColorMatrix in="SourceGraphic" type="saturate" values="2" result="luminescence">
+                <animate attributeName="values" calcMode="linear" keyTimes="0.0; 0.94; 0.98; 1.0"
+                         values="1; 1; 2; 1" dur="20s" repeatCount="indefinite"/>
+            </feColorMatrix>
+            <feMerge>
+                <feMergeNode in="blur1"/>
+                <feMergeNode in="blur2"/>
+                <feMergeNode in="blur3"/>
+                <feMergeNode in="SourceGraphic"/>
+                <feMergeNode in="luminescence"/>
+            </feMerge>
+        </filter>
+        <filter id="glow">
+            <feGaussianBlur stdDeviation="1" result="blur1"/>
+            <feGaussianBlur stdDeviation="2" result="blur2"/>
+            <feGaussianBlur stdDeviation="4" result="blur3"/>
+            <feColorMatrix in="SourceGraphic" type="saturate" values="2" result="luminescence"/>
+            <feMerge>
+                <feMergeNode in="blur1"/>
+                <feMergeNode in="blur2"/>
+                <feMergeNode in="blur3"/>
+                <feMergeNode in="SourceGraphic"/>
+                <feMergeNode in="luminescence"/>
+            </feMerge>
+        </filter>
+    </defs>
+    <g id="ratarmount" class="text-stroke gloweffect">
+        <g id="ratar" >
+            <path id="r" d="m 30,50 c -11,0 -20,9 -20,20 v 30"/>
+            <g id="a">
+                <circle id="a-ring" cx="75" cy="75" r="25"/>
+                <path d="M 100,75 V 100" id="a-tail"/>
+            </g>
+            <path d="M 125,10 V 100" id="left-t"/>
+            <g id="mirrored-a">
+                <ellipse id="mirrored-a-ring" cx="175" cy="75" rx="25" ry="25"/>
+                <path d="m 150,75 -0,25" id="mirrored-a-tail"/>
+            </g>
+            <path id="mirrored-r" d="m 220,50 c 11,0 20,9 20,20 v 30"/>
+        </g>
+        <g id="mount">
+            <!-- The high-precision numbers appear because the Bezier curves do not map nicely to circles -->
+            <path id="m" d="M 305,100 V 70 c 0,-11.042347 -8.94277,-20 -20,-20 -11.04224,0 -20,8.95475 -20,20 v 30 m 80,0 V 70 c 0,-11.042484 -8.95502,-20 -20,-20 -11.0422,0 -20,8.954887 -20,20"/>
+            <ellipse id="o" cx="390" cy="75" rx="25" ry="25"/>
+            <path id="u" d="m 485,50 c 0,11.30637 0.11627,17.441254 0.11627,25 0,13.80713 -11.19356,25 -25,25 -13.80637,0 -25,-11.193123 -25,-25 0,-13.806744 0,-12.648381 0,-25"/>
+            <path id="n" d="m 505,100 c 0,-11.306785 -0.11628,-17.440724 -0.11628,-25 0,-13.807349 11.19258,-25.000289 25.00057,-25.000289 13.80672,0 25,11.19294 25,25 0,13.807347 -0,12.647981 -0,25"/>
+            <path id="right-t" d="M 580,10 V 100"/>
+            <path id="right-t-bar" d="M 560,30 h 40" style="stroke:url(#linearGradient1)">
+                <animate attributeName="d"
+                    calcMode="spline"
+                    keyTimes="0.0; 0.7; 0.75; 0.95; 1.0"
+                    values="M 240,30 H 595;
+                            M 240,30 H 595;
+                            M 565,30 H 595;
+                            M 565,30 H 595;
+                            M 240,30 H 595"
+                    dur="20s"
+                    repeatCount="indefinite"/>
+            </path>
+        </g>
+        <path style="stroke:url(#linearGradient1)" d="M 10,30 H 600" id="roof">
+            <!--
+            Multiply length with cosine to simulate an animation as if the line was rotating with constant speed:
+            python3 -c 'import numpy as np; \
+                cs = 0.5 + 0.5 * np.cos( np.linspace( 0, 1, 24, endpoint = True ) * 2 * np.pi ); \
+                cs = np.concatenate( (np.ones( 48 ), cs) ); \
+                print( ";\n".join( f"M {105 - c * 90},30 H {145 + c * 450}" for c in cs ) )'
+
+            <animate attributeName="d" values="... output from Python script ..." dur="8s" repeatCount="indefinite"/>
+            -->
+            <animate attributeName="d"
+                calcMode="spline"
+                keyTimes="0.0; 0.7; 0.75; 0.95; 1.0"
+                values="M 15,30 H 240;
+                        M 15,30 H 240;
+                        M 105,30 H 145;
+                        M 105,30 H 145;
+                        M 15,30 H 240"
+                dur="20s"
+                repeatCount="indefinite"/>
+        </path>
+    </g>
+</svg>
