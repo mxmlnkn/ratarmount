@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v3
       with:
         python-version: '3.9'
 
@@ -69,7 +69,7 @@ jobs:
         #       Maybe only test ratarmount-core without most dependencies after I have split that off.
         # Oldest and newest versions should be enough. Python versions are supported 5 years from release date.
         # 3.5 was released 2015-09-13 and end-of-life was 2020-09-13
-        # 3.6 was released 2016-12-23 and end-of-life will be 2021-12-23
+        # 3.6 was released 2016-12-23 and end-of-life was 2021-12-23
         # 3.7 was released 2018-06-27 and end-of-life will be 2023-06-27
         # 3.8 was released 2019-10-14 and end-of-life will be 2024-10-14
         # 3.9 was released 2020-10-05 and end-of-life will be 2025-10-25
@@ -82,10 +82,10 @@ jobs:
         shell: bash
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
 
