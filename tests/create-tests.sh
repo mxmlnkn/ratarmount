@@ -1,5 +1,7 @@
 #!/bin/bash
 
+alias tarc='tar -c --owner=user --group=group --numeric'
+
 recreateArchive()
 (
     archive="$( pwd )/$( basename -- "$1" )"
@@ -11,8 +13,9 @@ recreateArchive()
 
     # run TAR command
     set -x
-    tar -c -f "$newArchive" --owner=user --group=group "$@"
+    tarc -f "$newArchive" "$@"
 )
+
 
 # These archives are mostly only different in what kind of TAR they produce but don't differ with their actual contents.
 # So, for these test TARs the creation command is more important than their contents.
@@ -27,10 +30,10 @@ recreateArchive 'single-nested-folder.tar' foo/fighter/
 recreateArchive 'file-existing-as-non-link-and-link.tar' foo/fighter/ foo/fighter/ufo
 
 echo foo > bar
-tar -c --owner=user --group=group --numeric -f 'single-self-link.tar' bar bar
+tarc -f 'single-self-link.tar' bar bar
 tar --delete --occurrence=1 --file 'single-self-link.tar' bar
 
-tar -c --owner=user --group=group --numeric -f 'two-self-links.tar' bar bar bar
+tarc -f 'two-self-links.tar' bar bar bar
 tar --delete --occurrence=1 --file 'two-self-links.tar' bar
 
 cp 'single-file.tar' 'empty.tar'
@@ -60,10 +63,10 @@ mkdir super-nested-archive
     mv -- * files
 
     # Create archives of archives
-    tar -cf  tar-with-archives.tar     -- files
-    tar -cjf tar-with-archives.tar.bz2 -- files
-    tar -czf tar-with-archives.tar.gz  -- files
-    tar -cJf tar-with-archives.tar.xz  -- files
+    tarc -f  tar-with-archives.tar     -- files
+    tarc -jf tar-with-archives.tar.bz2 -- files
+    tarc -zf tar-with-archives.tar.gz  -- files
+    tarc -Jf tar-with-archives.tar.xz  -- files
 
     7z a seven-elves.7z files
     rar a foos-rar-dah.rar files
@@ -71,8 +74,14 @@ mkdir super-nested-archive
     mkisofs -lJR -o miso.iso files
 
     cd ..
-    tar -cjf super-nested-archive{.tar.bz2,}
+    tarc -jf super-nested-archive{.tar.bz2,}
 )
+
+
+tar -xf nested-tar.tar
+bzip2 foo/lighter.tar
+tarc -f nested-compressed-tar.tar foo
+rm -r foo
 
 
 tar -xf nested-tar.tar
@@ -129,7 +138,7 @@ rar a rar-misrecognized-as-zip.rar bag.zip bag1.zip
 
 tarFile='updated-file-with-file-under-that-path.tar'
 echo bar > foo
-tar -c --owner=user --group=group --numeric -f "$tarFile" foo
+tarc -f "$tarFile" foo
 rm foo
 mkdir foo
 echo iriya > foo/fighter
@@ -150,47 +159,47 @@ echo 'one' > foo/1
 echo 'three' > foo/3
 sleep 2s
 echo 'two' > foo/2
-tar -c --owner=user --group=group --numeric -f 'incremental-backup.level.0.tar' --listed-incremental="new-incremental-backup.level.0.snar" root-file.txt foo
+tarc -f 'incremental-backup.level.0.tar' --listed-incremental="new-incremental-backup.level.0.snar" root-file.txt foo
 
 # Create an incremental backup
 cp new-incremental-backup.level.{0,1}.snar
 mv foo/{1,moved}
 printf '\nmodified\n' >> foo/3
 rm foo/2
-tar -c --owner=user --group=group --numeric -f 'incremental-backup.level.1.tar' --listed-incremental="new-incremental-backup.level.1.snar" root-file.txt foo
+tarc -f 'incremental-backup.level.1.tar' --listed-incremental="new-incremental-backup.level.1.snar" root-file.txt foo
 
 rm foo root-file.txt
 
 
 rm foo
 echo bar > foo
-tar -c --owner=user --group=group --numeric -f 'single-file-incremental.tar' --incremental foo
+tarc -f 'single-file-incremental.tar' --incremental foo
 octalMTime=$( printf %o "$( stat -c %Y foo )" )
 mkdir "$octalMTime"
 mv foo "$_"
-tar -c --owner=user --group=group --numeric -f 'single-file-incremental-mockup.tar' "$octalMTime/foo"
+tarc -f 'single-file-incremental-mockup.tar' "$octalMTime/foo"
 rm "$octalMTime"
 
 longName=$( printf 000000000%s 1 2 3 4 5 6 7 8 9 A B C )
 rm "$longName" 'single-file-incremental-long-name'*
 echo bar > "$longName"
-tar -c --owner=user --group=group --numeric -f 'single-file-incremental-long-name.tar' --incremental "$longName"
+tarc -f 'single-file-incremental-long-name.tar' --incremental "$longName"
 octalMTime=$( printf %o "$( stat -c %Y "$longName" )" )
 mkdir "$octalMTime"
 mv "$longName" "$_"
-tar -c --owner=user --group=group --numeric -f 'single-file-incremental-long-name-mockup.tar' "$octalMTime/$longName"
+tarc -f 'single-file-incremental-long-name-mockup.tar' "$octalMTime/$longName"
 rm "$octalMTime"
 
 
 echo bar > /tmp/foo
-tar -c --absolute-names --owner=user --group=group --numeric -f 'absolute-file-incremental.tar' --incremental /tmp/foo
+tarc --absolute-names -f 'absolute-file-incremental.tar' --incremental /tmp/foo
 
 
 # special-char.tar
 mkdir mimi momo
 echo iriya > 'mimi/Datei-mit-dämlicher-Kodierung.txt'
 ratarmount -o modules=iconv,to_code=ISO-8859-1 mimi momo
-tar -c --owner=0 --group=0 --numeric-owner -f special-char.tar momo/*
+tarc -f special-char.tar momo/*
 fusermount -u momo
 rm -r mimi momo
 
@@ -200,7 +209,7 @@ mkdir -p 'mimi/Ördner-mìt-dämlicher-Ködierúng'
 file='Ördner-mìt-dämlicher-Ködierúng/Datei-mit-dämlicher-Kodierung.txt'
 echo iriya > "mimi/$file"
 ratarmount -o modules=iconv,to_code=ISO-8859-1 mimi momo
-( cd momo && tar -c --owner=0 --group=0 --numeric-owner -f ../nested-special-char.tar "$file"; )
+( cd momo && tarc -f ../nested-special-char.tar "$file"; )
 fusermount -u momo
 rm -r mimi momo
 
