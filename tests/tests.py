@@ -22,14 +22,14 @@ from ratarmountcore import FileInfo, SQLiteIndexedTar, SQLiteIndexedTarUserData
 print("\nTest creating and using an index with .tar.gz files with SQLiteIndexedTar")
 
 
-def createFile(tarArchive, name, contents):
-    tinfo = tarfile.TarInfo(name)
+def createFile(tarArchive, fileName, contents):
+    tinfo = tarfile.TarInfo(fileName)
     tinfo.size = len(contents)
     tarArchive.addfile(tinfo, io.BytesIO(contents.encode()))
 
 
-def makeFolder(tarArchive, name):
-    tinfo = tarfile.TarInfo(name)
+def makeFolder(tarArchive, folderName):
+    tinfo = tarfile.TarInfo(folderName)
     tinfo.type = tarfile.DIRTYPE
     tarArchive.addfile(tinfo, io.BytesIO())
 

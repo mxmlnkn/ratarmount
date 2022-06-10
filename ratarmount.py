@@ -471,7 +471,7 @@ class FuseMount(fuse.Operations):
 
         options['writeIndex'] = True
 
-        self.printDebug = options.get('printDebug', 0)
+        self.printDebug: int = int(options.get('printDebug', 0))
         self.writeOverlay: Optional[WritableFolderMountSource] = None
         self.overlayPath: Optional[str] = None
 
@@ -1439,22 +1439,22 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
     fuseOperationsObject = FuseMount(
         # fmt: off
         pathToMount                  = args.mount_source,
-        clearIndexCache              = args.recreate_index,
-        recursive                    = args.recursive,
+        clearIndexCache              = bool(args.recreate_index),
+        recursive                    = bool(args.recursive),
         gzipSeekPointSpacing         = args.gzipSeekPointSpacing,
         mountPoint                   = args.mount_point,
         encoding                     = args.encoding,
-        ignoreZeros                  = args.ignore_zeros,
-        verifyModificationTime       = args.verify_mtime,
+        ignoreZeros                  = bool(args.ignore_zeros),
+        verifyModificationTime       = bool(args.verify_mtime),
         stripRecursiveTarExtension   = args.strip_recursive_tar_extension,
         indexFilePath                = args.index_file,
         indexFolders                 = args.index_folders,
-        lazyMounting                 = args.lazy,
-        passwords                    = args.passwords,
+        lazyMounting                 = bool(args.lazy),
+        passwords                    = list(args.passwords),
         parallelization              = args.parallelization,
         isGnuIncremental             = args.gnu_incremental,
         writeOverlay                 = args.write_overlay,
-        printDebug                   = args.debug,
+        printDebug                   = int(args.debug),
         transformRecursiveMountPoint = args.transform_recursive_mount_point,
         # fmt: on
     )

@@ -205,6 +205,7 @@ class LambdaReaderFile(io.RawIOBase):
 
     def __init__(self, rawRead: Callable[[int, int], bytes], size: int) -> None:
         """rawRead: Function which returns bytes for (offset, size) input."""
+        io.RawIOBase.__init__(self)
 
         self.offset = 0
         self.rawRead = rawRead
