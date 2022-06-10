@@ -1470,7 +1470,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
             **fusekwargs
         )
     except RuntimeError as exception:
-        raise RuntimeError(
+        raise RatarmountError(
             "FUSE mountpoint could not be created. See previous output for more information."
         ) from exception
 
