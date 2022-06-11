@@ -1507,13 +1507,11 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
 
     try:
         fuse.FUSE(
-            # fmt: on
             operations=fuseOperationsObject,
             mountpoint=args.mount_point,
             foreground=args.foreground,
             nothreads=True,  # Can't access SQLite database connection object from multiple threads
-            # fmt: off
-            **fusekwargs
+            **fusekwargs,
         )
     except RuntimeError as exception:
         raise RatarmountError(
