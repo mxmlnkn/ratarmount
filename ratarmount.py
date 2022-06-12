@@ -1335,6 +1335,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
                     # ratarmount does not discern between these two cases.
                     deletionListFile.write(f"{pathRelativeToRoot}\0")
                     deletionListFile.write(f"/{pathRelativeToRoot}\0")
+                    deletionListFile.write(f"./{pathRelativeToRoot}\0")
 
                     appendListFile.write(f"{pathRelativeToRoot}\0")
 
