@@ -175,8 +175,10 @@ class WritableFolderMountSource(fuse.Operations):
             self.sqlConnection.execute('DELETE FROM "files" WHERE (path,name) == (?,?)', (folder, name))
 
     def listDeleted(self, path: str) -> List[str]:
-        """Return list of files markes as deleted in the given path."""
-        result = self.sqlConnection.execute('SELECT name FROM "files" WHERE path == (?) AND deleted == 1', (path,))
+        """Return list of files marked as deleted in the given path."""
+        result = self.sqlConnection.execute(
+            'SELECT name FROM "files" WHERE path == (?) AND deleted == 1', (path.rstrip('/'),)
+        )
 
         # For temporary SQLite file suffixes, see https://www.sqlite.org/tempfiles.html
         suffixes = ['', '-journal', '-shm', '-wal']

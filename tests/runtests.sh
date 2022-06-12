@@ -1208,6 +1208,7 @@ checkWriteOverlayFile()
 
     'rm' "$filePath"
     if [[ -f "$filePath" ]]; then returnError "$LINENO" 'File should have been deleted'; fi
+    if find "$mountFolder" | 'grep' -q "$filePath"; then returnError "$LINENO" 'File should not appear in listing'; fi
 }
 
 
