@@ -32,7 +32,7 @@ jobs:
 
     - name: Install AppImage Tooling
       run: |
-        curl -L -o /usr/bin/appimagetool 'https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage'
+        curl -L -o /usr/bin/appimagetool 'https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage'
         chmod u+x /usr/bin/appimagetool
         curl -L -o /usr/bin/linuxdeploy 'https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage'
         chmod u+x /usr/bin/linuxdeploy
