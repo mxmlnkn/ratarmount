@@ -129,9 +129,12 @@ class RarMountSource(MountSource):
     @staticmethod
     def _convertToFileInfo(info: "rarfile.RarInfo") -> FileInfo:
         mode = 0o555 | (stat.S_IFDIR if info.is_dir() else stat.S_IFREG)
-        dtime = datetime.datetime(*info.date_time)
-        dtime = dtime.replace(tzinfo=datetime.timezone.utc)
-        mtime = dtime.timestamp() if info.date_time else 0
+        if info.date_time:
+            dtime = datetime.datetime(*info.date_time)
+            dtime = dtime.replace(tzinfo=datetime.timezone.utc)
+            mtime = dtime.timestamp() if info.date_time else 0
+        else:
+            mtime = 0
 
         # file_redir is (type, flags, target) or None. Only tested for type == RAR5_XREDIR_UNIX_SYMLINK.
         linkname = ""
