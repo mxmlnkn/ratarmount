@@ -1,4 +1,4 @@
-<p align="center"><a href=#><img src="ratarmount.svg"/></a></p>
+<p align="center"><a href=#><img src="https://raw.githubusercontent.com/mxmlnkn/ratarmount/master/ratarmount.svg"/></a></p>
 
 # Random Access Tar Mount (Ratarmount)
 
