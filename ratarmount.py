@@ -343,7 +343,8 @@ class WritableFolderMountSource(fuse.Operations):
         if not self.mountSource.exists(path) or self.isDeleted(path):
             raise fuse.FuseOSError(fuse.errno.ENOENT)
 
-        if set(self.mountSource.listDir(path).keys()) - set(self.listDeleted(path)):
+        contents = self.mountSource.listDir(path)
+        if contents is not None and set(contents.keys()) - set(self.listDeleted(path)):
             raise fuse.FuseOSError(fuse.errno.ENOTEMPTY)
 
         try:
