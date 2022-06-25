@@ -193,7 +193,7 @@ def checkForSplitFile(path: str) -> Optional[Tuple[List[str], str]]:
     # These character tests are necessary because Python's built-in isalpha, isdigit and such
     # all also return true for a lot of Unicode alternatives like for the Thai zero.
 
-    folder, filename = os.path.split(path)  # Get file extensions
+    folder, filename = os.path.split(os.path.realpath(path))  # Get file extensions
     if '.' not in filename:
         return None
     basename, extension = filename.rsplit('.', maxsplit=1)
