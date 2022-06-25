@@ -3,6 +3,10 @@
 
  - AutoMountLayer now takes a 'recursionDepth' argument instead of 'recursive'.
 
+# Version 0.3.2 built on 2022-06-25
+
+ - Fix exception when trying to mount a RAR archive containing files without timestamps.
+
 # Version 0.3.1 built on 2022-04-10
 
  - Fix duplicate mounting of uncompressed TARs inside TARs when using --recursive.
