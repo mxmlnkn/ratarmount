@@ -1,4 +1,10 @@
 
+# Version 0.11.3 built on 2022-06-25
+
+ - Fix files with leading "./" not being deleted when using --commit-overlay
+ - Fix files directly under the mount point not being deleted correctly with --write-overlay.
+ - (ratarmountcore 0.3.2) Fix exception when trying to mount a RAR archive containing files without timestamps.
+
 # Version 0.11.2 built on 2022-05-27
 
  - Fix --password option not working.
