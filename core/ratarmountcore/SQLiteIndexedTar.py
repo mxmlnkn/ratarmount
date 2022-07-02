@@ -1142,7 +1142,8 @@ class SQLiteIndexedTar(MountSource):
         self.sqlConnection.close()
 
         uriPath = urllib.parse.quote(self.indexFilePath)
-        self.sqlConnection = SQLiteIndexedTar._openSqlDb(f"file:{uriPath}?mode=ro", uri=True)
+        # check_same_thread=False can be used because it is read-only anyway and it allows to enable FUSE multithreading
+        self.sqlConnection = SQLiteIndexedTar._openSqlDb(f"file:{uriPath}?mode=ro", uri=True, check_same_thread=False)
 
     def _updateProgressBar(self, progressBar, fileobj: Any) -> None:
         if not progressBar:
