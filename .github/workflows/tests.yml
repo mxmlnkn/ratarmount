@@ -136,7 +136,7 @@ jobs:
           python3 ratarmount.py README.md || [ $? != 139 ]
           python3 -m pip uninstall --yes "$module"
         done
-        python3 -m pip install --upgrade git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=indexed_bzip2
+        python3 -m pip install --upgrade 'git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=indexed_bzip2&subdirectory=python/indexed_bzip2'
 
     - name: Test ratarmountcore Installation From Tarball
       working-directory: core
