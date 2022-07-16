@@ -18,7 +18,12 @@ import traceback
 import urllib.parse
 import zipfile
 from typing import Any, Callable, Dict, Iterable, IO, List, Optional, Tuple, Union
-import fuse
+
+try:
+    import fuse
+except ImportError:
+    import fusepy as fuse
+    
 
 try:
     import rarfile

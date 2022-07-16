@@ -58,6 +58,13 @@ else:
     zipfile = None
 
 
+try:
+    import libarchive
+except ImportError:
+    libarchive = None
+
+
+
 # Defining lambdas does not yet check the names of entities used inside the lambda!
 CompressionInfo = collections.namedtuple(
     'CompressionInfo', ['suffixes', 'doubleSuffixes', 'moduleName', 'checkHeader', 'open']
@@ -107,6 +114,14 @@ supportedCompressions = {
         lambda x: x.read(4) == (0xFD2FB528).to_bytes(4, 'little'),
         lambda x: indexed_zstd.IndexedZstdFile(x.fileno()),
     ),
+    '7z': CompressionInfo(
+        ['7z', '7zip'],
+        [],
+        'libarchive',
+        lambda x: x.read(6) == b'7z\xBC\xAF\x27\x1C',
+        lambda x: libarchive.SeekableArchive(x),
+        ),
+        
 }
 
 
