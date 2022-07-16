@@ -7,7 +7,7 @@ import traceback
 
 from typing import IO, Union
 
-from .compressions import supportedCompressions, checkForSplitFile, rarfile, zipfile
+from .compressions import supportedCompressions, checkForSplitFile, rarfile, zipfile, libarchive
 from .utils import CompressionError, RatarmountError
 from .MountSource import MountSource
 from .FolderMountSource import FolderMountSource
@@ -16,6 +16,7 @@ from .SingleFileMountSource import SingleFileMountSource
 from .SQLiteIndexedTar import SQLiteIndexedTar
 from .StenciledFile import JoinedFileFromFactory
 from .ZipMountSource import ZipMountSource
+from .LibArchiveMountSource import LibArchiveMountSource
 
 
 def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource:
@@ -47,6 +48,17 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
     except Exception as exception:
         if printDebug >= 1:
             print("[Info] Checking for RAR file raised an exception:", exception)
+        if printDebug >= 2:
+            traceback.print_exc()
+    finally:
+        if hasattr(fileOrPath, 'seek'):
+            fileOrPath.seek(0)  # type: ignore
+    
+    try:
+        return LibArchiveMountSource(fileOrPath, **options)
+    except Exception as exception:
+        if printDebug >= 1:
+            print("[Info] Checking for libarchive file raised an exception:", exception)
         if printDebug >= 2:
             traceback.print_exc()
     finally:
