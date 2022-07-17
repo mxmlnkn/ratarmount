@@ -42,6 +42,22 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
                 [(lambda file=file: open(file, 'rb')) for file in filesToJoin]  # type: ignore
             )
 
+    special_formats = ('zip', 'tar', 'rar') if not options.get('force_libarchive', False) else (None, )
+    try:
+        if not libarchive.is_archive(fileOrPath, formats = special_formats):
+            return LibArchiveMountSource(fileOrPath, **options)
+        return LibArchiveMountSource(fileOrPath, **options)
+    except Exception as exception:
+        if printDebug >= 1:
+            print("[Info] Checking for libarchive file raised an exception:", exception)
+        if printDebug >= 2:
+            traceback.print_exc()
+    finally:
+        if hasattr(fileOrPath, 'seek'):
+            fileOrPath.seek(0)  # type: ignore
+
+
+
     try:
         if 'rarfile' in sys.modules and rarfile.is_rarfile(fileOrPath):
             return RarMountSource(fileOrPath, **options)
@@ -54,17 +70,6 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
         if hasattr(fileOrPath, 'seek'):
             fileOrPath.seek(0)  # type: ignore
     
-    try:
-        return LibArchiveMountSource(fileOrPath, **options)
-    except Exception as exception:
-        if printDebug >= 1:
-            print("[Info] Checking for libarchive file raised an exception:", exception)
-        if printDebug >= 2:
-            traceback.print_exc()
-    finally:
-        if hasattr(fileOrPath, 'seek'):
-            fileOrPath.seek(0)  # type: ignore
-
     try:
         if isinstance(fileOrPath, str):
             return SQLiteIndexedTar(fileOrPath, **options)
