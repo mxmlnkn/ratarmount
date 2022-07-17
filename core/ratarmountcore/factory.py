@@ -43,7 +43,7 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
             )
 
     special_formats = ('zip', 'tar', 'rar') if not options.get('force_libarchive', False) else (None, )
-    if printDebug > 0 and options.get('force_libarchive', False);
+    if printDebug > 0 and options.get('force_libarchive', False):
         print("[Info] .zip, .tar,  and .rar will be handled by libarchive.") 
 
     try:
