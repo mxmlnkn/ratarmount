@@ -23,7 +23,7 @@ try:
     import fuse
 except ImportError:
     import fusepy as fuse
-    
+
 
 try:
     import rarfile
@@ -553,6 +553,8 @@ class FuseMount(fuse.Operations):
             if isinstance(mountSource, FolderMountSource) and mountSource.root == self.mountPoint:
                 self.selfBindMount = mountSource
                 self.mountPointFd = os.open(self.mountPoint, os.O_RDONLY)
+
+    
 
     def __del__(self) -> None:
         try:
@@ -1170,6 +1172,11 @@ seeking capabilities when opening that file.
     advancedGroup.add_argument(
         '-d', '--debug', type=int, default=1,
         help='Sets the debugging level. Higher means more output. Currently, 3 is the highest.')
+
+    advancedGroup.add_argument(
+        '--force_libarchive', action='store_true', default=False,
+        help='Use libarchive to handle .tar, .rar, an .zip files.')
+
 
     # Considerations for the default value:
     #   - seek times for the bz2 backend are between 0.01s and 0.1s
