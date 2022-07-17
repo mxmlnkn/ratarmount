@@ -555,8 +555,6 @@ class FuseMount(fuse.Operations):
                 self.selfBindMount = mountSource
                 self.mountPointFd = os.open(self.mountPoint, os.O_RDONLY)
 
-    
-
     def __del__(self) -> None:
         try:
             if self.mountPointWasCreated:

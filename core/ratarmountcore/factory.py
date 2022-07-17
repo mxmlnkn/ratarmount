@@ -43,9 +43,9 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
             )
 
     forceLibarchive: bool = options.get("forceLibarchive", False)
-    special_formats = ('zip', 'tar', 'rar') if not forceLibarchive else (None, )
+    special_formats = ('zip', 'tar', 'rar') if not forceLibarchive else (None,)
     if printDebug > 0 and forceLibarchive:
-        print("[Info] .zip, .tar,  and .rar will be handled by libarchive.") 
+        print("[Info] .zip, .tar,  and .rar will be handled by libarchive.")
 
     try:
         if forceLibarchive and libarchive.is_archive(fileOrPath):
@@ -53,7 +53,7 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
                 print(f"[Debug] Using libarchive for {fileOrPath}")
             return LibArchiveMountSource(fileOrPath, **options)
 
-        if not libarchive.is_archive(fileOrPath, formats = special_formats):
+        if not libarchive.is_archive(fileOrPath, formats=special_formats):
             if printDebug > 2:
                 print(f"[Debug] Using libarchive for {fileOrPath}")
             return LibArchiveMountSource(fileOrPath, **options)
@@ -66,8 +66,6 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
         if hasattr(fileOrPath, 'seek'):
             fileOrPath.seek(0)  # type: ignore
 
-
-
     try:
         if 'rarfile' in sys.modules and rarfile.is_rarfile(fileOrPath):
             return RarMountSource(fileOrPath, **options)
@@ -79,7 +77,7 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
     finally:
         if hasattr(fileOrPath, 'seek'):
             fileOrPath.seek(0)  # type: ignore
-    
+
     try:
         if isinstance(fileOrPath, str):
             return SQLiteIndexedTar(fileOrPath, **options)

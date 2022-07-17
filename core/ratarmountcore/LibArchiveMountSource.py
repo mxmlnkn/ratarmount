@@ -70,7 +70,7 @@ class FileInsideArchive(io.RawIOBase):
             if not data:
                 break
             size -= len(data)
- 
+
     @overrides(io.RawIOBase)
     def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
         here = self.tell()
@@ -96,9 +96,9 @@ class LibArchiveMountSource(MountSource):
     # Basically copy paste of ZipMountSource because the interfaces are very similar
 
     def __init__(self, fileOrPath: Union[str, IO[bytes]], **options) -> None:
-        self.fileObject : libarchive.SeekableArchive = libarchive.SeekableArchive(fileOrPath, mode='r')
+        self.fileObject: libarchive.SeekableArchive = libarchive.SeekableArchive(fileOrPath, mode='r')
         LibArchiveMountSource._findPassword(self.fileObject, options.get("passwords", []))
-        self.files =  [e for e in self.fileObject]
+        self.files = [e for e in self.fileObject]
         self.options = options
 
     @staticmethod
@@ -108,7 +108,7 @@ class LibArchiveMountSource(MountSource):
     @staticmethod
     def _convertToFileInfo(entry: libarchive.Entry) -> FileInfo:
         mode = 0o555 | (stat.S_IFDIR if entry.isdir() else stat.S_IFREG)
-    
+
         fileInfo = FileInfo(
             # fmt: off
             size     = entry.size,
