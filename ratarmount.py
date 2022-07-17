@@ -484,6 +484,7 @@ class FuseMount(fuse.Operations):
         self.printDebug: int = int(options.get('printDebug', 0))
         self.writeOverlay: Optional[WritableFolderMountSource] = None
         self.overlayPath: Optional[str] = None
+        self.forceLibarchive: bool = bool(options.get('forceLibarchive', False))
 
         # Add write overlay as folder mount source to read from with highest priority.
         if 'writeOverlay' in options and isinstance(options['writeOverlay'], str) and options['writeOverlay']:
@@ -1174,7 +1175,7 @@ seeking capabilities when opening that file.
         help='Sets the debugging level. Higher means more output. Currently, 3 is the highest.')
 
     advancedGroup.add_argument(
-        '--force_libarchive', action='store_true', default=False,
+        '--force-libarchive', action='store_true', default=False,
         help='Use libarchive to handle .tar, .rar, an .zip files.')
 
 
@@ -1518,6 +1519,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         writeOverlay                 = args.write_overlay,
         printDebug                   = int(args.debug),
         transformRecursiveMountPoint = args.transform_recursive_mount_point,
+        forceLibarchive              = args.force_libarchive,
         # fmt: on
     )
 
