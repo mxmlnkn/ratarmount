@@ -64,7 +64,6 @@ except ImportError:
     libarchive = None
 
 
-
 # Defining lambdas does not yet check the names of entities used inside the lambda!
 CompressionInfo = collections.namedtuple(
     'CompressionInfo', ['suffixes', 'doubleSuffixes', 'moduleName', 'checkHeader', 'open']
@@ -120,8 +119,7 @@ supportedCompressions = {
         'libarchive',
         lambda x: x.read(6) == b'7z\xBC\xAF\x27\x1C',
         lambda x: libarchive.SeekableArchive(x),
-        ),
-        
+    ),
 }
 
 
