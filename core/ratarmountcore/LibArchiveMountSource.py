@@ -107,14 +107,19 @@ class LibArchiveMountSource(MountSource):
 
     @staticmethod
     def _convertToFileInfo(entry: libarchive.Entry) -> FileInfo:
-        mode = 0o555 | (stat.S_IFDIR if entry.isdir() else stat.S_IFREG)
-
+        if entry.issym():
+            linkname = entry.symlink
+            mode = 0o555 | stat.S_IFLNK
+        else:
+            mode = 0o555 | (stat.S_IFDIR if entry.isdir() else stat.S_IFREG)
+            linkname = ""
+    
         fileInfo = FileInfo(
             # fmt: off
             size     = entry.size,
             mtime    = entry.mtime,
             mode     = entry.mode,
-            linkname = "",
+            linkname = linkname,
             uid      = os.getuid(),
             gid      = os.getgid(),
             userdata = [entry],
@@ -194,9 +199,9 @@ class LibArchiveMountSource(MountSource):
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo) -> IO[bytes]:
-        e: libarchive.Entry = fileInfo.userdata[-1]
-        assert isinstance(e, libarchive.Entry)
-        return cast(IO[bytes], FileInsideArchive(lambda: self.fileObject.readstream(e.pathname), e.size))
+        entry: libarchive.Entry = fileInfo.userdata[-1]
+        assert isinstance(entry, libarchive.Entry)
+        return cast(IO[bytes], FileInsideArchive(lambda: self.fileObject.readstream(entry.pathname), entry.size))
 
     @overrides(MountSource)
     def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
