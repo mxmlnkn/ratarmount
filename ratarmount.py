@@ -1176,7 +1176,6 @@ seeking capabilities when opening that file.
         '--force-libarchive', action='store_true', default=False,
         help='Use libarchive to handle TAR, RAR, and ZIP archives.')
 
-
     # Considerations for the default value:
     #   - seek times for the bz2 backend are between 0.01s and 0.1s
     #   - seek times for the gzip backend are roughly 1/10th compared to bz2 at a default spacing of 4MiB
