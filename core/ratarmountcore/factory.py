@@ -42,7 +42,7 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
                 [(lambda file=file: open(file, 'rb')) for file in filesToJoin]  # type: ignore
             )
 
-    forceLibarchive: bool = options.get("forceLibarchive", False)
+    forceLibarchive: bool = bool(options.get("forceLibarchive", False))
     special_formats = ('zip', 'tar', 'rar') if not forceLibarchive else (None,)
     if printDebug > 0 and forceLibarchive:
         print("[Info] .zip, .tar,  and .rar will be handled by libarchive.")
