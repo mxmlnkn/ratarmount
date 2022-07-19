@@ -97,13 +97,10 @@ class LibArchiveMountSource(MountSource):
 
     def __init__(self, fileOrPath: Union[str, IO[bytes]], **options) -> None:
         self.fileObject: libarchive.SeekableArchive = libarchive.SeekableArchive(fileOrPath, mode='r')
-        LibArchiveMountSource._findPassword(self.fileObject, options.get("passwords", []))
+        for password in options.get("passwords", []):
+            self.fileObject.add_passphrase(password)
         self.files = [e for e in self.fileObject]
         self.options = options
-
-    @staticmethod
-    def _findPassword(fileobj: libarchive.SeekableArchive, passwords):
-        return None
 
     @staticmethod
     def _convertToFileInfo(entry: libarchive.Entry) -> FileInfo:
@@ -113,12 +110,12 @@ class LibArchiveMountSource(MountSource):
         else:
             mode = 0o555 | (stat.S_IFDIR if entry.isdir() else stat.S_IFREG)
             linkname = ""
-    
+
         fileInfo = FileInfo(
             # fmt: off
             size     = entry.size,
             mtime    = entry.mtime,
-            mode     = entry.mode,
+            mode     = mode,
             linkname = linkname,
             uid      = os.getuid(),
             gid      = os.getgid(),
