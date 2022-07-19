@@ -1174,7 +1174,7 @@ seeking capabilities when opening that file.
 
     advancedGroup.add_argument(
         '--force-libarchive', action='store_true', default=False,
-        help='Use libarchive to handle .tar, .rar, an .zip files.')
+        help='Use libarchive to handle TAR, RAR, and ZIP archives.')
 
 
     # Considerations for the default value:
