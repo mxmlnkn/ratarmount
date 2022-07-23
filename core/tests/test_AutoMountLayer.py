@@ -53,7 +53,9 @@ class TestAutoMountLayer:
             assert recursivelyMounted.listDir('/')
             assert recursivelyMounted.listDir('/ufo_12')
             assert recursivelyMounted.listDir('/ufo_00')
-            assert recursivelyMounted.open(recursivelyMounted.getFileInfo('/ufo_00/ufo')).read() == b'iriya\n'
+            dataFile = recursivelyMounted.open(recursivelyMounted.getFileInfo('/ufo_00/ufo'))
+            data = dataFile.read()
+            assert data == b'iriya\n'
 
     @staticmethod
     def test_regex_mount_point_gz(parallelization):
@@ -76,3 +78,8 @@ class TestAutoMountLayer:
             assert recursivelyMounted.listDir('/ufo_00')
             fileInfo = recursivelyMounted.getFileInfo('/ufo_00/ufo')
             assert recursivelyMounted.open(fileInfo).read() == b'iriya\n'
+
+
+# Execute code if this file is called directly
+if __name__ == '__main__':
+    pytest.main()
