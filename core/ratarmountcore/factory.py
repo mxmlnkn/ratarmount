@@ -63,8 +63,14 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
         if printDebug >= 2:
             traceback.print_exc()
     finally:
-        if hasattr(fileOrPath, 'seek'):
-            fileOrPath.seek(0)  # type: ignore
+        try:
+            if hasattr(fileOrPath, 'seek'):
+                fileOrPath.seek(0)  # type: ignore
+        except Exception as exception:
+            if printDebug >= 1:
+                print("[Info] seek(0) provoked excetpiton:", exception)
+            if printDebug >= 2:
+                traceback.print_exc()
 
     try:
         if 'rarfile' in sys.modules and rarfile.is_rarfile(fileOrPath):
