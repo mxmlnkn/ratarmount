@@ -100,6 +100,7 @@ jobs:
         echo "uname -a: $( uname -a )"
         echo "Shell: $SHELL"
         echo "Mount points:"; mount
+        echo "PYTHONPATH: $PYTHONPATH"
 
     - uses: msys2/setup-msys2@v2
       if: startsWith( matrix.os, 'windows' )
