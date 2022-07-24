@@ -132,6 +132,7 @@ jobs:
         python3 -m pip install --upgrade wheel
         python3 -m pip install --upgrade setuptools
         python3 -m pip install --upgrade-strategy eager --upgrade cython twine build zstandard fusepy
+        pyhton3 -c "import dataclasses" || python3 -m pip install --upgrade-strategy eager --upgrade dataclasses
 
     - name: Test Startup With Only One Compression Dependency
       run: |
