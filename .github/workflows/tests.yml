@@ -63,6 +63,9 @@ jobs:
 
   Tests:
     runs-on: ${{ matrix.os }}
+    env:
+      PYTHONPATH: ${GITHUB_WORKSPACE}/.core
+
 
     strategy:
       matrix:
