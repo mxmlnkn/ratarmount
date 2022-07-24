@@ -144,7 +144,7 @@ jobs:
           python3 -m pip uninstall --yes "$module"
         done
         python3 -m pip install --upgrade 'git+https://github.com/mxmlnkn/indexed_bzip2.git@develop#egginfo=indexed_bzip2&subdirectory=python/indexed_bzip2'
-        python3 -m pip install --upgrade 'git+https://github.com/Vadiml1024/python-libarchive/tarball/extended'
+        python3 -m pip install --upgrade 'https://github.com/Vadiml1024/python-libarchive/tarball/extended'
 
     - name: Test ratarmountcore Installation From Tarball
       working-directory: core
