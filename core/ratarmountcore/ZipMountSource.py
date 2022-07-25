@@ -21,7 +21,7 @@ class ZipMountSource(MountSource):
         self.options = options
 
     @staticmethod
-    def _findPassword(fileobj: zipfile.ZipFile, passwords): # pytype: disable=attribute-error
+    def _findPassword(fileobj: zipfile.ZipFile, passwords):  # pytype: disable=attribute-error
         # If headers are encrypted, then infolist will simply return an empty list!
         files = fileobj.infolist()
         if not files:
@@ -54,7 +54,9 @@ class ZipMountSource(MountSource):
         self.fileObject.close()
 
     @staticmethod
-    def _convertToFileInfo(info: zipfile.ZipInfo, zipFile: zipfile.ZipFile) -> FileInfo: # pytype: disable=attribute-error
+    def _convertToFileInfo(
+        info: zipfile.ZipInfo, zipFile: zipfile.ZipFile
+    ) -> FileInfo:  # pytype: disable=attribute-error
         mode = 0o555 | (stat.S_IFDIR if info.is_dir() else stat.S_IFREG)
         mtime = datetime.datetime(*info.date_time, tzinfo=datetime.timezone.utc).timestamp() if info.date_time else 0
 
