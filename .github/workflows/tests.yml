@@ -64,7 +64,7 @@ jobs:
   Tests:
     runs-on: ${{ matrix.os }}
     env:
-      PYTHONPATH: ${{ github.workspace }}/core
+      xPYTHONPATH: ${{ github.workspace }}/core
 
 
     strategy:
