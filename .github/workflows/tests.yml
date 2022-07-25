@@ -132,7 +132,7 @@ jobs:
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade wheel
         python3 -m pip install --upgrade setuptools
-        python3 -m pip install --upgrade-strategy eager --upgrade cython twine build zstandard fusepy zipfile
+        python3 -m pip install --upgrade-strategy eager --upgrade cython twine build zstandard fusepy
         python3 -c "import dataclasses" || python3 -m pip install --upgrade-strategy eager --upgrade dataclasses
         python3 -m pip install --upgrade 'git+https://github.com/Vadiml1024/python-libarchive.git@extended'
 
