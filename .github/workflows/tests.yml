@@ -68,6 +68,7 @@ jobs:
 
 
     strategy:
+      fail-fast: false
       matrix:
         os: [macos-10.15, ubuntu-latest]
         # ToDo: Add windows-latest but it requires a lot of setup of the dependencies!
