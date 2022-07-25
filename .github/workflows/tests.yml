@@ -10,7 +10,7 @@ jobs:
   Static-Code-Checks:
     runs-on: ubuntu-latest
     env:
-      PYTHONPATH: ${GITHUB_WORKSPACE}/core
+      # PYTHONPATH: ${GITHUB_WORKSPACE}/core
 
     steps:
     - uses: actions/checkout@v3
