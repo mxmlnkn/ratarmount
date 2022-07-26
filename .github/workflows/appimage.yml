@@ -48,6 +48,7 @@ jobs:
 
     - name: Install Ratarmount into AppDir
       run: |
+        "$appdir/opt/python3.9/bin/python3.9" -I -m pip install --no-cache-dir  'git+https://github.com/Vadiml1024/python-libarchive.git@extended'
         "$appdir/opt/python3.9/bin/python3.9" -I -m pip install --no-cache-dir ./core
         "$appdir/opt/python3.9/bin/python3.9" -I -m pip install --no-cache-dir .
 
