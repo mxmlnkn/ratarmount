@@ -28,7 +28,7 @@ jobs:
         ln -s /opt/python/cp39-cp39/bin/python3 /usr/local/bin/python3
         export PATH="/opt/python/cp39-cp39/bin:$PATH"
         python3 -m pip install python-appimage
-        yum install -y fuse fakeroot patchelf fuse-libs libsqlite3x strace desktop-file-utils
+        yum install -y fuse fakeroot patchelf fuse-libs libsqlite3x strace desktop-file-utils libarchive
 
     - name: Install AppImage Tooling
       run: |
