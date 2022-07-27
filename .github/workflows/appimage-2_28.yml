@@ -89,8 +89,8 @@ jobs:
 
     - uses: actions/upload-artifact@v3
       with:
-        name: ${{jobs.Manylinux-Appimage.env.appbase}}.AppImage
-        path: ${{jobs.Manylinux-Appimage.env.appbase}}.AppImage
+        name: ${{env.appbase}}.AppImage
+        path: ${{env.appbase}}.AppImage
 
 
   AppImage-Tests:
