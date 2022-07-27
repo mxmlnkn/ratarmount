@@ -26,6 +26,7 @@ jobs:
         cat /etc/issue
         echo "Shell: $SHELL"
         echo "Mount points:"; mount
+        env
 
     - name: Install System Build Tools
       run: |
@@ -44,11 +45,11 @@ jobs:
 
     - name: Build Base Python AppImage With Ratarmount Metadata
       run: |
-        python3 -m python_appimage build app -l manylinux2014_x86_64 -p 3.9 AppImage/
+        python3 -m python_appimage build app -l "${sysbase}" -p 3.9 AppImage/
 
     - name: Extract AppImage to AppDir for Further Modification
       run: |
-        ./${{env['appbase']}}.AppImage --appimage-extract
+        ./${appbase}.AppImage --appimage-extract
         mv squashfs-root/ "$appdir"
 
     - name: Install Ratarmount into AppDir
