@@ -32,7 +32,7 @@ jobs:
         ln -s /opt/python/cp39-cp39/bin/python3 /usr/local/bin/python3
         export PATH="/opt/python/cp39-cp39/bin:$PATH"
         python3 -m pip install python-appimage
-        yum -i install epel-release
+        yum -y install epel-release
         yum install -y fuse fakeroot patchelf fuse-libs libsqlite3x strace desktop-file-utils libarchive-devel
 
     - name: Install AppImage Tooling
