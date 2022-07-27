@@ -12,8 +12,8 @@ jobs:
     container: quay.io/pypa/manylinux_2_28_x86_64
     env:
       sysbase: manylinux_2_28_x86_64
-      appbase: ratarmount-${{env['sysbase']}}
-      appdir: ${{env['appbase']}}.AppDir
+      appbase: ratarmount-${{env.sysbase}}
+      appdir: ratarmount-${{env.appbase}}.AppDir
     steps:
     - uses: actions/checkout@v3
 
@@ -86,8 +86,8 @@ jobs:
 
     - uses: actions/upload-artifact@v3
       with:
-        name: ${{env['appbase']}}.AppImage
-        path: ${{env['appbase']}}.AppImage
+        name: ${{env.appbase}}.AppImage
+        path: ${{env.appbase}}.AppImage
 
 
   AppImage-Tests:
@@ -101,7 +101,7 @@ jobs:
     steps:
     - uses: actions/download-artifact@v3
       with:
-        name: ${{env['appbase']}}.AppImage
+        name: ${{env.appbase}}.AppImage
 
     - name: Install AppImage
       run: |
