@@ -1,0 +1,134 @@
+name: AppImage-2_28
+
+on:
+  push:
+    branches: 'master'
+    tags: 'v*'
+  workflow_dispatch:
+
+jobs:
+  Manylinux-Appimage:
+    runs-on: ubuntu-latest
+    container: quay.io/pypa/manylinux_2_28_x86_64
+    env:
+      sysbase: manylinux_2_28_x86_64
+      appbase: ratarmount-${{env['sysbase']}}
+      appdir: ${{env['appbase']}}.AppDir
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Print System Information
+      run: |
+        echo "uname -a: $( uname -a )"
+        cat /etc/issue
+        echo "Shell: $SHELL"
+        echo "Mount points:"; mount
+
+    - name: Install System Build Tools
+      run: |
+        ln -s /opt/python/cp39-cp39/bin/python3 /usr/local/bin/python3
+        export PATH="/opt/python/cp39-cp39/bin:$PATH"
+        python3 -m pip install python-appimage
+        yum install -y fuse fakeroot patchelf fuse-libs libsqlite3x strace desktop-file-utils libarchive-devel
+
+    - name: Install AppImage Tooling
+      run: |
+        curl -L -o /usr/bin/appimagetool 'https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage'
+        chmod u+x /usr/bin/appimagetool
+        curl -L -o /usr/bin/linuxdeploy 'https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage'
+        chmod u+x /usr/bin/linuxdeploy
+
+    - name: Build Base Python AppImage With Ratarmount Metadata
+      run: |
+        python3 -m python_appimage build app -l manylinux2014_x86_64 -p 3.9 AppImage/
+
+    - name: Extract AppImage to AppDir for Further Modification
+      run: |
+        ./${{env['appbase']}}.AppImage --appimage-extract
+        mv squashfs-root/ "$appdir"
+
+    - name: Install Ratarmount into AppDir
+      run: |
+        "$appdir/opt/python3.9/bin/python3.9" -I -m pip install --no-cache-dir  'git+https://github.com/Vadiml1024/python-libarchive.git@extended'
+        "$appdir/opt/python3.9/bin/python3.9" -I -m pip install --no-cache-dir ./core
+        "$appdir/opt/python3.9/bin/python3.9" -I -m pip install --no-cache-dir .
+
+    - name: Bundle System Dependencies into AppDir
+      run: |
+        # Note that manylinux2014 already has libsqlite3.so.0 inside /usr/lib.
+        cp -a $( repoquery -l fuse-libs -l libarchive | 'grep' 'lib64.*[.]so' ) "$appdir"/usr/lib/
+        APPIMAGE_EXTRACT_AND_RUN=1 linuxdeploy --appdir="$appdir" \
+            --library=/usr/lib64/libfuse.so.2 \
+            --library=/usr/lib64/libulockmgr.so.1 \
+            --library=/usr/lib64/libarchive.so.13 \
+            --executable=/usr/bin/fusermount \
+            --executable=/usr/bin/ulockmgr_server
+
+    - name: Clean up Unnecessary Files from AppDir
+      run: |
+        "$appdir/opt/python3.9/bin/python3.9" -s -m pip uninstall -y build setuptools wheel pip
+        rm -rf "$appdir/opt/python3.9/lib/python3.9/site-packages/indexed_gzip/tests" \
+               "$appdir/opt/python3.9/include" \
+               "$appdir/usr/share/tcltk" \
+               "$appdir/usr/lib/libtk8.5.so" \
+               "$appdir/usr/lib/libtcl8.5.so" \
+               "$appdir/opt/python3.9/lib/python3.9/ensurepip" \
+               "$appdir/opt/python3.9/lib/python3.9/lib2to3" \
+               "$appdir/opt/python3.9/lib/python3.9/tkinter" \
+               "$appdir/opt/python3.9/lib/python3.9/unittest"
+        find "$appdir" -type d -empty -print0 | xargs -0 rmdir
+        find "$appdir" -type d -empty -print0 | xargs -0 rmdir
+        find "$appdir" -name '__pycache__' -print0 | xargs -0 rm -r
+
+    - name: Create AppImage from Modified AppDir
+      run: |
+        APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 appimagetool --no-appstream "$appbase".App{Dir,Image}
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: ${{env['appbase']}}.AppImage
+        path: ${{env['appbase']}}.AppImage
+
+
+  AppImage-Tests:
+    runs-on: ${{ matrix.os }}
+    needs: [Manylinux-Appimage]
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+
+    steps:
+    - uses: actions/download-artifact@v3
+      with:
+        name: ${{env['appbase']}}.AppImage
+
+    - name: Install AppImage
+      run: |
+        chmod u+x "$appbase".AppImage
+        mv "$appbase".AppImage /usr/local/bin/ratarmount
+        echo "/usr/local/bin" >> $GITHUB_PATH
+
+    - name: Install Dependencies
+      run: |
+        # These are required for creating test files on the fly not for ratarmount!
+        sudo apt-get -y install bzip2 pixz zstd unar
+
+    - name: Test Simple Startup
+      run: |
+        ratarmount --help
+        ratarmount --version
+
+    - uses: actions/checkout@v3
+
+    - name: Test Simple Mount
+      run: |
+        ratarmount tests/single-file.tar mimi
+        ls -la mimi
+        sleep 1s
+        ratarmount -u mimi
+
+    - name: Regression Tests
+      run: |
+        export RATARMOUNT_CMD=/usr/local/bin/ratarmount
+        bash tests/runtests.sh
