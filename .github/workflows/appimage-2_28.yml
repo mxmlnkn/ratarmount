@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  sysbase: manylinux_2_28_x86_64
+  sysbase: manylinux_x_y
   DUMMY: 1
 
 jobs:
@@ -15,8 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     container: quay.io/pypa/manylinux_2_28_x86_64
     env:
-      appbase: ratarmount-manylinux_2_28_x86_64
-      appdir: ratarmount-manylinux_2_28_x86_64.AppDir
+      appbase: ratarmount-${{ fromJSON(github.env).sysbase }}
+      appdir: ratarmount$-${{ fromJSON(github.env).sysbase }}.AppDir
     steps:
     - uses: actions/checkout@v3
 
