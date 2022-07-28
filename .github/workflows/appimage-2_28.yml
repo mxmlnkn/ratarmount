@@ -15,8 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     container: quay.io/pypa/manylinux_2_28_x86_64
     env:
-      appbase: ratarmount-${{ fromJSON(github.env).sysbase }}
-      appdir: ratarmount$-${{ fromJSON(github.env).sysbase }}.AppDir
+      appbase: ratarmount-manylinux_x_y
+      appdir: ratarmount$-manylinux_x_y.AppDir
     steps:
     - uses: actions/checkout@v3
 
