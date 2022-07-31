@@ -14,15 +14,6 @@
     --color-mount: #009900;
 }
 
-.text-stroke {
-    fill: none;
-    stroke-width: 10;
-    stroke-linecap: round;
-    stroke-miterlimit: 4;
-    stroke-dasharray: none;
-    stroke-opacity:1 ;
-}
-
 #ratar { stroke: var(--color-ratar); }
 #stop-ratar { stop-color: var(--color-ratar); }
 #mount { stroke: var(--color-mount); }
@@ -39,8 +30,8 @@
            gradientUnits="userSpaceOnUse"
            x1="190" y1="0" x2="320" y2="0"/>
         <linearGradient id="linearGradientStops">
-            <stop offset="0" id="stop-ratar"/>
-            <stop offset="1" id="stop-mount"/>
+            <stop offset="0" id="stop-ratar" style="stop-color: #aa00cc"/>
+            <stop offset="1" id="stop-mount" style="stop-color: #009900"/>
         </linearGradient>
         <filter id="animated-glow">
             <feGaussianBlur stdDeviation="1" result="blur1">
@@ -81,8 +72,14 @@
             </feMerge>
         </filter>
     </defs>
-    <g id="ratarmount" class="text-stroke gloweffect">
-        <g id="ratar" >
+    <g id="ratarmount" class="gloweffect" style="
+        fill: none;
+        stroke-width: 10;
+        stroke-linecap: round;
+        stroke-miterlimit: 4;
+        stroke-dasharray: none;
+        stroke-opacity:1;">
+        <g id="ratar" style="stroke: #aa00cc">
             <path id="r" d="m 30,50 c -11,0 -20,9 -20,20 v 30"/>
             <g id="a">
                 <circle id="a-ring" cx="75" cy="75" r="25"/>
@@ -95,7 +92,7 @@
             </g>
             <path id="mirrored-r" d="m 220,50 c 11,0 20,9 20,20 v 30"/>
         </g>
-        <g id="mount">
+        <g id="mount" style="stroke:#009900">
             <!-- The high-precision numbers appear because the Bezier curves do not map nicely to circles -->
             <path id="m" d="M 305,100 V 70 c 0,-11.042347 -8.94277,-20 -20,-20 -11.04224,0 -20,8.95475 -20,20 v 30 m 80,0 V 70 c 0,-11.042484 -8.95502,-20 -20,-20 -11.0422,0 -20,8.954887 -20,20"/>
             <ellipse id="o" cx="390" cy="75" rx="25" ry="25"/>
