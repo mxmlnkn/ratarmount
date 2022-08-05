@@ -113,14 +113,83 @@ supportedCompressions = {
         lambda x: x.read(4) == (0xFD2FB528).to_bytes(4, 'little'),
         lambda x: indexed_zstd.IndexedZstdFile(x.fileno()),
     ),
-    '7z': CompressionInfo(
-        ['7z', '7zip'],
-        [],
-        'libarchive',
-        lambda x: x.read(6) == b'7z\xBC\xAF\x27\x1C',
-        lambda x: libarchive.SeekableArchive(x),
-    ),
 }
+
+if 'libarchive' in sys.modules:
+    libarchive_compressions = { 
+        '7z': CompressionInfo(
+            ['7z', '7zip'],
+            [],
+            'libarchive',
+            lambda x: x.read(6) == b'7z\xBC\xAF\x27\x1C',
+            lambda x: libarchive.SeekableArchive(x),
+        ),
+        'ar': CompressionInfo(
+            ['ar'],
+            [],
+            'libarchive',
+            lambda x: x.read(8) == b'<aiaff>\n',
+            lambda x: libarchive.SeekableArchive(x),
+        ),
+        'rpm': CompressionInfo(
+            ['rpm'],
+            [],
+            'libarchive',
+            lambda x: x.read(4) == b'\xED\xAB\xEE\xDB',
+            lambda x: libarchive.SeekableArchive(x),
+        ),
+        'deb': CompressionInfo(
+            ['deb'],
+            [],
+            'libarchive',
+            lambda x: x.read(4) == b'\x21\x3C\x61\x72',
+            lambda x: libarchive.SeekableArchive(x),
+        ),
+        'xar': CompressionInfo(
+            ['xar'],
+            [],
+            'libarchive',
+            lambda x: x.read(4) == b'\x78\x61\x72\x21',
+            lambda x: libarchive.SeekableArchive(x),
+        ),
+        'lz4': CompressionInfo(
+            ['lz4'],
+            [],
+            'libarchive',
+            lambda x: x.read(4) == b'\x04\x22\x4C\x5A',
+            lambda x: libarchive.SeekableArchive(x),
+        ),
+        'lzma': CompressionInfo(
+            ['lzma'],
+            [],
+            'libarchive',
+            lambda x: x.read(4) == b'\x5D\x00\x00\x80',
+            lambda x: libarchive.SeekableArchive(x),
+        ),
+        'lzo': CompressionInfo(
+            ['lzo'],
+            [],
+            'libarchive',
+            lambda x: x.read(4) == b'\x89\x4C\x5A\x4F',
+            lambda x: libarchive.SeekableArchive(x),
+        ),
+        'cpio': CompressionInfo(
+            ['cpio'],
+            [],
+            'libarchive',
+            lambda x: x.read(6) == b'\x07\x07\x07\x07',
+            lambda x: libarchive.SeekableArchive(x),
+        ),
+        'iso': CompressionInfo(
+            ['iso'],
+            [],
+            'libarchive',
+            lambda x: True,
+            lambda x: libarchive.SeekableArchive(x),
+        ),
+    }
+    
+    supportedCompressions.update(libarchive_compressions)
 
 
 def stripSuffixFromCompressedFile(path: str) -> str:
