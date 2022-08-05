@@ -42,35 +42,36 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
                 [(lambda file=file: open(file, 'rb')) for file in filesToJoin]  # type: ignore
             )
 
-    forceLibarchive: bool = bool(options.get("forceLibarchive", False))
-    special_formats = ('zip', 'tar', 'rar') if not forceLibarchive else (None,)
-    if printDebug > 0 and forceLibarchive:
-        print("[Info] .zip, .tar,  and .rar will be handled by libarchive.")
+    if "libarchive" in sys.modules:
+        forceLibarchive: bool = bool(options.get("forceLibarchive", False))
+        special_formats = ('zip', 'tar', 'rar') if not forceLibarchive else (None,)
+        if printDebug > 0 and forceLibarchive:
+            print("[Info] .zip, .tar,  and .rar will be handled by libarchive.")
 
-    try:
-        if forceLibarchive and libarchive.is_archive(fileOrPath):
-            if printDebug > 2:
-                print(f"[Debug] Using libarchive for {fileOrPath}")
-            return LibArchiveMountSource(fileOrPath, **options)
-
-        if not libarchive.is_archive(fileOrPath, formats=special_formats):
-            if printDebug > 2:
-                print(f"[Debug] Using libarchive for {fileOrPath}")
-            return LibArchiveMountSource(fileOrPath, **options)
-    except Exception as exception:
-        if printDebug >= 1:
-            print("[Info] Checking for libarchive file raised an exception:", exception)
-        if printDebug >= 2:
-            traceback.print_exc()
-    finally:
         try:
-            if hasattr(fileOrPath, 'seek'):
-                fileOrPath.seek(0)  # type: ignore
+            if forceLibarchive and libarchive.is_archive(fileOrPath):
+                if printDebug > 2:
+                    print(f"[Debug] Using libarchive for {fileOrPath}")
+                return LibArchiveMountSource(fileOrPath, **options)
+
+            if not libarchive.is_archive(fileOrPath, formats=special_formats):
+                if printDebug > 2:
+                    print(f"[Debug] Using libarchive for {fileOrPath}")
+                return LibArchiveMountSource(fileOrPath, **options)
         except Exception as exception:
             if printDebug >= 1:
-                print("[Info] seek(0) provoked excetpiton:", exception)
+                print("[Info] Checking for libarchive file raised an exception:", exception)
             if printDebug >= 2:
                 traceback.print_exc()
+        finally:
+            try:
+                if hasattr(fileOrPath, 'seek'):
+                    fileOrPath.seek(0)  # type: ignore
+            except Exception as exception:
+                if printDebug >= 1:
+                    print("[Info] seek(0) provoked excetpiton:", exception)
+                if printDebug >= 2:
+                    traceback.print_exc()
 
     try:
         if 'rarfile' in sys.modules and rarfile.is_rarfile(fileOrPath):

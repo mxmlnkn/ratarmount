@@ -5,6 +5,7 @@ platform=${AUDITWHEEL_PLAT%_$arch}
 appbase=$appname-$platform_$arch
 appdir=$appbase.AppDir
 python_tag=cp39-cp39
+python_libarchive_ext_url=https://github.com/Vadiml1024/python-libarchive/releases/download/V3.6.1-extended-36/python_libarchive_ext-3.6.1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
 
 echo Install System Build Tools
 ln -s python3.9 /usr/local/bin/python3
@@ -22,12 +23,12 @@ chmod u+x /usr/bin/linuxdeploy
 echo Create Base Python AppImage platform: $platform arch: $arch
 python3 -m python_appimage build local -p $(which python3)
 pyversion_string=( $(python3 -V) ); pyfullversion=${pyversion_string[1]}
-python_base_image="python$pyfullversion-$pythontag-${platform}_${arch}.AppImage"
+python_base_image="python$pyfullversion-$python_tag-${platform}_${arch}.AppImage"
 pyver=${pyfullversion%.[0-9]*} # remove the last part of the version number
 mv python$pyfullversion-$arch.AppImage $python_base_image
 
 echo Build Base Python AppImage With Ratarmount Metadata
-python3 -m python_appimage build app -b $python_base_image -n ratarmount AppImage/
+python3 -m python_appimage build app -b $python_base_image -n ratarmount-$platform AppImage/
 
 echo Extract AppImage to AppDir for Further Modification
 
@@ -36,7 +37,7 @@ mv squashfs-root/ "$appdir"
 
 echo Install Ratarmount into AppDir
 apppython=$appdir/opt/python3.9/bin/python3.9
-"$apppython" -I -m pip install --no-cache-dir  https://github.com/Vadiml1024/python-libarchive/releases/download/V3.5.3-extended-33/python_libarchive_ext-3.5.3-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+"$apppython" -I -m pip install --no-cache-dir  "$python_libarchive_ext_url"
 "$apppython" -I -m pip install --no-cache-dir ./core
 "$apppython" -I -m pip install --no-cache-dir .
 
@@ -44,12 +45,11 @@ echo Bundle System Dependencies into AppDir
 # Note that manylinux2014 already has libsqlite3.so.0 inside /usr/lib.
 cp -a $( dnf repoquery -l fuse-libs | 'grep' 'lib64.*[.]so' ) "$appdir"/usr/lib/
 APPIMAGE_EXTRACT_AND_RUN=1 linuxdeploy --appdir="$appdir" \
-            --library=/usr/lib64/libc-2.28.so \
             --library=/usr/lib64/libfuse.so.2 \
             --library=/usr/lib64/libulockmgr.so.1 \
             --executable=/usr/bin/fusermount \
             --executable=/usr/bin/ulockmgr_server
-(cd "$appdir"/usr/lib  && rm -f libc.so.6 libc.so &&  ln -s libc-2.28.so libc.so.6 && ln -s libc-so.6 libc.so)
+#(cd "$appdir"/usr/lib  && rm -f libc.so.6 libc.so &&  ln -s libc-2.28.so libc.so.6 && ln -s libc-so.6 libc.so)
 echo Clean up Unnecessary Files from AppDir
 "$apppython" -s -m pip uninstall -y build setuptools wheel pip
 rm -rf "$appdir/opt/python3.9/lib/python3.9/site-packages/indexed_gzip/tests" \
