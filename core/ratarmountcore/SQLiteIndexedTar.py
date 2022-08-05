@@ -612,7 +612,7 @@ class SQLiteIndexedTar(MountSource):
         indexFilePath                : Optional[str]             = None,
         indexFolders                 : Optional[List[str]]       = None,
         recursive                    : bool                      = False,
-        gzipSeekPointSpacing         : int                       = 4*1024*1024,
+        gzipSeekPointSpacing         : int                       = 4 * 1024 * 1024,
         encoding                     : str                       = tarfile.ENCODING,
         stripRecursiveTarExtension   : bool                      = False,
         ignoreZeros                  : bool                      = False,
