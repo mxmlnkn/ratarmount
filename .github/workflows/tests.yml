@@ -37,7 +37,7 @@ jobs:
     - name: Lint With Flake8
       run: |
         python3 -m pip install flake8
-        flake8 *.py tests/*.py core/ratarmountcore/[^_]*.py
+        flake8 --ignore W503 *.py tests/*.py core/ratarmountcore/[^_]*.py
 
     - name: Lint With Pylint
       run: |
