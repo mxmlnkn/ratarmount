@@ -878,14 +878,14 @@ class PrintVersionAction(argparse.Action):
         print("Compression Backends:")
         print()
 
-        for _, cinfo in supportedCompressions.items():
+        def printModuleVersion(moduleName: str):
             try:
-                importlib.import_module(cinfo.moduleName)
+                importlib.import_module(moduleName)
             except ImportError:
                 pass
 
-            if cinfo.moduleName in sys.modules:
-                module = sys.modules[cinfo.moduleName]
+            if moduleName in sys.modules:
+                module = sys.modules[moduleName]
                 # zipfile has no __version__ attribute and PEP 396 ensuring that was rejected 2021-04-14
                 # in favor of 'version' from importlib.metadata which does not even work with zipfile.
                 # Probably, because zipfile is a built-in module whose version would be the Python version.
@@ -894,7 +894,10 @@ class PrintVersionAction(argparse.Action):
                 # there is no generic way to get the "python-xz" name from the "xz" runtime module object
                 # and importlib.metadata.version will require "python-xz" as argument.
                 if hasattr(module, '__version__'):
-                    print(cinfo.moduleName, getattr(module, '__version__'))
+                    print(moduleName, getattr(module, '__version__'))
+
+        for _, cinfo in supportedCompressions.items():
+            printModuleVersion(cinfo.moduleName)
 
         sys.exit(0)
 
