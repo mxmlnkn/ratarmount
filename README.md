@@ -50,6 +50,7 @@ And in contrast to [tarindexer](https://github.com/devsnd/tarindexer), which als
    4. [File versions](#file-versions)
    5. [Compressed non-TAR files](#compressed-non-tar-files)
    6. [Xz and Zst Files](#xz-and-zst-files)
+   7. [As a Library](#as-a-library)
 
 
 # Installation
@@ -58,7 +59,7 @@ You can install ratarmount either by simply downloading the AppImage or via pip.
 
 ## Installation via AppImage
 
-The [AppImage](https://appimage.org/) files are attached under "Assets" on the [releases  page](https://github.com/mxmlnkn/ratarmount/releases).
+The [AppImage](https://appimage.org/) files are attached under "Assets" on the [releases page](https://github.com/mxmlnkn/ratarmount/releases).
 They require no installation and can be simply executed like a portable executable.
 If you want to install it, you can simply copy it into any of the folders listed in your `PATH`.
 
@@ -555,6 +556,13 @@ It also works when being piped to. This can be useful for recompressing files to
 ```bash
 lbzip2 -cd well-compressed-file.bz2 | createMultiFrameZstd $(( 4*1024*1024 )) > recompressed.zst
 ```
+
+
+## As a Library
+
+Ratarmount can also be used as a library.
+Using [ratarmountcore](core/), files inside archives can be accessed directly from Python code without requiring FUSE.
+For a more detailed description, see the [ratarmountcore readme here](core/).
 
 
 ## Donations
