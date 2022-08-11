@@ -17,21 +17,29 @@ And in contrast to [tarindexer](https://github.com/devsnd/tarindexer), which als
 
 *Capabilities:*
 
- - **Highly Parallelized:** Using the `-P <cores>` option will activate parallel xz and bzip2 decoders. This can yield huge speedups on most modern processors.
+ - **Highly Parallelized:** By default, all cores are used for parallelized algorithms like for the gzip, bzip2, and xz decoders.
+   This can yield huge speedups on most modern processors but requires more main memory.
+   It can be controlled or completely turned off using the `-P <cores>` option.
  - **Recursive Mounting:** Ratarmount will also mount TARs inside TARs inside TARs, ... recursively into folders of the same name, which is useful for the 1.31TB ImageNet data set.
- - **Mount Compressed Files:** You may also mount files with one of the supported compression schemes. Even if these files do not contain a TAR, you can leverage ratarmount's true seeking capabilities when opening the mounted uncompressed view of such a file.
+ - **Mount Compressed Files:** You may also mount files with one of the supported compression schemes.
+   Even if these files do not contain a TAR, you can leverage ratarmount's true seeking capabilities when opening the mounted uncompressed view of such a file.
  - **Read-Only Bind Mounting:** Folders may be mounted read-only to other folders for usecases like merging a backup TAR with newer versions of those files residing in a normal folder.
  - **Union Mounting:** Multiple TARs, compressed files, and bind mounted folders can be mounted under the same mountpoint.
- - **Write Overlay:** A folder can be specified as write overlay. All changes below the mountpoint will be redirected to this folder and deletions are tracked so that all changes can be applied back to the archive.
+ - **Write Overlay:** A folder can be specified as write overlay.
+   All changes below the mountpoint will be redirected to this folder and deletions are tracked so that all changes can be applied back to the archive.
 
-*Compressions supported for random access:*
+*TAR compressions supported for random access:*
 
  - **BZip2** as provided by [indexed_bzip2](https://github.com/mxmlnkn/indexed_bzip2) as a backend, which is a refactored and extended version of [bzcat](https://github.com/landley/toybox/blob/c77b66455762f42bb824c1aa8cc60e7f4d44bdab/toys/other/bzcat.c) from [toybox](https://landley.net/code/toybox/). See also the [reverse engineered specification](https://github.com/dsnet/compress/blob/master/doc/bzip2-format.pdf).
  - **Gzip** as provided by [indexed_gzip](https://github.com/pauldmccarthy/indexed_gzip) by Paul McCarthy. See also [RFC1952](https://tools.ietf.org/html/rfc1952).
- - **Rar** as provided by [rarfile](https://github.com/markokr/rarfile) by Marko Kreen. See also the [RAR 5.0 archive format](https://www.rarlab.com/technote.htm).
  - **Xz** as provided by [python-xz](https://github.com/Rogdham/python-xz) by Rogdham or [lzmaffi](https://github.com/r3m0t/backports.lzma) by Tomer Chachamu. See also [The .xz File Format](https://tukaani.org/xz/xz-file-format.txt).
- - **Zip** as provided by [zipfile](https://docs.python.org/3/library/zipfile.html), which is distributed with Python itself. See also the [ZIP File Format Specification](https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT).
  - **Zstd** as provided by [indexed_zstd](https://github.com/martinellimarco/indexed_zstd) by Marco Martinelli. See also [Zstandard Compression Format](https://github.com/facebook/zstd/blob/master/doc/zstd_compression_format.md).
+
+*Other supported archive formats:*
+
+ - **Rar** as provided by [rarfile](https://github.com/markokr/rarfile) by Marko Kreen. See also the [RAR 5.0 archive format](https://www.rarlab.com/technote.htm).
+ - **Zip** as provided by [zipfile](https://docs.python.org/3/library/zipfile.html), which is distributed with Python itself. See also the [ZIP File Format Specification](https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT).
+ - **7z**, and many others as provided by [libarchive](https://github.com/libarchive/libarchive).
 
 
 # Table of Contents
