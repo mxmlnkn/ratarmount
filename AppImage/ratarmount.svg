@@ -1,38 +1,47 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!-- Created with Inkscape (http://www.inkscape.org/) -->
-
-<svg
-   width="256"
-   height="256"
-   viewBox="0 0 67.733331 67.733331"
-   version="1.1"
-   id="svg5"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:svg="http://www.w3.org/2000/svg">
-  <defs
-     id="defs2" />
-  <g
-     id="layer1">
-    <ellipse
-       style="fill:#772b7c;fill-opacity:1;stroke:none;stroke-width:0.26352499;stroke-miterlimit:4;stroke-dasharray:0.26352499, 0.26352499;stroke-dashoffset:0;stroke-opacity:1"
-       id="path114"
-       cx="33.866669"
-       cy="33.86652"
-       rx="33.734886"
-       ry="33.735191" />
-    <text
-       xml:space="preserve"
-       style="font-style:normal;font-weight:normal;font-size:23.9889px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
-       x="32.777325"
-       y="42.118706"
-       id="text2203"><tspan
-         id="tspan2201"
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:23.9889px;font-family:'DejaVu Sans';-inkscape-font-specification:'DejaVu Sans';text-align:center;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.264583;stroke-opacity:1"
-         x="32.777325"
-         y="42.118706">ratar</tspan><tspan
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:23.9889px;font-family:'DejaVu Sans';-inkscape-font-specification:'DejaVu Sans';text-align:center;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.264583;stroke-opacity:1"
-         x="32.777325"
-         y="72.104836"
-         id="tspan2381" /></text>
-  </g>
+<svg width="310"
+     height="260"
+     version="1.1"
+     id="ratarmount-logo"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     xmlns="http://www.w3.org/2000/svg"
+     xmlns:svg="http://www.w3.org/2000/svg"
+>
+    <g id="ratarmount-icon-face" class="gloweffect" transform="translate(5, 20)" style="
+        fill: none;
+        stroke-width: 10;
+        stroke-linecap: round;
+        stroke-miterlimit: 4;
+        stroke-dasharray: none;
+        stroke-opacity:1;">
+        <rect id="background" x="0" y="0" width="300" height="220" ry="60" style="
+            fill:#000000;
+            fill-opacity:1;
+            stroke:#009900"/>
+        <g id="face-features" transform="translate(25, 30)">
+            <g id="ratar" style="stroke: #aa00cc">
+                <g id="r" transform="translate(30, 0)">
+                    <path d="m 0,50 c -11,0 -20,9 -20,20 v 30"/>
+                </g>
+                <g id="a" transform="translate(50, 0)">
+                    <circle id="a-ring" cx="25" cy="75" r="25"/>
+                    <path d="m 50,75 v 25" id="a-tail"/>
+                </g>
+                <g id="left-t" transform="translate(125, 0)">
+                    <path d="M 0,10 v 90"/>
+                </g>
+                <g id="mirrored-a" transform="translate(150, 0)">
+                    <circle id="mirrored-a-ring" cx="25" cy="75" r="25"/>
+                    <path d="m 0,75 -0,25" id="mirrored-a-tail"/>
+                </g>
+                <g id="mirrored-r" transform="translate(220, 0)">
+                    <path d="m 0,50 c 11,0 20,9 20,20 v 30"/>
+                </g>
+            </g>
+            <g id="u" style="stroke: #aa00cc" transform="translate(125, 50)">
+                <path d="m 25,50 v 25 c 0,13.8 -11,25 -25,25 -13.8,0 -25,-11 -25,-25 v -25"/>
+            </g>
+            <path style="stroke:#aa00cc" d="M 10,30 H 240" id="roof"/>
+        </g>
+    </g>
 </svg>
