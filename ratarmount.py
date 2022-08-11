@@ -47,6 +47,16 @@ __version__ = '0.12.0'
 
 def hasNonEmptySupport() -> bool:
     try:
+        # Check suffix of shared library
+        if (
+            'fuse' in sys.modules
+            and hasattr(fuse, '_libfuse_path')
+            and getattr(fuse, '_libfuse_path').endswith(".so.2")
+        ):
+            return True
+
+        # Note that in Ubuntu 22.04 libfuse3 and libfuse2 can be installed side-by-side with fusermount 3 being
+        # detected with precedence even though fusepy will use libfuse-2.9.9.
         with os.popen('fusermount -V') as pipe:
             match = re.search(r'([0-9]+)[.][0-9]+[.][0-9]+', pipe.read())
             if match:
