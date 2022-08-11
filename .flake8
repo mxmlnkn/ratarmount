@@ -1,5 +1,6 @@
 [flake8]
-extend-ignore = C901, E201, E202, E203, E211, E221, E251, E266, E501
+# W503 "line break before binary operator" is directly in opposition to how black breaks lines!
+extend-ignore = C901, E201, E202, E203, E211, E221, E251, E266, E501, W503
 max-line-length = 120
 max-complexity = 18
 select = B,C,E,F,W,T4,B9
