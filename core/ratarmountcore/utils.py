@@ -2,7 +2,22 @@
 # -*- coding: utf-8 -*-
 
 import math
-from typing import Dict, Generic, Iterable, List, Optional, TypeVar
+import pathlib
+import sys
+import types
+
+from typing import Dict, Generic, Iterable, List, Optional, TypeVar, Union
+
+import importlib
+
+try:
+    import importlib.metadata
+except ImportError:
+    import importlib_metadata
+
+    imeta: types.ModuleType = importlib_metadata
+else:
+    imeta = importlib.metadata
 
 
 class RatarmountError(Exception):
@@ -178,3 +193,69 @@ def formatNumber(i: int, base: str, length: int = 0):
         i = i // len(base)
         length = length - 1
     return result[::-1]
+
+
+def distributionContainsFile(distribution, path: str) -> bool:
+    if not distribution.files:
+        return False
+
+    for file in distribution.files:
+        if not path.endswith(str(file)):
+            continue
+
+        try:
+            pathlib.Path(path).relative_to(file.locate())
+        except ValueError:
+            return False
+        else:
+            return True
+    return False
+
+
+def getModule(module: Union[str, types.ModuleType]) -> Optional[types.ModuleType]:
+    if isinstance(module, types.ModuleType):
+        return module
+
+    if module not in sys.modules:
+        try:
+            importlib.import_module(module)
+        except ImportError:
+            pass
+    return sys.modules[module] if module in sys.modules else None
+
+
+def findModuleVersion(moduleOrName: Union[str, types.ModuleType]) -> Optional[str]:
+    module = getModule(moduleOrName)
+    if not module:
+        return None
+
+    # zipfile has no __version__ attribute and PEP 396 ensuring that was rejected 2021-04-14
+    # in favor of 'version' from importlib.metadata which does not even work with zipfile.
+    # Probably, because zipfile is a built-in module whose version would be the Python version.
+    # https://www.python.org/dev/peps/pep-0396/
+    # The "python-xz" project is imported as an "xz" module, which complicates things because
+    # there is no generic way to get the "python-xz" name from the "xz" runtime module object
+    # and importlib.metadata.version will require "python-xz" as argument.
+    # Note that even when querying the version with importlib.metadata.version, it can return
+    # a different version than the actually imported module if some import tricks were done
+    # like manipulating sys.path to import a non-installed module.
+    # All in all, this really gets on my nerves and I wished that PEP 396 would have been accepted.
+    # Currently, it feels like work has been shifted from the maintainer side to the user side.
+    # See below the kinds of handstands we have to do to even just get the unreliable package
+    # name from the module name in order to query the version. It's mental.
+    # And note that importlib.metadata has only been introduced in Python 3.8 and has been
+    # provisional until including Python 3.9, meaning it can still take years to be available
+    # and stable on all systems or I have to add yet another dependency just to get the damn version.
+    if hasattr(module, '__version__'):
+        return str(getattr(module, '__version__'))
+
+    if hasattr(module, '__file__'):
+        moduleFilePath = getattr(module, '__file__')
+        for distribution in imeta.distributions():
+            try:
+                if distributionContainsFile(distribution, moduleFilePath) and 'Name' in distribution.metadata:
+                    return distribution.metadata['Name']
+            except Exception:
+                pass
+
+    return None

@@ -43,7 +43,16 @@ Example:
 from .version import __version__
 
 from .compressions import supportedCompressions, stripSuffixFromTarFile, checkForSplitFile, compressZstd, getGzipInfo
-from .utils import RatarmountError, IndexNotOpenError, InvalidIndexError, CompressionError, overrides
+from .utils import (
+    RatarmountError,
+    IndexNotOpenError,
+    InvalidIndexError,
+    CompressionError,
+    overrides,
+    distributionContainsFile,
+    getModule,
+    findModuleVersion,
+)
 from .StenciledFile import LambdaReaderFile, RawStenciledFile, StenciledFile, JoinedFile
 from .SQLiteBlobFile import SQLiteBlobFile, SQLiteBlobsFile
 from .BlockParallelReaders import BlockParallelReader, ParallelXZReader, ParallelZstdReader

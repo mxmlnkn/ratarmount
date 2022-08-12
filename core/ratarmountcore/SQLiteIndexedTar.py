@@ -39,7 +39,15 @@ from .ProgressBar import ProgressBar
 from .SQLiteBlobFile import SQLiteBlobsFile, WriteSQLiteBlobs
 from .StenciledFile import StenciledFile
 from .compressions import getGzipInfo, supportedCompressions
-from .utils import RatarmountError, IndexNotOpenError, InvalidIndexError, CompressionError, overrides, ceilDiv
+from .utils import (
+    RatarmountError,
+    IndexNotOpenError,
+    InvalidIndexError,
+    CompressionError,
+    ceilDiv,
+    findModuleVersion,
+    overrides,
+)
 from .BlockParallelReaders import ParallelXZReader
 
 
@@ -937,9 +945,11 @@ class SQLiteIndexedTar(MountSource):
         try:
             connection.executescript(versionsTable)
         except Exception as exception:
+            print("[Warning] There was an error when adding metadata information. Index loading might not work.")
             if printDebug >= 2:
                 print(exception)
-            print("[Warning] There was an error when adding metadata information. Index loading might not work.")
+            if printDebug >= 3:
+                traceback.print_exc()
 
         try:
 
@@ -962,22 +972,17 @@ class SQLiteIndexedTar(MountSource):
 
             for _, cinfo in supportedCompressions.items():
                 if cinfo.moduleName in sys.modules:
-                    module = sys.modules[cinfo.moduleName]
-                    # zipfile has no __version__ attribute and PEP 396 ensuring that was rejected 2021-04-14
-                    # in favor of 'version' from importlib.metadata which does not even work with zipfile.
-                    # Probably, because zipfile is a built-in module whose version would be the Python version.
-                    # https://www.python.org/dev/peps/pep-0396/
-                    # The "python-xz" project is imported as an "xz" module, which complicates things because
-                    # there is no generic way to get the "python-xz" name from the "xz" runtime module object
-                    # and importlib.metadata.version will require "python-xz" as argument.
-                    if hasattr(module, '__version__'):
-                        versions += [makeVersionRow(cinfo.moduleName, getattr(module, '__version__'))]
+                    moduleVersion = findModuleVersion(sys.modules[cinfo.moduleName])
+                    if moduleVersion:
+                        versions += [makeVersionRow(cinfo.moduleName, moduleVersion)]
 
             connection.executemany('INSERT OR REPLACE INTO "versions" VALUES (?,?,?,?,?)', versions)
         except Exception as exception:
             print("[Warning] There was an error when adding version information.")
-            if printDebug >= 3:
+            if printDebug >= 2:
                 print(exception)
+            if printDebug >= 3:
+                traceback.print_exc()
 
     @staticmethod
     def _storeTarMetadata(connection: sqlite3.Connection, tarPath: AnyStr, printDebug: int = 0) -> None:

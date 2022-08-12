@@ -32,13 +32,14 @@ except ImportError:
 
 import ratarmountcore as core
 from ratarmountcore import (
-    SQLiteIndexedTar,
-    MountSource,
-    UnionMountSource,
     AutoMountLayer,
+    MountSource,
     FileVersionLayer,
-    openMountSource,
     FolderMountSource,
+    SQLiteIndexedTar,
+    UnionMountSource,
+    findModuleVersion,
+    openMountSource,
     overrides,
     supportedCompressions,
     stripSuffixFromTarFile,
@@ -900,16 +901,9 @@ class PrintVersionAction(argparse.Action):
                 pass
 
             if moduleName in sys.modules:
-                module = sys.modules[moduleName]
-                # zipfile has no __version__ attribute and PEP 396 ensuring that was rejected 2021-04-14
-                # in favor of 'version' from importlib.metadata which does not even work with zipfile.
-                # Probably, because zipfile is a built-in module whose version would be the Python version.
-                # https://www.python.org/dev/peps/pep-0396/
-                # The "python-xz" project is imported as an "xz" module, which complicates things because
-                # there is no generic way to get the "python-xz" name from the "xz" runtime module object
-                # and importlib.metadata.version will require "python-xz" as argument.
-                if hasattr(module, '__version__'):
-                    print(moduleName, getattr(module, '__version__'))
+                moduleVersion = findModuleVersion(sys.modules[moduleName])
+                if moduleVersion:
+                    print(moduleName, moduleVersion)
 
         for _, cinfo in supportedCompressions.items():
             printModuleVersion(cinfo.moduleName)

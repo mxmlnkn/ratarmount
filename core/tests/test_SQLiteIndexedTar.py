@@ -189,6 +189,7 @@ class TestSQLiteIndexedTarParallelized:
             clearIndexCache=False,
             indexFilePath=indexFilePath,
             parallelization=parallelization,
+            printDebug=3,
         )
 
         objectName = '<file object>' if tarFileName is None else tarFileName
@@ -328,6 +329,7 @@ class TestSQLiteIndexedTarParallelized:
             clearIndexCache=True,
             indexFilePath=indexFilePath,
             parallelization=parallelization,
+            printDebug=3,
         ) as indexedTar:
             assert not indexedTar.hasBeenAppendedTo
             assert indexedTar.exists("/foo")
@@ -346,6 +348,7 @@ class TestSQLiteIndexedTarParallelized:
             clearIndexCache=False,
             indexFilePath=indexFilePath,
             parallelization=parallelization,
+            printDebug=3,
         ) as indexedTar:
             assert not indexedTar.hasBeenAppendedTo
             assert indexedTar.exists("/foo")
@@ -364,6 +367,7 @@ class TestSQLiteIndexedTarParallelized:
             clearIndexCache=False,
             indexFilePath=indexFilePath,
             parallelization=parallelization,
+            printDebug=3,
         ) as indexedTar:
             assert not indexedTar.hasBeenAppendedTo
             assert indexedTar.exists("/foo")
@@ -386,6 +390,7 @@ class TestSQLiteIndexedTarParallelized:
             clearIndexCache=False,
             indexFilePath=indexFilePath,
             parallelization=parallelization,
+            printDebug=3,
         ) as indexedTar:
             assert not indexedTar.hasBeenAppendedTo
             assert indexedTar.exists("/foo")
@@ -405,6 +410,7 @@ class TestSQLiteIndexedTarParallelized:
             clearIndexCache=False,
             indexFilePath=indexFilePath,
             parallelization=parallelization,
+            printDebug=3,
         ) as indexedTar:
             assert not indexedTar.hasBeenAppendedTo
             assert indexedTar.exists("/foo")
