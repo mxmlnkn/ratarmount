@@ -88,21 +88,26 @@ tar -xf nested-tar.tar
 rar a -hpfoo encrypted-headers-nested-tar.rar foo
 rar a -pfoo encrypted-nested-tar.rar foo
 zip -r --encrypt --password foo encrypted-nested-tar.zip foo
+7z a -pfoo encrypted-nested-tar.7z foo
 
 
 mkdir foo2
 echo iriya > foo2/ufo
 rar a file-in-non-existing-folder.rar foo2/ufo
 zip file-in-non-existing-folder.zip foo2/ufo
+7z a file-in-non-existing-folder.7z foo2/ufo
 
 
+rm -rf foo ufo
 echo fighter > foo
 echo iriya > ufo
 rar a natsu.rar foo ufo
 zip rar.zip natsu.rar
+7z a natsu.7z foo ufo
 
 zip natsu.zip foo ufo
-rar a zip.rar natsu.rar
+rar a zip.rar natsu.zip
+7z a zip.7z natsu.zip
 
 
 rm foo
@@ -111,6 +116,7 @@ tar -xf nested-tar.tar
 zip -r --symlinks nested-with-symlink.zip foo
 # RAR simply copies the link target when adding the file by default, need -ol to save the link itself
 rar a -ol nested-with-symlink.rar foo
+7z a -snl nested-with-symlink.7z foo
 
 
 rm foo
@@ -119,6 +125,7 @@ tar -xf single-nested-folder.tar
 zip -r --symlinks folder-symlink.zip foo
 # RAR simply copies the link target when adding the file by default, need -ol to save the link itself
 rar a -ol folder-symlink.rar foo
+7z a -ol folder-symlink.7z foo
 
 
 cat <<EOF > CHANGELOG.md
