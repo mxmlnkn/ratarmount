@@ -1,4 +1,6 @@
-<p align="center"><a href=#><img src="https://raw.githubusercontent.com/mxmlnkn/ratarmount/master/ratarmount.svg"/></a></p>
+<div align="center">
+
+![Ratarmount Logo](https://raw.githubusercontent.com/mxmlnkn/ratarmount/master/ratarmount.svg "Purple 'ratar' and dark green 'mount'. The `raarmoun` letters pleasingly have the exact same height and the two bars of the 't's thrones over. The t-bars are animated to connect in a full horizontal line from time to time.")
 
 # Random Access Tar Mount (Ratarmount)
 
@@ -9,6 +11,8 @@
 [![Build Status](https://github.com/mxmlnkn/ratarmount/workflows/tests/badge.svg)](https://github.com/mxmlnkn/ratarmount/actions)
 [![Discord](https://img.shields.io/discord/783411320354766878?label=discord)](https://discord.gg/Wra6t6akh2)
 [![Telegram](https://img.shields.io/badge/Chat-Telegram-%2330A3E6)](https://t.me/joinchat/FUdXxkXIv6c4Ib8bgaSxNg)
+
+</div>
 
 Ratarmount collects all file positions inside a TAR so that it can easily jump to and read from any file without extracting it.
 It, then, **mounts** the **TAR** using [fusepy](https://github.com/fusepy/fusepy) for read access just like [archivemount](https://github.com/cybernoid/archivemount/).
