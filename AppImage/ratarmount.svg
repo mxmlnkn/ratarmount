@@ -17,9 +17,9 @@
         <rect id="background" x="0" y="0" width="300" height="220" ry="60" style="
             fill:#000000;
             fill-opacity:1;
-            stroke:#009900"/>
+            stroke:#aa00cc"/>
         <g id="face-features" transform="translate(25, 30)">
-            <g id="ratar" style="stroke: #aa00cc">
+            <g id="ratar" style="stroke: #009900">
                 <g id="r" transform="translate(30, 0)">
                     <path d="m 0,50 c -11,0 -20,9 -20,20 v 30"/>
                 </g>
@@ -38,10 +38,10 @@
                     <path d="m 0,50 c 11,0 20,9 20,20 v 30"/>
                 </g>
             </g>
-            <g id="u" style="stroke: #aa00cc" transform="translate(125, 50)">
+            <g id="u" style="stroke: #009900" transform="translate(125, 50)">
                 <path d="m 25,50 v 25 c 0,13.8 -11,25 -25,25 -13.8,0 -25,-11 -25,-25 v -25"/>
             </g>
-            <path style="stroke:#aa00cc" d="M 10,30 H 240" id="roof"/>
+            <path style="stroke:#009900" d="M 10,30 H 240" id="roof"/>
         </g>
     </g>
 </svg>
