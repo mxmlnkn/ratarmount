@@ -2273,10 +2273,19 @@ class SQLiteIndexedTar(MountSource):
             maxBlobSize = 256 * 1024 * 1024  # 256 MiB
 
             if 'gzipindex' in tables or 'gzipindexes' in tables:
+                table = 'gzipindexes' if 'gzipindexes' in tables else 'gzipindex'
+
                 try:
+                    blobCount = db.execute(f"SELECT COUNT(data) FROM {table}").fetchone()[0]
+                    if blobCount == 0:
+                        raise Exception(
+                            f"{table} table exists but is empty. Last index creation might not have "
+                            "finished or the file is relatively small. In the latter case, rewriting "
+                            "the gzip index should also be cheap"
+                        )
+
                     t0 = time.time()
                     # indexed_gzip 1.5.0 added support for pure Python file objects as arguments for the index!
-                    table = 'gzipindexes' if 'gzipindexes' in tables else 'gzipindex'
                     fileObject.import_index(fileobj=SQLiteBlobsFile(db, table, 'data', buffer_size=maxBlobSize))
 
                     # SQLiteBlobFile is rather slow to get parts of a large blob by using substr.
@@ -2322,6 +2331,7 @@ class SQLiteIndexedTar(MountSource):
             # Timings when using WriteSQLiteBlobs to write directly into the SQLite database.
             #   Time / s: 13.029 14.884 14.110 14.229 13.807
 
+            db.execute('DROP TABLE IF EXISTS gzipindexes')
             db.execute('CREATE TABLE gzipindexes ( data BLOB )')
 
             try:
@@ -2344,6 +2354,7 @@ class SQLiteIndexedTar(MountSource):
                     print("[Warning] size is smaller than the gzip seek point spacing.")
             elif blobCount == 1:
                 # For downwards compatibility
+                db.execute('DROP TABLE IF EXISTS gzipindex;')
                 db.execute('ALTER TABLE gzipindexes RENAME TO gzipindex;')
 
             db.commit()
