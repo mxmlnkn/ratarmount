@@ -1590,6 +1590,10 @@ tests+=(
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-with-symlink.zip                foo/lighter.tar/fighter/bar
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.zip                     foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.zip                     foo/jet/ufo
+
+    2709a3348eb2c52302a7606ecf5860bc tests/denormal-paths.zip                     ufo
+    d3b07384d113edec49eaa6238ad5ff00 tests/denormal-paths.zip                     root/bar
+    c157a79031e1c40f85931829bc5fc552 tests/denormal-paths.zip                     foo
 )
 fi
 
@@ -1611,9 +1615,19 @@ tests+=(
 
     d3b07384d113edec49eaa6238ad5ff00 'tests/#not-a-good-name! Ör, is it?.tar'     bar
     d3b07384d113edec49eaa6238ad5ff00 tests/single-file.tar                        bar
+
     d3b07384d113edec49eaa6238ad5ff00 tests/single-file-with-leading-dot-slash.tar bar
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/folder-with-leading-dot-slash.tar      foo/bar
     2709a3348eb2c52302a7606ecf5860bc tests/folder-with-leading-dot-slash.tar      foo/fighter/ufo
+
+    2709a3348eb2c52302a7606ecf5860bc tests/denormal-paths.rar                     ufo
+    d3b07384d113edec49eaa6238ad5ff00 tests/denormal-paths.rar                     root/bar
+    c157a79031e1c40f85931829bc5fc552 tests/denormal-paths.rar                     foo
+
+    2709a3348eb2c52302a7606ecf5860bc tests/denormal-paths.tar                     ufo
+    d3b07384d113edec49eaa6238ad5ff00 tests/denormal-paths.tar                     root/bar
+    c157a79031e1c40f85931829bc5fc552 tests/denormal-paths.tar                     foo
+
     2709a3348eb2c52302a7606ecf5860bc tests/single-nested-file.tar                 foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/single-nested-folder.tar               foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/nested-tar.tar                         foo/fighter/ufo

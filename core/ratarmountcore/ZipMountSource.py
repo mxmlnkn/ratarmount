@@ -18,7 +18,16 @@ class ZipMountSource(MountSource):
         self.fileObject = zipfile.ZipFile(fileOrPath, 'r')
         ZipMountSource._findPassword(self.fileObject, options.get("passwords", []))
         self.files = self.fileObject.infolist()
+        for file in self.files:
+            file.filename = ZipMountSource._cleanPath(file.filename)
         self.options = options
+
+    @staticmethod
+    def _cleanPath(path):
+        result = os.path.normpath(path) + ('/' if path.endswith('/') else '')
+        while result.startswith('../'):
+            result = result[3:]
+        return result
 
     @staticmethod
     def _findPassword(fileobj: "zipfile.ZipFile", passwords):

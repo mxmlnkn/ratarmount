@@ -94,8 +94,16 @@ class RarMountSource(MountSource):
     def __init__(self, fileOrPath: Union[str, IO[bytes]], **options) -> None:
         self.fileObject = rarfile.RarFile(fileOrPath, 'r')
         RarMountSource._findPassword(self.fileObject, options.get("passwords", []))
-        self.files = self.fileObject.infolist()
+
+        self.files = {RarMountSource._cleanPath(info.filename): info for info in self.fileObject.infolist()}
         self.options = options
+
+    @staticmethod
+    def _cleanPath(path):
+        result = os.path.normpath(path) + ('/' if path.endswith('/') else '')
+        while result.startswith('../'):
+            result = result[3:]
+        return result
 
     @staticmethod
     def _findPassword(fileobj: "rarfile.RarFile", passwords):
@@ -127,7 +135,7 @@ class RarMountSource(MountSource):
         raise rarfile.PasswordRequired("Could not find a matching password!")
 
     @staticmethod
-    def _convertToFileInfo(info: "rarfile.RarInfo") -> FileInfo:
+    def _convertToFileInfo(normalizedPath: str, info: "rarfile.RarInfo") -> FileInfo:
         mode = 0o555 | (stat.S_IFDIR if info.is_dir() else stat.S_IFREG)
         if info.date_time:
             dtime = datetime.datetime(*info.date_time)
@@ -150,7 +158,7 @@ class RarMountSource(MountSource):
             linkname = linkname,
             uid      = os.getuid(),
             gid      = os.getgid(),
-            userdata = [info],
+            userdata = [(normalizedPath, info)],
             # fmt: on
         )
 
@@ -184,21 +192,25 @@ class RarMountSource(MountSource):
             return filePath
 
         # The "filename" member is wrongly named as it returns the full path inside the archive not just the name part.
-        return {getName(info.filename): self._convertToFileInfo(info) for info in self.files if getName(info.filename)}
+        return {
+            getName(normalizedPath): self._convertToFileInfo(normalizedPath, info)
+            for normalizedPath, info in self.files.items()
+            if getName(normalizedPath)
+        }
 
     def _getFileInfos(self, path: str) -> List[FileInfo]:
         infoList = [
-            RarMountSource._convertToFileInfo(info)
-            for info in self.files
-            if info.filename.rstrip('/') == path.lstrip('/')
+            RarMountSource._convertToFileInfo(normalizedPath, info)
+            for normalizedPath, info in self.files.items()
+            if normalizedPath.rstrip('/') == path.lstrip('/')
         ]
 
         # If we have a fileInfo for the given directory path, then everything is fine.
         pathAsDir = path.strip('/') + '/'
 
         # Check whether some parent directories of files do not exist as separate entities in the archive.
-        if not any(info.userdata[-1].filename == pathAsDir for info in infoList) and any(
-            info.filename.rstrip('/').startswith(pathAsDir) for info in self.files
+        if not any(info.userdata[-1][0] == pathAsDir for info in infoList) and any(
+            normalizedPath.rstrip('/').startswith(pathAsDir) for normalizedPath, info in self.files.items()
         ):
             infoList.append(
                 FileInfo(
@@ -227,7 +239,7 @@ class RarMountSource(MountSource):
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo) -> IO[bytes]:
-        info = fileInfo.userdata[-1]
+        info = fileInfo.userdata[-1][1]
         assert isinstance(info, rarfile.RarInfo)
         return cast(IO[bytes], RawFileInsideRar(lambda: self.fileObject.open(info, 'r'), info.file_size))
 

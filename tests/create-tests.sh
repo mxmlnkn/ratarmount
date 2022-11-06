@@ -267,6 +267,65 @@ done
 mv ufo_99.gz compressed-100-times.gz
 
 
+# parent path
+mkdir -p root
+(
+    cd root || exit 1
+    mkdir -p folder
+    echo iriya > ufo
+    echo foo > bar
+    echo bar > foo
+
+    # 7z cleans those paths but Zip 3.0 (July 5th 2008), by Info-ZIP only cleans the leading ./././ but not any other ones
+    # zipinfo denormal-paths.zip
+    #     -rwx------  3.0 unx  6 tx stor 22-Nov-06 17:57 folder/../ufo
+    #     -rwx------  3.0 unx  4 tx stor 22-Nov-06 17:57 ../root/bar
+    #     -rwx------  3.0 unx  4 tx stor 22-Nov-06 17:57 folder/../././foo
+    zip ../denormal-paths.zip folder/../ufo ../root/bar ./././folder/../././foo
+
+    # tar fails to clean up some ./ but cleans up most .. in the path. However, with transform, we can readd '..'!
+    tarc --transform 's,ufo,root/../ufo,' --transform 's,root/bar,../root/./bar,' -f ../denormal-paths.tar \
+        ./folder/.././folder/./../ufo ../root/./bar ./././folder/../././foo
+    # tar tvlf denormal-paths.tar
+    #     -rwx------ 1000/1000         6 2022-11-06 18:00 root/../ufo
+    #     -rwx------ 1000/1000         4 2022-11-06 18:00 root/./bar
+    #     -rwx------ 1000/1000         4 2022-11-06 18:00 ././foo
+    python3 -c '
+import os
+import tarfile
+with tarfile.open("../denormal-paths-tarfile.tar", "w") as tar:
+    for path in ["folder/../ufo", "../root/bar", "./././folder/../././foo"]:
+        tarInfo = tar.gettarinfo(path)
+        tarInfo.uname = ""
+        tarInfo.gname = ""
+        tar.addfile(tarInfo)
+'
+    # Not only is tar refusing to add leading ../ to contained files it even errors out on such TARs when created
+    # with Python's tarfile module!
+    # tar tvlf ../denormal-paths.tar
+    #     tar: Removing leading `folder/../' from member names
+    #     -rwx------ 1000/1000         6 2022-11-06 20:21 folder/../ufo
+    #     tar: Skipping to next header
+    #     tar: Removing leading `../' from member names
+    #     -rwx------ 1000/1000         4 2022-11-06 20:21 ../root/bar
+    #     tar: Skipping to next header
+    #     tar: Removing leading `./././folder/../' from member names
+    #     -rwx------ 1000/1000         4 2022-11-06 20:21 ./././folder/../././foo
+    #     tar: Exiting with failure status due to previous errors
+    # Actually, even tarfile fails to read all but the 'ufo' file!
+
+    # rar automatically normalizes paths and removes leading ../ so we have to readd with -ap
+    rar a -apfolder/../ ../denormal-paths.rar folder/../ufo
+    rar a -ap../ ../denormal-paths.rar ../root/bar
+    rar a -ap./././folder/../././ ../denormal-paths.rar ./././folder/../././foo
+    # rar l ../denormal-paths.rar
+    #     -rwx------  6  2022-11-06 20:21  folder/../ufo
+    #     -rwx------  4  2022-11-06 20:21  ../root/bar
+    #     -rwx------  4  2022-11-06 20:21  ./././folder/../././foo
+)
+rm -rf root
+
+
 # Split files
 echo foo >> simple-file-split.001
 echo bar >> simple-file-split.002
