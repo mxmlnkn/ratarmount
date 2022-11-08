@@ -1219,6 +1219,14 @@ seeking capabilities when opening that file.
         help='Specify a file with newline separated passwords for RAR and ZIP files. '
              'The passwords will be tried out in order of appearance in the file.')
 
+    moduleNames = sorted([module.name for _, info in supportedCompressions.items() for module in info.modules])
+
+    advancedGroup.add_argument(
+        '--use-backend', type=str, action='append',
+        help='Specify a backend to be used with higher priority for files which might be opened with multiple '
+             'backends. Arguments specified last will have the highest priority. A comma-separated list may be '
+             f'specified. Possible backends: {moduleNames}')
+
     # Positional Arguments
 
     positionalGroup.add_argument(
@@ -1324,6 +1332,19 @@ seeking capabilities when opening that file.
             args.passwords += file.read().split(b'\n')
 
     args.passwords = _removeDuplicatesStable(args.passwords)
+
+    # Clean backend list
+    supportedModuleNames = [module.name for _, info in supportedCompressions.items() for module in info.modules]
+    args.prioritizedBackends = (
+        [
+            backend
+            for backendString in args.use_backend
+            for backend in backendString.split(',')
+            if backend in supportedModuleNames
+        ][::-1]
+        if args.use_backend
+        else []
+    )
 
     return args
 
@@ -1525,6 +1546,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         writeOverlay                 = args.write_overlay,
         printDebug                   = int(args.debug),
         transformRecursiveMountPoint = args.transform_recursive_mount_point,
+        prioritizedBackends          = args.prioritizedBackends,
         # fmt: on
     )
 

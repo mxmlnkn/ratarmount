@@ -629,6 +629,7 @@ class SQLiteIndexedTar(MountSource):
         isGnuIncremental             : Optional[bool]            = None,
         printDebug                   : int                       = 0,
         transformRecursiveMountPoint : Optional[Tuple[str, str]] = None,
+        prioritizedBackends          : Optional[List[str]]       = None,
         # pylint: disable=unused-argument
         **kwargs
         # fmt: on
@@ -682,6 +683,7 @@ class SQLiteIndexedTar(MountSource):
         self.encoding                     = encoding
         self.stripRecursiveTarExtension   = stripRecursiveTarExtension
         self.transformRecursiveMountPoint = transformRecursiveMountPoint
+        self.prioritizedBackends          = prioritizedBackends
         self.ignoreZeros                  = ignoreZeros
         self.verifyModificationTime       = verifyModificationTime
         self.gzipSeekPointSpacing         = gzipSeekPointSpacing
@@ -716,7 +718,12 @@ class SQLiteIndexedTar(MountSource):
         # compression   : Stores what kind of compression the originally specified TAR file uses.
         # isTar         : Can be false for the degenerated case of only a bz2 or gz file not containing a TAR
         self.tarFileObject, self.rawFileObject, self.compression, self.isTar = SQLiteIndexedTar._openCompressedFile(
-            fileObject, gzipSeekPointSpacing, encoding, self.parallelization, printDebug=self.printDebug
+            fileObject,
+            gzipSeekPointSpacing,
+            encoding,
+            self.parallelization,
+            prioritizedBackends=self.prioritizedBackends,
+            printDebug=self.printDebug,
         )
         if not self.isTar and not self.rawFileObject:
             raise RatarmountError("File object (" + str(fileObject) + ") could not be opened as a TAR file!")
@@ -2085,7 +2092,9 @@ class SQLiteIndexedTar(MountSource):
         return False
 
     @staticmethod
-    def _detectCompression(fileobj: IO[bytes], printDebug: int = 0) -> Optional[str]:
+    def _detectCompression(
+        fileobj: IO[bytes], prioritizedBackends: Optional[List[str]], printDebug: int = 0
+    ) -> Optional[str]:
         if not isinstance(fileobj, io.IOBase) or not fileobj.seekable():
             return None
 
@@ -2100,7 +2109,7 @@ class SQLiteIndexedTar(MountSource):
             if not matches:
                 continue
 
-            formatOpen = findAvailableOpen(compressionId)
+            formatOpen = findAvailableOpen(compressionId, prioritizedBackends)
             if formatOpen:
                 return compressionId
 
@@ -2141,21 +2150,28 @@ class SQLiteIndexedTar(MountSource):
 
     @staticmethod
     def _openCompressedFile(
-        fileobj: IO[bytes], gzipSeekPointSpacing: int, encoding: str, parallelization: int, printDebug: int = 0
+        fileobj: IO[bytes],
+        gzipSeekPointSpacing: int,
+        encoding: str,
+        parallelization: int,
+        prioritizedBackends: Optional[List[str]],
+        printDebug: int = 0,
     ) -> Any:
         """
         Opens a file possibly undoing the compression.
         Returns (tar_file_obj, raw_file_obj, compression, isTar).
         raw_file_obj will be none if compression is None.
         """
-        compression = SQLiteIndexedTar._detectCompression(fileobj, printDebug=printDebug)
+        compression = SQLiteIndexedTar._detectCompression(
+            fileobj, prioritizedBackends=prioritizedBackends, printDebug=printDebug
+        )
         if printDebug >= 3:
             print(f"[Info] Detected compression {compression} for file object:", fileobj)
 
         if compression not in TAR_COMPRESSION_FORMATS:
             return fileobj, None, compression, SQLiteIndexedTar._detectTar(fileobj, encoding, printDebug=printDebug)
 
-        formatOpen = findAvailableOpen(compression)
+        formatOpen = findAvailableOpen(compression, prioritizedBackends)
         if not formatOpen:
             moduleNames = [module.name for module in TAR_COMPRESSION_FORMATS[compression].modules]
             raise CompressionError(
