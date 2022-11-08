@@ -38,7 +38,7 @@ from .MountSource import FileInfo, MountSource
 from .ProgressBar import ProgressBar
 from .SQLiteBlobFile import SQLiteBlobsFile, WriteSQLiteBlobs
 from .StenciledFile import StenciledFile
-from .compressions import getGzipInfo, supportedCompressions
+from .compressions import findAvailableOpen, getGzipInfo, TAR_COMPRESSION_FORMATS
 from .utils import (
     RatarmountError,
     IndexNotOpenError,
@@ -970,11 +970,15 @@ class SQLiteIndexedTar(MountSource):
                 makeVersionRow('index', SQLiteIndexedTar.__version__),
             ]
 
-            for _, cinfo in supportedCompressions.items():
-                if cinfo.moduleName in sys.modules:
-                    moduleVersion = findModuleVersion(sys.modules[cinfo.moduleName])
-                    if moduleVersion:
-                        versions += [makeVersionRow(cinfo.moduleName, moduleVersion)]
+            for moduleName in set(
+                module.name
+                for _, info in TAR_COMPRESSION_FORMATS.items()
+                for module in info.modules
+                if module.name in sys.modules
+            ):
+                moduleVersion = findModuleVersion(sys.modules[moduleName])
+                if moduleVersion:
+                    versions += [makeVersionRow(moduleName, moduleVersion)]
 
             connection.executemany('INSERT OR REPLACE INTO "versions" VALUES (?,?,?,?,?)', versions)
         except Exception as exception:
@@ -2086,10 +2090,7 @@ class SQLiteIndexedTar(MountSource):
             return None
 
         oldOffset = fileobj.tell()
-        for compressionId, compression in supportedCompressions.items():
-            if compressionId in ['rar', 'zip']:
-                continue
-
+        for compressionId, compression in TAR_COMPRESSION_FORMATS.items():
             # The header check is a necessary condition not a sufficient condition.
             # Especially for gzip, which only has 2 magic bytes, false positives might happen.
             # Therefore, only use the magic bytes based check if the module could not be found
@@ -2099,11 +2100,12 @@ class SQLiteIndexedTar(MountSource):
             if not matches:
                 continue
 
-            if compression.moduleName not in sys.modules and matches:
+            formatOpen = findAvailableOpen(compressionId)
+            if formatOpen:
                 return compressionId
 
             try:
-                compressedFileobj = compression.open(fileobj)
+                compressedFileobj = formatOpen(fileobj)
                 # Reading 1B from a single-frame zst file might require decompressing it fully in order
                 # to get uncompressed file size! Avoid that. The magic bytes should suffice mostly.
                 # TODO: Make indexed_zstd not require the uncompressed size for the read call.
@@ -2150,13 +2152,15 @@ class SQLiteIndexedTar(MountSource):
         if printDebug >= 3:
             print(f"[Info] Detected compression {compression} for file object:", fileobj)
 
-        if compression not in supportedCompressions:
+        if compression not in TAR_COMPRESSION_FORMATS:
             return fileobj, None, compression, SQLiteIndexedTar._detectTar(fileobj, encoding, printDebug=printDebug)
 
-        cinfo = supportedCompressions[compression]
-        if cinfo.moduleName not in sys.modules:
+        formatOpen = findAvailableOpen(compression)
+        if not formatOpen:
+            moduleNames = [module.name for module in TAR_COMPRESSION_FORMATS[compression].modules]
             raise CompressionError(
-                f"Can't open a {compression} compressed file '{fileobj.name}' without {cinfo.moduleName} module!"
+                f"Cannot open a {compression} compressed TAR file '{fileobj.name}' "
+                f"without any of these modules: {moduleNames}"
             )
 
         if compression == 'gz':
@@ -2181,12 +2185,12 @@ class SQLiteIndexedTar(MountSource):
             and os.path.isfile(fileobj.name)
             and platform.system() == 'Linux'
         ):
-            tar_file = cinfo.open(fileobj)
+            tar_file = formatOpen(fileobj)
             if len(tar_file.block_boundaries) > 1:
                 tar_file.close()
                 tar_file = ParallelXZReader(fileobj.name, parallelization=parallelization)
         else:
-            tar_file = cinfo.open(fileobj)
+            tar_file = formatOpen(fileobj)
 
         return tar_file, fileobj, compression, SQLiteIndexedTar._detectTar(tar_file, encoding, printDebug=printDebug)
 

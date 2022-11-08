@@ -39,6 +39,7 @@ from ratarmountcore import (
     SQLiteIndexedTar,
     UnionMountSource,
     findModuleVersion,
+    findAvailableOpen,
     openMountSource,
     overrides,
     supportedCompressions,
@@ -817,10 +818,14 @@ def checkInputFileType(
 
         try:
             # Determining if there are many frames in zstd is O(1) with is_multiframe
-            if compression != 'zst' or supportedCompressions[compression].moduleName not in sys.modules:
+            if compression != 'zst':
                 raise Exception()  # early exit because we catch it anyways
 
-            zstdFile = supportedCompressions[compression].open(fileobj)
+            formatOpen = findAvailableOpen(compression)
+            if not formatOpen:
+                raise Exception()  # early exit because we catch it anyways
+
+            zstdFile = formatOpen(fileobj)
 
             if not zstdFile.is_multiframe() and fileSize > 1024 * 1024:
                 print(f"[Warning] The specified file '{tarFile}'")
@@ -845,10 +850,11 @@ def checkInputFileType(
 
             raise argparse.ArgumentTypeError(f"Archive '{tarFile}' can't be opened!")
 
-    cinfo = supportedCompressions[compression]
-    if cinfo.moduleName not in sys.modules:
+    if not findAvailableOpen(compression):
+        moduleNames = [module.name for module in supportedCompressions[compression].modules]
         raise argparse.ArgumentTypeError(
-            f"Can't open a {compression} compressed TAR file '{fileobj.name}' without {cinfo.moduleName} module!"
+            f"Cannot open a {compression} compressed TAR file '{fileobj.name}' "
+            f"without any of these modules: {moduleNames}"
         )
 
     return tarFile, compression
@@ -905,8 +911,9 @@ class PrintVersionAction(argparse.Action):
                 if moduleVersion:
                     print(moduleName, moduleVersion)
 
-        for _, cinfo in supportedCompressions.items():
-            printModuleVersion(cinfo.moduleName)
+        for _, info in supportedCompressions.items():
+            for module in info.modules:
+                printModuleVersion(module.name)
 
         sys.exit(0)
 

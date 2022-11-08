@@ -6,7 +6,7 @@ import concurrent.futures
 import os
 import struct
 import sys
-from typing import Callable, IO, Iterable, List, Optional, Tuple
+from typing import Callable, Dict, IO, Iterable, List, Optional, Tuple
 
 from .utils import isLatinAlpha, isLatinDigit, isLatinHexAlpha, formatNumber, ALPHA, DIGITS, HEX
 
@@ -58,56 +58,81 @@ else:
     zipfile = None
 
 
+CompressionModuleInfo = collections.namedtuple('CompressionModuleInfo', ['name', 'open'])
 # Defining lambdas does not yet check the names of entities used inside the lambda!
-CompressionInfo = collections.namedtuple(
-    'CompressionInfo', ['suffixes', 'doubleSuffixes', 'moduleName', 'checkHeader', 'open']
-)
+# "modules" contains a list of CompressionModuleInfo for modules that are available.
+# Those appearing first in this list have priority.
+CompressionInfo = collections.namedtuple('CompressionInfo', ['suffixes', 'doubleSuffixes', 'modules', 'checkHeader'])
 
 
-supportedCompressions = {
+TAR_COMPRESSION_FORMATS: Dict[str, CompressionInfo] = {
     'bz2': CompressionInfo(
         ['bz2', 'bzip2'],
         ['tb2', 'tbz', 'tbz2', 'tz2'],
-        'indexed_bzip2',
+        [CompressionModuleInfo('indexed_bzip2', lambda x: indexed_bzip2.open(x))],
         lambda x: (x.read(4)[:3] == b'BZh' and x.read(6) == (0x314159265359).to_bytes(6, 'big')),
-        lambda x: indexed_bzip2.open(x),
     ),
     'gz': CompressionInfo(
         ['gz', 'gzip'],
         ['taz', 'tgz'],
-        'indexed_gzip',
+        [CompressionModuleInfo('indexed_gzip', lambda x: indexed_gzip.IndexedGzipFile(fileobj=x))],
         lambda x: x.read(2) == b'\x1F\x8B',
-        lambda x: indexed_gzip.IndexedGzipFile(fileobj=x),
-    ),
-    'rar': CompressionInfo(
-        ['rar'],
-        [],
-        'rarfile',
-        lambda x: x.read(6) == b'Rar!\x1A\x07',
-        lambda x: rarfile.RarFile(x),
     ),
     'xz': CompressionInfo(
         ['xz'],
         ['txz'],
-        'lzmaffi' if 'lzmaffi' in sys.modules else 'xz',
+        # Prioritize xz over lzmaffi
+        [
+            CompressionModuleInfo('xz', lambda x: xz.open(x)),
+            CompressionModuleInfo('lzmaffi', lambda x: lzmaffi.open(x)),
+        ],
         lambda x: x.read(6) == b"\xFD7zXZ\x00",
-        (lambda x: lzmaffi.open(x)) if 'lzmaffi' in sys.modules else (lambda x: xz.open(x)),
-    ),
-    'zip': CompressionInfo(
-        ['zip'],
-        [],
-        'zipfile',
-        lambda x: x.read(2) == b'PK',
-        lambda x: zipfile.ZipFile(x),
     ),
     'zst': CompressionInfo(
         ['zst', 'zstd'],
         ['tzst'],
-        'indexed_zstd',
+        [CompressionModuleInfo('indexed_zstd', lambda x: indexed_zstd.IndexedZstdFile(x.fileno()))],
         lambda x: x.read(4) == (0xFD2FB528).to_bytes(4, 'little'),
-        lambda x: indexed_zstd.IndexedZstdFile(x.fileno()),
     ),
 }
+
+
+ARCHIVE_FORMATS: Dict[str, CompressionInfo] = {
+    'rar': CompressionInfo(
+        ['rar'],
+        [],
+        [CompressionModuleInfo('rarfile', lambda x: rarfile.RarFile(x))],
+        lambda x: x.read(6) == b'Rar!\x1A\x07',
+    ),
+    'zip': CompressionInfo(
+        ['zip'],
+        [],
+        [CompressionModuleInfo('zipfile', lambda x: zipfile.ZipFile(x))],
+        lambda x: x.read(2) == b'PK',
+    ),
+}
+
+
+supportedCompressions = {**TAR_COMPRESSION_FORMATS, **ARCHIVE_FORMATS}
+
+
+def findAvailableOpen(compression: str, prioritizedBackends: Optional[List[str]] = None) -> Optional[Callable]:
+    if compression not in supportedCompressions:
+        return None
+
+    modules = supportedCompressions[compression].modules
+    if prioritizedBackends:
+        for moduleName in prioritizedBackends:
+            if moduleName in sys.modules:
+                for module in modules:
+                    if module.name == moduleName and module.open:
+                        return module.open
+
+    for module in modules:
+        if module.name in sys.modules:
+            return module.open
+
+    return None
 
 
 def stripSuffixFromCompressedFile(path: str) -> str:

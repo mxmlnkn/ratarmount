@@ -42,7 +42,17 @@ Example:
 
 from .version import __version__
 
-from .compressions import supportedCompressions, stripSuffixFromTarFile, checkForSplitFile, compressZstd, getGzipInfo
+from .compressions import (
+    TAR_COMPRESSION_FORMATS,
+    ARCHIVE_FORMATS,
+    findAvailableOpen,
+    supportedCompressions,
+    stripSuffixFromTarFile,
+    checkForSplitFile,
+    compressZstd,
+    getGzipInfo,
+)
+
 from .utils import (
     RatarmountError,
     IndexNotOpenError,
