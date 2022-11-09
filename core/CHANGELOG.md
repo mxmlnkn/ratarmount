@@ -1,7 +1,9 @@
 
-# Version 0.4.0 built on 2022-06-xx
+# Version 0.4.0 built on 2022-11-13
 
  - AutoMountLayer now takes a 'recursionDepth' argument instead of 'recursive'.
+ - Fix handling of paths in zip and rar files that contain '../'.
+ - Add backend prioritization option to SQLiteIndexedTar.
 
 # Version 0.3.2 built on 2022-06-25
 

@@ -1,9 +1,19 @@
 
-# Version 0.12.0 built on 2022-06-xx
+# Version 0.12.0 built on 2022-11-13
 
  - Add --recursion-depth argument for more fine-grained recursion control.
  - Add support to show a joined view of split files, e.g., <file>.001, and also support split archives.
+ - Add --use-backend option to choose between multiple available backends, e.g., 'lzmaffi' and 'xz' for xz files.
+ - Add support for pragzip when it has been installed and specified with '--use-backend pragzip'.
+   Pragzip offers unique parallelized decompression of arbitrary gzip files. Using a 12-core processor,
+   it can show speedups of 12 over gzip and speedups of 8 over pigz for sequentially decoding base64 files.
+   Furthermore, similar to indexed_bzip2 it is based on a block cache and therefore can substantially speed up
+   concurrent access streams as might happen when accessing multiple files through ratarmount concurrently.
+   Currently, indexed_gzip will still be used to create the index in the first pass and pragzip is used
+   for subsequent accesses with '--use-backend pragzip'.
  - (ratarmountcore 0.4.0) AutoMountLayer now takes a 'recursionDepth' argument instead of 'recursive'.
+ - (ratarmountcore 0.4.0) Fix handling of paths in zip and rar files that contain '../'.
+ - (ratarmountcore 0.4.0) Add backend prioritization option to SQLiteIndexedTar.
 
 # Version 0.11.3 built on 2022-06-25
 
