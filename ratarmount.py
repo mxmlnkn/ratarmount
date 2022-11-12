@@ -16,6 +16,7 @@ import tempfile
 import time
 import traceback
 import urllib.parse
+import urllib.request
 import zipfile
 from typing import Any, Callable, Dict, Iterable, IO, List, Optional, Tuple, Union
 
@@ -918,6 +919,35 @@ class PrintVersionAction(argparse.Action):
         sys.exit(0)
 
 
+class PrintOSSAttributionAction(argparse.Action):
+    def __call__(self, parser, args, values, option_string=None):
+        licenses = []
+        for name, githubPath in [
+            ("fusepy", "/fusepy/fusepy/master/LICENSE"),
+            ("python-xz", "/Rogdham/python-xz/master/LICENSE.txt"),
+            ("rarfile", "/markokr/rarfile/master/LICENSE"),
+            ("libfuse", "/libfuse/libfuse/master/LGPL2.txt"),
+            ("libsqlite3", "/sqlite/sqlite/master/LICENSE.md"),
+            ("cpython", "/python/cpython/main/LICENSE"),
+            ("libzstd-seek", "/martinellimarco/libzstd-seek/main/LICENSE"),
+            ("zstd", "/facebook/zstd/dev/LICENSE"),
+            ("zlib", "/madler/zlib/master/LICENSE"),
+            ("ratarmountcore", "/mxmlnkn/ratarmount/master/core/LICENSE"),
+            ("indexed_bzip2", "/mxmlnkn/indexed_bzip2/master/LICENSE"),
+            ("indexed_gzip", "/mxmlnkn/indexed_gzip/master/LICENSE"),
+            ("indexed_zstd", "/martinellimarco/indexed_zstd/master/LICENSE"),
+        ]:
+            licenseUrl = "https://raw.githubusercontent.com" + githubPath
+            licenseContents = urllib.request.urlopen(licenseUrl).read().decode()
+            homepage = "https://github.com" + '/'.join(githubPath.split('/', 3)[:3])
+            licenses.append((name, homepage, licenseContents))
+
+        for moduleName, url, license in sorted(licenses):
+            print(f"# {moduleName}\n\n{url}\n\n\n```\n{license}\n```\n\n")
+
+        sys.exit(0)
+
+
 def _parseArgs(rawArgs: Optional[List[str]] = None):
     parser = argparse.ArgumentParser(
         formatter_class=_CustomFormatter,
@@ -1226,6 +1256,10 @@ seeking capabilities when opening that file.
         help='Specify a backend to be used with higher priority for files which might be opened with multiple '
              'backends. Arguments specified last will have the highest priority. A comma-separated list may be '
              f'specified. Possible backends: {moduleNames}')
+
+    advancedGroup.add_argument(
+        '--oss-attributions', action=PrintOSSAttributionAction, nargs=0, default=argparse.SUPPRESS,
+        help='Show licenses of used libraries.')
 
     # Positional Arguments
 
