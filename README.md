@@ -43,7 +43,6 @@ And in contrast to [tarindexer](https://github.com/devsnd/tarindexer), which als
 
  - **Rar** as provided by [rarfile](https://github.com/markokr/rarfile) by Marko Kreen. See also the [RAR 5.0 archive format](https://www.rarlab.com/technote.htm).
  - **Zip** as provided by [zipfile](https://docs.python.org/3/library/zipfile.html), which is distributed with Python itself. See also the [ZIP File Format Specification](https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT).
- - **7z**, and many others as provided by [libarchive](https://github.com/libarchive/libarchive).
 
 
 # Table of Contents
