@@ -38,7 +38,9 @@ class UnionMountSource(MountSource):
         if len(self.mountSources) > 1:
             self._buildFolderCache()
 
-    def _buildFolderCache(self, maxDepth=1024, nMaxCacheSize=100000, nMaxSecondsToCache=60):
+    def _buildFolderCache(
+        self, maxDepth: int = 1024, nMaxCacheSize: int = 100000, nMaxSecondsToCache: float = 60
+    ) -> None:
         """
         nMaxCacheSize:
             Even assuming very long file paths like 1000 chars, the cache size

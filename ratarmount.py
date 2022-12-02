@@ -518,7 +518,7 @@ class FuseMount(fuse.Operations):
         # Those threads will be automatically recreated again on the next read call.
         # Without this, the ratarmount background process won't quit even after unmounting!
         joinThreads = getattr(self.mountSource, 'joinThreads', None)
-        if joinThreads:
+        if joinThreads is not None:
             joinThreads()
 
         self.mountSource = FileVersionLayer(self.mountSource)
@@ -942,8 +942,8 @@ class PrintOSSAttributionAction(argparse.Action):
             homepage = "https://github.com" + '/'.join(githubPath.split('/', 3)[:3])
             licenses.append((name, homepage, licenseContents))
 
-        for moduleName, url, license in sorted(licenses):
-            print(f"# {moduleName}\n\n{url}\n\n\n```\n{license}\n```\n\n")
+        for moduleName, url, licenseContents in sorted(licenses):
+            print(f"# {moduleName}\n\n{url}\n\n\n```\n{licenseContents}\n```\n\n")
 
         sys.exit(0)
 
