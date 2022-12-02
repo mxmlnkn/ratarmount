@@ -75,7 +75,7 @@ jobs:
         # 3.9 was released 2020-10-05 and end-of-life will be 2025-10-25
         # 3.10 was released 2021-10-04 and end-of-life will be 2026-10-04
         # 3.11 is to be released 2022-10-03
-        python-version: ['3.6', '3.11']
+        python-version: ['3.7', '3.11']
 
     defaults:
       run:
