@@ -195,7 +195,7 @@ class TestSQLiteIndexedTarParallelized:
         objectName = '<file object>' if tarFileName is None else tarFileName
         expectedName = os.path.basename(tarFileName).rsplit('.', 1)[0] if fileObject is None else objectName
 
-        finfo = indexedFile._getFileInfo("/", listDir=True)
+        finfo = indexedFile.index.getFileInfo("/", listDir=True)
         assert expectedName in finfo
         assert finfo[expectedName].size == len(contents)
 

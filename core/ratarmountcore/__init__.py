@@ -73,6 +73,7 @@ from .FolderMountSource import FolderMountSource
 from .RarMountSource import RarMountSource
 from .ZipMountSource import ZipMountSource
 from .SQLiteIndexedTar import SQLiteIndexedTar, SQLiteIndexedTarUserData
+from .SQLiteIndex import SQLiteIndex
 
 from .AutoMountLayer import AutoMountLayer
 from .FileVersionLayer import FileVersionLayer

@@ -1343,11 +1343,13 @@ seeking capabilities when opening that file.
     args.mount_point = os.path.abspath(args.mount_point)
 
     # Preprocess the --index-folders list as a string argument
-    if args.index_folders:
+    if args.index_folders and isinstance(args.index_folders, str):
         if args.index_folders[0] == '[':
             args.index_folders = json.loads(args.index_folders)
         elif ',' in args.index_folders:
             args.index_folders = args.index_folders.split(',')
+        else:
+            args.index_folders = [args.index_folders]
 
     # Check the parallelization argument and move to global variable
     assert isinstance(args.parallelization, int)
