@@ -690,7 +690,6 @@ class SQLiteIndexedTar(MountSource):
         self.encoding                     = encoding
         self.stripRecursiveTarExtension   = stripRecursiveTarExtension
         self.transformRecursiveMountPoint = transformRecursiveMountPoint
-        self.prioritizedBackends          = prioritizedBackends
         self.ignoreZeros                  = ignoreZeros
         self.verifyModificationTime       = verifyModificationTime
         self.gzipSeekPointSpacing         = gzipSeekPointSpacing
@@ -699,8 +698,8 @@ class SQLiteIndexedTar(MountSource):
         self.isFileObject                 = fileObject is not None
         self.isGnuIncremental             = isGnuIncremental
         self.hasBeenAppendedTo            = False
-        self.numberOfMetadataToVerify     = 1000  # shouldn't take more than 1 second according to benchmarks
         # fmt: on
+        self.prioritizedBackends: List[str] = [] if prioritizedBackends is None else prioritizedBackends
 
         # Determine an archive file name to show for debug output
         self.tarFileName: str
