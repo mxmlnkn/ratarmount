@@ -1088,10 +1088,6 @@ class SQLiteIndexedTar(MountSource):
         assert isinstance(fileInfo, FileInfo)
         return fileInfo
 
-    def isDir(self, path: str) -> bool:
-        """Return true if path exists and is a folder."""
-        return self.listDir(path) is not None
-
     @overrides(MountSource)
     def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         """
