@@ -919,6 +919,14 @@ class PrintVersionAction(argparse.Action):
         sys.exit(0)
 
 
+def getXdgCacheHome():
+    # https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
+    # > $XDG_CACHE_HOME defines the base directory relative to which user-specific non-essential data files should
+    # > be stored. If $XDG_CACHE_HOME is either not set or empty, a default equal to $HOME/.cache should be used.
+    path = os.environ.get('XDG_CACHE_HOME', '')
+    return path if path else os.path.join('~', '.cache')
+
+
 class PrintOSSAttributionAction(argparse.Action):
     def __call__(self, parser, args, values, option_string=None):
         licenses = []
@@ -1112,8 +1120,15 @@ seeking capabilities when opening that file.
         help='Specify a path to the .index.sqlite file. Setting this will disable fallback index folders. '
              'If the given path is ":memory:", then the index will not be written out to disk.')
 
+    indexFolders = ['', os.path.join( "~", ".ratarmount")]
+    xdgCacheHome = getXdgCacheHome()
+    if xdgCacheHome and os.path.isdir(os.path.expanduser(xdgCacheHome)):
+        indexFolders.insert(1, os.path.join(xdgCacheHome, 'ratarmount'))
+    containsComma = any(',' in folder for folder in indexFolders)
+    indexFoldersAsString = json.dumps(indexFolders) if containsComma else ','.join(indexFolders)
+
     indexGroup.add_argument(
-        '--index-folders', default="," + os.path.join( "~", ".ratarmount"),
+        '--index-folders', default=indexFoldersAsString,
         help='Specify one or multiple paths for storing .index.sqlite files. Paths will be tested for suitability '
              'in the given order. An empty path will be interpreted as the location in which the TAR resides. '
              'If the argument begins with a bracket "[", then it will be interpreted as a JSON-formatted list. '

@@ -343,7 +343,7 @@ class SQLiteIndex:
         return self.getConnection().execute("""SELECT version FROM versions WHERE name == 'index';""").fetchone()[0]
 
     @staticmethod
-    def _pathIsWritable(path: AnyStr, printDebug: int = 0) -> bool:
+    def _pathIsWritable(path: str, printDebug: int = 0) -> bool:
         try:
             folder = os.path.dirname(path)
             if folder:
@@ -356,9 +356,8 @@ class SQLiteIndex:
             return True
 
         except PermissionError:
-            if printDebug >= 2:
-                traceback.print_exc()
-                print("Could not create file:", path)
+            if printDebug >= 3:
+                print(f"Insufficient permissions to write to: {path}")
 
         except IOError:
             if printDebug >= 2:
@@ -368,7 +367,7 @@ class SQLiteIndex:
         return False
 
     @staticmethod
-    def _pathCanBeUsedForSqlite(path: AnyStr, printDebug: int = 0) -> bool:
+    def _pathCanBeUsedForSqlite(path: str, printDebug: int = 0) -> bool:
         if not SQLiteIndex._pathIsWritable(path, printDebug):
             return False
 
