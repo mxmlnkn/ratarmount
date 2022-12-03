@@ -195,9 +195,12 @@ class TestSQLiteIndexedTarParallelized:
         objectName = '<file object>' if tarFileName is None else tarFileName
         expectedName = os.path.basename(tarFileName).rsplit('.', 1)[0] if fileObject is None else objectName
 
-        finfo = indexedFile.index.getFileInfo("/", listDir=True)
-        assert expectedName in finfo
-        assert finfo[expectedName].size == len(contents)
+        folderList = indexedFile.listDir("/")
+        assert isinstance(folderList, dict)
+        if isinstance(folderList, dict):
+            # https://github.com/PyCQA/pylint/issues/1162
+            assert expectedName in folderList  # pylint: disable=unsupported-membership-test
+            assert folderList[expectedName].size == len(contents)  # pylint: disable=unsubscriptable-object
 
         finfo = indexedFile.getFileInfo("/" + expectedName)
         assert finfo.size == len(contents)
@@ -229,7 +232,9 @@ class TestSQLiteIndexedTarParallelized:
                 foldersToRecurse = ["/"]
                 while foldersToRecurse:
                     folder = foldersToRecurse.pop()
-                    for name in indexedTar.listDir(folder):
+                    folderContents = indexedTar.listDir(folder)
+                    assert isinstance(folderContents, dict)
+                    for name in folderContents:  # pylint: disable=not-an-iterable
                         path = os.path.join(folder, name)
                         print(path)
                         fileInfo = indexedTar.getFileInfo(path)

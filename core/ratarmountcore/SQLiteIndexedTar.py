@@ -1080,30 +1080,15 @@ class SQLiteIndexedTar(MountSource):
 
     @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
-        fileInfo = self.index.getFileInfo(path, fileVersion=fileVersion)
-
-        if fileInfo is None:
-            return None
-
-        assert isinstance(fileInfo, FileInfo)
-        return fileInfo
+        return self.index.getFileInfo(path, fileVersion=fileVersion)
 
     @overrides(MountSource)
     def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
-        """
-        Usability wrapper for getFileInfo(listDir=True) with FileInfo stripped if you are sure you don't need it.
-        """
-        result = self.index.getFileInfo(path, listDir=True)
-        if isinstance(result, dict):
-            return result
-        return None
+        return self.index.listDir(path)
 
     @overrides(MountSource)
     def fileVersions(self, path: str) -> int:
-        """
-        Usability wrapper for getFileInfo(listVersions=True) with FileInfo stripped if you are sure you don't need it.
-        """
-        fileVersions = self.index.getFileInfo(path, listVersions=True)
+        fileVersions = self.index.fileVersions(path)
         return len(fileVersions) if isinstance(fileVersions, dict) else 0
 
     @overrides(MountSource)

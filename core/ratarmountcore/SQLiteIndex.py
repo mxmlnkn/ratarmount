@@ -12,7 +12,7 @@ import time
 import traceback
 import urllib.parse
 
-from typing import Any, AnyStr, Callable, Dict, IO, List, Optional, Tuple, Union
+from typing import Any, AnyStr, Callable, Dict, IO, List, Optional, Tuple
 from dataclasses import dataclass
 
 try:
@@ -516,21 +516,55 @@ class SQLiteIndex:
 
         return fileInfo
 
-    def getFileInfo(
-        self,
-        # fmt: off
-        fullPath     : str,
-        listDir      : bool = False,
-        listVersions : bool = False,
-        fileVersion  : int  = 0
-        # fmt: on
-    ) -> Optional[Union[FileInfo, Dict[str, FileInfo]]]:
-        """
-        This is the heart of this class' public interface!
+    @staticmethod
+    def normpath(path: str):
+        # also strips trailing '/' except for a single '/' and leading '/'
+        return '/' + os.path.normpath(path).lstrip('/')
 
-        path    : full path to file where '/' denotes TAR's root, e.g., '/', or '/foo'
-        listDir : if True, return a dictionary for the given directory path: { fileName : FileInfo, ... }
-                  if False, return simple FileInfo to given path (directory or file)
+    def listDir(self, path: str) -> Optional[Dict[str, FileInfo]]:
+        """
+        Return a dictionary for the given directory path: { fileName : FileInfo, ... } or None
+        if the path does not exist.
+
+        path : full path to file where '/' denotes TAR's root, e.g., '/', or '/foo'
+        """
+
+        # For listing directory entries the file version can't be applied meaningfully at this abstraction layer.
+        # E.g., should it affect the file version of the directory to list, or should it work on the listed files
+        # instead and if so how exactly if there aren't the same versions for all files available, ...?
+        # Or, are folders assumed to be overwritten by a new folder entry in a TAR or should they be union mounted?
+        # If they should be union mounted, like is the case now, then the folder version only makes sense for
+        # its attributes.
+        rows = self.getConnection().execute(
+            'SELECT * FROM "files" WHERE "path" == (?)', (self.normpath(path).rstrip('/'),)
+        )
+        directory: Dict[str, FileInfo] = {}
+        gotResults = False
+        for row in rows:
+            gotResults = True
+            if row['name']:
+                directory[row['name']] = self._rowToFileInfo(row)
+        return directory if gotResults else None
+
+    def fileVersions(self, path: str) -> Dict[str, FileInfo]:
+        """
+        Return metadata for all versions of a file possibly appearing more than once
+        in the index as a directory dictionary or an empty dictionary if the path does not exist.
+
+        path : full path to file where '/' denotes TAR's root, e.g., '/', or '/foo'
+        """
+
+        path, name = self.normpath(path).rsplit('/', 1)
+        rows = self.getConnection().execute(
+            'SELECT * FROM "files" WHERE "path" == (?) AND "name" == (?) ORDER BY "offsetheader" ASC', (path, name)
+        )
+        result = {str(version + 1): self._rowToFileInfo(row) for version, row in enumerate(rows)}
+        return result
+
+    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+        """
+        Return the FileInfo to given path (directory or file) or None if the path does not exist.
+
         fileVersion : If the TAR contains the same file path multiple times, by default only the last one is shown.
                       But with this argument other versions can be queried. Version 1 is the oldest one.
                       Version 0 translates to the most recent one for compatibility with tar --occurrence=<number>.
@@ -541,56 +575,25 @@ class SQLiteIndex:
                       no matter the specified version. The file system layer has to take care that a directory
                       listing is not even requested in the first place if it is not a directory.
                       FUSE already does this by calling getattr for all parent folders in the specified path first.
-
-        If path does not exist, always return None
-
-        If listVersions is true, then return metadata for all versions of a file possibly appearing more than once
-        in the TAR as a directory dictionary. listDir will then be ignored!
         """
-        # TODO cache last listDir as most often a stat over all entries will soon follow
 
         if not isinstance(fileVersion, int):
             raise RatarmountError("The specified file version must be an integer!")
-        if not self.sqlConnection:
-            raise IndexNotOpenError("This method can not be called without an opened index database!")
 
-        # also strips trailing '/' except for a single '/' and leading '/'
-        fullPath = '/' + os.path.normpath(fullPath).lstrip('/')
-
-        if listVersions:
-            path, name = fullPath.rsplit('/', 1)
-            rows = self.sqlConnection.execute(
-                'SELECT * FROM "files" WHERE "path" == (?) AND "name" == (?) ORDER BY "offsetheader" ASC', (path, name)
-            )
-            result = {str(version + 1): self._rowToFileInfo(row) for version, row in enumerate(rows)}
-            return result
-
-        if listDir:
-            # For listing directory entries the file version can't be applied meaningfully at this abstraction layer.
-            # E.g., should it affect the file version of the directory to list, or should it work on the listed files
-            # instead and if so how exactly if there aren't the same versions for all files available, ...?
-            # Or, are folders assumed to be overwritten by a new folder entry in a TAR or should they be union mounted?
-            # If they should be union mounted, like is the case now, then the folder version only makes sense for
-            # its attributes.
-            rows = self.sqlConnection.execute('SELECT * FROM "files" WHERE "path" == (?)', (fullPath.rstrip('/'),))
-            directory = {}
-            gotResults = False
-            for row in rows:
-                gotResults = True
-                if row['name']:
-                    directory[row['name']] = self._rowToFileInfo(row)
-            return directory if gotResults else None
-
-        path, name = fullPath.rsplit('/', 1)
-        row = self.sqlConnection.execute(
-            f"""
+        path, name = self.normpath(path).rsplit('/', 1)
+        row = (
+            self.getConnection()
+            .execute(
+                f"""
             SELECT * FROM "files"
             WHERE "path" == (?) AND "name" == (?)
             ORDER BY "offsetheader" {'DESC' if fileVersion is None or fileVersion <= 0 else 'ASC'}
             LIMIT 1 OFFSET (?);
             """,
-            (path, name, 0 if fileVersion is None else fileVersion - 1 if fileVersion > 0 else -fileVersion),
-        ).fetchone()
+                (path, name, 0 if fileVersion is None else fileVersion - 1 if fileVersion > 0 else -fileVersion),
+            )
+            .fetchone()
+        )
         return self._rowToFileInfo(row) if row else None
 
     def _tryAddParentFolders(self, path: str, offsetheader: int, offset: int) -> None:
