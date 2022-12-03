@@ -198,21 +198,12 @@ class _TarFileMetadataReader:
         if isGnuIncremental:
             _TarFileMetadataReader._fixIncrementalBackupNamePrefixes(fileObject, tarInfo, printDebug)
 
-        # Add a leading '/' as a convention where '/' represents the TAR root folder
-        # Partly, done because fusepy specifies paths in a mounted directory like this
-        # os.normpath does not delete duplicate '/' at beginning of string!
-        # tarInfo.name might be identical to "." or begin with "./", which is bad!
-        # os.path.normpath can remove suffixed folder/./ path specifications but it can't remove
-        # a leading dot.
-        # TODO: Would be a nice function / line of code to test because it is very finicky.
-        #       And some cases are only triggered for recursive mounts, i.e., for non-empty pathPrefix.
-        fullPath = "/" + os.path.normpath(pathPrefix + "/" + tarInfo.name).lstrip('/')
+        path, name = SQLiteIndex.normpath(pathPrefix + "/" + tarInfo.name).rsplit("/", 1)
 
         # TODO: As for the tarfile type SQLite expects int but it is generally bytes.
         #       Most of them would be convertible to int like tarfile.SYMTYPE which is b'2',
         #       but others should throw errors, like GNUTYPE_SPARSE which is b'S'.
         #       When looking at the generated index, those values get silently converted to 0?
-        path, name = fullPath.rsplit("/", 1)
         # fmt: off
         fileInfo : Tuple = (
             path                                            ,  # 0

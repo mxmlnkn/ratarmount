@@ -518,8 +518,13 @@ class SQLiteIndex:
 
     @staticmethod
     def normpath(path: str):
-        # also strips trailing '/' except for a single '/' and leading '/'
-        return '/' + os.path.normpath(path).lstrip('/')
+        # Add a leading '/' as a convention where '/' represents the TAR root folder.
+        # Also strips trailing '/' except for a single '/'.
+        # Partly, done because fusepy specifies paths in a mounted directory like this
+        # os.normpath does not delete duplicate '/' at beginning of string!
+        # os.path.normpath can remove suffixed folder/./ path specifications but it can't remove
+        # a leading dot that's why we prefix a leading slash also before calling normpath.
+        return '/' + os.path.normpath('/' + path).lstrip('/')
 
     def listDir(self, path: str) -> Optional[Dict[str, FileInfo]]:
         """
