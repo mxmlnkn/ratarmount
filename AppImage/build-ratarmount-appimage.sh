@@ -59,19 +59,23 @@ function installAppImagePythonPackages()
 function installAppImageSystemLibraries()
 {
     # Note that manylinux2014 already has libsqlite3.so.0 inside /usr/lib.
+    local libraries=()
     if commandExists repoquery; then
-        'cp' -a $( repoquery -l fuse-libs | 'grep' 'lib64.*[.]so' ) "$APP_DIR"/usr/lib/
+        libraries=( $( repoquery -l fuse-libs | 'grep' 'lib64.*[.]so' ) )
     elif commandExists dnf; then
-        'cp' -a $( dnf repoquery -l fuse-libs | 'grep' 'lib64.*[.]so' ) "$APP_DIR"/usr/lib/
+        libraries=( $( dnf repoquery -l fuse-libs | 'grep' 'lib64.*[.]so' ) )
+    elif commandExists dpkg; then
+        libraries=( $( dpkg -L libfuse2 | 'grep' '/lib.*[.]so' ) )
     else
         echo -e "\e[31mCannot gather FUSE libs into AppImage without (dnf) repoquery.\e[0m"
     fi
 
-    APPIMAGE_EXTRACT_AND_RUN=1 linuxdeploy --appdir="$APP_DIR" \
-        --library=/usr/lib64/libfuse.so.2 \
-        --library=/usr/lib64/libulockmgr.so.1 \
-        --executable=/usr/bin/fusermount \
-        --executable=/usr/bin/ulockmgr_server
+    if [[ ${libraries[@]} -gt 0 ]]; then
+        'cp' -a "${libraries[@]}" "$APP_DIR"/usr/lib/
+    fi
+
+    APPIMAGE_EXTRACT_AND_RUN=1 linuxdeploy --appdir="$APP_DIR" "${libraries[@]/#/--library=}" \
+        --executable=/usr/bin/fusermount
 }
 
 function trimAppImage()
