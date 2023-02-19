@@ -85,6 +85,7 @@ sudo cp ratarmount-manylinux2014_x86_64.AppImage /usr/local/bin/ratarmount  # Ex
 
 Python 3.6+, preferably pip 19.0+, FUSE, and sqlite3 are required.
 These should be preinstalled on most systems.
+
 On Debian-like systems like Ubuntu, you can install/update all dependencies using:
 
 ```bash
@@ -604,6 +605,68 @@ lbzip2 -cd well-compressed-file.bz2 | createMultiFrameZstd $(( 4*1024*1024 )) > 
 
 </details>
 
+
+# Writable Mounting
+
+The  `--write-overlay <folder>` option can be used to create a writable mount point.
+The original archive will not be modified.
+
+ - File creations will create these files in the specified overlay folder.
+ - File deletions and renames will be registered in a database that also resides in the overlay folder.
+ - File modifications will copy the file from the archive into the overlay folder before applying the modification.
+
+This overlay folder can be stored alongside the archive or it can be deleted after unmounting the archive.
+This is useful when building the executable from a source tarball without extracting.
+After installation, the intermediary build files residing in the overlay folder can be safely removed.
+
+If it is desired to apply the modifications to the original archive, then the `--commit-overlay` can be prepended to the original ratarmount call.
+
+Here is an example for applying modifications to a writable mount and then committing those modifications back to the archive:
+
+ 1. Mount it with a write overlay and add new files. The original archive is not modified.
+    ```bash
+    ratarmount --write-overlay example-overlay example.tar example-mount-point
+    echo "Hello World" > example-mount-point/new-file.txt
+    ```
+
+ 2. Unmount. Changes persist solely in the overlay folder.
+    ```bash
+    fusermount -u example-mount-point
+    ```
+
+ 3. Commit changes to the original archive.
+    ```bash
+    ratarmount --commit-overlay --write-overlay example-overlay example.tar example-mount-point
+    ```
+    Output:
+    ```bash
+    To commit the overlay folder to the archive, these commands have to be executed:
+    
+        tar --delete --null --verbatim-files-from --files-from='/tmp/tmp_ajfo8wf/deletions.lst' \
+            --file 'example.tar' 2>&1 |
+           sed '/^tar: Exiting with failure/d; /^tar.*Not found in archive/d'
+        tar --append -C 'zlib-wiki-overlay' --null --verbatim-files-from --files-from='/tmp/tmp_ajfo8wf/append.lst' --file 'example.tar'
+    
+    Committing is an experimental feature!
+    Please confirm by entering "commit". Any other input will cancel.
+    > 
+    Committed successfully. You can now remove the overlay folder at example-overlay.
+    ```
+
+ 4. Verify the modifications to the original archive.
+    ```bash
+    tar -tvlf example.tar
+    ```
+    Output:
+    ```
+    -rw-rw-r-- user/user 652817 2022-08-08 10:44 example.txt
+    -rw-rw-r-- user/user     12 2023-02-16 09:49 new-file.txt
+    ```
+
+ 5. Remove the obsole write overlay folder.
+    ```bash
+    rm -r example-overlay
+    ```
 
 ## As a Library
 
