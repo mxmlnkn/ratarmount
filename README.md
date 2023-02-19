@@ -75,7 +75,7 @@ They require no installation and can be simply executed like a portable executab
 If you want to install it, you can simply copy it into any of the folders listed in your `PATH`.
 
 ```bash
-wget 'https://github.com/mxmlnkn/ratarmount/releases/download/v0.10.0/ratarmount-manylinux2014_x86_64.AppImage'
+wget 'https://github.com/mxmlnkn/ratarmount/releases/download/v0.13.0/ratarmount-0.13.0-manylinux2014_x86_64.AppImage'
 chmod u+x 'ratarmount-manylinux2014_x86_64.AppImage'
 ./ratarmount-manylinux2014_x86_64.AppImage --help  # Simple test run
 sudo cp ratarmount-manylinux2014_x86_64.AppImage /usr/local/bin/ratarmount  # Example installation

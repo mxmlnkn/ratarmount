@@ -1,4 +1,11 @@
 
+# Version 0.13.0 built on 2023-02-19
+
+ - (ratarmountcore 0.5.0) Use XDG_CACHE_HOME according to FreeDesktop as default fallback
+   when the archive folder is not writable.
+ - (ratarmountcore 0.5.0) Create an SQLite index file for zip archives to speed up metadata lookup.
+ - (ratarmountcore 0.5.0) Fix issue with folders for mounted zip files not being traversed with find.
+
 # Version 0.12.0 built on 2022-11-13
 
  - Add --recursion-depth argument for more fine-grained recursion control.
