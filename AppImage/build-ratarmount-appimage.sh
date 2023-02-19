@@ -95,6 +95,7 @@ function trimAppImage()
     find "$APP_DIR" -type d -empty -print0 | xargs -0 rmdir
     find "$APP_DIR" -type d -empty -print0 | xargs -0 rmdir
     find "$APP_DIR" -name '__pycache__' -print0 | xargs -0 rm -r
+    find "$APP_PYTHON_LIB/site-packages/" -name '*.so' -size +1M -print0 | xargs -0 strip --strip-debug
 }
 
 
