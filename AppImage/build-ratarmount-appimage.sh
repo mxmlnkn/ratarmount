@@ -76,7 +76,7 @@ function installAppImageSystemLibraries()
 
 function trimAppImage()
 {
-    APP_PYTHON_BASE="${appdir}/opt/python${APP_PYTHON_VERSION}"
+    APP_PYTHON_BASE="${APP_DIR}/opt/python${APP_PYTHON_VERSION}"
     APP_PYTHON_LIB="${APP_PYTHON_BASE}/lib/python${APP_PYTHON_VERSION}"
     "$APP_PYTHON_BIN" -s -m pip uninstall -y build setuptools wheel pip
     'rm' -rf "$APP_PYTHON_LIB/site-packages/indexed_gzip/tests" \
