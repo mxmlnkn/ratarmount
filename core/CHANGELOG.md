@@ -1,9 +1,19 @@
 
+# Version 0.5.0 built on 2023-02-19
+
+ - Split off SQLite backend from `SQLiteIndexedTar` into `SQLiteIndex`.
+ - Remove obsolete `SQLiteIndexedTar.isDir`. Use `getFileInfo` instead.
+ - Split up `getFileInfo` method into `getFileInfo`, `listDir`, and `fileVersions`.
+ - Use XDG_CACHE_HOME according to FreeDesktop as default fallback
+   when the archive folder is not writable.
+ - Create an SQLite index file for zip archives to speed up metadata lookup.
+ - Fix issue with folders for mounted zip files not being traversed with find.
+
 # Version 0.4.0 built on 2022-11-13
 
- - AutoMountLayer now takes a 'recursionDepth' argument instead of 'recursive'.
- - Fix handling of paths in zip and rar files that contain '../'.
- - Add backend prioritization option to SQLiteIndexedTar.
+ - `AutoMountLayer` now takes a `recursionDepth` argument instead of `recursive`.
+ - Fix handling of paths in zip and rar files that contain `../`.
+ - Add backend prioritization option to `SQLiteIndexedTar`.
 
 # Version 0.3.2 built on 2022-06-25
 
@@ -11,7 +21,7 @@
 
 # Version 0.3.1 built on 2022-04-10
 
- - Fix duplicate mounting of uncompressed TARs inside TARs when using --recursive.
+ - Fix duplicate mounting of uncompressed TARs inside TARs when using `--recursive`.
 
 # Version 0.3.0 built on 2022-04-06
 
@@ -25,7 +35,7 @@
    appended to by only analyzing the new files.
  - Fix uncompressed archives having been appended very small files (<10 KiB)
    were not detected as changed by default.
- - Fix problem triggered by combining --recursive and -P 0 with a recursive bzip2 archive.
+ - Fix problem triggered by combining `--recursive` and `-P 0` with a recursive bzip2 archive.
 
 # Version 0.2.4 built on 2022-04-04
 
@@ -38,7 +48,7 @@
 # Version 0.2.2 built on 2022-02-20
 
  - Improve performance for gzip files significantly by using a larger buffer.
- - Do not use ParallelXZReader for single-block xz files to avoid memory issues.
+ - Do not use `ParallelXZReader` for single-block xz files to avoid memory issues.
 
 # Version 0.2.1 built on 2022-02-07
 
@@ -50,7 +60,7 @@
  - Extend listDir interface to also return FileInfo objects for each file.
  - Improve performance for large Union Mounts by keeping a path cache for read-only mount sources. This way,
    each FUSE getattr only has to query mount sources known to have the file instead of iterating over all of them.
- - Fix file objects returned by SQLiteIndexedTar to be thread-safe when reading and seeking.
+ - Fix file objects returned by `SQLiteIndexedTar` to be thread-safe when reading and seeking.
  - Improve performance of index creation for uncompressed TARs by batching SQLite index insertions among others.
  - Add elapsed time output to progress indicator.
 
@@ -60,9 +70,9 @@
 
 # Version 0.1.4 built on 2021-12-21
 
- - Fix mounting of TAR fails if there are special characters like '#' in the path.
+ - Fix mounting of TAR fails if there are special characters like `#` in the path.
  - Fix recursive mounting of simple compressed files (file.bz2) inside TAR.
- - Fix file objects being returned by SQLiteIndexedTar not being independent from each other
+ - Fix file objects being returned by `SQLiteIndexedTar` not being independent from each other
    because of the shared underlying file object.
 
 # Version 0.1.3 built on 2021-12-08
@@ -72,7 +82,7 @@
 # Version 0.1.2 built on 2021-12-05
 
  - Avoid SQLite error for libsqlite 3.11.0 on Ubuntu 16.04.
- - Fix '<file object>.index.sqlite' files being created when opening file objects
+ - Fix `<file object>.index.sqlite` files being created when opening file objects
    without specifying a tarFileName and when using writeIndex=True.
 
 # Version 0.1.1 built on 2021-10-11
