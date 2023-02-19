@@ -181,6 +181,9 @@ Further benchmarks can be viewed [here](benchmarks/BENCHMARKS.md).
 You downloaded a large TAR file from the internet, for example the [1.31TB](http://academictorrents.com/details/564a77c1e1119da199ff32622a1609431b9f1c47) large [ImageNet](http://image-net.org/), and you now want to use it but lack the space, time, or a file system fast enough to extract all the 14.2 million image files.
 
 
+<details>
+<summary>Existing Partial Solutions</summary>
+
 ## Partial Solutions
 
 ### Archivemount
@@ -212,25 +215,13 @@ I didn't find out about [TAR Browser](https://github.com/tomorrow-nf/tar-as-file
 Pros:
   - supports bz2- and xz-compressed TAR archives
 
+</details>
 
 ## The Solution
 
 Ratarmount creates an index file with file names, ownership, permission flags, and offset information.
 This sidecar is stored at the TAR file's location or in `~/.ratarmount/`.
 Ratarmount can load that index file in under a second if it exists and then offers FUSE mount integration for easy access to the files inside the archive.
-
-The test with the first version (50e8dbb), which used the removed pickle backend for serializing the metadata index, for the ImageNet data set is promising:
-
-  - TAR size: 1.31TB
-  - Contains TARs: yes
-  - Files in TAR: ~26 000
-  - Files in TAR (including recursively in contained TARs): 14.2 million
-  - Index creation (first mounting): 4 hours
-  - Index size: 1GB
-  - Index loading (subsequent mounting): 80s
-  - Reading a 40kB file: 100ms (first time) and 4ms (subsequent times)
-
-The reading time for a small file simply verifies the random access by using file seek to be working. The difference between the first read and subsequent reads is not because of ratarmount but because of operating system and file system caches.
 
 Here is a more recent test for version 0.2.0 with the new default SQLite backend:
 
@@ -244,17 +235,45 @@ Here is a more recent test for version 0.2.0 with the new default SQLite backend
   - Reading a 64kB file: ~4ms
   - Running 'find mountPoint -type f | wc -l' (1.26M stat calls): 1m 50s
 
+The reading time for a small file simply verifies the random access by using file seek to be working. The difference between the first read and subsequent reads is not because of ratarmount but because of operating system and file system caches.
+
+<details>
+<summary>Older test with 1.31 TB Imagenet (Fall 2011 release)</summary>
+
+The test with the first version of ratarmount ([50e8dbb](https://github.com/mxmlnkn/ratarmount/commit/50e8dbb10696d51de2e613dee560662be580cbd4)), which used the, as of now removed, pickle backend for serializing the metadata index, for the [ImageNet data set](https://academictorrents.com/details/564a77c1e1119da199ff32622a1609431b9f1c47):
+
+  - TAR size: 1.31TB
+  - Contains TARs: yes
+  - Files in TAR: ~26 000
+  - Files in TAR (including recursively in contained TARs): 14.2 million
+  - Index creation (first mounting): 4 hours
+  - Index size: 1GB
+  - Index loading (subsequent mounting): 80s
+  - Reading a 40kB file: 100ms (first time) and 4ms (subsequent times)
+
+Index loading is relatively slow with 80s because of the pickle backend, which now has been replaced with SQLite and should take less than a second now.
+
+</details>
+
 
 # Usage
 
-```
-usage: ratarmount.py [-h] [-f] [-d DEBUG] [-c] [-r] [--recursion-depth RECURSION_DEPTH] [-l] [-s]
-                     [--transform-recursive-mount-point REGEX_PATTERN REPLACEMENT]
-                     [-gs GZIP_SEEK_POINT_SPACING] [-p PREFIX] [--password PASSWORD]
-                     [--password-file PASSWORD_FILE] [-e ENCODING] [-i] [--gnu-incremental]
-                     [--no-gnu-incremental] [--verify-mtime] [--index-file INDEX_FILE]
-                     [--index-folders INDEX_FOLDERS] [-w WRITE_OVERLAY] [--commit-overlay]
-                     [-o FUSE] [-u] [-P PARALLELIZATION] [-v]
+## Command Line Options
+
+See `ratarmount --help`.
+
+<details>
+<summary>Full command line options</summary>
+
+```c
+usage: ratarmount.py [-h] [-c] [-r] [-u] [-P PARALLELIZATION] [-v] [--password PASSWORD]
+                     [--verify-mtime] [--index-file INDEX_FILE] [--index-folders INDEX_FOLDERS]
+                     [--recursion-depth RECURSION_DEPTH] [-l] [-s]
+                     [--transform-recursive-mount-point REGEX_PATTERN REPLACEMENT] [-e ENCODING]
+                     [-i] [--gnu-incremental] [--no-gnu-incremental] [-w WRITE_OVERLAY]
+                     [--commit-overlay] [-o FUSE] [-f] [-d DEBUG] [-gs GZIP_SEEK_POINT_SPACING]
+                     [-p PREFIX] [--password-file PASSWORD_FILE] [--use-backend USE_BACKEND]
+                     [--oss-attributions]
                      mount_source [mount_source ...] [mount_point]
 
 With ratarmount, you can:
@@ -306,7 +325,8 @@ Index Options:
                         folders '["~/.ratarmount", "foo,9000"]' will never try to save besides the
                         TAR. --index-folder ~/.ratarmount will only test ~/.ratarmount as a
                         storage location and nothing else. Instead, it will first try
-                        ~/.ratarmount and the folder "foo,9000". (default: ,~/.ratarmount)
+                        ~/.ratarmount and the folder "foo,9000". (default:
+                        ,~/.cache/ratarmount,~/.ratarmount)
   --verify-mtime        By default, only the TAR file size is checked to match the one in the
                         found existing ratarmount index. If this option is specified, then also
                         check the modification timestamp. But beware that the mtime might change
@@ -373,10 +393,17 @@ Write Overlay Options:
                         the hidden metadata database inside the overlay folder. (default: None)
 
 Advanced Options:
+  --oss-attributions    Show licenses of used libraries.
   --password-file PASSWORD_FILE
                         Specify a file with newline separated passwords for RAR and ZIP files. The
                         passwords will be tried out in order of appearance in the file. (default:
                         )
+  --use-backend USE_BACKEND
+                        Specify a backend to be used with higher priority for files which might be
+                        opened with multiple backends. Arguments specified last will have the
+                        highest priority. A comma-separated list may be specified. Possible
+                        backends: ['indexed_bzip2', 'indexed_gzip', 'indexed_zstd', 'lzmaffi',
+                        'pragzip', 'rarfile', 'xz', 'zipfile'] (default: None)
   -d DEBUG, --debug DEBUG
                         Sets the debugging level. Higher means more output. Currently, 3 is the
                         highest. (default: 1)
@@ -401,6 +428,8 @@ Advanced Options:
                         /var/log/apt/ can be specified so that the mount target directory
                         >directly< contains history.log. (default: )
 ```
+
+</details>
 
 ## Metadata Index Cache
 
@@ -509,6 +538,9 @@ The standard zstd tool does not support setting smaller block sizes yet although
 Alternatively, you can simply split the original file into parts, compress those parts, and then concatenate those parts together to get a suitable multiframe zst file.
 Here is a bash function, which can be used for that:
 
+<details>
+<summary>Bash script: createMultiFrameZstd</summary>
+
 ```bash
 createMultiFrameZstd()
 (
@@ -570,20 +602,11 @@ It also works when being piped to. This can be useful for recompressing files to
 lbzip2 -cd well-compressed-file.bz2 | createMultiFrameZstd $(( 4*1024*1024 )) > recompressed.zst
 ```
 
+</details>
+
 
 ## As a Library
 
 Ratarmount can also be used as a library.
 Using [ratarmountcore](core/), files inside archives can be accessed directly from Python code without requiring FUSE.
 For a more detailed description, see the [ratarmountcore readme here](core/).
-
-
-## Donations
-
-If ratarmount helped you out and satisfied you so much that you can't help but want to donate, you can toss a coin to your programmer through one of these addresses:
-
-| Type | Address                                    |
-|------|--------------------------------------------|
-| BTC  | bc1qkc7stljxazpkk5lzcj4gqu2tvh0dh4exz4563t |
-| LTC  | LTRbWdUY576MNkhXhXEXNpt3NuY2ecR9F9         |
-| XMR  | 44DcWgDNxvUJav5zKHprJLJyKx11RyMgEfv3yuuqeUGGec26jRqA9UnaKc2uoKf5TyCVx3CmfZhyQiXtZP1kbdYCRCXNyJS |
