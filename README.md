@@ -415,6 +415,9 @@ Write Overlay Options:
                         the hidden metadata database inside the overlay folder. (default: None)
 
 Advanced Options:
+  --disable-union-mount
+                        Mounts all specified archives in equally named subfolders under the mount
+                        point. (default: False)
   --oss-attributions    Show licenses of used libraries.
   --password-file PASSWORD_FILE
                         Specify a file with newline separated passwords for RAR and ZIP files. The

@@ -46,6 +46,7 @@ from ratarmountcore import (
     supportedCompressions,
     stripSuffixFromTarFile,
     RatarmountError,
+    SubvolumesMountSource,
     FileInfo,
 )
 
@@ -506,9 +507,15 @@ class FuseMount(fuse.Operations):
             pathToMount.append(self.overlayPath)
 
         # This also will create or load the block offsets for compressed formats
-        mountSources = [openMountSource(path, **options) for path in pathToMount]
+        mountSources: Dict[str, MountSource] = {
+            os.path.basename(path): openMountSource(path, **options) for path in pathToMount
+        }
 
-        self.mountSource: MountSource = UnionMountSource(mountSources, printDebug=self.printDebug)
+        self.mountSource: MountSource = (
+            SubvolumesMountSource(mountSources, printDebug=self.printDebug)
+            if options.get('disableUnionMount', False)
+            else UnionMountSource(list(mountSources.values()), printDebug=self.printDebug)
+        )
         if options.get('recursionDepth', 0):
             self.mountSource = AutoMountLayer(self.mountSource, **options)
 
@@ -562,7 +569,7 @@ class FuseMount(fuse.Operations):
         # Take care that bind-mounting folders to itself works
         self.mountPointFd: Optional[int] = None
         self.selfBindMount: Optional[FolderMountSource] = None
-        for mountSource in mountSources:
+        for mountSource in mountSources.values():
             if isinstance(mountSource, FolderMountSource) and mountSource.root == self.mountPoint:
                 self.selfBindMount = mountSource
                 self.mountPointFd = os.open(self.mountPoint, os.O_RDONLY)
@@ -1278,6 +1285,10 @@ seeking capabilities when opening that file.
         '--oss-attributions', action=PrintOSSAttributionAction, nargs=0, default=argparse.SUPPRESS,
         help='Show licenses of used libraries.')
 
+    advancedGroup.add_argument(
+        '--disable-union-mount', action='store_true', default=False,
+        help='Mounts all specified archives in equally named subfolders under the mount point.')
+
     # Positional Arguments
 
     positionalGroup.add_argument(
@@ -1608,6 +1619,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         printDebug                   = int(args.debug),
         transformRecursiveMountPoint = args.transform_recursive_mount_point,
         prioritizedBackends          = args.prioritizedBackends,
+        disableUnionMount            = args.disable_union_mount,
         # fmt: on
     )
 

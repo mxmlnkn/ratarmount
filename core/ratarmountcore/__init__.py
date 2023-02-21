@@ -17,6 +17,8 @@ The ratarmountcore library offers multiple implementations of the interface:
  - ZipMountSource: An implementation for ZIPs using zipfile.
  - FolderMountSource: An implementation taking an existing folder as input.
  - UnionMountSource: Takes multiple MountSource implementations and merges them.
+ - SubvolumesMountSource: Takes multiple MountSource implementations and mounts
+                          each in separate subfolders with specified names.
  - FileVersionLayer: Takes a MountSource as input, decodes the requested
                      paths, also accepting "<file>.version/<number>" paths,
                      and calls the methods of the MountSource with the given
@@ -78,6 +80,7 @@ from .SQLiteIndex import SQLiteIndex
 from .AutoMountLayer import AutoMountLayer
 from .FileVersionLayer import FileVersionLayer
 from .UnionMountSource import UnionMountSource
+from .SubvolumesMountSource import SubvolumesMountSource
 
 from .factory import openMountSource
 
