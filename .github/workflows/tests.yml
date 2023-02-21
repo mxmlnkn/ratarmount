@@ -64,7 +64,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [macos-10.15, ubuntu-latest]
+        os: [macos-latest, ubuntu-latest]
         # ToDo: Add windows-latest but it requires a lot of setup of the dependencies!
         #       Maybe only test ratarmount-core without most dependencies after I have split that off.
         # Oldest and newest versions should be enough. Python versions are supported 5 years from release date.
@@ -161,6 +161,9 @@ jobs:
         ratarmount --version
 
     - name: Test Simple Mount
+      # macOS 11+ is too uptight about "security" and is not able to fully load the macfuse kernel extension.
+      # https://github.com/actions/runner-images/issues/4731
+      if: ${{ !startsWith( matrix.os, 'macos' ) }}
       run: |
         ratarmount tests/single-file.tar mimi
         ls -la mimi
@@ -169,11 +172,13 @@ jobs:
         ratarmount -u mimi
 
     - name: Test Startup Without Compression Dependencies
+      if: ${{ !startsWith( matrix.os, 'macos' ) }}
       run: |
         # Segfaults (139) are not allowed but other exit codes are valid!
         python3 ratarmount.py tests/simple.bz2 || [ $? != 139 ]
 
     - name: Unit Tests
+      if: ${{ !startsWith( matrix.os, 'macos' ) }}
       run: |
         python3 -m pip install pytest
         for file in core/tests/test_*.py tests/test_*.py; do
@@ -183,6 +188,7 @@ jobs:
         done
 
     - name: Regression Tests
+      if: ${{ !startsWith( matrix.os, 'macos' ) }}
       run: |
         python3 tests/tests.py
         bash tests/runtests.sh
