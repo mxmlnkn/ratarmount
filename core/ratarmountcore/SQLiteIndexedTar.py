@@ -1556,7 +1556,9 @@ class SQLiteIndexedTar(MountSource):
             if self.printDebug >= 1:
                 print("[Info] Reopening the gzip with the pragzip backend...")
 
-            self.tarFileObject = pragzip.PragzipFile(self.rawFileObject, parallelization=self.parallelization)
+            self.tarFileObject = pragzip.PragzipFile(
+                self.rawFileObject, parallelization=self.parallelization, verbose=self.printDebug >= 2
+            )
             self.tarFileObject.import_index(gzindex)
 
             if self.printDebug >= 1:
