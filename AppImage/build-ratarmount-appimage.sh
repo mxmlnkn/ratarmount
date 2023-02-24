@@ -51,9 +51,9 @@ function installAppImagePythonPackages()
     else
         "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir indexed_bzip2
         "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir pragzip
-        "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ../core
-        "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ..
     fi
+    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ../core
+    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ..
 }
 
 function installAppImageSystemLibraries()
