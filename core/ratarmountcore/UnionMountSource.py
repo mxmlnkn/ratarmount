@@ -12,11 +12,27 @@ from .utils import overrides
 
 
 class UnionMountSource(MountSource):
-    def __init__(self, mountSources: List[MountSource], printDebug: int = 0) -> None:
+    def __init__(
+        self,
+        mountSources: List[MountSource],
+        printDebug: int = 0,
+        maxCacheDepth: int = 1024,
+        maxCacheEntries: int = 100000,
+        maxSecondsToCache: float = 60,
+        **options,
+    ) -> None:
         """
-        mountSources : List of mount sources for which to show a union view. The rightmost mount sources have
-                       the highest precedence. Meaning, if a file with the same name exists in multiple mount
-                       sources, then by default the file of the rightmost mount source will be returned.
+        mountSources:
+            List of mount sources for which to show a union view. The rightmost mount sources have
+            the highest precedence. Meaning, if a file with the same name exists in multiple mount
+            sources, then by default the file of the rightmost mount source will be returned.
+        maxCacheEntries:
+            Even assuming very long file paths like 1000 chars, the cache size
+            will be below 100 MB if the maximum number of elements is 100k.
+        maxSecondsToCache:
+            Another problem is the setup time, as it might take ~0.001s for each getFileInfo call
+            and it shouldn't take minutes! Note that there always can be an edge case with hundred
+            thousands of files in one folder, which can take an arbitrary amount of time to cache.
         """
         self.mountSources: List[MountSource] = mountSources
         self.printDebug = printDebug
@@ -36,30 +52,19 @@ class UnionMountSource(MountSource):
         )
 
         if len(self.mountSources) > 1:
-            self._buildFolderCache()
+            self._buildFolderCache(maxCacheDepth, maxCacheEntries, maxSecondsToCache)
 
-    def _buildFolderCache(
-        self, maxDepth: int = 1024, nMaxCacheSize: int = 100000, nMaxSecondsToCache: float = 60
-    ) -> None:
-        """
-        nMaxCacheSize:
-            Even assuming very long file paths like 1000 chars, the cache size
-            will be below 100 MB if the maximum number of elements is 100k.
-        nMaxSecondsToCache:
-            Another problem is the setup time, as it might take ~0.001s for each getFileInfo call
-            and it shouldn't take minutes! Note that there always can be an edge case with hundred
-            thousands of files in one folder, which can take an arbitrary amount of time to cache.
-        """
+    def _buildFolderCache(self, maxCacheDepth: int, maxCacheEntries: int, maxSecondsToCache: float) -> None:
         t0 = time.time()
 
         if self.printDebug >= 1:
-            print(f"Building cache for union mount (timeout after {nMaxSecondsToCache}s)...")
+            print(f"Building cache for union mount (timeout after {maxSecondsToCache}s)...")
 
         self.folderCache = {"/": [m for m in self.mountSources if m.isImmutable()]}
 
         lastFolderCache: Dict[str, List[MountSource]] = self.folderCache.copy()
 
-        for depth in range(1, maxDepth):
+        for depth in range(1, maxCacheDepth):
             # This intermediary structure is used because:
             #   1. We need to only iterate over the newly added folders in the next step
             #   2. We always want to (atomically) merge results for one folder depth so that we can be sure
@@ -73,7 +78,7 @@ class UnionMountSource(MountSource):
                         continue
 
                     for file in filesInFolder:
-                        if time.time() - t0 > nMaxSecondsToCache or nMaxCacheSize <= 0:
+                        if time.time() - t0 > maxSecondsToCache or maxCacheEntries <= 0:
                             return
 
                         fullPath = os.path.join(folder, file)
@@ -81,7 +86,7 @@ class UnionMountSource(MountSource):
                         if not fileInfo or not stat.S_ISDIR(fileInfo.mode):
                             continue
 
-                        nMaxCacheSize -= 1
+                        maxCacheEntries -= 1
 
                         if fullPath in newFolderCache:
                             newFolderCache[fullPath].append(mountSource)

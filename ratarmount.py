@@ -514,7 +514,7 @@ class FuseMount(fuse.Operations):
         self.mountSource: MountSource = (
             SubvolumesMountSource(mountSources, printDebug=self.printDebug)
             if options.get('disableUnionMount', False)
-            else UnionMountSource(list(mountSources.values()), printDebug=self.printDebug)
+            else UnionMountSource(list(mountSources.values()), **options)
         )
         if options.get('recursionDepth', 0):
             self.mountSource = AutoMountLayer(self.mountSource, **options)
@@ -1289,6 +1289,18 @@ seeking capabilities when opening that file.
         '--disable-union-mount', action='store_true', default=False,
         help='Mounts all specified archives in equally named subfolders under the mount point.')
 
+    advancedGroup.add_argument(
+        '--union-mount-cache-max-depth', type=int, default=1024,
+        help='Maximum number of folder levels to descend for building the union mount cache.')
+
+    advancedGroup.add_argument(
+        '--union-mount-cache-max-entries', type=int, default=100000,
+        help='Maximum number of paths before stopping to descend into subfolders when building the union mount cache.')
+
+    advancedGroup.add_argument(
+        '--union-mount-cache-timeout', type=float, default=60,
+        help='Timeout in seconds before stopping to build the union mount cache.')
+
     # Positional Arguments
 
     positionalGroup.add_argument(
@@ -1620,6 +1632,9 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         transformRecursiveMountPoint = args.transform_recursive_mount_point,
         prioritizedBackends          = args.prioritizedBackends,
         disableUnionMount            = args.disable_union_mount,
+        maxCacheDepth                = args.union_mount_cache_max_depth,
+        maxCacheEntries              = args.union_mount_cache_max_entries,
+        maxSecondsToCache            = args.union_mount_cache_timeout,
         # fmt: on
     )
 
