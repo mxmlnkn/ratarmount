@@ -4,6 +4,7 @@
 import datetime
 import json
 import os
+import re
 import stat
 import tarfile
 from timeit import default_timer as timer
@@ -21,22 +22,32 @@ class ZipMountSource(MountSource):
         self,
         # fmt: off
         fileOrPath             : Union[str, IO[bytes]],
-        writeIndex             : bool                = False,
-        clearIndexCache        : bool                = False,
-        indexFilePath          : Optional[str]       = None,
-        indexFolders           : Optional[List[str]] = None,
-        encoding               : str                 = tarfile.ENCODING,
-        verifyModificationTime : bool                = False,
-        printDebug             : int                 = 0,
+        writeIndex             : bool                      = False,
+        clearIndexCache        : bool                      = False,
+        indexFilePath          : Optional[str]             = None,
+        indexFolders           : Optional[List[str]]       = None,
+        encoding               : str                       = tarfile.ENCODING,
+        verifyModificationTime : bool                      = False,
+        printDebug             : int                       = 0,
+        transform              : Optional[Tuple[str, str]] = None,
         **options
         # fmt: on
     ) -> None:
-        self.fileObject = zipfile.ZipFile(fileOrPath, 'r')
-        self.archiveFilePath = fileOrPath if isinstance(fileOrPath, str) else None
-        self.encoding = encoding
+        # fmt: off
+        self.fileObject             = zipfile.ZipFile(fileOrPath, 'r')
+        self.archiveFilePath        = fileOrPath if isinstance(fileOrPath, str) else None
+        self.encoding               = encoding
         self.verifyModificationTime = verifyModificationTime
-        self.printDebug = printDebug
-        self.options = options
+        self.printDebug             = printDebug
+        self.options                = options
+        self.transformPattern       = transform
+        # fmt: on
+
+        self.transform = (
+            (lambda x: re.sub(self.transformPattern[0], self.transformPattern[1], x))
+            if isinstance(self.transformPattern, (tuple, list)) and len(self.transformPattern) == 2
+            else (lambda x: x)
+        )
 
         ZipMountSource._findPassword(self.fileObject, options.get("passwords", []))
         self.files = {info.header_offset: info for info in self.fileObject.infolist()}
@@ -76,7 +87,7 @@ class ZipMountSource(MountSource):
                 self.index.reloadIndexReadOnly()
 
     def _storeMetadata(self) -> None:
-        argumentsToSave = ['encoding']
+        argumentsToSave = ['encoding', 'transformPattern']
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
         self.index.storeMetadata(argumentsMetadata, self.archiveFilePath)
 
@@ -100,7 +111,7 @@ class ZipMountSource(MountSource):
             linkname = self.fileObject.read(info).decode()
             mode = 0o555 | stat.S_IFLNK
 
-        path, name = SQLiteIndex.normpath(info.filename).rsplit("/", 1)
+        path, name = SQLiteIndex.normpath(self.transform(info.filename)).rsplit("/", 1)
 
         # Currently, this is unused. The index only is used for getting metadata. (The data offset
         # is already determined and written out in order to possibly speed up reading of encrypted
@@ -265,7 +276,7 @@ class ZipMountSource(MountSource):
         # TODO: Add --force options?
         if 'arguments' in metadata:
             indexArgs = json.loads(metadata['arguments'])
-            argumentsToCheck = ['encoding']
+            argumentsToCheck = ['encoding', 'transformPattern']
             differingArgs = []
             for arg in argumentsToCheck:
                 if arg in indexArgs and hasattr(self, arg) and indexArgs[arg] != getattr(self, arg):

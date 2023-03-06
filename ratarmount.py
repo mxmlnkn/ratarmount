@@ -1371,6 +1371,11 @@ seeking capabilities when opening that file.
              'creating a .index.sqlite file. This is currently not applied for TAR files because the file count '
              'only becomes known after parsing the archive, for which an index is already created.')
 
+    advancedGroup.add_argument(
+        '--transform', type=str, nargs=2, metavar=('REGEX_PATTERN', 'REPLACEMENT'),
+        help='Specify a regex pattern and a replacement string, which will be applied via Python\'s re module '
+             'to the full paths of all archive files.')
+
     # Positional Arguments
 
     positionalGroup.add_argument(
@@ -1763,6 +1768,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         writeOverlay                 = args.write_overlay,
         printDebug                   = int(args.debug),
         transformRecursiveMountPoint = args.transform_recursive_mount_point,
+        transform                    = args.transform,
         prioritizedBackends          = args.prioritizedBackends,
         disableUnionMount            = args.disable_union_mount,
         maxCacheDepth                = args.union_mount_cache_max_depth,

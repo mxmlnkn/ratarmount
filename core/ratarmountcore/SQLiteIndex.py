@@ -340,7 +340,7 @@ class SQLiteIndex:
             serializedTarStats = json.dumps(
                 {attr: getattr(tarStats, attr) for attr in dir(tarStats) if attr.startswith('st_')}
             )
-            connection.execute('INSERT INTO "metadata" VALUES (?,?)', ("tarstats", serializedTarStats))
+            connection.execute('INSERT OR REPLACE INTO "metadata" VALUES (?,?)', ("tarstats", serializedTarStats))
         except Exception as exception:
             print("[Warning] There was an error when adding file metadata.")
             print("[Warning] Automatic detection of changed TAR files during index loading might not work.")
@@ -360,7 +360,7 @@ class SQLiteIndex:
             self._storeFileMetadata(filePath)
 
         try:
-            connection.execute('INSERT INTO "metadata" VALUES (?,?)', ("arguments", metadata))
+            connection.execute('INSERT OR REPLACE INTO "metadata" VALUES (?,?)', ("arguments", metadata))
         except Exception as exception:
             if self.printDebug >= 2:
                 print(exception)
