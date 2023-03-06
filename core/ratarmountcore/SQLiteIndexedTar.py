@@ -183,6 +183,7 @@ class _TarFileMetadataReader:
         streamOffset     : int,
         isGnuIncremental : Optional[bool],
         mountRecursively : bool,
+        transform        : Callable[[str], str],
         printDebug       : int,
         # fmt: on
     ) -> Tuple[List[Tuple], bool, Optional[bool]]:
@@ -199,7 +200,10 @@ class _TarFileMetadataReader:
         if isGnuIncremental:
             _TarFileMetadataReader._fixIncrementalBackupNamePrefixes(fileObject, tarInfo, printDebug)
 
-        path, name = SQLiteIndex.normpath(pathPrefix + "/" + tarInfo.name).rsplit("/", 1)
+        fullPath = pathPrefix + "/" + tarInfo.name
+        if tarInfo.isdir():
+            fullPath += "/"
+        path, name = SQLiteIndex.normpath(transform(fullPath)).rsplit("/", 1)
 
         # TODO: As for the tarfile type SQLite expects int but it is generally bytes.
         #       Most of them would be convertible to int like tarfile.SYMTYPE which is b'2',
@@ -253,6 +257,7 @@ class _TarFileMetadataReader:
         mountRecursively : bool,
         ignoreZeros      : bool,
         encoding         : str,
+        transform        : Callable[[str], str],
         printDebug       : int,
     ):
         """
@@ -282,6 +287,7 @@ class _TarFileMetadataReader:
                         fileObject=fileObject,
                         isGnuIncremental=isGnuIncremental,
                         mountRecursively=mountRecursively,
+                        transform=transform,
                         printDebug=printDebug,
                     )
 
@@ -425,6 +431,7 @@ class _TarFileMetadataReader:
                             self._parent.mountRecursively,
                             self._parent.ignoreZeros,
                             self._parent.encoding,
+                            self._parent.transform,
                             self._parent.printDebug,
                         ),
                     )
@@ -507,6 +514,7 @@ class _TarFileMetadataReader:
                     streamOffset=streamOffset,
                     isGnuIncremental=self._parent._isGnuIncremental,
                     mountRecursively=self._parent.mountRecursively,
+                    transform=self._parent.transform,
                     printDebug=self._parent.printDebug,
                 )
 
@@ -589,6 +597,7 @@ class SQLiteIndexedTar(MountSource):
         self,
         tarFileName                  : Optional[str]             = None,
         fileObject                   : Optional[IO[bytes]]       = None,
+        *,  # force all parameters after to be keyword-only
         writeIndex                   : bool                      = False,
         clearIndexCache              : bool                      = False,
         indexFilePath                : Optional[str]             = None,
@@ -603,6 +612,7 @@ class SQLiteIndexedTar(MountSource):
         isGnuIncremental             : Optional[bool]            = None,
         printDebug                   : int                       = 0,
         transformRecursiveMountPoint : Optional[Tuple[str, str]] = None,
+        transform                    : Optional[Tuple[str, str]] = None,
         prioritizedBackends          : Optional[List[str]]       = None,
         indexMinimumFileCount        : int                       = 0,
         # pylint: disable=unused-argument
@@ -668,6 +678,7 @@ class SQLiteIndexedTar(MountSource):
         self.encoding                     = encoding
         self.stripRecursiveTarExtension   = stripRecursiveTarExtension
         self.transformRecursiveMountPoint = transformRecursiveMountPoint
+        self.transformPattern             = transform
         self.ignoreZeros                  = ignoreZeros
         self.verifyModificationTime       = verifyModificationTime
         self.gzipSeekPointSpacing         = gzipSeekPointSpacing
@@ -678,6 +689,12 @@ class SQLiteIndexedTar(MountSource):
         self.hasBeenAppendedTo            = False
         # fmt: on
         self.prioritizedBackends: List[str] = [] if prioritizedBackends is None else prioritizedBackends
+
+        self.transform = (
+            (lambda x: re.sub(self.transformPattern[0], self.transformPattern[1], x))
+            if isinstance(self.transformPattern, (tuple, list)) and len(self.transformPattern) == 2
+            else (lambda x: x)
+        )
 
         # Determine an archive file name to show for debug output
         self.tarFileName: str
@@ -875,6 +892,7 @@ class SQLiteIndexedTar(MountSource):
             'encoding',
             'stripRecursiveTarExtension',
             'transformRecursiveMountPoint',
+            'transformPattern',
             'ignoreZeros',
         ]
 
@@ -1330,6 +1348,7 @@ class SQLiteIndexedTar(MountSource):
                 'encoding',
                 'stripRecursiveTarExtension',
                 'transformRecursiveMountPoint',
+                'transformPattern',
                 'ignoreZeros',
             ]
 
@@ -1381,6 +1400,7 @@ class SQLiteIndexedTar(MountSource):
                             offsetHeader,  # will be added to all offsets to get the real offset
                             self._isGnuIncremental,
                             False,  # mountRecursively
+                            self.transform,
                             self.printDebug,
                         )
 
