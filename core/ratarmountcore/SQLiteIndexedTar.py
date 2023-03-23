@@ -1510,15 +1510,17 @@ class SQLiteIndexedTar(MountSource):
             self.tarFileObject.join_threads()
 
     def _reloadWithPragzip(self):
-        if (
-            'pragzip' not in sys.modules
-            or self.rawFileObject is None
-            or self.compression != 'gz'
-            # TODO Currently, only use pragzip when explicitly specified because it is still in development.
-            # Note that the runaway memory isn't so much an issue when the index has been created with indexed_gzip
-            # because it splits at roughly equal decompressed chunk sizes!
-            or 'pragzip' not in self.prioritizedBackends
-        ):
+        # TODO Currently, only use pragzip when explicitly specified because it is still in development.
+        # Note that the runaway memory isn't so much an issue when the index has been created with indexed_gzip
+        # because it splits at roughly equal decompressed chunk sizes! I could also use the single-threaded
+        # pragzip version to create the index to avoid memory issue but then what would be the point?
+        # Getting rid of dependencies?
+        if self.rawFileObject is None or self.compression != 'gz' or 'pragzip' not in self.prioritizedBackends:
+            return
+
+        if 'pragzip' not in sys.modules:
+            print("[Warning] Cannot use pragzip for access to gzip file because it is not installed. Try:")
+            print("[Warning]     python3 -m pip install --user pragzip")
             return
 
         # Check whether indexed_gzip might have a higher priority than pragzip if both are listed.
