@@ -65,6 +65,7 @@ from .utils import (
     getModule,
     findModuleVersion,
 )
+from .AESFile import AESFile
 from .StenciledFile import LambdaReaderFile, RawStenciledFile, StenciledFile, JoinedFile
 from .SQLiteBlobFile import SQLiteBlobFile, SQLiteBlobsFile
 from .BlockParallelReaders import BlockParallelReader, ParallelXZReader, ParallelZstdReader

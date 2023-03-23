@@ -27,8 +27,6 @@ class RawStenciledFile(io.RawIOBase):
         stencils: A list tuples specifying the offset and length of the underlying file to use.
                   The order of these tuples will be kept.
                   The offset must be non-negative and the size must be positive.
-        fileobj: (deprecated) Only either fileobj and stencils or fileStencils may be specified
-        stencils: (deprecated) Only either fileobj and stencils or fileStencils may be specified
         fileStencils: Contains a list of (file object, offset, size) tuples. The offset and size
                       can be seen as a cut-out of the file object. All cut-outs are joined
                       together in the order of the list. Note that multiple cut-outs into the

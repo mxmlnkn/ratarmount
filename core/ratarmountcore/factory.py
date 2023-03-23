@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import hashlib
+import io
 import os
 import traceback
 
 from typing import IO, Optional, Union
 
+from .AESFile import AESFile
 from .compressions import checkForSplitFile, libarchive, rarfile, TAR_COMPRESSION_FORMATS, zipfile
 from .utils import CompressionError, RatarmountError
 from .MountSource import MountSource
@@ -91,28 +94,8 @@ _BACKENDS = {
 }
 
 
-def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource:
+def openMountSourceWithoutEncryption(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource:
     printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
-
-    joinedFileName = ''
-    if isinstance(fileOrPath, str):
-        if not os.path.exists(fileOrPath):
-            raise RatarmountError(f"Mount source does not exist: {fileOrPath}")
-
-        if os.path.isdir(fileOrPath):
-            return FolderMountSource('.' if fileOrPath == '.' else os.path.realpath(fileOrPath))
-
-        splitFileResult = checkForSplitFile(fileOrPath)
-        if splitFileResult:
-            filesToJoin = splitFileResult[0]
-            joinedFileName = os.path.basename(filesToJoin[0]).rsplit('.', maxsplit=1)[0]
-            if 'indexFilePath' not in options or not options['indexFilePath']:
-                options['indexFilePath'] = filesToJoin[0] + ".index.sqlite"
-            # https://docs.python.org/3/faq/programming.html
-            # > Why do lambdas defined in a loop with different values all return the same result?
-            fileOrPath = JoinedFileFromFactory(
-                [(lambda file=file: open(file, 'rb')) for file in filesToJoin]  # type: ignore
-            )
 
     prioritizedBackends = options.get("prioritizedBackends", [])
     triedBackends = set()
@@ -143,7 +126,53 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
             if printDebug >= 3:
                 traceback.print_exc()
 
-    if joinedFileName and not isinstance(fileOrPath, str):
-        return SingleFileMountSource(joinedFileName, fileOrPath)
-
     raise CompressionError(f"Archive to open ({str(fileOrPath)}) has unrecognized format!")
+
+
+def generateSecuretarAESKey(password: bytes) -> bytes:
+    key = password
+    for _ in range(100):
+        key = hashlib.sha256(key).digest()
+    return key[:16]
+
+
+def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource:
+    joinedFileName = ''
+    if isinstance(fileOrPath, str):
+        if not os.path.exists(fileOrPath):
+            raise RatarmountError(f"Mount source does not exist: {fileOrPath}")
+
+        if os.path.isdir(fileOrPath):
+            return FolderMountSource('.' if fileOrPath == '.' else os.path.realpath(fileOrPath))
+
+        splitFileResult = checkForSplitFile(fileOrPath)
+        if splitFileResult:
+            filesToJoin = splitFileResult[0]
+            joinedFileName = os.path.basename(filesToJoin[0]).rsplit('.', maxsplit=1)[0]
+            if 'indexFilePath' not in options or not options['indexFilePath']:
+                options['indexFilePath'] = filesToJoin[0] + ".index.sqlite"
+            # https://docs.python.org/3/faq/programming.html
+            # > Why do lambdas defined in a loop with different values all return the same result?
+            fileOrPath = JoinedFileFromFactory(
+                [(lambda file=file: open(file, 'rb')) for file in filesToJoin]  # type: ignore
+            )
+
+    try:
+        return openMountSourceWithoutEncryption(fileOrPath, **options)
+    except CompressionError as e:
+        if joinedFileName and not isinstance(fileOrPath, str):
+            return SingleFileMountSource(joinedFileName, fileOrPath)
+
+        passwords = options.get("passwords", [])
+        if not passwords:
+            raise e
+
+        aesKeys = [generateSecuretarAESKey(p) for p in passwords] + [p for p in passwords if len(p) == 32]
+        for aesKey in aesKeys:
+            decryptedFile = io.BytesIO(AESFile(fileOrPath, aesKey)._buffer)
+            try:
+                return openMountSourceWithoutEncryption(decryptedFile, **options)
+            except CompressionError:
+                decryptedFile.close()
+
+        raise e

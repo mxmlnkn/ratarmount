@@ -3,7 +3,9 @@
 
 import argparse
 import errno
+import hashlib
 import importlib
+import io
 import json
 import math
 import os
@@ -43,6 +45,7 @@ except ImportError:
 
 import ratarmountcore as core
 from ratarmountcore import (
+    AESFile,
     AutoMountLayer,
     MountSource,
     FileVersionLayer,
@@ -847,8 +850,64 @@ class FuseMount(fuse.Operations):
         return 0  # Nothing to flush, so return success
 
 
+def checkFileObjectCompression(
+    fileObject: IO, fileName: Optional[str], printDebug: int = 0
+) -> Tuple[str, Optional[str]]:
+    # Header checks are sufficient for this step.
+    oldOffset = fileObject.tell()
+    compression = None
+    for compressionId, compressionInfo in supportedCompressions.items():
+        try:
+            if compressionInfo.checkHeader(fileObject):
+                compression = compressionId
+                break
+        finally:
+            fileObject.seek(oldOffset)
+
+    # Determining if there are many frames in zstd with is_multiframe is O(1).
+    if compression == 'zst':
+        try:
+            formatOpen = findAvailableOpen(compression)
+            if not formatOpen:
+                return compression
+
+            zstdFile = formatOpen(fileObject)
+
+            fileObject.seek(0, io.SEEK_END)
+            fileSize = fileObject.tell()
+            fileObject.seek(oldOffset)
+
+            if not zstdFile.is_multiframe() and fileSize > 1024 * 1024:
+                print(f"[Warning] The specified file '{fileName}'")
+                print("[Warning] is compressed using zstd but only contains one zstd frame. This makes it ")
+                print("[Warning] impossible to use true seeking! Please (re)compress your TAR using multiple ")
+                print("[Warning] frames in order for ratarmount to do be able to do fast seeking to requested ")
+                print("[Warning] files. Else, each file access will decompress the whole TAR from the beginning!")
+                print("[Warning] You can try out t2sz for creating such archives:")
+                print("[Warning] https://github.com/martinellimarco/t2sz")
+                print("[Warning] Here you can find a simple bash script demonstrating how to do this:")
+                print("[Warning] https://github.com/mxmlnkn/ratarmount#xz-and-zst-files")
+                print()
+
+            zstdFile.close()
+        except Exception as e:
+            if printDebug >= 3:
+                print("Failed to open Zstandard-recognized file as Zstandard file.")
+        finally:
+            fileObject.seek(oldOffset)
+
+    return compression
+
+
+def generateSecuretarAESKey(password: bytes) -> bytes:
+    key = password
+    for _ in range(100):
+        key = hashlib.sha256(key).digest()
+    return key[:16]
+
+
 def checkInputFileType(
-    tarFile: str, encoding: str = tarfile.ENCODING, printDebug: int = 0
+    tarFile: str, encoding: str = tarfile.ENCODING, passwords: Optional[List[str]] = None, printDebug: int = 0
 ) -> Tuple[str, Optional[str]]:
     """Raises an exception if it is not an accepted archive format else returns the real path and compression type."""
 
@@ -863,48 +922,23 @@ def checkInputFileType(
     with open(tarFile, 'rb') as fileobj:
         fileSize = os.stat(tarFile).st_size
 
-        # Header checks are enough for this step.
-        oldOffset = fileobj.tell()
-        compression = None
-        for compressionId, compressionInfo in supportedCompressions.items():
-            try:
-                if compressionInfo.checkHeader(fileobj):
-                    compression = compressionId
-                    break
-            finally:
-                fileobj.seek(oldOffset)
+        compression = checkFileObjectCompression(fileobj, tarFile)
 
-        try:
-            # Determining if there are many frames in zstd is O(1) with is_multiframe
-            if compression != 'zst':
-                raise Exception()  # early exit because we catch it anyways
-
-            formatOpen = findAvailableOpen(compression)
-            if not formatOpen:
-                raise Exception()  # early exit because we catch it anyways
-
-            zstdFile = formatOpen(fileobj)
-
-            if not zstdFile.is_multiframe() and fileSize > 1024 * 1024:
-                print(f"[Warning] The specified file '{tarFile}'")
-                print("[Warning] is compressed using zstd but only contains one zstd frame. This makes it ")
-                print("[Warning] impossible to use true seeking! Please (re)compress your TAR using multiple ")
-                print("[Warning] frames in order for ratarmount to do be able to do fast seeking to requested ")
-                print("[Warning] files. Else, each file access will decompress the whole TAR from the beginning!")
-                print("[Warning] You can try out t2sz for creating such archives:")
-                print("[Warning] https://github.com/martinellimarco/t2sz")
-                print("[Warning] Here you can find a simple bash script demonstrating how to do this:")
-                print("[Warning] https://github.com/mxmlnkn/ratarmount#xz-and-zst-files")
-                print()
-        except Exception:
-            pass
+        if compression not in supportedCompressions:
+            if passwords:
+                aesKeys = [generateSecuretarAESKey(p) for p in passwords] + [p for p in passwords if len(p) == 32]
+                for aesKey in aesKeys:
+                    with AESFile(fileobj, aesKey) as decryptedFile:
+                        compression = checkFileObjectCompression(decryptedFile, tarFile)
+                        if compression in supportedCompressions:
+                            break
 
         if compression not in supportedCompressions:
             if SQLiteIndexedTar._detectTar(fileobj, encoding, printDebug=printDebug):
                 return tarFile, compression
 
             if printDebug >= 2:
-                print(f"Archive '{tarFile}' (compression: {compression}) can't be opened!")
+                print(f"Archive '{tarFile}' (compression: {compression}) cannot be opened!")
 
             if printDebug >= 1:
                 print("[Info] Supported compressions:", list(supportedCompressions.keys()))
@@ -1435,6 +1469,17 @@ seeking capabilities when opening that file.
 
     if args.transform_recursive_mount_point:
         args.transform_recursive_mount_point = tuple(args.transform_recursive_mount_point)
+
+    # Sanitize different ways to specify passwords into a simple list
+    args.passwords = []
+    if args.password:
+        args.passwords.append(args.password.encode())
+
+    if args.password_file:
+        with open(args.password_file, 'rb') as file:
+            args.passwords += file.read().split(b'\n')
+
+    args.passwords = _removeDuplicatesStable(args.passwords)
 
     # This is a hack but because we have two positional arguments (and want that reflected in the auto-generated help),
     # all positional arguments, including the mountpath will be parsed into the tar file path's namespace and we have to
