@@ -793,7 +793,7 @@ class FuseMount(fuse.Operations):
 def checkInputFileType(
     tarFile: str, encoding: str = tarfile.ENCODING, printDebug: int = 0
 ) -> Tuple[str, Optional[str]]:
-    """Raises an exception if it is not a accepted archive format else returns the real path and compression type."""
+    """Raises an exception if it is not an accepted archive format else returns the real path and compression type."""
 
     if not os.path.isfile(tarFile):
         raise argparse.ArgumentTypeError(f"File '{tarFile}' is not a file!")
@@ -1329,11 +1329,30 @@ seeking capabilities when opening that file.
             "You must at least specify one path to a valid TAR file or union mount source directory!"
         )
 
+    # Sanitize different ways to specify passwords into a simple list
+    # Better initialize it before calling checkMountSource, which might use args.passwords in the future.
+    args.passwords = []
+    if args.password:
+        args.passwords.append(args.password.encode())
+
+    if args.password_file:
+        with open(args.password_file, 'rb') as file:
+            args.passwords += file.read().split(b'\n')
+
+    args.passwords = _removeDuplicatesStable(args.passwords)
+
     # Manually check that all specified TARs and folders exist
     def checkMountSource(path):
-        if os.path.isdir(path) or zipfile.is_zipfile(path) or ('rarfile' in sys.modules and rarfile.is_rarfile(path)):
-            return os.path.realpath(path)
-        return checkInputFileType(path, encoding=args.encoding, printDebug=args.debug)[0]
+        try:
+            return checkInputFileType(path, encoding=args.encoding, printDebug=args.debug)[0]
+        except argparse.ArgumentTypeError as e:
+            if (
+                os.path.isdir(path)
+                or zipfile.is_zipfile(path)
+                or ('rarfile' in sys.modules and rarfile.is_rarfile(path))
+            ):
+                return os.path.realpath(path)
+            raise e
 
     mountSources: List[str] = []
     for path in args.mount_source:
@@ -1374,17 +1393,6 @@ seeking capabilities when opening that file.
         raise argparse.ArgumentTypeError("Argument for parallelization must be non-negative!")
     if args.parallelization == 0:
         args.parallelization = defaultParallelization
-
-    # Sanitize different ways to specify passwords into a simple list
-    args.passwords = []
-    if args.password:
-        args.passwords.append(args.password.encode())
-
-    if args.password_file:
-        with open(args.password_file, 'rb') as file:
-            args.passwords += file.read().split(b'\n')
-
-    args.passwords = _removeDuplicatesStable(args.passwords)
 
     # Clean backend list
     supportedModuleNames = [module.name for _, info in supportedCompressions.items() for module in info.modules]
