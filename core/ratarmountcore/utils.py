@@ -205,10 +205,9 @@ def distributionContainsFile(distribution, path: str) -> bool:
 
         try:
             pathlib.Path(path).relative_to(file.locate())
+            return True
         except ValueError:
             return False
-        else:
-            return True
     return False
 
 

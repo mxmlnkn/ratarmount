@@ -1495,7 +1495,7 @@ class SQLiteIndexedTar(MountSource):
                 fileobj=fileobj, drop_handles=False, spacing=gzipSeekPointSpacing, buffer_size=bufferSize
             )
         elif compression == 'bz2':
-            tar_file = indexed_bzip2.open(fileobj, parallelization=parallelization)
+            tar_file = indexed_bzip2.open(fileobj, parallelization=parallelization)  # type: ignore
         elif (
             compression == 'xz'
             and xz

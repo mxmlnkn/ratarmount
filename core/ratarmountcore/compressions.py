@@ -13,22 +13,22 @@ from .utils import isLatinAlpha, isLatinDigit, isLatinHexAlpha, formatNumber, AL
 try:
     import indexed_bzip2
 except ImportError:
-    indexed_bzip2 = None
+    indexed_bzip2 = None  # type: ignore
 
 try:
     import indexed_gzip
 except ImportError:
-    indexed_gzip = None
+    indexed_gzip = None  # type: ignore
 
 try:
     import indexed_zstd
 except ImportError:
-    indexed_zstd = None
+    indexed_zstd = None  # type: ignore
 
 try:
     import lzmaffi
 except ImportError:
-    lzmaffi = None
+    lzmaffi = None  # type: ignore
 
 try:
     import xz
@@ -41,7 +41,7 @@ except ImportError:
 try:
     import rarfile
 except ImportError:
-    rarfile = None
+    rarfile = None  # type: ignore
 
 try:
     import zstandard
@@ -69,7 +69,7 @@ TAR_COMPRESSION_FORMATS: Dict[str, CompressionInfo] = {
     'bz2': CompressionInfo(
         ['bz2', 'bzip2'],
         ['tb2', 'tbz', 'tbz2', 'tz2'],
-        [CompressionModuleInfo('indexed_bzip2', lambda x: indexed_bzip2.open(x))],
+        [CompressionModuleInfo('indexed_bzip2', lambda x: indexed_bzip2.open(x))],  # type: ignore
         lambda x: (x.read(4)[:3] == b'BZh' and x.read(6) == (0x314159265359).to_bytes(6, 'big')),
     ),
     'gz': CompressionInfo(
