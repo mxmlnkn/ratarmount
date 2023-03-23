@@ -48,9 +48,9 @@ And in contrast to [tarindexer](https://github.com/devsnd/tarindexer), which als
 # Table of Contents
 
 1. [Installation](#installation)
-   1. [Installation via Package Manager](#installation-via-package-manager)
+   1. [Installation via AppImage](#installation-via-appimage)
+   2. [Installation via Package Manager](#installation-via-package-manager)
       1. [Arch Linux](#arch-linux)
-   2. [Installation via AppImage](#installation-via-appimage)
    3. [System Dependencies for PIP Installation (Rarely Necessary)](#system-dependencies-for-pip-installation-rarely-necessary)
    4. [PIP Package Installation](#pip-package-installation)
 2. [Benchmarks](#benchmarks)
@@ -68,19 +68,11 @@ And in contrast to [tarindexer](https://github.com/devsnd/tarindexer), which als
 
 # Installation
 
-You can install ratarmount either by simply downloading the AppImage or via pip. The latter might require installing additional dependencies.
+You can install ratarmount either by simply downloading the [AppImage](https://github.com/mxmlnkn/ratarmount/releases) or via pip.
+The latter might require [installing additional dependencies](#system-dependencies-for-pip-installation-rarely-necessary).
 
-## Installation via Package Manager
-
-### Arch Linux 
-
-Arch Linux's AUR offers ratarmount as stable and development package. Use an [AUR-Helper](https://wiki.archlinux.org/title/AUR_helpers), like paru, to install one of them:
-
-```console
-# stable version
-paru -Syu ratarmount
-# development version
-paru -Syu ratarmount-git
+```bash
+pip install ratarmount
 ```
 
 ## Installation via AppImage
@@ -94,6 +86,19 @@ wget 'https://github.com/mxmlnkn/ratarmount/releases/download/v0.13.0/ratarmount
 chmod u+x 'ratarmount-manylinux2014_x86_64.AppImage'
 ./ratarmount-manylinux2014_x86_64.AppImage --help  # Simple test run
 sudo cp ratarmount-manylinux2014_x86_64.AppImage /usr/local/bin/ratarmount  # Example installation
+```
+
+## Installation via Package Manager
+
+### Arch Linux
+
+Arch Linux's AUR offers ratarmount as stable and development package. Use an [AUR-Helper](https://wiki.archlinux.org/title/AUR_helpers), like [yay](https://github.com/Jguer/yay) or [paru](https://github.com/Morganamilo/paru), to install one of them:
+
+```console
+# stable version
+paru -Syu ratarmount
+# development version
+paru -Syu ratarmount-git
 ```
 
 ## System Dependencies for PIP Installation (Rarely Necessary)
