@@ -92,7 +92,8 @@ sudo cp ratarmount-manylinux2014_x86_64.AppImage /usr/local/bin/ratarmount  # Ex
 
 ### Arch Linux
 
-Arch Linux's AUR offers ratarmount as stable and development package. Use an [AUR-Helper](https://wiki.archlinux.org/title/AUR_helpers), like [yay](https://github.com/Jguer/yay) or [paru](https://github.com/Morganamilo/paru), to install one of them:
+Arch Linux's AUR offers ratarmount as [stable](https://aur.archlinux.org/packages/ratarmount) and [development](https://aur.archlinux.org/packages/ratarmount-git) package.
+Use an [AUR helper](https://wiki.archlinux.org/title/AUR_helpers), like [yay](https://github.com/Jguer/yay) or [paru](https://github.com/Morganamilo/paru), to install one of them:
 
 ```console
 # stable version
