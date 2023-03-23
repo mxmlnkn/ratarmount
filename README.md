@@ -4,9 +4,11 @@
 
 # Random Access Tar Mount (Ratarmount)
 
-[![PyPI version](https://badge.fury.io/py/ratarmount.svg)](https://badge.fury.io/py/ratarmount)
 [![Python Version](https://img.shields.io/pypi/pyversions/ratarmount)](https://pypi.org/project/ratarmount/)
+[![PyPI version](https://badge.fury.io/py/ratarmount.svg)](https://badge.fury.io/py/ratarmount)
 [![Downloads](https://pepy.tech/badge/ratarmount/month)](https://pepy.tech/project/ratarmount)
+[![Conda](https://img.shields.io/conda/v/conda-forge/ratarmount?color=dark-green)](https://anaconda.org/conda-forge/ratarmount)
+</br>
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](http://opensource.org/licenses/MIT)
 [![Build Status](https://github.com/mxmlnkn/ratarmount/workflows/tests/badge.svg)](https://github.com/mxmlnkn/ratarmount/actions)
 [![Discord](https://img.shields.io/discord/783411320354766878?label=discord)](https://discord.gg/Wra6t6akh2)
@@ -90,6 +92,8 @@ sudo cp ratarmount-manylinux2014_x86_64.AppImage /usr/local/bin/ratarmount  # Ex
 
 ## Installation via Package Manager
 
+[![Packaging status](https://repology.org/badge/vertical-allrepos/ratarmount.svg)](https://repology.org/project/ratarmount/versions)
+
 ### Arch Linux
 
 Arch Linux's AUR offers ratarmount as [stable](https://aur.archlinux.org/packages/ratarmount) and [development](https://aur.archlinux.org/packages/ratarmount-git) package.
@@ -101,6 +105,13 @@ paru -Syu ratarmount
 # development version
 paru -Syu ratarmount-git
 ```
+
+### Conda
+
+```bash
+conda install -c conda-forge ratarmount
+```
+
 
 ## System Dependencies for PIP Installation (Rarely Necessary)
 
