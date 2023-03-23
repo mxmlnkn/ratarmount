@@ -48,9 +48,11 @@ And in contrast to [tarindexer](https://github.com/devsnd/tarindexer), which als
 # Table of Contents
 
 1. [Installation](#installation)
-   1. [Installation via AppImage](#installation-via-appimage)
-   2. [System Dependencies for PIP Installation (Rarely Necessary)](#system-dependencies-for-pip-installation-rarely-necessary)
-   3. [PIP Package Installation](#pip-package-installation)
+   1. [Installation via Package Manager](#installation-via-package-manager)
+      1. [Arch Linux](#arch-linux)
+   2. [Installation via AppImage](#installation-via-appimage)
+   3. [System Dependencies for PIP Installation (Rarely Necessary)](#system-dependencies-for-pip-installation-rarely-necessary)
+   4. [PIP Package Installation](#pip-package-installation)
 2. [Benchmarks](#benchmarks)
 3. [The Problem](#the-problem)
 4. [The Solution](#the-solution)
@@ -67,6 +69,19 @@ And in contrast to [tarindexer](https://github.com/devsnd/tarindexer), which als
 # Installation
 
 You can install ratarmount either by simply downloading the AppImage or via pip. The latter might require installing additional dependencies.
+
+## Installation via Package Manager
+
+### Arch Linux 
+
+Arch Linux's AUR offers ratarmount as stable and development package. Use an [AUR-Helper](https://wiki.archlinux.org/title/AUR_helpers), like paru, to install one of them:
+
+```console
+# stable version
+paru -Syu ratarmount
+# development version
+paru -Syu ratarmount-git
+```
 
 ## Installation via AppImage
 
