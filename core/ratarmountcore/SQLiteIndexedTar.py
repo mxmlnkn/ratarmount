@@ -708,11 +708,6 @@ class SQLiteIndexedTar(MountSource):
             except Exception:
                 pass
 
-        # TODO This does and did not work correctly for recursive TARs because the outermost layer will change None to
-        #      a hard value and from then on it would have been fixed to that value even then called inside createIndex.
-        if self.isGnuIncremental is None:
-            self.isGnuIncremental = self._isGnuIncremental(self.tarFileObject)
-
         if indexFolders and isinstance(indexFolders, str):
             indexFolders = [indexFolders]
 
@@ -732,7 +727,19 @@ class SQLiteIndexedTar(MountSource):
             if not self.hasBeenAppendedTo:  # indirectly set by a successful call to _tryLoadIndex
                 self._loadOrStoreCompressionOffsets()  # load
                 self.index.reloadIndexReadOnly()
+
+                # Only required because self.isGnuIncremental is a public interface member, strictly speaking.
+                # Might be removed in the future. I think it is not actually needed in this case.
+                if self.isGnuIncremental is None:
+                    self.isGnuIncremental = self._isGnuIncremental(self.tarFileObject)
                 return
+
+            # TODO This does and did not work correctly for recursive TARs because the outermost layer will change
+            #      None to a hard value and from then on it would have been fixed to that value even when called
+            #      inside createIndex.
+            # Required for _checkIndexValidity
+            if self.isGnuIncremental is None:
+                self.isGnuIncremental = self._isGnuIncremental(self.tarFileObject)
 
             # TODO Handling appended files to compressed archives would have to account for dropping the offsets,
             #      seeking to the first appended file while not processing any metadata and still showing a progress
@@ -763,6 +770,13 @@ class SQLiteIndexedTar(MountSource):
 
             self.index.close()
             print("[Warning] The loaded index does not match the archive. Will recreate it.")
+
+        # TODO This does and did not work correctly for recursive TARs because the outermost layer will change
+        #      None to a hard value and from then on it would have been fixed to that value even when called
+        #      inside createIndex.
+        # Required for _createIndex
+        if self.isGnuIncremental is None:
+            self.isGnuIncremental = self._isGnuIncremental(self.tarFileObject)
 
         # Open new database when we didn't find an existing one.
         if not self.index.indexIsLoaded():
