@@ -1502,7 +1502,7 @@ class SQLiteIndexedTar(MountSource):
     def _loadOrStoreCompressionOffsets(self):
         self.index.synchronizeCompressionOffsets(self.tarFileObject, self.compression)
 
-        if self.compression == 'gz' and self.parallelization != 1:
+        if self.compression == 'gz':
             self._reloadWithPragzip()
 
     def joinThreads(self):
