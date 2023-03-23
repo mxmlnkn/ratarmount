@@ -1075,6 +1075,8 @@ seeking capabilities when opening that file.
     writeGroup = parser.add_argument_group("Write Overlay Options")
     advancedGroup = parser.add_argument_group("Advanced Options")
 
+    defaultParallelization = len(os.sched_getaffinity(0))
+
     # fmt: off
     commonGroup.add_argument(
         '-h', '--help', action='help', default=argparse.SUPPRESS,
@@ -1096,7 +1098,7 @@ seeking capabilities when opening that file.
         '-P', '--parallelization', type=int, default=0,
         help='If an integer other than 1 is specified, then the threaded parallel bzip2 decoder will be used '
              'specified amount of block decoder threads. Further threads with lighter work may be started. '
-             f'A value of 0 will use all the available cores ({os.cpu_count()}).')
+             f'A value of 0 will use all the available cores ({defaultParallelization}).')
 
     commonGroup.add_argument(
         '-v', '--version', action=PrintVersionAction, nargs=0, default=argparse.SUPPRESS,
@@ -1371,7 +1373,7 @@ seeking capabilities when opening that file.
     if args.parallelization < 0:
         raise argparse.ArgumentTypeError("Argument for parallelization must be non-negative!")
     if args.parallelization == 0:
-        args.parallelization = os.cpu_count()
+        args.parallelization = defaultParallelization
 
     # Sanitize different ways to specify passwords into a simple list
     args.passwords = []
