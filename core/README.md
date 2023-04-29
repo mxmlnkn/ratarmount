@@ -114,7 +114,7 @@ archive = rmc.open("foo.tar", recursive=True)
 archive.listDir("/")
 info = archive.getFileInfo("/bar")
 
-print "Contents of /bar:"
+print("Contents of /bar:")
 with archive.open(info) as file:
     print(file.read())
 ```
