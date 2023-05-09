@@ -125,7 +125,7 @@ jobs:
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade wheel
         python3 -m pip install --upgrade setuptools
-        python3 -m pip install --upgrade-strategy eager --upgrade cython twine build zstandard fusepy
+        python3 -m pip install --upgrade-strategy eager --upgrade cython twine build zstandard fusepy cffi
 
     - name: Test Startup With Only One Compression Dependency
       run: |
