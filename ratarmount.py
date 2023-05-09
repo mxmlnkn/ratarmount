@@ -1075,7 +1075,7 @@ seeking capabilities when opening that file.
     writeGroup = parser.add_argument_group("Write Overlay Options")
     advancedGroup = parser.add_argument_group("Advanced Options")
 
-    defaultParallelization = len(os.sched_getaffinity(0))
+    defaultParallelization = len(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else os.cpu_count()
 
     # fmt: off
     commonGroup.add_argument(
