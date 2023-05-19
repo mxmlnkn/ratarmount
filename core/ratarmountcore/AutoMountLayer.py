@@ -253,12 +253,17 @@ class AutoMountLayer(MountSource):
 
         # Check whether we need to add recursive mount points to this directory listing
         # The outer if is only a performance optimization. In general, it should be possible to remove it.
-        if self.options.get('stripRecursiveTarExtension', False) or self.options.get(
-            'transformRecursiveMountPoint', False
+        # In case that 'files' also contains stat results, we might have to overwrite some results with
+        # the results for a mount point!
+        if (
+            not isinstance(files, set)
+            or self.options.get('stripRecursiveTarExtension', False)
+            or self.options.get('transformRecursiveMountPoint', False)
         ):
             for mountPoint, mountInfo in self.mounted.items():
                 folder, folderName = os.path.split(mountPoint)
-                if folder == path and folderName and folderName not in files:
+                # This also potentially updates a archive file stat result with a stat result for a folder type!
+                if folder == path and folderName and folderName:
                     if isinstance(files, set):
                         files.add(folderName)
                     else:
