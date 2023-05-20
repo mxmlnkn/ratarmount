@@ -20,5 +20,5 @@ jobs:
 
     - uses: actions/upload-artifact@v3
       with:
-        name: ratarmount-manylinux2014_x86_64.AppImage
-        path: AppImage/ratarmount-manylinux2014_x86_64.AppImage
+        name: ratarmount-x86_64.AppImage
+        path: "AppImage/ratarmount*-x86_64.AppImage"

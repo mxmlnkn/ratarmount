@@ -21,8 +21,8 @@ jobs:
 
     - uses: actions/upload-artifact@v3
       with:
-        name: ratarmount-manylinux2014_x86_64.AppImage
-        path: AppImage/ratarmount-manylinux2014_x86_64.AppImage
+        name: ratarmount-x86_64.AppImage
+        path: "AppImage/ratarmount*-x86_64.AppImage"
 
 
   AppImage-Tests:
@@ -36,12 +36,12 @@ jobs:
     steps:
     - uses: actions/download-artifact@v3
       with:
-        name: ratarmount-manylinux2014_x86_64.AppImage
+        name: ratarmount-x86_64.AppImage
 
     - name: Install AppImage
       run: |
-        chmod u+x ratarmount-manylinux2014_x86_64.AppImage
-        mv ratarmount-manylinux2014_x86_64.AppImage /usr/local/bin/ratarmount
+        chmod u+x ratarmount*-x86_64.AppImage
+        mv ratarmount*-x86_64.AppImage /usr/local/bin/ratarmount
         echo "/usr/local/bin" >> $GITHUB_PATH
 
     - name: Install Dependencies

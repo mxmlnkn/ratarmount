@@ -142,7 +142,7 @@ python3 -m python_appimage build app -l "$APPIMAGE_PLATFORM" -p "$APP_PYTHON_VER
 
 echo "Extract AppImage to AppDir for Further Modification"
 ./"ratarmount-$APPIMAGE_ARCH.AppImage" --appimage-extract
-'rm' -rf "$APP_DIR"
+'rm' -rf "$APP_DIR" ./"ratarmount-$APPIMAGE_ARCH.AppImage"
 mv squashfs-root/ "$APP_DIR"
 
 echo "Install Ratarmount into AppDir"
@@ -156,3 +156,12 @@ trimAppImage
 
 echo "Create AppImage from Modified AppDir"
 APPIMAGE_EXTRACT_AND_RUN=1 ARCH="$APPIMAGE_ARCH" appimagetool --no-appstream "$APP_BASE".App{Dir,Image}
+
+chmod u+x "$APP_BASE.AppImage"
+version=$( ./"$APP_BASE.AppImage" --version | sed -n -E 's|ratarmount ([0-9.]+)|\1|p' &>/dev/null )
+if [[ -z "$version" ]]; then
+    version=$( sed -n -E "s|.*__version__ = '([0-9.]+).*'|\1|p" ../ratarmount.py )
+fi
+if [[ -n "$version" ]]; then
+    'mv' -- "$APP_BASE.AppImage" "ratarmount-$version-$APPIMAGE_ARCH.AppImage"
+fi
