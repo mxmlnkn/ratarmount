@@ -3,6 +3,7 @@
 
 import math
 import pathlib
+import platform
 import sys
 import types
 
@@ -40,8 +41,9 @@ def overrides(parentClass):
     """Simple decorator that checks that a method with the same name exists in the parent class"""
 
     def overrider(method):
-        assert method.__name__ in dir(parentClass)
-        assert callable(getattr(parentClass, method.__name__))
+        if platform.python_implementation() != 'PyPy':
+            assert method.__name__ in dir(parentClass)
+            assert callable(getattr(parentClass, method.__name__))
         return method
 
     return overrider
