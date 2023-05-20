@@ -19,17 +19,19 @@ function installSystemRequirements()
 
 function installAppImageTools()
 {
+    local platform=$( uname --hardware-platform )
+
     toolName='appimagetool'
     if [[ ! -x $toolName ]]; then
         curl -L -o "$toolName" \
-            'https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage'
+            "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-$platform.AppImage"
         chmod u+x "$toolName"
     fi
 
     toolName='linuxdeploy'
     if [[ ! -x "$toolName" ]]; then
         curl -L -o "$toolName" \
-            'https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage'
+            "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-$platform.AppImage"
         chmod u+x "$toolName"
     fi
 
@@ -70,7 +72,7 @@ function installAppImageSystemLibraries()
         echo -e "\e[31mCannot gather FUSE libs into AppImage without (dnf) repoquery.\e[0m"
     fi
 
-    if [[ ${libraries[@]} -gt 0 ]]; then
+    if [[ "${#libraries[@]}" -gt 0 ]]; then
         'cp' -a "${libraries[@]}" "$APP_DIR"/usr/lib/
     fi
 
@@ -101,6 +103,8 @@ function trimAppImage()
 
 # Main entry
 
+cd -- "$( dirname -- "$BASH_SOURCE" )"
+
 # AUDITWHEEL_ARCH is set inside the manylinux container automatically
 if [[ -n $AUDITWHEEL_ARCH ]]; then
     APPIMAGE_ARCH=$AUDITWHEEL_ARCH
@@ -111,6 +115,7 @@ fi
 if [[ -n $AUDITWHEEL_PLAT ]]; then
     APPIMAGE_PLATFORM=$AUDITWHEEL_PLAT
 else
+    # This is used for python-appimage and requires a manylinux version!
     APPIMAGE_PLATFORM="manylinux2014_$APPIMAGE_ARCH"
 fi
 
@@ -131,7 +136,9 @@ echo "Install AppImage Tooling"
 installAppImageTools
 
 echo "Build Base Python AppImage With Ratarmount Metadata"
-python3 -m python_appimage build app -l "$APPIMAGE_PLATFORM" -p "$APP_PYTHON_VERSION" ratarmount-metadata/
+python3 -m pip install --upgrade python_appimage
+python3 -m python_appimage build app -l "$APPIMAGE_PLATFORM" -p "$APP_PYTHON_VERSION" ratarmount-metadata/ ||
+    exit 1
 
 echo "Extract AppImage to AppDir for Further Modification"
 ./"ratarmount-$APPIMAGE_ARCH.AppImage" --appimage-extract
