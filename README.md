@@ -6,7 +6,7 @@
 
 [![Python Version](https://img.shields.io/pypi/pyversions/ratarmount)](https://pypi.org/project/ratarmount/)
 [![PyPI version](https://badge.fury.io/py/ratarmount.svg)](https://badge.fury.io/py/ratarmount)
-[![Downloads](https://pepy.tech/badge/ratarmount/month)](https://pepy.tech/project/ratarmount)
+[![Downloads](https://static.pepy.tech/badge/ratarmount/month)](https://pepy.tech/project/ratarmount)
 [![Conda](https://img.shields.io/conda/v/conda-forge/ratarmount?color=dark-green)](https://anaconda.org/conda-forge/ratarmount)
 </br>
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](http://opensource.org/licenses/MIT)
