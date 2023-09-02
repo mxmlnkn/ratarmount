@@ -78,8 +78,8 @@ TAR_COMPRESSION_FORMATS: Dict[str, CompressionInfo] = {
         [
             CompressionModuleInfo('indexed_gzip', lambda x: indexed_gzip.IndexedGzipFile(fileobj=x)),
             # TODO Declare existence of this module but do not provide an open method yet because it
-            # is still in development. SQLiteIndexedTar has a special case for opening with pragzip.
-            CompressionModuleInfo('pragzip', None),
+            # is still in development. SQLiteIndexedTar has a special case for opening with rapidgzip.
+            CompressionModuleInfo('rapidgzip', None),
         ],
         lambda x: x.read(2) == b'\x1F\x8B',
     ),

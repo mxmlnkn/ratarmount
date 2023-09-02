@@ -29,7 +29,7 @@ except ImportError:
     pass
 
 try:
-    import pragzip
+    import rapidgzip
 except ImportError:
     pass
 
@@ -1517,36 +1517,36 @@ class SQLiteIndexedTar(MountSource):
         self.index.synchronizeCompressionOffsets(self.tarFileObject, self.compression)
 
         if self.compression == 'gz':
-            self._reloadWithPragzip()
+            self._reloadWithRapidgzip()
 
     def joinThreads(self):
         if hasattr(self.tarFileObject, 'join_threads'):
             self.tarFileObject.join_threads()
 
-    def _reloadWithPragzip(self):
-        # TODO Currently, only use pragzip when explicitly specified because it is still in development.
+    def _reloadWithRapidgzip(self):
+        # TODO Currently, only use rapidgzip when explicitly specified because it is still in development.
         # Note that the runaway memory isn't so much an issue when the index has been created with indexed_gzip
         # because it splits at roughly equal decompressed chunk sizes! I could also use the single-threaded
-        # pragzip version to create the index to avoid memory issue but then what would be the point?
+        # rapidgzip version to create the index to avoid memory issue but then what would be the point?
         # Getting rid of dependencies?
-        if self.rawFileObject is None or self.compression != 'gz' or 'pragzip' not in self.prioritizedBackends:
+        if self.rawFileObject is None or self.compression != 'gz' or 'rapidgzip' not in self.prioritizedBackends:
             return
 
-        if 'pragzip' not in sys.modules:
-            print("[Warning] Cannot use pragzip for access to gzip file because it is not installed. Try:")
-            print("[Warning]     python3 -m pip install --user pragzip")
+        if 'rapidgzip' not in sys.modules:
+            print("[Warning] Cannot use rapidgzip for access to gzip file because it is not installed. Try:")
+            print("[Warning]     python3 -m pip install --user rapidgzip")
             return
 
-        # Check whether indexed_gzip might have a higher priority than pragzip if both are listed.
+        # Check whether indexed_gzip might have a higher priority than rapidgzip if both are listed.
         if (
             'indexed_gzip' in self.prioritizedBackends
-            and 'pragzip' in self.prioritizedBackends
-            and self.prioritizedBackends.index('indexed_gzip') < self.prioritizedBackends.index('pragzip')
+            and 'rapidgzip' in self.prioritizedBackends
+            and self.prioritizedBackends.index('indexed_gzip') < self.prioritizedBackends.index('rapidgzip')
         ):
             # Low index have higher priority (because normally the list would be checked from lowest indexes).
             return
 
-        # Only allow mounting of real files. Pragzip does work with Python file objects but we don't want to
+        # Only allow mounting of real files. Rapidgzip does work with Python file objects but we don't want to
         # mount recursive archives all with the parallel gzip decoder because then the cores would be oversubscribed!
         # Similarly, small files would result in being wholly cached into memory, which probably isn't what the user
         # had intended by using ratarmount?
@@ -1556,7 +1556,7 @@ class SQLiteIndexedTar(MountSource):
         hasMultipleChunks = os.stat(self.rawFileObject.name).st_size >= 4 * self.gzipSeekPointSpacing
         if not isRealFile or not hasMultipleChunks:
             if self.printDebug >= 2:
-                print("[Info] Do not reopen with pragzip backend because:")
+                print("[Info] Do not reopen with rapidgzip backend because:")
                 if not isRealFile:
                     print("[Info]  - the file to open is a recursive file, which limits the usability of ")
                     print("[Info]    parallel decompression.")
@@ -1570,12 +1570,12 @@ class SQLiteIndexedTar(MountSource):
         gzindex = self.index.openGzipIndex()
         if gzindex:
             if self.printDebug >= 1:
-                print("[Info] Reopening the gzip with the pragzip backend...")
+                print("[Info] Reopening the gzip with the rapidgzip backend...")
 
-            self.tarFileObject = pragzip.PragzipFile(
+            self.tarFileObject = rapidgzip.RapidgzipFile(
                 self.rawFileObject, parallelization=self.parallelization, verbose=self.printDebug >= 2
             )
             self.tarFileObject.import_index(gzindex)
 
             if self.printDebug >= 1:
-                print("[Info] Reopened the gzip with the pragzip backend.")
+                print("[Info] Reopened the gzip with the rapidgzip backend.")

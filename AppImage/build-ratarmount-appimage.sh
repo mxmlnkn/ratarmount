@@ -49,10 +49,10 @@ function installAppImagePythonPackages()
         "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir \
             'git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=indexed_bzip2&subdirectory=python/indexed_bzip2'
         "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir \
-            'git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=pragzip&subdirectory=python/pragzip'
+            'git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=rapidgzip&subdirectory=python/rapidgzip'
     else
         "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir indexed_bzip2
-        "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir pragzip
+        "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir rapidgzip
     fi
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ../core
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ..

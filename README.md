@@ -37,7 +37,7 @@ And in contrast to [tarindexer](https://github.com/devsnd/tarindexer), which als
 *TAR compressions supported for random access:*
 
  - **BZip2** as provided by [indexed_bzip2](https://github.com/mxmlnkn/indexed_bzip2) as a backend, which is a refactored and extended version of [bzcat](https://github.com/landley/toybox/blob/c77b66455762f42bb824c1aa8cc60e7f4d44bdab/toys/other/bzcat.c) from [toybox](https://landley.net/code/toybox/). See also the [reverse engineered specification](https://github.com/dsnet/compress/blob/master/doc/bzip2-format.pdf).
- - **Gzip** as provided by [pragzip](https://github.com/mxmlnkn/pragzip) or [indexed_gzip](https://github.com/pauldmccarthy/indexed_gzip) by Paul McCarthy. See also [RFC1952](https://tools.ietf.org/html/rfc1952).
+ - **Gzip** as provided by [rapidgzip](https://github.com/mxmlnkn/rapidgzip) or [indexed_gzip](https://github.com/pauldmccarthy/indexed_gzip) by Paul McCarthy. See also [RFC1952](https://tools.ietf.org/html/rfc1952).
  - **Xz** as provided by [python-xz](https://github.com/Rogdham/python-xz) by Rogdham or [lzmaffi](https://github.com/r3m0t/backports.lzma) by Tomer Chachamu. See also [The .xz File Format](https://tukaani.org/xz/xz-file-format.txt).
  - **Zstd** as provided by [indexed_zstd](https://github.com/martinellimarco/indexed_zstd) by Marco Martinelli. See also [Zstandard Compression Format](https://github.com/facebook/zstd/blob/master/doc/zstd_compression_format.md).
 
@@ -428,7 +428,7 @@ Advanced Options:
                         opened with multiple backends. Arguments specified last will have the
                         highest priority. A comma-separated list may be specified. Possible
                         backends: ['indexed_bzip2', 'indexed_gzip', 'indexed_zstd', 'lzmaffi',
-                        'pragzip', 'rarfile', 'xz', 'zipfile'] (default: None)
+                        'rapidgzip', 'rarfile', 'xz', 'zipfile'] (default: None)
   -d DEBUG, --debug DEBUG
                         Sets the debugging level. Higher means more output. Currently, 3 is the
                         highest. (default: 1)
