@@ -292,10 +292,15 @@ usage: ratarmount.py [-h] [-c] [-r] [-u] [-P PARALLELIZATION] [-v] [--password P
                      [--verify-mtime] [--index-file INDEX_FILE] [--index-folders INDEX_FOLDERS]
                      [--recursion-depth RECURSION_DEPTH] [-l] [-s]
                      [--transform-recursive-mount-point REGEX_PATTERN REPLACEMENT] [-e ENCODING]
-                     [-i] [--gnu-incremental] [--no-gnu-incremental] [-w WRITE_OVERLAY]
-                     [--commit-overlay] [-o FUSE] [-f] [-d DEBUG] [-gs GZIP_SEEK_POINT_SPACING]
-                     [-p PREFIX] [--password-file PASSWORD_FILE] [--use-backend USE_BACKEND]
-                     [--oss-attributions]
+                     [-i] [--gnu-incremental] [--no-gnu-incremental] [--detect-gnu-incremental]
+                     [-w WRITE_OVERLAY] [--commit-overlay] [-o FUSE] [-f] [-d DEBUG]
+                     [-gs GZIP_SEEK_POINT_SPACING] [-p PREFIX] [--password-file PASSWORD_FILE]
+                     [--use-backend USE_BACKEND] [--oss-attributions] [--disable-union-mount]
+                     [--union-mount-cache-max-depth UNION_MOUNT_CACHE_MAX_DEPTH]
+                     [--union-mount-cache-max-entries UNION_MOUNT_CACHE_MAX_ENTRIES]
+                     [--union-mount-cache-timeout UNION_MOUNT_CACHE_TIMEOUT]
+                     [--index-minimum-file-count INDEX_MINIMUM_FILE_COUNT]
+                     [--transform REGEX_PATTERN REPLACEMENT]
                      mount_source [mount_source ...] [mount_point]
 
 With ratarmount, you can:
@@ -386,11 +391,16 @@ Recursion Options:
                         (default: False)
 
 Tar Options:
+  --detect-gnu-incremental
+                        If specified, will automatically try to detect GNU tar incremental files
+                        and, if so, will strip octal modification prefixes. Note that this is only
+                        a heuristic derived by testing 1000-10000 file entries. If you are sure it
+                        is an incremental TAR, use --gnu-incremental instead. (default: False)
   --gnu-incremental     Will strip octal modification time prefixes from file paths, which appear
                         in GNU incremental backups created with GNU tar with the --incremental or
-                        --listed-incremental options. (default: None)
+                        --listed-incremental options. (default: False)
   --no-gnu-incremental  If specified, will never strip octal modification prefixes and will also
-                        not do automatic detection. (default: True)
+                        not do automatic detection. (default: False)
   -e ENCODING, --encoding ENCODING
                         Specify an input encoding used for file names among others in the TAR.
                         This must be used when, e.g., trying to open a latin1 encoded TAR on an
@@ -418,11 +428,29 @@ Advanced Options:
   --disable-union-mount
                         Mounts all specified archives in equally named subfolders under the mount
                         point. (default: False)
+  --index-minimum-file-count INDEX_MINIMUM_FILE_COUNT
+                        Create indexes for archives with fewer than this limit of files in memory
+                        instead of creating a .index.sqlite file. This is currently not applied
+                        for TAR files because the file count only becomes known after parsing the
+                        archive, for which an index is already created. (default: 1000)
   --oss-attributions    Show licenses of used libraries.
   --password-file PASSWORD_FILE
                         Specify a file with newline separated passwords for RAR and ZIP files. The
                         passwords will be tried out in order of appearance in the file. (default:
                         )
+  --transform REGEX_PATTERN REPLACEMENT
+                        Specify a regex pattern and a replacement string, which will be applied
+                        via Python's re module to the full paths of all archive files. (default:
+                        None)
+  --union-mount-cache-max-depth UNION_MOUNT_CACHE_MAX_DEPTH
+                        Maximum number of folder levels to descend for building the union mount
+                        cache. (default: 1024)
+  --union-mount-cache-max-entries UNION_MOUNT_CACHE_MAX_ENTRIES
+                        Maximum number of paths before stopping to descend into subfolders when
+                        building the union mount cache. (default: 100000)
+  --union-mount-cache-timeout UNION_MOUNT_CACHE_TIMEOUT
+                        Timeout in seconds before stopping to build the union mount cache.
+                        (default: 60)
   --use-backend USE_BACKEND
                         Specify a backend to be used with higher priority for files which might be
                         opened with multiple backends. Arguments specified last will have the
