@@ -40,6 +40,15 @@ class TestStenciledFile:
     def test_empty_file():
         assert StenciledFile([(tmpFile, 0, 0)]).read() == b""
 
+        with StenciledFile([]) as file:
+            assert file.readable()
+            assert file.seekable()
+            assert file.read() == b""
+            assert file.seek(0, io.SEEK_SET) == 0
+            assert file.seek(0, io.SEEK_CUR) == 0
+            assert file.seek(0, io.SEEK_END) == 0
+            assert file.read() == b""
+
     @staticmethod
     def test_findStencil():
         stenciledFile = RawStenciledFile(

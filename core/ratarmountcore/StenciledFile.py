@@ -51,7 +51,8 @@ class RawStenciledFile(io.RawIOBase):
         self.sizes: List[int] = []
         self.fileObjects: List[IO] = []
 
-        self.fileObjects, self.offsets, self.sizes = zip(*fileStencils)
+        if fileStencils:
+            self.fileObjects, self.offsets, self.sizes = zip(*fileStencils)
 
         # Check whether values make sense
         for offset in self.offsets:
@@ -221,6 +222,7 @@ class RawJoinedFileFromFactory(io.RawIOBase):
         # See StenciledFile._findStencil
         assert offset >= 0
         i = bisect.bisect_left(self.cumsizes, offset + 1) - 1
+        # i might be 0 when self.cumsizes is empty but even for no fileStencils, it is initialized with [0]
         assert i >= 0
         return i
 
