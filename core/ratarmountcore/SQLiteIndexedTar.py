@@ -693,6 +693,7 @@ class SQLiteIndexedTar(MountSource):
         fileObject.seek(0, io.SEEK_END)
         fileSize = fileObject.tell()
         fileObject.seek(0)  # Even if not interested in the file size, seeking to the start might be useful.
+        self._archiveFileSize = fileSize
 
         # rawFileObject : Only set when opening a compressed file and only kept to keep the
         #                 compressed file handle from being closed by the garbage collector.
@@ -876,7 +877,10 @@ class SQLiteIndexedTar(MountSource):
             return
 
         try:
-            if hasattr(fileobj, 'tell_compressed') and self.compression == 'bz2':
+            if hasattr(fileobj, 'tell_compressed') and (
+                ('indexed_bzip2' in sys.modules and isinstance(fileobj, indexed_bzip2.IndexedBzip2File))
+                or ('rapidgzip' in sys.modules and isinstance(fileobj, rapidgzip.RapidgzipFile))
+            ):
                 # Note that because bz2 works on a bitstream the tell_compressed returns the offset in bits
                 progressBar.update(fileobj.tell_compressed() // 8)
             elif hasattr(fileobj, 'tell_compressed'):
@@ -918,24 +922,7 @@ class SQLiteIndexedTar(MountSource):
         self, fileObject: IO[bytes], progressBar: Optional[Any] = None, pathPrefix: str = '', streamOffset: int = 0
     ) -> None:
         if progressBar is None:
-            fileSize = None
-            try:
-                fileSize = os.fstat(fileObject.fileno()).st_size
-            except io.UnsupportedOperation:
-                pass
-
-            if fileSize is None and isinstance(fileObject, ParallelXZReader):
-                oldOffset = fileObject.tell()
-                try:
-                    # This is O(1) because xz stores the block information easily accessible
-                    fileSize = fileObject.seek(0, io.SEEK_END)
-                finally:
-                    fileObject.seek(oldOffset)
-
-            if fileSize is not None:
-                progressBar = ProgressBar(fileSize)
-            elif self.printDebug >= 2:
-                print("[Info] Could not create a progress bar because the file size could not be queried.")
+            progressBar = ProgressBar(self._archiveFileSize)
 
         metadataReader = _TarFileMetadataReader(
             self, self.index.setFileInfos, lambda: self._updateProgressBar(progressBar, fileObject)
@@ -1501,17 +1488,26 @@ class SQLiteIndexedTar(MountSource):
             )
 
         if compression == 'gz':
-            # The buffer size must be much larger than the spacing or else there will be large performance penalties
-            # even for reading sequentially, see https://github.com/pauldmccarthy/indexed_gzip/issues/89
-            # Use 4x spacing because each raw read seeks from the last index point even if the position did not change
-            # since the last read call. On average, this incurs an overhead of spacing / 2. For 3x spacing, this
-            # overhead would be 1/6 = 17%, which should be negligible. The increased memory-usage is not an issue
-            # because internally many buffers are allocated with 4 * spacing size.
-            bufferSize = max(3 * 1024 * 1024, 3 * gzipSeekPointSpacing)
-            # drop_handles keeps a file handle opening as is required to call tell() during decoding
-            tar_file = indexed_gzip.IndexedGzipFile(
-                fileobj=fileobj, drop_handles=False, spacing=gzipSeekPointSpacing, buffer_size=bufferSize
-            )
+            if SQLiteIndexedTar._useRapidgzip(
+                fileobj,
+                compression=compression,
+                gzipSeekPointSpacing=gzipSeekPointSpacing,
+                prioritizedBackends=prioritizedBackends,
+                printDebug=printDebug,
+            ):
+                tar_file = rapidgzip.RapidgzipFile(fileobj, parallelization=parallelization, verbose=printDebug >= 2)
+            else:
+                # The buffer size must be much larger than the spacing or else there will be large performance penalties
+                # even for reading sequentially, see https://github.com/pauldmccarthy/indexed_gzip/issues/89
+                # Use 4x spacing because each raw read seeks from the last index point even if the position did not change
+                # since the last read call. On average, this incurs an overhead of spacing / 2. For 3x spacing, this
+                # overhead would be 1/6 = 17%, which should be negligible. The increased memory-usage is not an issue
+                # because internally many buffers are allocated with 4 * spacing size.
+                bufferSize = max(3 * 1024 * 1024, 3 * gzipSeekPointSpacing)
+                # drop_handles keeps a file handle opening as is required to call tell() during decoding
+                tar_file = indexed_gzip.IndexedGzipFile(
+                    fileobj=fileobj, drop_handles=False, spacing=gzipSeekPointSpacing, buffer_size=bufferSize
+                )
         elif compression == 'bz2':
             tar_file = indexed_bzip2.open(fileobj, parallelization=parallelization)  # type: ignore
         elif (
@@ -1529,71 +1525,63 @@ class SQLiteIndexedTar(MountSource):
         else:
             tar_file = formatOpen(fileobj)
 
+        if printDebug >= 3:
+            print(f"[Info] Undid {compression} file compression by using: {type(tar_file).__name__}")
+
         return tar_file, fileobj, compression, SQLiteIndexedTar._detectTar(tar_file, encoding, printDebug=printDebug)
 
     def _loadOrStoreCompressionOffsets(self):
         self.index.synchronizeCompressionOffsets(self.tarFileObject, self.compression)
 
-        if self.compression == 'gz':
-            self._reloadWithRapidgzip()
-
     def joinThreads(self):
         if hasattr(self.tarFileObject, 'join_threads'):
             self.tarFileObject.join_threads()
 
-    def _reloadWithRapidgzip(self):
-        # TODO Currently, only use rapidgzip when explicitly specified because it is still in development.
-        # Note that the runaway memory isn't so much an issue when the index has been created with indexed_gzip
-        # because it splits at roughly equal decompressed chunk sizes! I could also use the single-threaded
-        # rapidgzip version to create the index to avoid memory issue but then what would be the point?
-        # Getting rid of dependencies?
-        if self.rawFileObject is None or self.compression != 'gz' or 'rapidgzip' not in self.prioritizedBackends:
-            return
+    @staticmethod
+    def _useRapidgzip(
+        rawFileObject: IO[bytes],
+        compression: str,
+        gzipSeekPointSpacing: int,
+        prioritizedBackends: Optional[List[str]],
+        printDebug: int,
+    ) -> bool:
+        if (
+            rawFileObject is None
+            or compression != 'gz'
+            or not prioritizedBackends
+            or 'rapidgzip' not in prioritizedBackends
+        ):
+            return False
 
         if 'rapidgzip' not in sys.modules:
             print("[Warning] Cannot use rapidgzip for access to gzip file because it is not installed. Try:")
             print("[Warning]     python3 -m pip install --user rapidgzip")
-            return
+            return False
 
         # Check whether indexed_gzip might have a higher priority than rapidgzip if both are listed.
         if (
-            'indexed_gzip' in self.prioritizedBackends
-            and 'rapidgzip' in self.prioritizedBackends
-            and self.prioritizedBackends.index('indexed_gzip') < self.prioritizedBackends.index('rapidgzip')
+            prioritizedBackends
+            and 'indexed_gzip' in prioritizedBackends
+            and 'rapidgzip' in prioritizedBackends
+            and prioritizedBackends.index('indexed_gzip') < prioritizedBackends.index('rapidgzip')
         ):
             # Low index have higher priority (because normally the list would be checked from lowest indexes).
-            return
+            return False
 
         # Only allow mounting of real files. Rapidgzip does work with Python file objects but we don't want to
         # mount recursive archives all with the parallel gzip decoder because then the cores would be oversubscribed!
         # Similarly, small files would result in being wholly cached into memory, which probably isn't what the user
         # had intended by using ratarmount?
-        isRealFile = (
-            hasattr(self.rawFileObject, 'name') and self.rawFileObject.name and os.path.isfile(self.rawFileObject.name)
-        )
-        hasMultipleChunks = os.stat(self.rawFileObject.name).st_size >= 4 * self.gzipSeekPointSpacing
-        if not isRealFile or not hasMultipleChunks:
-            if self.printDebug >= 2:
+        isRealFile = hasattr(rawFileObject, 'name') and rawFileObject.name and os.path.isfile(rawFileObject.name)
+        hasMultipleChunks = isRealFile and os.stat(rawFileObject.name).st_size >= 4 * gzipSeekPointSpacing
+        if not hasMultipleChunks:
+            if printDebug >= 2:
                 print("[Info] Do not reopen with rapidgzip backend because:")
                 if not isRealFile:
                     print("[Info]  - the file to open is a recursive file, which limits the usability of ")
                     print("[Info]    parallel decompression.")
                 if not hasMultipleChunks:
                     print("[Info]  - is too small to qualify for parallel decompression.")
-            return
+            return False
 
-        if self.tarFileObject:
-            self.tarFileObject.close()
-
-        gzindex = self.index.openGzipIndex()
-        if gzindex:
-            if self.printDebug >= 1:
-                print("[Info] Reopening the gzip with the rapidgzip backend...")
-
-            self.tarFileObject = rapidgzip.RapidgzipFile(
-                self.rawFileObject, parallelization=self.parallelization, verbose=self.printDebug >= 2
-            )
-            self.tarFileObject.import_index(gzindex)
-
-            if self.printDebug >= 1:
-                print("[Info] Reopened the gzip with the rapidgzip backend.")
+        return True

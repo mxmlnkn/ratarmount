@@ -20,6 +20,11 @@ try:
 except ImportError:
     pass
 
+try:
+    import rapidgzip
+except ImportError:
+    pass
+
 from .version import __version__
 from .MountSource import FileInfo
 from .compressions import TAR_COMPRESSION_FORMATS
@@ -920,8 +925,12 @@ class SQLiteIndex:
         connection = self.getConnection()
         try:
             t0 = time.time()
-            # indexed_gzip 1.5.0 added support for pure Python file objects as arguments for the index!
-            importIndex(fileobj=SQLiteBlobsFile(connection, table, 'data', buffer_size=SQLiteIndex._MAX_BLOB_SIZE))
+            fileobj = SQLiteBlobsFile(connection, table, 'data', buffer_size=SQLiteIndex._MAX_BLOB_SIZE)
+            if 'rapidgzip' in sys.modules and isinstance(fileObject, rapidgzip.RapidgzipFile):
+                importIndex(fileobj)
+            else:
+                # indexed_gzip 1.5.0 added support for pure Python file objects as arguments for the index!
+                importIndex(fileobj=fileobj)
 
             # SQLiteBlobFile is rather slow to get parts of a large blob by using substr.
             # Here are some timings for 4x256 MiB blobs:
@@ -974,12 +983,18 @@ class SQLiteIndex:
         #   Time / s: 13.029 14.884 14.110 14.229 13.807
 
         db = self.getConnection()
+        db.execute('DROP TABLE IF EXISTS "gzipindexes"')
         db.execute('CREATE TABLE gzipindexes ( data BLOB )')
 
         try:
             with WriteSQLiteBlobs(db, 'gzipindexes', blob_size=SQLiteIndex._MAX_BLOB_SIZE) as gzindex:
-                exportIndex(fileobj=gzindex)
-        except indexed_gzip.ZranError as exception:
+                if 'rapidgzip' in sys.modules and isinstance(fileObject, rapidgzip.RapidgzipFile):
+                    # See the following link for the exception mapping done by Cython:
+                    # https://cython.readthedocs.io/en/latest/src/userguide/wrapping_CPlusPlus.html#exceptions
+                    exportIndex(gzindex)
+                else:
+                    exportIndex(fileobj=gzindex)
+        except (indexed_gzip.ZranError, RuntimeError, ValueError) as exception:
             db.execute('DROP TABLE IF EXISTS "gzipindexes"')
 
             print("[Warning] The GZip index required for seeking could not be written to the database!")
