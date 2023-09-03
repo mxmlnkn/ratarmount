@@ -1,4 +1,22 @@
 
+# Version 0.6.0 built on 2023-09-03
+
+ - Use `rapidgzip` instead of `indexed_gzip` by default.
+ - Do not parallelize gzip on slow drives because `pread` is slower than
+   sequential `read` on those.
+ - Enable profiling output for rapidgzip with -d 2 or greater.
+ - Do not check for GNU incremental TAR archive after an index has been loaded because
+   it is only necessary for index creation. Note that this means that`SQLiteIndexedTar.isGnuIncremental`
+   member will remain `False` when an index has been loaded.
+ - Test for incremental archive after loading the compression index to avoid having
+   to recreate it.
+ - Fix missing warning for multi-frame requirement of Zstandard archives.
+ - Fix unnecessary warning about mismatching `gzip-seek-point-spacing`
+   when loading an index for
+   archives without gzip compression.
+ - Change the default value of the `SQLiteIndexedTar` constructor argument
+   `gzipSeekPointSpacing` from 4 MiB tp 16 MiB to make it consistent with the ratarmount CLI option.
+
 # Version 0.5.0 built on 2023-02-19
 
  - Split off SQLite backend from `SQLiteIndexedTar` into `SQLiteIndex`.
