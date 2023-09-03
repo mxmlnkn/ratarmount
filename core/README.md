@@ -111,7 +111,7 @@ The factory function `open` opens one of the archive `MountSource` implementatio
 import ratarmountcore as rmc
 
 archive = rmc.open("foo.tar", recursive=True)
-archive.listDir("/")
+print(archive.listDir("/"))
 info = archive.getFileInfo("/bar")
 
 print("Contents of /bar:")
