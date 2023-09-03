@@ -163,7 +163,7 @@ class SQLiteIndex:
         # Will hold the actually opened valid path to an index file
         self.indexFilePath: Optional[str] = None
         self.encoding = encoding
-        self.possibleIndexFilePaths = SQLiteIndex._getPossibleIndexFilePaths(
+        self.possibleIndexFilePaths = SQLiteIndex.getPossibleIndexFilePaths(
             indexFilePath, indexFolders, archiveFilePath
         )
         # stores which parent folders were last tried to add to database and therefore do exist
@@ -171,7 +171,7 @@ class SQLiteIndex:
         self.checkMetadata = checkMetadata
 
     @staticmethod
-    def _getPossibleIndexFilePaths(
+    def getPossibleIndexFilePaths(
         indexFilePath: Optional[str], indexFolders: Optional[List[str]] = None, archiveFilePath: Optional[str] = None
     ) -> List[str]:
         if indexFilePath:
