@@ -230,7 +230,7 @@ checkFileInTAR()
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # try with index recreation
-    local args=( -P "$parallelization" -c --ignore-zeros --recursive "$archive" "$mountFolder" )
+    local args=( -P "$parallelization" -c --detect-gnu-incremental --ignore-zeros --recursive "$archive" "$mountFolder" )
     {
         runAndCheckRatarmount "${args[@]}" &&
         checkStat "$mountFolder/$fileInTar" &&
@@ -243,7 +243,7 @@ checkFileInTAR()
     fi
 
     # retry without forcing index recreation
-    local args=( -P "$parallelization" --ignore-zeros --recursive "$archive" "$mountFolder" )
+    local args=( -P "$parallelization" --detect-gnu-incremental --ignore-zeros --recursive "$archive" "$mountFolder" )
     {
         runAndCheckRatarmount "${args[@]}" &&
         checkStat "$mountFolder/$fileInTar" &&
@@ -1040,7 +1040,8 @@ checkRecursiveFolderMounting()
     for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
         'cp' -- "${tests[iTest+1]}" "$archiveFolder"
     done
-    runAndCheckRatarmount -P "$parallelization" -c --ignore-zeros --recursive "$@" "$archiveFolder" "$mountFolder"
+    runAndCheckRatarmount -P "$parallelization" -c --detect-gnu-incremental --ignore-zeros --recursive \
+        "$@" "$archiveFolder" "$mountFolder"
 
     local nChecks=0
     for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do

@@ -1200,13 +1200,19 @@ seeking capabilities when opening that file.
              'is useful when reading archives created with the -A option.')
 
     tarGroup.add_argument(
-        '--gnu-incremental', dest='gnu_incremental', action='store_true', default=None,
+        '--gnu-incremental', dest='gnu_incremental', action='store_true', default=False,
         help='Will strip octal modification time prefixes from file paths, which appear in GNU incremental backups '
              'created with GNU tar with the --incremental or --listed-incremental options.')
 
     tarGroup.add_argument(
-        '--no-gnu-incremental', dest='gnu_incremental', action='store_false',
+        '--no-gnu-incremental', dest='gnu_incremental', action='store_false', default=False,
         help='If specified, will never strip octal modification prefixes and will also not do automatic detection.')
+
+    tarGroup.add_argument(
+        '--detect-gnu-incremental', dest='gnu_incremental', action='store_const', const=None, default=False,
+        help='If specified, will automatically try to detect GNU tar incremental files and, if so, will strip '
+             'octal modification prefixes. Note that this is only a heuristic derived by testing 1000-10000 file '
+             'entries. If you are sure it is an incremental TAR, use --gnu-incremental instead.')
 
     # Write Overlay Options
 
