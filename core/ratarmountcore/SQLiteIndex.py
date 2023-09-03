@@ -145,17 +145,25 @@ class SQLiteIndex:
         encoding: str = tarfile.ENCODING,
         checkMetadata: Optional[Callable[[Dict[str, Any]], None]] = None,
         printDebug: int = 0,
+        preferMemory: bool = False,
     ):
         """
-        indexFilePath : Path to the index file. This takes precedence over defaultIndexFilePath.
-                        If it is ':memory:', then the SQLite database will be kept in memory
-                        and not stored to the file system at any point.
-        indexFolders : Specify one or multiple paths for storing .index.sqlite files. Paths will be tested for
-                       suitability in the given order. An empty path will be interpreted as the location in which
-                       the archive resides in.
-        checkMetadata : A verifying callback that is called when opening an existing index. It is given the
-                        the dictionary of metadata in the index and should thrown an exception when the index
-                        should not be used, e.g., because the version is incompatible.
+        indexFilePath
+            Path to the index file. This takes precedence over defaultIndexFilePath.
+            If it is ':memory:', then the SQLite database will be kept in memory
+            and not stored to the file system at any point.
+        indexFolders
+            Specify one or multiple paths for storing .index.sqlite files. Paths will be tested for
+            suitability in the given order. An empty path will be interpreted as the location in which
+            the archive resides in.
+        checkMetadata
+            A verifying callback that is called when opening an existing index. It is given the
+            the dictionary of metadata in the index and should thrown an exception when the index
+            should not be used, e.g., because the version is incompatible.
+        preferMemory
+            If True, then load existing indexes and write to explicitly given index file paths but
+            if no such things are given, then create the new index in memory as if indexFilePath
+            = ':memory:' was specified.
         """
 
         self.printDebug = printDebug
@@ -169,6 +177,7 @@ class SQLiteIndex:
         # stores which parent folders were last tried to add to database and therefore do exist
         self.parentFolderCache: List[Tuple[str, str]] = []
         self.checkMetadata = checkMetadata
+        self.preferMemory = preferMemory
 
     @staticmethod
     def getPossibleIndexFilePaths(
@@ -210,7 +219,7 @@ class SQLiteIndex:
         self._openPath(':memory:')
 
     def openWritable(self):
-        if self.possibleIndexFilePaths:
+        if self.possibleIndexFilePaths and not self.preferMemory:
             for indexPath in self.possibleIndexFilePaths:
                 if SQLiteIndex._pathIsWritable(
                     indexPath, printDebug=self.printDebug
@@ -218,6 +227,8 @@ class SQLiteIndex:
                     self._openPath(indexPath)
                     break
         else:
+            if self.printDebug >= 3 and self.preferMemory:
+                print("[Info] Create new index in memory because memory is to be preferred, e.g., for small archives.")
             self._openPath(':memory:')
 
         if not self.indexIsLoaded():

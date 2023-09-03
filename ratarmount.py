@@ -1309,6 +1309,12 @@ seeking capabilities when opening that file.
         '--union-mount-cache-timeout', type=float, default=60,
         help='Timeout in seconds before stopping to build the union mount cache.')
 
+    advancedGroup.add_argument(
+        '--index-minimum-file-count', type=int, default=1000,
+        help='Create indexes for archives with fewer than this limit of files in memory instead of '
+             'creating a .index.sqlite file. This is currently not applied for TAR files because the file count '
+             'only becomes known after parsing the archive, for which an index is already created.')
+
     # Positional Arguments
 
     positionalGroup.add_argument(
@@ -1643,6 +1649,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         maxCacheDepth                = args.union_mount_cache_max_depth,
         maxCacheEntries              = args.union_mount_cache_max_entries,
         maxSecondsToCache            = args.union_mount_cache_timeout,
+        indexMinimumFileCount        = args.index_minimum_file_count,
         # fmt: on
     )
 

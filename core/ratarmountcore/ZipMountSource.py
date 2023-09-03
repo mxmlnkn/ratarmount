@@ -220,15 +220,6 @@ class ZipMountSource(MountSource):
         ZipMountSource._findPassword(self.fileObject, options.get("passwords", []))
         self.files = {info.header_offset: info for info in self.fileObject.infolist()}
 
-        # If no explicit index file path given and if it is a very small file, then avoid creating an obnoxious
-        # index file for it. This becomes especially important when mounting folders of ZIPs!
-        possibleIndexFilePaths = SQLiteIndex.getPossibleIndexFilePaths(
-            indexFilePath = indexFilePath, indexFolders = indexFolders, archiveFilePath = self.archiveFilePath
-        )
-        indexExists = any(path and os.path.isfile(path) for path in possibleIndexFilePaths)
-        if indexFilePath is None and len(self.files) < options.get("indexMinimumFileCount", 1000) and not indexExists:
-            indexFilePath = ':memory:'
-
         self.index = SQLiteIndex(
             indexFilePath,
             indexFolders=indexFolders,
@@ -236,6 +227,7 @@ class ZipMountSource(MountSource):
             encoding=self.encoding,
             checkMetadata=self._checkMetadata,
             printDebug=self.printDebug,
+            preferMemory=len(self.files) < options.get("indexMinimumFileCount", 1000),
         )
 
         if clearIndexCache:
