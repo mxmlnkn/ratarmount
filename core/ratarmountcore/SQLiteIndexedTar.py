@@ -391,8 +391,8 @@ class _TarFileMetadataReader:
             if result:
                 offset, typeFlag = result
 
-                if typeFlag == b'D' and self._parent.isGnuIncremental is None:
-                    self._parent.isGnuIncremental = True
+                if typeFlag == b'D' and self._parent._isGnuIncremental is None:
+                    self._parent._isGnuIncremental = True
                     if self._parent.printDebug >= 1:
                         print("[Warning] A folder metadata entry for GNU incremental archives")
                         print("[Warning] was encountered but this archive was not automatically recognized as such!")
@@ -420,7 +420,7 @@ class _TarFileMetadataReader:
                             subSize,
                             pathPrefix,
                             streamOffset,
-                            self._parent.isGnuIncremental,
+                            self._parent._isGnuIncremental,
                             self._parent.mountRecursively,
                             self._parent.ignoreZeros,
                             self._parent.encoding,
@@ -499,12 +499,12 @@ class _TarFileMetadataReader:
                     self._lastUpdateTime = time.time()
                     self._updateProgressBar()
 
-                newFileInfos, mightBeTar, self._parent.isGnuIncremental = _TarFileMetadataReader._processTarInfo(
+                newFileInfos, mightBeTar, self._parent._isGnuIncremental = _TarFileMetadataReader._processTarInfo(
                     tarInfo,
                     fileObject=fileObject,
                     pathPrefix=pathPrefix,
                     streamOffset=streamOffset,
-                    isGnuIncremental=self._parent.isGnuIncremental,
+                    isGnuIncremental=self._parent._isGnuIncremental,
                     mountRecursively=self._parent.mountRecursively,
                     printDebug=self._parent.printDebug,
                 )
@@ -655,7 +655,7 @@ class SQLiteIndexedTar(MountSource):
         self.parallelization              = parallelization
         self.printDebug                   = printDebug
         self.isFileObject                 = fileObject is not None
-        self.isGnuIncremental             = isGnuIncremental
+        self._isGnuIncremental            = isGnuIncremental
         self.hasBeenAppendedTo            = False
         # fmt: on
         self.prioritizedBackends: List[str] = [] if prioritizedBackends is None else prioritizedBackends
@@ -730,16 +730,16 @@ class SQLiteIndexedTar(MountSource):
 
                 # Only required because self.isGnuIncremental is a public interface member, strictly speaking.
                 # Might be removed in the future. I think it is not actually needed in this case.
-                if self.isGnuIncremental is None:
-                    self.isGnuIncremental = self._detectGnuIncremental(self.tarFileObject)
+                if self._isGnuIncremental is None:
+                    self._isGnuIncremental = self._detectGnuIncremental(self.tarFileObject)
                 return
 
             # TODO This does and did not work correctly for recursive TARs because the outermost layer will change
             #      None to a hard value and from then on it would have been fixed to that value even when called
             #      inside createIndex.
             # Required for _checkIndexValidity
-            if self.isGnuIncremental is None:
-                self.isGnuIncremental = self._detectGnuIncremental(self.tarFileObject)
+            if self._isGnuIncremental is None:
+                self._isGnuIncremental = self._detectGnuIncremental(self.tarFileObject)
 
             # TODO Handling appended files to compressed archives would have to account for dropping the offsets,
             #      seeking to the first appended file while not processing any metadata and still showing a progress
@@ -775,8 +775,8 @@ class SQLiteIndexedTar(MountSource):
         #      None to a hard value and from then on it would have been fixed to that value even when called
         #      inside createIndex.
         # Required for _createIndex
-        if self.isGnuIncremental is None:
-            self.isGnuIncremental = self._detectGnuIncremental(self.tarFileObject)
+        if self._isGnuIncremental is None:
+            self._isGnuIncremental = self._detectGnuIncremental(self.tarFileObject)
 
         # Open new database when we didn't find an existing one.
         if not self.index.indexIsLoaded():
@@ -1362,7 +1362,7 @@ class SQLiteIndexedTar(MountSource):
                             file,  # only used for isGnuIncremental == True
                             "",  # pathPrefix
                             offset_header,  # will be added to all offsets to get the real offset
-                            self.isGnuIncremental,
+                            self._isGnuIncremental,
                             False,  # mountRecursively
                             self.printDebug,
                         )
