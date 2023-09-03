@@ -731,7 +731,7 @@ class SQLiteIndexedTar(MountSource):
                 # Only required because self.isGnuIncremental is a public interface member, strictly speaking.
                 # Might be removed in the future. I think it is not actually needed in this case.
                 if self.isGnuIncremental is None:
-                    self.isGnuIncremental = self._isGnuIncremental(self.tarFileObject)
+                    self.isGnuIncremental = self._detectGnuIncremental(self.tarFileObject)
                 return
 
             # TODO This does and did not work correctly for recursive TARs because the outermost layer will change
@@ -739,7 +739,7 @@ class SQLiteIndexedTar(MountSource):
             #      inside createIndex.
             # Required for _checkIndexValidity
             if self.isGnuIncremental is None:
-                self.isGnuIncremental = self._isGnuIncremental(self.tarFileObject)
+                self.isGnuIncremental = self._detectGnuIncremental(self.tarFileObject)
 
             # TODO Handling appended files to compressed archives would have to account for dropping the offsets,
             #      seeking to the first appended file while not processing any metadata and still showing a progress
@@ -776,7 +776,7 @@ class SQLiteIndexedTar(MountSource):
         #      inside createIndex.
         # Required for _createIndex
         if self.isGnuIncremental is None:
-            self.isGnuIncremental = self._isGnuIncremental(self.tarFileObject)
+            self.isGnuIncremental = self._detectGnuIncremental(self.tarFileObject)
 
         # Open new database when we didn't find an existing one.
         if not self.index.indexIsLoaded():
@@ -800,7 +800,7 @@ class SQLiteIndexedTar(MountSource):
                   "and is sized", os.stat( self.index.indexFilePath ).st_size, "B")
             # fmt: on
 
-    def _isGnuIncremental(self, fileObject: Any) -> bool:
+    def _detectGnuIncremental(self, fileObject: Any) -> bool:
         """Check for GNU incremental backup TARs."""
         oldPos = fileObject.tell()
 
