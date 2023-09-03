@@ -1311,12 +1311,15 @@ class SQLiteIndexedTar(MountSource):
             indexArgs = json.loads(metadata['arguments'])
             argumentsToCheck = [
                 'mountRecursively',
-                'gzipSeekPointSpacing',
                 'encoding',
                 'stripRecursiveTarExtension',
                 'transformRecursiveMountPoint',
                 'ignoreZeros',
             ]
+
+            if self.compression == 'gz':
+                argumentsToCheck.append('gzipSeekPointSpacing')
+
             differingArgs = []
             for arg in argumentsToCheck:
                 if arg in indexArgs and hasattr(self, arg) and indexArgs[arg] != getattr(self, arg):
