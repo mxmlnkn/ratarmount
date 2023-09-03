@@ -60,6 +60,7 @@ class WriteSQLiteBlobs(io.RawIOBase):
         self.table = table
         self.blob_size = blob_size
         self.blob = io.BytesIO()
+        self._size = 0
 
     def _flushBlob(self):
         if self.blob.tell() > 0:
@@ -105,7 +106,20 @@ class WriteSQLiteBlobs(io.RawIOBase):
             self._flushBlob()
             writtenCount += self.blob.write(buffer[freeBytesInBlob:])
 
+        self._size += writtenCount
+
         if writtenCount != len(buffer):
             raise RuntimeError("Failed to write all of the given data out!")
 
         return len(buffer)
+
+    @overrides(io.RawIOBase)
+    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
+        # We are always at SEEK_END because no real seeking is implemented.
+        if (whence in [io.SEEK_CUR, io.SEEK_END] and offset == 0) or (whence == io.SEEK_SET and offset == self.tell()):
+            return self._size
+        raise io.UnsupportedOperation()
+
+    @overrides(io.RawIOBase)
+    def tell(self) -> int:
+        return self._size
