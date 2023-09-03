@@ -1545,12 +1545,7 @@ class SQLiteIndexedTar(MountSource):
         prioritizedBackends: Optional[List[str]],
         printDebug: int,
     ) -> bool:
-        if (
-            rawFileObject is None
-            or compression != 'gz'
-            or not prioritizedBackends
-            or 'rapidgzip' not in prioritizedBackends
-        ):
+        if rawFileObject is None or compression != 'gz':
             return False
 
         if 'rapidgzip' not in sys.modules:
