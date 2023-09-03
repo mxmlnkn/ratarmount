@@ -581,6 +581,8 @@ class SQLiteIndexedTar(MountSource):
     for all contained files in an index to support fast seeking to a given file.
     """
 
+    DEFAULT_GZIP_SEEK_POINT_SPACING = 16 * 1024 * 1024
+
     def __init__(
         # fmt: off
         self,
@@ -591,7 +593,7 @@ class SQLiteIndexedTar(MountSource):
         indexFilePath                : Optional[str]             = None,
         indexFolders                 : Optional[List[str]]       = None,
         recursive                    : bool                      = False,
-        gzipSeekPointSpacing         : int                       = 4 * 1024 * 1024,
+        gzipSeekPointSpacing         : int                       = DEFAULT_GZIP_SEEK_POINT_SPACING,
         encoding                     : str                       = tarfile.ENCODING,
         stripRecursiveTarExtension   : bool                      = False,
         ignoreZeros                  : bool                      = False,
