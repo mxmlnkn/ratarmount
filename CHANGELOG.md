@@ -1,4 +1,36 @@
 
+# Version 0.14.0 built on 2023-09-03
+
+ - Add `--disable-union-mount` option to present multiple archives in subfolders under the mount point.
+ - Add fine-grained control over the union mount cache:
+   - `--union-mount-cache-max-depth`
+   - `--union-mount-cache-max-entries`
+   - `--union-mount-cache-timeout`
+ - Only use the number of cores the ratarmount process has affinity for by default.
+ - Disable auto-detection of GNU incremental TAR archives by default.
+   Use `--detect-gnu-incremental` or better `--gnu-incremental`/`--no-gnu-incremental`
+   instead.
+ - Add `--index-minimum-file-count` with sane default (1000) to avoid creating index files for
+   rather small ZIP archives.
+ - Apply name change: pragzip -> rapigzip.
+ - Fix ambiguous FUSE behavior that resulted in `find` not descending into recursively
+   mounted subarchives.
+ - (ratarmountcore 0.6.0) Use `rapidgzip` instead of `indexed_gzip` by default.
+ - (ratarmountcore 0.6.0) Do not parallelize gzip on slow drives because `pread` is slower than
+   sequential `read` on those.
+ - (ratarmountcore 0.6.0) Enable profiling output for rapidgzip with -d 2 or greater.
+ - (ratarmountcore 0.6.0) Do not check for GNU incremental TAR archive after an index has been loaded because
+   it is only necessary for index creation. Note that this means that`SQLiteIndexedTar.isGnuIncremental`
+   member will remain `False` when an index has been loaded.
+ - (ratarmountcore 0.6.0) Test for incremental archive after loading the compression index to avoid having
+   to recreate it.
+ - (ratarmountcore 0.6.0) Fix missing warning for multi-frame requirement of Zstandard archives.
+ - (ratarmountcore 0.6.0) Fix unnecessary warning about mismatching `gzip-seek-point-spacing`
+   when loading an index for
+   (ratarmountcore 0.6.0) archives without gzip compression.
+ - (ratarmountcore 0.6.0) Change the default value of the `SQLiteIndexedTar` constructor argument
+   `gzipSeekPointSpacing` from 4 MiB tp 16 MiB to make it consistent with the ratarmount CLI option.
+
 # Version 0.13.0 built on 2023-02-19
 
  - (ratarmountcore 0.5.0) Use XDG_CACHE_HOME according to FreeDesktop as default fallback
