@@ -727,11 +727,9 @@ class SQLiteIndexedTar(MountSource):
             if not self.hasBeenAppendedTo:  # indirectly set by a successful call to _tryLoadIndex
                 self._loadOrStoreCompressionOffsets()  # load
                 self.index.reloadIndexReadOnly()
-
-                # Only required because self.isGnuIncremental is a public interface member, strictly speaking.
-                # Might be removed in the future. I think it is not actually needed in this case.
-                if self._isGnuIncremental is None:
-                    self._isGnuIncremental = self._detectGnuIncremental(self.tarFileObject)
+                # TODO The value should not matter when an index has been loaded. But maybe write this to the index
+                #      and load it in order to have the correct value without having to do a very costly recheck?
+                self._isGnuIncremental = False
                 return
 
             # TODO This does and did not work correctly for recursive TARs because the outermost layer will change
