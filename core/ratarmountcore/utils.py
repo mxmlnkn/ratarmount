@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import math
+import os
 import pathlib
 import platform
 import sys
@@ -260,3 +261,18 @@ def findModuleVersion(moduleOrName: Union[str, types.ModuleType]) -> Optional[st
                 pass
 
     return None
+
+
+def isOnSlowDrive(filePath: str):
+    # TODO determine whether the whole file or most of it has been cached:
+    #      https://serverfault.com/questions/278454/is-it-possible-to-list-the-files-that-are-cached
+    #      https://github.com/mxmlnkn/rapidgzip/issues/13#issuecomment-1592856413
+    # TODO make it work on Windows: https://devblogs.microsoft.com/oldnewthing/20201023-00/?p=104395
+    try:
+        device = os.stat(filePath).st_dev
+        with open(f"/sys/dev/block/{os.major(device)}:{os.minor(device)}/queue/rotational", 'rt') as file:
+            if file.read().strip() == "1":
+                return True
+    except Exception:
+        pass
+    return False
