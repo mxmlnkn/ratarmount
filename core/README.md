@@ -2,7 +2,7 @@
 
 [![PyPI version](https://badge.fury.io/py/ratarmountcore.svg)](https://badge.fury.io/py/ratarmountcore)
 [![Python Version](https://img.shields.io/pypi/pyversions/ratarmountcore)](https://pypi.org/project/ratarmountcore/)
-[![Downloads](https://pepy.tech/badge/ratarmountcore/month)](https://pepy.tech/project/ratarmountcore)
+[![Downloads](https://static.pepy.tech/badge/ratarmountcore/month)](https://pepy.tech/project/ratarmountcore)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](http://opensource.org/licenses/MIT)
 
 This is the library used as backend by ratarmount (CLI).
