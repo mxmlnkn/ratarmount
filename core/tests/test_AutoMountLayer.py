@@ -14,6 +14,14 @@ import pytest  # noqa: E402
 from ratarmountcore import AutoMountLayer, openMountSource  # noqa: E402
 
 
+def findTestFile(relativePathOrName):
+    for i in range(3):
+        path = os.path.sep.join([".."] * i + ["tests", relativePathOrName])
+        if os.path.exists(path):
+            return path
+    return relativePathOrName
+
+
 @pytest.mark.parametrize("parallelization", [1, 2, 4])
 class TestAutoMountLayer:
     @staticmethod
@@ -25,7 +33,7 @@ class TestAutoMountLayer:
             'transformRecursiveMountPoint': ('.*/([^/]*).tar', r'\1'),
         }
 
-        with openMountSource("tests/packed-100-times.tar.gz", **options) as mountSource:
+        with openMountSource(findTestFile("packed-100-times.tar.gz"), **options) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
 
             assert recursivelyMounted.listDir('/')
@@ -47,7 +55,7 @@ class TestAutoMountLayer:
         #      other files and those other files will actually take 10x or more longer than without this test running
         #      before! It might be that the memory usage makes Python's garbage collector a bottleneck because of too
         #      many small objects?!
-        with openMountSource("tests/compressed-100-times.tar.gz", **options) as mountSource:
+        with openMountSource(findTestFile("compressed-100-times.tar.gz"), **options) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
 
             assert recursivelyMounted.listDir('/')
@@ -68,7 +76,7 @@ class TestAutoMountLayer:
         # > Recursively mounted: /ufo_805.gz
         # >  File "core/ratarmountcore/SQLiteIndexedTar.py", line 2085, in _detectTar
         # > indexed_gzip.indexed_gzip.ZranError: zran_read returned error: ZRAN_READ_FAIL (file: n/a)
-        with openMountSource("tests/compressed-100-times.gz", **options) as mountSource:
+        with openMountSource(findTestFile("compressed-100-times.gz"), **options) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
 
             assert recursivelyMounted.listDir('/')
