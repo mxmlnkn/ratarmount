@@ -286,10 +286,15 @@ class ZipMountSource(MountSource):
 
         path, name = SQLiteIndex.normpath(info.filename).rsplit("/", 1)
 
-        # Currently, this is unused. The index only is used for getting metadata. But the data offset
+        # Currently, this is unused. The index only is used for getting metadata. (The data offset
         # is already determined and written out in order to possibly speed up reading of encrypted
-        # files by implementing the decryption ourselves.
-        dataOffset = self._findDataOffset(info.header_offset)
+        # files by implementing the decryption ourselves.)
+        # The data offset is deprecated again! Collecting it can add a huge overhead for large zip files
+        # because we have to seek to every position and read a few bytes from it. Furthermore, it is useless
+        # by itself anyway. We don't even store yet how the data is compressed or encrypted, so we would
+        # have to read the local header again anyway!
+        # dataOffset = self._findDataOffset(info.header_offset)
+        dataOffset = 0
 
         # fmt: off
         fileInfo : Tuple = (
