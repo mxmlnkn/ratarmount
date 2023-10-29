@@ -1,4 +1,8 @@
 
+# Version 0.6.1 built on 2023-10-29
+
+ - Skip data offset collection for zip files because it takes too long and is unused.
+
 # Version 0.6.0 built on 2023-09-03
 
  - Use `rapidgzip` instead of `indexed_gzip` by default.
