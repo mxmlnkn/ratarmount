@@ -1,4 +1,8 @@
 
+# Version 0.6.2 built on 2023-12-26
+
+ - Fix faulty seek forward for file opened via `RarMountSource` when whence is not `io.SEEK_SET`.
+
 # Version 0.6.1 built on 2023-10-29
 
  - Skip data offset collection for zip files because it takes too long and is unused.
