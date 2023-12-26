@@ -63,6 +63,14 @@ class RawFileInsideRar(io.RawIOBase):
         return False
 
     @overrides(io.RawIOBase)
+    def readall(self) -> bytes:
+        return self.fileobj.readall()
+
+    @overrides(io.RawIOBase)
+    def readinto(self, buffer) -> int:
+        return self.fileobj.readinto(buffer)
+
+    @overrides(io.RawIOBase)
     def read(self, size: int = -1) -> bytes:
         return self.fileobj.read(size)
 
