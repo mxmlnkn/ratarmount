@@ -70,12 +70,14 @@ jobs:
         # Oldest and newest versions should be enough. Python versions are supported 5 years from release date.
         # 3.5 was released 2015-09-13 and end-of-life was 2020-09-13
         # 3.6 was released 2016-12-23 and end-of-life was 2021-12-23
-        # 3.7 was released 2018-06-27 and end-of-life will be 2023-06-27
+        # 3.7 was released 2018-06-27 and end-of-life was 2023-06-27
         # 3.8 was released 2019-10-14 and end-of-life will be 2024-10-14
         # 3.9 was released 2020-10-05 and end-of-life will be 2025-10-25
         # 3.10 was released 2021-10-04 and end-of-life will be 2026-10-04
-        # 3.11 is to be released 2022-10-03
-        python-version: ['3.7', '3.11']
+        # 3.11 was released 2022-10-24 and end-of-life will be 2027-10
+        # 3.12 was released 2023-10-02 and end-of-life will be 2028-10
+        # 3.13 is to be released 2024-10
+        python-version: ['3.7', '3.12']
 
     defaults:
       run:
