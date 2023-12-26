@@ -73,10 +73,8 @@ class RawFileInsideRar(io.RawIOBase):
         elif whence == io.SEEK_END:
             offset += self.file_size
 
-        if offset >= self.tell():
-            return self.fileobj.seek(offset, whence)
-
-        self.fileobj = self.reopen()
+        if offset < self.tell():
+            self.fileobj = self.reopen()
         return self.fileobj.seek(offset, io.SEEK_SET)
 
     @overrides(io.RawIOBase)
