@@ -3,6 +3,7 @@
 
 import collections
 import concurrent.futures
+import io
 import os
 import struct
 import sys
@@ -423,5 +424,52 @@ def getGzipInfo(fileobj: IO[bytes]) -> Optional[Tuple[str, int]]:
             name += c
             c = fileobj.read(1)
         return name.decode(), mtime
+
+    return None
+
+
+def detectCompression(
+    fileobj: IO[bytes], prioritizedBackends: Optional[List[str]], printDebug: int = 0
+) -> Optional[str]:
+    if not isinstance(fileobj, io.IOBase) or not fileobj.seekable():
+        return None
+
+    oldOffset = fileobj.tell()
+    for compressionId, compression in TAR_COMPRESSION_FORMATS.items():
+        # The header check is a necessary condition not a sufficient condition.
+        # Especially for gzip, which only has 2 magic bytes, false positives might happen.
+        # Therefore, only use the magic bytes based check if the module could not be found
+        # in order to still be able to print pinpoint error messages.
+        matches = compression.checkHeader(fileobj)
+        fileobj.seek(oldOffset)
+        if not matches:
+            continue
+
+        formatOpen = findAvailableOpen(compressionId, prioritizedBackends)
+        # If no appropriate module exists, then don't do any further checks.
+        if not formatOpen:
+            if printDebug >= 1:
+                print(
+                    f"[Warning] A given file with magic bytes for {compressionId} could not be opened because "
+                    "no appropriate Python module could be loaded. Are some dependencies missing? To install "
+                    "ratarmountcore with all dependencies do: python3 -m pip install --user ratarmountcore[full]"
+                )
+            return None
+
+        try:
+            compressedFileobj = formatOpen(fileobj)
+            # Reading 1B from a single-frame zst file might require decompressing it fully in order
+            # to get uncompressed file size! Avoid that. The magic bytes should suffice mostly.
+            # TODO: Make indexed_zstd not require the uncompressed size for the read call.
+            if compressionId != 'zst':
+                compressedFileobj.read(1)
+            compressedFileobj.close()
+            fileobj.seek(oldOffset)
+            return compressionId
+        except Exception as e:
+            if printDebug >= 2:
+                print(f"[Warning] A given file with magic bytes for {compressionId} could not be opened because:")
+                print(e)
+            fileobj.seek(oldOffset)
 
     return None
