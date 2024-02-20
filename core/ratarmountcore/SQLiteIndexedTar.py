@@ -710,7 +710,10 @@ class SQLiteIndexedTar(MountSource):
             printDebug=self.printDebug,
         )
         if not self.isTar and not self.rawFileObject:
-            raise RatarmountError("File object (" + str(fileObject) + ") could not be opened as a TAR file!")
+            fileObjectInfo = str(fileObject)
+            if not self.isFileObject:
+                fileObject.close()
+            raise RatarmountError(f"File object ({fileObjectInfo}) could not be opened as a TAR file!")
 
         self.fileObjectLock = threading.Lock()
 
