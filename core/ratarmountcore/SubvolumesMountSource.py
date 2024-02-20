@@ -90,21 +90,23 @@ class SubvolumesMountSource(MountSource):
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo) -> IO[bytes]:
-        mountSource = fileInfo.userdata.pop()
+        subvolume = fileInfo.userdata.pop()
+        if subvolume is None:
+            raise ValueError(f"Found subvolume is None for fileInfo: {fileInfo}")
         try:
-            assert isinstance(mountSource, MountSource)
-            return mountSource.open(fileInfo)
+            return self.mountSources[subvolume].open(fileInfo)
         finally:
-            fileInfo.userdata.append(mountSource)
+            fileInfo.userdata.append(subvolume)
 
     @overrides(MountSource)
     def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
-        mountSource = fileInfo.userdata.pop()
+        subvolume = fileInfo.userdata.pop()
+        if subvolume is None:
+            raise ValueError(f"Found subvolume is None for fileInfo: {fileInfo}")
         try:
-            assert isinstance(mountSource, MountSource)
-            return mountSource.read(fileInfo, size, offset)
+            return self.mountSources[subvolume].read(fileInfo, size, offset)
         finally:
-            fileInfo.userdata.append(mountSource)
+            fileInfo.userdata.append(subvolume)
 
     @overrides(MountSource)
     def getMountSource(self, fileInfo: FileInfo) -> Tuple[str, MountSource, FileInfo]:
