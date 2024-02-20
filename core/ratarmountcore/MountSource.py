@@ -81,3 +81,11 @@ class MountSource(ABC):
     def isdir(self, path: str):
         fileInfo = self.getFileInfo(path)
         return fileInfo is not None and stat.S_ISDIR(fileInfo.mode)
+
+    def __enter__(self):
+        return self
+
+    # If the derived MountSource opens some file object or similar in its constructor
+    # then it should override this and close the file object.
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        pass

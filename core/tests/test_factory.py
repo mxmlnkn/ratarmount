@@ -22,15 +22,15 @@ class TestOpenMountSource:
         with open(os.path.join(tmpdir, "foo.002"), 'wb') as file:
             file.write(compressed[len(compressed) // 2 :])
 
-        mountSource = openMountSource(os.path.join(tmpdir, "foo.001"))
-        fileInfo = mountSource.getFileInfo("/<file object>")
-        assert fileInfo
-        assert mountSource.open(fileInfo).read() == b"foobar"
+        with openMountSource(os.path.join(tmpdir, "foo.001")) as mountSource:
+            fileInfo = mountSource.getFileInfo("/<file object>")
+            assert fileInfo
+            assert mountSource.open(fileInfo).read() == b"foobar"
 
-        mountSource = openMountSource(os.path.join(tmpdir, "foo.002"))
-        fileInfo = mountSource.getFileInfo("/<file object>")
-        assert fileInfo
-        assert mountSource.open(fileInfo).read() == b"foobar"
+        with openMountSource(os.path.join(tmpdir, "foo.002")) as mountSource:
+            fileInfo = mountSource.getFileInfo("/<file object>")
+            assert fileInfo
+            assert mountSource.open(fileInfo).read() == b"foobar"
 
     @staticmethod
     def test_joining_file(tmpdir):
@@ -39,11 +39,12 @@ class TestOpenMountSource:
         with open(os.path.join(tmpdir, "foo.002"), 'wb') as file:
             file.write(b"bar")
 
-        mountSource = openMountSource(os.path.join(tmpdir, "foo.001"))
-        print("mountSource list:", mountSource.listDir("/"))
-        fileInfo = mountSource.getFileInfo("/foo")
-        assert fileInfo
-        assert mountSource.open(fileInfo).read() == b"foobar"
+        print(type(openMountSource(os.path.join(tmpdir, "foo.001"))))
+        with openMountSource(os.path.join(tmpdir, "foo.001")) as mountSource:
+            print("mountSource list:", mountSource.listDir("/"))
+            fileInfo = mountSource.getFileInfo("/foo")
+            assert fileInfo
+            assert mountSource.open(fileInfo).read() == b"foobar"
 
     @staticmethod
     def test_joining_files_exceeding_handle_limit(tmpdir):
@@ -53,7 +54,7 @@ class TestOpenMountSource:
                 file.write(str(i).encode())
                 result += str(i).encode()
 
-        mountSource = openMountSource(os.path.join(tmpdir, "foo.005"))
-        fileInfo = mountSource.getFileInfo("/foo")
-        assert fileInfo
-        assert mountSource.open(fileInfo).read() == result
+        with openMountSource(os.path.join(tmpdir, "foo.005")) as mountSource:
+            fileInfo = mountSource.getFileInfo("/foo")
+            assert fileInfo
+            assert mountSource.open(fileInfo).read() == result

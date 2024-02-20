@@ -48,7 +48,9 @@ class TestSQLiteIndexedTarParallelized:
 
     @staticmethod
     def test_context_manager(parallelization):
-        with SQLiteIndexedTar(findTestFile('single-file.tar'), writeIndex=False, parallelization=parallelization) as indexedTar:
+        with SQLiteIndexedTar(
+            findTestFile('single-file.tar'), writeIndex=False, parallelization=parallelization
+        ) as indexedTar:
             assert indexedTar.listDir('/')
 
     @staticmethod
