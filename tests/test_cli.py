@@ -222,6 +222,7 @@ ARCHIVES_TO_TEST = [
     ("19696f24a91fc4e8950026f9c801a0d0", "simple.bz2", "simple"),
     ("19696f24a91fc4e8950026f9c801a0d0", "simple.gz", "simple"),
     ("19696f24a91fc4e8950026f9c801a0d0", "simple.xz", "simple"),
+    ("19696f24a91fc4e8950026f9c801a0d0", "simple.zlib", "simple"),
     ("19696f24a91fc4e8950026f9c801a0d0", "simple.zst", "simple"),
     ("2709a3348eb2c52302a7606ecf5860bc", "file-existing-as-non-link-and-link.tar", "foo/fighter/ufo"),
     ("d3b07384d113edec49eaa6238ad5ff00", "two-self-links-to-existing-file.tar", "bar"),

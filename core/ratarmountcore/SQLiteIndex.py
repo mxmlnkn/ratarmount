@@ -1065,7 +1065,11 @@ class SQLiteIndex:
             db.commit()
             return
 
-        if hasattr(fileObject, 'import_index') and hasattr(fileObject, 'export_index') and compression == 'gz':
+        if (
+            hasattr(fileObject, 'import_index')
+            and hasattr(fileObject, 'export_index')
+            and compression in ['gz', 'zlib']
+        ):
             tables = getSqliteTables(db)
 
             if 'gzipindex' in tables or 'gzipindexes' in tables:

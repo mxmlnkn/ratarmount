@@ -1050,7 +1050,7 @@ class SQLiteIndexedTar(MountSource):
                 tarInfo = None
 
             fname = os.path.basename(self.tarFileName)
-            for suffix in ['.gz', '.bz2', '.bzip2', '.gzip', '.xz', '.zst', '.zstd']:
+            for suffix in ['.gz', '.bz2', '.bzip2', '.gzip', '.xz', '.zst', '.zstd', '.zz', '.zlib']:
                 if fname.lower().endswith(suffix) and len(fname) > len(suffix):
                     fname = fname[: -len(suffix)]
                     break

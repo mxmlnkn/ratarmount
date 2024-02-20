@@ -74,6 +74,22 @@ CompressionModuleInfo = collections.namedtuple('CompressionModuleInfo', ['name',
 CompressionInfo = collections.namedtuple('CompressionInfo', ['suffixes', 'doubleSuffixes', 'modules', 'checkHeader'])
 
 
+def checkZlibHeader(file):
+    header = file.read(2)
+    cmf = header[0]
+    if cmf & 0xF != 8:
+        return False
+    if cmf >> 4 > 7:
+        return False
+    flags = header[1]
+    if ((cmf << 8) + flags) % 31 != 0:
+        return False
+    usesDictionary = ((flags >> 5) & 1) != 0
+    if usesDictionary:
+        return False
+    return True
+
+
 TAR_COMPRESSION_FORMATS: Dict[str, CompressionInfo] = {
     'bz2': CompressionInfo(
         ['bz2', 'bzip2'],
@@ -105,6 +121,12 @@ TAR_COMPRESSION_FORMATS: Dict[str, CompressionInfo] = {
         ['tzst'],
         [CompressionModuleInfo('indexed_zstd', lambda x: indexed_zstd.IndexedZstdFile(x.fileno()))],
         lambda x: x.read(4) == (0xFD2FB528).to_bytes(4, 'little'),
+    ),
+    'zlib': CompressionInfo(
+        ['zz', 'zlib'],
+        [],
+        [CompressionModuleInfo('rapidgzip', lambda x: rapidgzip.RapidgzipFile(x))],
+        checkZlibHeader,
     ),
 }
 
