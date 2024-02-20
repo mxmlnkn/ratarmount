@@ -10,6 +10,7 @@ jobs:
     env:
       APP_PYTHON_VERSION: "3.12"
     steps:
+    # Cannot use checkout@v4 because it requires a newer GLIBC version than manylinux2014!
     - uses: actions/checkout@v3
 
     - name: Build AppImage
@@ -53,7 +54,7 @@ jobs:
         ratarmount --help
         ratarmount --version
 
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Test Simple Mount
       run: |
