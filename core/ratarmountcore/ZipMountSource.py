@@ -2,11 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import datetime
-import io
 import json
 import os
 import stat
-import struct
 import tarfile
 from timeit import default_timer as timer
 
@@ -16,182 +14,6 @@ from .compressions import zipfile
 from .MountSource import FileInfo, MountSource
 from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
 from .utils import InvalidIndexError, overrides
-
-
-# Only really 8 (Deflate), 12 (bzip2), 14 (LZMA), and maybe 93 (Zstandard) are common.
-# 1-6 are not even recommended by the APPNOTE anymore.
-COMPRESSION_METHODS = {
-    0: "The file is stored (no compression)",
-    1: "The file is Shrunk",
-    2: "The file is Reduced with compression factor 1",
-    3: "The file is Reduced with compression factor 2",
-    4: "The file is Reduced with compression factor 3",
-    5: "The file is Reduced with compression factor 4",
-    6: "The file is Imploded",
-    7: "Reserved for Tokenizing compression algorithm",
-    8: "Deflate",  # Most common. Should be supported!
-    9: "Enhanced Deflating using Deflate64(tm)",
-    10: "PKWARE Data Compression Library Imploding (old IBM TERSE)",
-    11: "Reserved by PKWARE",
-    12: "BZIP2",  # Next most common.
-    13: "Reserved by PKWARE",
-    14: "LZMA",  # Also in use.
-    15: "Reserved by PKWARE",
-    16: "IBM z/OS CMPSC Compression",
-    17: "Reserved by PKWARE",
-    18: "File is compressed using IBM TERSE (new)",
-    19: "IBM LZ77 z Architecture",
-    20: "deprecated (use method 93 for zstd)",
-    93: "Zstandard (zstd) Compression",  # Modern compression
-    94: "MP3 Compression",
-    95: "XZ Compression",  # I think that LZMA is used instead of this?
-    96: "JPEG variant",
-    97: "WavPack compressed data",
-    98: "PPMd version I, Rev 1",
-    99: "AE-x encryption marker (see APPENDIX E)",
-}
-
-EXTRA_FIELD_IDS = {
-    0x0001: "Zip64 extended information extra field",
-    0x0007: "AV Info",
-    0x0008: "Reserved for extended language encoding data (PFS) (see APPENDIX D)",
-    0x0009: "OS/2",
-    0x000A: "NTFS",
-    0x000C: "OpenVMS",
-    0x000D: "UNIX",
-    0x000E: "Reserved for file stream and fork descriptors",
-    0x000F: "Patch Descriptor",
-    0x0014: "PKCS#7 Store for X.509 Certificates",
-    0x0015: "X.509 Certificate ID and Signature for individual file",
-    0x0016: "X.509 Certificate ID for Central Directory",
-    0x0017: "Strong Encryption Header",
-    0x0018: "Record Management Controls",
-    0x0019: "PKCS#7 Encryption Recipient Certificate List",
-    0x0020: "Reserved for Timestamp record",
-    0x0021: "Policy Decryption Key Record",
-    0x0022: "Smartcrypt Key Provider Record",
-    0x0023: "Smartcrypt Policy Key Data Record",
-    0x0065: "IBM S/390 (Z390), AS/400 (I400) attributes - uncompressed",
-    0x0066: "Reserved for IBM S/390 (Z390), AS/400 (I400) attributes - compressed",
-    0x4690: "POSZIP 4690 (reserved)",
-    0x07C8: "Macintosh",
-    0x1986: "Pixar USD header ID",
-    0x2605: "ZipIt Macintosh",
-    0x2705: "ZipIt Macintosh 1.3.5+",
-    0x2805: "ZipIt Macintosh 1.3.5+",
-    0x334D: "Info-ZIP Macintosh",
-    0x4154: "Tandem",
-    0x4341: "Acorn/SparkFS",
-    0x4453: "Windows NT security descriptor (binary ACL)",
-    0x4704: "VM/CMS",
-    0x470F: "MVS",
-    0x4854: "THEOS (old?)",
-    0x4B46: "FWKCS MD5 (see below)",
-    0x4C41: "OS/2 access control list (text ACL)",
-    0x4D49: "Info-ZIP OpenVMS",
-    0x4D63: "Macintosh Smartzip (??)",
-    0x4F4C: "Xceed original location extra field",
-    0x5356: "AOS/VS (ACL)",
-    0x5455: "extended timestamp",
-    0x554E: "Xceed unicode extra field",
-    0x5855: "Info-ZIP UNIX (original, also OS/2, NT, etc)",
-    0x6375: "Info-ZIP Unicode Comment Extra Field",
-    0x6542: "BeOS/BeBox",
-    0x6854: "THEOS",
-    0x7075: "Info-ZIP Unicode Path Extra Field",
-    0x7441: "AtheOS/Syllable",
-    0x756E: "ASi UNIX",
-    0x7855: "Info-ZIP UNIX (new)",
-    0x7875: "Info-ZIP UNIX (newer UID/GID)",
-    0xA11E: "Data Stream Alignment (Apache Commons-Compress)",
-    0xA220: "Microsoft Open Packaging Growth Hint",
-    0xCAFE: "Java JAR file Extra Field Header ID",
-    0xD935: "Android ZIP Alignment Extra Field",
-    0xE57A: "Korean ZIP code page info",
-    0xFD4A: "SMS/QDOS",
-    0x9901: "AE-x encryption structure (see APPENDIX E)",
-    0x9902: "unknown",
-}
-
-
-class LocalFileHeader:
-    """
-    This class can be constructed from a file object. During construction it reads the ZIP local file header
-    from the current position and advances the position to the file data.
-    Currently, this class is only indirectly used by ZipMountSource to get the file data offset.
-    """
-
-    # https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
-    #
-    # > 4.3.7  Local file header:
-    # >
-    # >    local file header signature     4 bytes  (0x04034b50)
-    # >    version needed to extract       2 bytes
-    # >    general purpose bit flag        2 bytes
-    # >    compression method              2 bytes
-    # >    last mod file time              2 bytes
-    # >    last mod file date              2 bytes
-    # >    crc-32                          4 bytes
-    # >    compressed size                 4 bytes
-    # >    uncompressed size               4 bytes
-    # >    file name length                2 bytes
-    # >    extra field length              2 bytes
-    # >
-    # >    file name (variable size)
-    # >    extra field (variable size)
-    # >
-    # > 4.3.8  File data
-    # >
-    # >    Immediately following the local header for a file
-    # >    SHOULD be placed the compressed or stored data for the file.
-    # >    If the file is encrypted, the encryption header for the file
-    # >    SHOULD be placed after the local header and before the file
-    # >    data. The series of [local file header][encryption header]
-    # >    [file data][data descriptor] repeats for each file in the
-    # >    .ZIP archive.
-    # >
-    # >    Zero-byte files, directories, and other file types that
-    # >    contain no content MUST NOT include file data.
-    #
-    # For more details, see "4.4 Explanation of fields"
-
-    FixedLocalFileHeader = struct.Struct('<LHHHHHLLLHH')
-
-    def __init__(self, fileObject: IO[bytes]):
-        result = LocalFileHeader.FixedLocalFileHeader.unpack(fileObject.read(LocalFileHeader.FixedLocalFileHeader.size))
-        assert len(result) == 11
-
-        (
-            self.signature,
-            self.extractVersion,
-            self.flags,
-            self.compression,
-            self.modificationTime,
-            self.modificationDate,
-            self.crc32,
-            self.compressedSize,
-            self.uncompressedSize,
-            self.fileNameLength,
-            self.extraFieldLength,
-        ) = result
-
-        self.fileName = fileObject.read(self.fileNameLength)
-        self.extraField = fileObject.read(self.extraFieldLength)
-
-        assert self.signature == 0x04034B50
-
-        self.encryptionHeader = fileObject.read(12) if self.isEncrypted() else None
-
-    def isEncrypted(self):
-        return (self.flags & 1) != 0
-
-    def _printExtraFields(self):
-        print("Extra Field:")
-        extraFields = io.BytesIO(self.extraField)
-        while extraFields.tell() < len(self.extraField):
-            extraId, size = struct.unpack('<HH', extraFields.read(4))
-            extraData = extraFields.read(size)
-            print(f"    ID: {EXTRA_FIELD_IDS.get(extraId, hex(extraId))}, size: {size}, contents: {extraData}")
 
 
 class ZipMountSource(MountSource):
@@ -209,7 +31,6 @@ class ZipMountSource(MountSource):
         **options
         # fmt: on
     ) -> None:
-        self.rawFileObject = open(fileOrPath, 'rb') if isinstance(fileOrPath, str) else fileOrPath
         self.fileObject = zipfile.ZipFile(fileOrPath, 'r')
         self.archiveFilePath = fileOrPath if isinstance(fileOrPath, str) else None
         self.encoding = encoding
@@ -259,11 +80,6 @@ class ZipMountSource(MountSource):
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
         self.index.storeMetadata(argumentsMetadata, self.archiveFilePath)
 
-    def _findDataOffset(self, headerOffset: int):
-        self.rawFileObject.seek(headerOffset)
-        LocalFileHeader(self.rawFileObject)
-        return self.rawFileObject.tell()
-
     def _convertToRow(self, info: "zipfile.ZipInfo") -> Tuple:
         mode = 0o555 | (stat.S_IFDIR if info.is_dir() else stat.S_IFREG)
         mtime = datetime.datetime(*info.date_time, tzinfo=datetime.timezone.utc).timestamp() if info.date_time else 0
@@ -293,7 +109,6 @@ class ZipMountSource(MountSource):
         # because we have to seek to every position and read a few bytes from it. Furthermore, it is useless
         # by itself anyway. We don't even store yet how the data is compressed or encrypted, so we would
         # have to read the local header again anyway!
-        # dataOffset = self._findDataOffset(info.header_offset)
         dataOffset = 0
 
         # fmt: off
