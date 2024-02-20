@@ -14,7 +14,7 @@ function installSystemRequirements()
     export PATH="/opt/python/cp39-cp39/bin:$PATH"
     python3 -m pip install python-appimage
     yum -y install epel-release
-    yum install -y fuse fakeroot patchelf fuse-libs libsqlite3x strace desktop-file-utils
+    yum install -y fuse fakeroot patchelf fuse-libs libsqlite3x strace desktop-file-utils libzstd-devel
 }
 
 function installAppImageTools()
@@ -122,12 +122,12 @@ fi
 APP_BASE="ratarmount-$APPIMAGE_PLATFORM"
 APP_DIR="$APP_BASE.AppDir"
 if [[ -z $APP_PYTHON_VERSION ]]; then
-    APP_PYTHON_VERSION=3.11
+    APP_PYTHON_VERSION=3.12
 fi
 APP_PYTHON_BIN="$APP_DIR/opt/python$APP_PYTHON_VERSION/bin/python$APP_PYTHON_VERSION"
 
-echo "Install System Build Tools"
 if [[ -n $AUDITWHEEL_ARCH ]]; then
+    echo "Install System Build Tools"
     # If manylinux container is implied as the current host system, install requirements.
     installSystemRequirements
 fi
@@ -141,7 +141,7 @@ python3 -m python_appimage build app -l "$APPIMAGE_PLATFORM" -p "$APP_PYTHON_VER
     exit 1
 
 echo "Extract AppImage to AppDir for Further Modification"
-./"ratarmount-$APPIMAGE_ARCH.AppImage" --appimage-extract
+./"ratarmount-$APPIMAGE_ARCH.AppImage" --appimage-extract > /dev/null
 'rm' -rf "$APP_DIR" ./"ratarmount-$APPIMAGE_ARCH.AppImage"
 mv squashfs-root/ "$APP_DIR"
 

@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     container: quay.io/pypa/manylinux2014_x86_64
     env:
-      APP_PYTHON_VERSION: "3.11"
+      APP_PYTHON_VERSION: "3.12"
     steps:
     - uses: actions/checkout@v3
 
