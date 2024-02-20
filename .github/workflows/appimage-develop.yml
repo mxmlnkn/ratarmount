@@ -22,3 +22,47 @@ jobs:
       with:
         name: ratarmount-x86_64.AppImage
         path: "AppImage/ratarmount*-x86_64.AppImage"
+
+
+  AppImage-Tests:
+    runs-on: ${{ matrix.os }}
+    needs: [Manylinux-Appimage]
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+
+    steps:
+    - uses: actions/download-artifact@v3
+      with:
+        name: ratarmount-x86_64.AppImage
+
+    - name: Install AppImage
+      run: |
+        chmod u+x ratarmount*-x86_64.AppImage
+        mv ratarmount*-x86_64.AppImage /usr/local/bin/ratarmount
+        echo "/usr/local/bin" >> $GITHUB_PATH
+
+    - name: Install Dependencies
+      run: |
+        # These are required for creating test files on the fly not for ratarmount!
+        sudo apt-get -y install bzip2 pixz zstd unar fuse
+
+    - name: Test Simple Startup
+      run: |
+        ratarmount --help
+        ratarmount --version
+
+    - uses: actions/checkout@v3
+
+    - name: Test Simple Mount
+      run: |
+        ratarmount tests/single-file.tar mimi
+        ls -la mimi
+        sleep 1s
+        ratarmount -u mimi
+
+    - name: Regression Tests
+      run: |
+        export RATARMOUNT_CMD=/usr/local/bin/ratarmount
+        bash tests/runtests.sh
