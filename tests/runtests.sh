@@ -3,7 +3,7 @@
 cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." || { echo 'Failed to cd to ratarmount.py folder!'; exit 1; }
 
 if [[ -z "$RATARMOUNT_CMD" ]]; then
-    RATARMOUNT_CMD="python3 -u $( realpath -- ratarmount.py )"
+    RATARMOUNT_CMD="python3 -X dev -u $( realpath -- ratarmount.py )"
     #RATARMOUNT_CMD=ratarmount
     export RATARMOUNT_CMD
 fi
