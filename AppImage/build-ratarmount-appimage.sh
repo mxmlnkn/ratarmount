@@ -85,15 +85,74 @@ function trimAppImage()
     APP_PYTHON_BASE="${APP_DIR}/opt/python${APP_PYTHON_VERSION}"
     APP_PYTHON_LIB="${APP_PYTHON_BASE}/lib/python${APP_PYTHON_VERSION}"
     "$APP_PYTHON_BIN" -s -m pip uninstall -y build setuptools wheel pip
-    'rm' -rf "$APP_PYTHON_LIB/site-packages/indexed_gzip/tests" \
+
+    'rm' -rf \
+        "$APP_PYTHON_LIB/site-packages/indexed_gzip/tests" \
+        "$APP_PYTHON_LIB/site-packages/indexed_gzip/"*.c \
+        "$APP_PYTHON_LIB/site-packages/indexed_gzip/"*.h \
+        "$APP_PYTHON_LIB/site-packages/indexed_gzip/"*.pxd
+
+    #"$APP_PYTHON_LIB/email"  # imported by urllib, importlib, site-packages/packaging/metadata.py
+    'rm' -rf \
            "$APP_PYTHON_BASE/include" \
            "$APP_DIR/usr/share/tcltk" \
+           "$APP_DIR/usr/lib/libpng"* \
+           "$APP_PYTHON_LIB/dbm" \
+           "$APP_PYTHON_LIB/imaplib.py" \
+           "$APP_PYTHON_LIB/mailbox.py" \
+           "$APP_PYTHON_LIB/smtplib.py" \
+           "$APP_PYTHON_LIB/smtpd.py" \
            "$APP_PYTHON_LIB/ensurepip" \
-           "$APP_PYTHON_LIB/lib2to3" \
+           "$APP_PYTHON_LIB/html" \
+           "$APP_PYTHON_LIB/idlelib" \
+           "$APP_PYTHON_LIB/pickletools.py" \
+           "$APP_PYTHON_LIB/pydoc_data" \
+           "$APP_PYTHON_LIB/pydoc.py" \
            "$APP_PYTHON_LIB/tkinter" \
-           "$APP_PYTHON_LIB/unittest"
-    find "$APP_DIR/usr/lib/" -name 'libtk8*.so' -delete
-    find "$APP_DIR/usr/lib/" -name 'libtcl8*.so' -delete
+           "$APP_PYTHON_LIB/turtledemo" \
+           "$APP_PYTHON_LIB/turtle.py" \
+           "$APP_PYTHON_LIB/unittest" \
+           "$APP_PYTHON_LIB/wsgiref" \
+           "$APP_PYTHON_LIB/xmlrpc" \
+           "$APP_PYTHON_LIB/zoneinfo" \
+           "$APP_PYTHON_LIB/__phello__"
+    # Remove unused readline and everything using it
+    'rm' -rf \
+           "$APP_DIR/usr/lib/libreadline"* \
+           "$APP_PYTHON_LIB/cmd.py" \
+           "$APP_PYTHON_LIB/code.py" \
+           "$APP_PYTHON_LIB/pdb.py" \
+           "$APP_PYTHON_LIB/profile.py" \
+           "$APP_PYTHON_LIB/pstats.py" \
+           "$APP_PYTHON_LIB/rlcompleter.py" \
+           "$APP_PYTHON_LIB/lib-dynload/readline.cpython-311-x86_64-linux-gnu.so"
+    # Remove libraries deprecated since 3.11 and to be removed in 3.13:
+    # https://docs.python.org/3.13/whatsnew/3.13.html#whatsnew313-pep594
+    'rm' -rf \
+           "$APP_DIR/usr/lib/libcrypt"* \
+           "$APP_PYTHON_LIB/aifc.py" \
+           "$APP_PYTHON_LIB/lib-dynlod/audioop"* \
+           "$APP_PYTHON_LIB/chunk.py" \
+           "$APP_PYTHON_LIB/cgi.py" \
+           "$APP_PYTHON_LIB/cgitb.py" \
+           "$APP_PYTHON_LIB/crypt.py" \
+           "$APP_PYTHON_LIB/lib-dynload/crypt"* \
+           "$APP_PYTHON_LIB/imghdr.py" \
+           "$APP_PYTHON_LIB/mailcap.py" \
+           "$APP_PYTHON_LIB/msilib.py" \
+           "$APP_PYTHON_LIB/lib-dynlib/nis"* \
+           "$APP_PYTHON_LIB/nntplib.py" \
+           "$APP_PYTHON_LIB/lib-dynlib/ossaudiodev"* \
+           "$APP_PYTHON_LIB/pipes.py" \
+           "$APP_PYTHON_LIB/sndhdr.py" \
+           "$APP_PYTHON_LIB/lib-dynlib/spwd"* \
+           "$APP_PYTHON_LIB/sunau.py" \
+           "$APP_PYTHON_LIB/telnetlib.py" \
+           "$APP_PYTHON_LIB/uu.py" \
+           "$APP_PYTHON_LIB/xdrlib.py" \
+           "$APP_PYTHON_LIB/lib2to3"
+    find "$APP_DIR/usr/lib/" -name 'libtk*.so' -delete
+    find "$APP_DIR/usr/lib/" -name 'libtcl*.so' -delete
     find "$APP_DIR" -type d -empty -print0 | xargs -0 rmdir
     find "$APP_DIR" -type d -empty -print0 | xargs -0 rmdir
     find "$APP_DIR" -name '__pycache__' -print0 | xargs -0 rm -r
@@ -155,7 +214,8 @@ echo "Clean up Unnecessary Files from AppDir"
 trimAppImage
 
 echo "Create AppImage from Modified AppDir"
-APPIMAGE_EXTRACT_AND_RUN=1 ARCH="$APPIMAGE_ARCH" appimagetool --no-appstream "$APP_BASE".App{Dir,Image}
+# times and sizes for ratarmount.AppImage --help on T14: --comp gzip: 1.6s, 12.50 MB, --comp xz: 3.0s, 12.88 MB
+APPIMAGE_EXTRACT_AND_RUN=1 ARCH="$APPIMAGE_ARCH" appimagetool --comp gzip --no-appstream "$APP_BASE".App{Dir,Image}
 
 chmod u+x "$APP_BASE.AppImage"
 version=$( ./"$APP_BASE.AppImage" --version | sed -n -E 's|ratarmount ([0-9.]+)|\1|p' &>/dev/null )
