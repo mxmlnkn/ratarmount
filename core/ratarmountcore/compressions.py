@@ -13,11 +13,6 @@ from typing import Callable, Dict, IO, Iterable, List, Optional, Tuple
 from .utils import isLatinAlpha, isLatinDigit, isLatinHexAlpha, formatNumber, ALPHA, DIGITS, HEX
 
 try:
-    import indexed_bzip2
-except ImportError:
-    indexed_bzip2 = None  # type: ignore
-
-try:
     import indexed_gzip
 except ImportError:
     indexed_gzip = None  # type: ignore
@@ -82,7 +77,7 @@ TAR_COMPRESSION_FORMATS: Dict[str, CompressionInfo] = {
     'bz2': CompressionInfo(
         ['bz2', 'bzip2'],
         ['tb2', 'tbz', 'tbz2', 'tz2'],
-        [CompressionModuleInfo('indexed_bzip2', lambda x: indexed_bzip2.open(x))],  # type: ignore
+        [CompressionModuleInfo('rapidgzip', lambda x: rapidgzip.IndexedBzip2File(x))],  # type: ignore
         lambda x: (x.read(4)[:3] == b'BZh' and x.read(6) == (0x314159265359).to_bytes(6, 'big')),
     ),
     'gz': CompressionInfo(

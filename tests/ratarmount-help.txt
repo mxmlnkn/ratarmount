@@ -169,9 +169,8 @@ Advanced Options:
                         Specify a backend to be used with higher priority for files which might
                         be opened with multiple backends. Arguments specified last will have the
                         highest priority. A comma-separated list may be specified. Possible
-                        backends: ['indexed_bzip2', 'indexed_gzip', 'indexed_zstd',
-                        'libarchive', 'lzmaffi', 'rapidgzip', 'rarfile', 'xz', 'zipfile']
-                        (default: None)
+                        backends: ['indexed_gzip', 'indexed_zstd', 'libarchive', 'lzmaffi',
+                        'rapidgzip', 'rarfile', 'xz', 'zipfile'] (default: None)
   -d DEBUG, --debug DEBUG
                         Sets the debugging level. Higher means more output. Currently, 3 is the
                         highest. (default: 1)

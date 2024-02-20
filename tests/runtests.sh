@@ -832,9 +832,9 @@ benchmarkDecoderBackends()
         printf '% 5s : ' "$compression"
         case "$compression" in
             bzip2)
-                python3 -m timeit 'from indexed_bzip2 import IndexedBzip2File as IBF; IBF( '"'$file'"' ).read();'
+                python3 -m timeit 'from rapidgzip import IndexedBzip2File as IBF; IBF( '"'$file'"' ).read();'
                 printf '% 5s : ' "pbz2"
-                python3 -m timeit 'from indexed_bzip2 import IndexedBzip2File as IBF; IBF( '"'$file'"', parallelization = 0 ).read();'
+                python3 -m timeit 'from rapidgzip import IndexedBzip2File as IBF; IBF( '"'$file'"', parallelization = 0 ).read();'
                 ;;
             gzip)
                 python3 -m timeit 'from indexed_gzip import IndexedGzipFile as IBF; IBF( '"'$file'"' ).read();'

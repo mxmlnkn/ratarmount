@@ -20,11 +20,6 @@ from timeit import default_timer as timer
 from typing import Any, Callable, cast, Dict, Generator, IO, Iterable, List, Optional, Tuple, Union
 
 try:
-    import indexed_bzip2
-except ImportError:
-    pass
-
-try:
     import indexed_gzip
 except ImportError:
     pass
@@ -896,9 +891,10 @@ class SQLiteIndexedTar(MountSource):
             return
 
         try:
-            if hasattr(fileobj, 'tell_compressed') and (
-                ('indexed_bzip2' in sys.modules and isinstance(fileobj, indexed_bzip2.IndexedBzip2File))  # type: ignore
-                or ('rapidgzip' in sys.modules and isinstance(fileobj, rapidgzip.RapidgzipFile))
+            if (
+                hasattr(fileobj, 'tell_compressed')
+                and 'rapidgzip' in sys.modules
+                and (isinstance(fileobj, rapidgzip.IndexedBzip2File) or isinstance(fileobj, rapidgzip.RapidgzipFile))
             ):
                 # Note that because bz2 works on a bitstream the tell_compressed returns the offset in bits
                 progressBar.update(fileobj.tell_compressed() // 8)
@@ -1262,7 +1258,7 @@ class SQLiteIndexedTar(MountSource):
         # of this size should not take more than 10s, so pretty negligible in my opinion.
         #
         # For compressed archives, detecting appended archives does not help much because the bottleneck is
-        # the decompression not the indexing of files. And because indexed_bzip2 and indexed_gzip probably
+        # the decompression not the indexing of files. And because rapidgzip and indexed_gzip probably
         # assume that the index is complete once import_index has been called, we have to recreate the full
         # block offsets anyway.
         if self.compression:
@@ -1588,7 +1584,7 @@ class SQLiteIndexedTar(MountSource):
                     fileobj=fileobj, drop_handles=False, spacing=gzipSeekPointSpacing, buffer_size=bufferSize
                 )
         elif compression == 'bz2':
-            tar_file = indexed_bzip2.open(fileobj, parallelization=parallelization)  # type: ignore
+            tar_file = rapidgzip.IndexedBzip2File(fileobj, parallelization=parallelization)  # type: ignore
         elif (
             compression == 'xz'
             and xz

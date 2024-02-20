@@ -15,7 +15,7 @@ import sys
 import tarfile
 import tempfile
 
-import indexed_bzip2
+import rapidgzip
 
 from helpers import copyTestFile
 
@@ -439,7 +439,7 @@ class TestSQLiteIndexedTarParallelized:
 
         # Create a TAR large in size as well as file count
         tarPath = os.path.join(tmpdir, "foo.tar")
-        with copyTestFile("tar-with-300-folders-with-1000-files-0B-files.tar.bz2") as path, indexed_bzip2.open(
+        with copyTestFile("tar-with-300-folders-with-1000-files-0B-files.tar.bz2") as path, rapidgzip.IndexedBzip2File(
             path
         ) as file, open(tarPath, 'wb') as extracted:
             while True:

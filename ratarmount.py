@@ -1025,9 +1025,9 @@ class PrintOSSAttributionAction(argparse.Action):
             ("zstd", "/facebook/zstd/dev/LICENSE"),
             ("zlib", "/madler/zlib/master/LICENSE"),
             ("ratarmountcore", "/mxmlnkn/ratarmount/master/core/LICENSE"),
-            ("indexed_bzip2", "/mxmlnkn/indexed_bzip2/master/LICENSE"),
             ("indexed_gzip", "/mxmlnkn/indexed_gzip/master/LICENSE"),
             ("indexed_zstd", "/martinellimarco/indexed_zstd/master/LICENSE"),
+            ("rapidgzip", "/mxmlnkn/rapidgzip/master/LICENSE-MIT"),
         ]:
             licenseUrl = "https://raw.githubusercontent.com" + githubPath
             licenseContents = urllib.request.urlopen(licenseUrl).read().decode()

@@ -49,11 +49,8 @@ function installAppImagePythonPackages()
     # Even though it should be like this: -I<path-to-appdir>/opt/_internal/cpython-3.9.15/include/python3.9
     if [[ -n "$USE_CUTTING_EDGE_BACKENDS" ]]; then
         "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir \
-            'git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=indexed_bzip2&subdirectory=python/indexed_bzip2'
-        "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir \
             'git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=rapidgzip&subdirectory=python/rapidgzip'
     else
-        "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir indexed_bzip2
         "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir rapidgzip
     fi
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ../core

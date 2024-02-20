@@ -76,7 +76,7 @@ class TestOpenMountSource:
 
         # Check simple open and that index files are NOT created because they are too small.
         with openMountSource(
-            chimeraFilePath, writeIndex=True, prioritizedBackends=['zipfile', 'indexed_bzip2']
+            chimeraFilePath, writeIndex=True, prioritizedBackends=['zipfile', 'rapidgzip']
         ) as mountSource:
             assert isinstance(mountSource, ZipMountSource)
             files = mountSource.listDir("/")
@@ -88,7 +88,7 @@ class TestOpenMountSource:
         with openMountSource(
             chimeraFilePath,
             writeIndex=True,
-            prioritizedBackends=['zipfile', 'indexed_bzip2'],
+            prioritizedBackends=['zipfile', 'rapidgzip'],
             indexMinimumFileCount=0,
         ) as mountSource:
             assert isinstance(mountSource, ZipMountSource)
@@ -113,7 +113,7 @@ class TestOpenMountSource:
         with openMountSource(
             chimeraFilePath,
             writeIndex=True,
-            prioritizedBackends=['indexed_bzip2', 'zipfile'],
+            prioritizedBackends=['rapidgzip', 'zipfile'],
             indexMinimumFileCount=0,
         ) as mountSource:
             assert isinstance(mountSource, ZipMountSource)
@@ -131,7 +131,7 @@ class TestOpenMountSource:
 
         # Index file is always created for compressed files such as .tar.bz2
         with openMountSource(
-            chimeraFilePath, writeIndex=True, prioritizedBackends=['indexed_bzip2', 'zipfile']
+            chimeraFilePath, writeIndex=True, prioritizedBackends=['rapidgzip', 'zipfile']
         ) as mountSource:
             assert isinstance(mountSource, SQLiteIndexedTar)
             files = mountSource.listDir("/")
@@ -149,7 +149,7 @@ class TestOpenMountSource:
         with openMountSource(
             chimeraFilePath,
             writeIndex=True,
-            prioritizedBackends=['zipfile', 'indexed_bzip2'],
+            prioritizedBackends=['zipfile', 'rapidgzip'],
             indexMinimumFileCount=0,
         ) as mountSource:
             assert isinstance(mountSource, SQLiteIndexedTar)
