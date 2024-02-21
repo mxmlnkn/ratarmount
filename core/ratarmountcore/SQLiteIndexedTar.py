@@ -1422,8 +1422,15 @@ class SQLiteIndexedTar(MountSource):
                 continue
 
             formatOpen = findAvailableOpen(compressionId, prioritizedBackends)
-            if formatOpen:
-                return compressionId
+            # If no appropriate module exists, then don't do any further checks.
+            if not formatOpen:
+                if printDebug >= 1:
+                    print(
+                        f"[Warning] A given file with magic bytes for {compressionId} could not be opened because "
+                        "no appropriate Python module could be loaded. Are some dependencies missing? To install "
+                        "ratarmountcore with all dependencies do: python3 -m pip install --user ratarmountcore[full]"
+                    )
+                return None
 
             try:
                 compressedFileobj = formatOpen(fileobj)
