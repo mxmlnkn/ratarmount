@@ -860,8 +860,8 @@ class SQLiteIndexedTar(MountSource):
         if self.tarFileObject:
             self.tarFileObject.close()
 
-        if self.rawFileObject:
-            self.tarFileObject.close()
+        if not self.isFileObject and self.rawFileObject:
+            self.rawFileObject.close()
 
     def _storeMetadata(self) -> None:
         argumentsToSave = [
