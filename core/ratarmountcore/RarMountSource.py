@@ -254,3 +254,7 @@ class RarMountSource(MountSource):
         with self.open(fileInfo) as file:
             file.seek(offset, os.SEEK_SET)
             return file.read(size)
+
+    @overrides(MountSource)
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        self.fileObject.close()

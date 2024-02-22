@@ -225,3 +225,7 @@ class FileVersionLayer(MountSource):
     @overrides(MountSource)
     def getMountSource(self, fileInfo: FileInfo) -> Tuple[str, MountSource, FileInfo]:
         return self.mountSource.getMountSource(fileInfo)
+
+    @overrides(MountSource)
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        self.mountSource.__exit__(exception_type, exception_value, exception_traceback)

@@ -74,6 +74,10 @@ class SingleFileMountSource(MountSource):
     def isImmutable(self) -> bool:
         return True
 
+    @overrides(MountSource)
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        self.fileobj.close()
+
     def isdir(self, path: str):
         fileInfo = self.getFileInfo(path)
         return fileInfo is not None and stat.S_ISDIR(fileInfo.mode)

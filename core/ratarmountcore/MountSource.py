@@ -87,5 +87,6 @@ class MountSource(ABC):
 
     # If the derived MountSource opens some file object or similar in its constructor
     # then it should override this and close the file object.
+    @abstractmethod
     def __exit__(self, exception_type, exception_value, exception_traceback):
         pass

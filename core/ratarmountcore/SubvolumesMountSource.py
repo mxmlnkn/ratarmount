@@ -120,6 +120,11 @@ class SubvolumesMountSource(MountSource):
         subpath, subMountSource, subFileInfo = mountSource.getMountSource(sourceFileInfo)
         return subvolume + '/' + subpath, subMountSource, subFileInfo
 
+    @overrides(MountSource)
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        for mountSource in self.mountSources:
+            mountSource.__exit__(exception_type, exception_value, exception_traceback)
+
     def joinThreads(self):
         for mountSource in self.mountSources:
             if hasattr(mountSource, 'joinThreads'):

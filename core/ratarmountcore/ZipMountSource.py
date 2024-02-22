@@ -190,6 +190,7 @@ class ZipMountSource(MountSource):
     def __enter__(self):
         return self
 
+    @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
         self.index.close()
         self.fileObject.close()

@@ -107,6 +107,10 @@ class FolderMountSource(MountSource):
             file.seek(offset, os.SEEK_SET)
             return file.read(size)
 
+    @overrides(MountSource)
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        pass
+
     def getFilePath(self, fileInfo: FileInfo) -> str:
         path = fileInfo.userdata[-1]
         assert isinstance(path, str)

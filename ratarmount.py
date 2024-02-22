@@ -588,6 +588,11 @@ class FuseMount(fuse.Operations):
         except Exception:
             pass
 
+        try:
+            self.mountSource.__exit__(None, None, None)
+        except Exception:
+            pass
+
     def _addNewHandle(self, handle, flags):
         # Note that fh in fuse_common.h is 64-bit and Python also supports 64-bit (long integers) out of the box.
         # So, there should practically be no overflow and file handle reuse possible.

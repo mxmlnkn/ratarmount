@@ -298,6 +298,11 @@ class AutoMountLayer(MountSource):
         deeperMountPoint, deeperMountSource, deeperFileInfo = mountSource.getMountSource(sourceFileInfo)
         return os.path.join(mountPoint, deeperMountPoint.lstrip('/')), deeperMountSource, deeperFileInfo
 
+    @overrides(MountSource)
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        for _, mountInfo in self.mounted.items():
+            mountInfo.mountSource.__exit__(exception_type, exception_value, exception_traceback)
+
     def joinThreads(self):
         for _, mountInfo in self.mounted.items():
             if hasattr(mountInfo.mountSource, 'joinThreads'):

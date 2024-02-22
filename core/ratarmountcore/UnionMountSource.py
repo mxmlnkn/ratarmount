@@ -222,6 +222,11 @@ class UnionMountSource(MountSource):
         # the mount point path returned by getMountSource to the mount point '/'.
         return mountSource.getMountSource(sourceFileInfo)
 
+    @overrides(MountSource)
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        for mountSource in self.mountSources:
+            mountSource.__exit__(exception_type, exception_value, exception_traceback)
+
     def joinThreads(self):
         for mountSource in self.mountSources:
             if hasattr(mountSource, 'joinThreads'):
