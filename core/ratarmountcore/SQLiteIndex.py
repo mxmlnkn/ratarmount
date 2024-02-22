@@ -1019,6 +1019,7 @@ class SQLiteIndex:
                 print("[Warning] size is smaller than the gzip seek point spacing.")
         elif blobCount == 1:
             # For downwards compatibility
+            db.execute('DROP TABLE IF EXISTS "gzipindex";')
             db.execute('ALTER TABLE gzipindexes RENAME TO gzipindex;')
 
         db.commit()
