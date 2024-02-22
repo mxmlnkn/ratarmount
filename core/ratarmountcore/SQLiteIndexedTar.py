@@ -882,7 +882,7 @@ class SQLiteIndexedTar(MountSource):
 
         try:
             if hasattr(fileobj, 'tell_compressed') and (
-                ('indexed_bzip2' in sys.modules and isinstance(fileobj, indexed_bzip2.IndexedBzip2File))
+                ('indexed_bzip2' in sys.modules and isinstance(fileobj, indexed_bzip2.IndexedBzip2File))  # type: ignore
                 or ('rapidgzip' in sys.modules and isinstance(fileobj, rapidgzip.RapidgzipFile))
             ):
                 # Note that because bz2 works on a bitstream the tell_compressed returns the offset in bits
