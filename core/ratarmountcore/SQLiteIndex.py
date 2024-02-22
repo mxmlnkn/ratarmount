@@ -878,22 +878,27 @@ class SQLiteIndex:
             elif compression == 'zst':
                 table_name = 'zstdblocks'
 
-            try:
-                offsets = dict(db.execute(f"SELECT blockoffset,dataoffset FROM {table_name};"))
-                setBlockOffsets(offsets)
-            except Exception as exception:
-                if self.printDebug >= 2:
-                    print(f"[Info] Could not load {compression} block offset data. Will create it from scratch.")
-                    print(exception)
-                if self.printDebug >= 3:
-                    traceback.print_exc()
+            tables = getSqliteTables(db)
+            if table_name in tables:
+                try:
+                    offsets = dict(db.execute(f"SELECT blockoffset,dataoffset FROM {table_name};"))
+                    setBlockOffsets(offsets)
+                    return
+                except Exception as exception:
+                    if self.printDebug >= 2:
+                        print(f"[Info] Could not load {compression} block offset data. Will create it from scratch.")
+                        print(exception)
+                    if self.printDebug >= 3:
+                        traceback.print_exc()
+            else:
+                print(f"[Info] The index does not yet contain {compression} block offset data. Will write it out.")
 
-                tables = getSqliteTables(db)
-                if table_name in tables:
-                    db.execute(f"DROP TABLE {table_name}")
-                db.execute(f"CREATE TABLE {table_name} ( blockoffset INTEGER PRIMARY KEY, dataoffset INTEGER )")
-                db.executemany(f"INSERT INTO {table_name} VALUES (?,?)", getBlockOffsets().items())
-                db.commit()
+            tables = getSqliteTables(db)
+            if table_name in tables:
+                db.execute(f"DROP TABLE {table_name}")
+            db.execute(f"CREATE TABLE {table_name} ( blockoffset INTEGER PRIMARY KEY, dataoffset INTEGER )")
+            db.executemany(f"INSERT INTO {table_name} VALUES (?,?)", getBlockOffsets().items())
+            db.commit()
             return
 
         if hasattr(fileObject, 'import_index') and hasattr(fileObject, 'export_index') and compression == 'gz':
@@ -903,8 +908,11 @@ class SQLiteIndex:
                 if self._loadGzipIndex(fileObject, 'gzipindexes' if 'gzipindexes' in tables else 'gzipindex'):
                     return
 
-            if self.printDebug >= 2:
-                print("[Info] Could not load GZip Block offset data. Will create it from scratch.")
+                if self.printDebug >= 2:
+                    print("[Info] Could not load gzip block offset data. Will create it from scratch.")
+            else:
+                if self.printDebug >= 2:
+                    print("[Info] The index does not yet contain gzip block offset data. Will write it out.")
 
             self._storeGzipIndex(fileObject)
             return
