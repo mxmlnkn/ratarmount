@@ -1573,8 +1573,13 @@ class SQLiteIndexedTar(MountSource):
         if (
             prioritizedBackends
             and 'indexed_gzip' in prioritizedBackends
-            and 'rapidgzip' in prioritizedBackends
-            and prioritizedBackends.index('indexed_gzip') < prioritizedBackends.index('rapidgzip')
+            and (
+                (
+                    'rapidgzip' in prioritizedBackends
+                    and prioritizedBackends.index('indexed_gzip') < prioritizedBackends.index('rapidgzip')
+                )
+                or 'rapidgzip' not in prioritizedBackends
+            )
         ):
             # Low index have higher priority (because normally the list would be checked from lowest indexes).
             return False
