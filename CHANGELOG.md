@@ -1,4 +1,20 @@
 
+# Version 0.14.1 built on 2024-02-23
+
+ - Fix `AttributeError: module 'fuse' has no attribute 'errno'`.
+ - Fix `--commit-overlay`, which did not add newly created empty folders to TARs.
+ - Do not ask for confirmation if there is nothing to commit when using `--commit-overlay`.
+ - Improve unmounting with `ratarmount -u`, especially with the AppImage.
+ - (ratarmountcore 0.6.3) Properly close opened file objects in mount sources.
+ - (ratarmountcore 0.6.3) Fix `--disable-union-mount`, which returned an I/O error.
+ - (ratarmountcore 0.6.3) Fix that `--use-backend=indexed_gzip` still did use `rapidgzip`.
+   It only worked when both were specified.
+ - (ratarmountcore 0.6.3) Fix detection of self-extracting RAR files.
+ - (ratarmountcore 0.6.3) Improve the error message when a file cannot be read because of a missing dependency.
+ - (ratarmountcore 0.6.3) Improve debug message when the index does not yet contain a gzip index.
+ - (ratarmountcore 0.6.2) Fix faulty seek forward for files opened via `RarMountSource` when whence is not `io.SEEK_SET`.
+ - (ratarmountcore 0.6.1) Skip data offset collection for zip files because it takes too long and is unused.
+
 # Version 0.14.0 built on 2023-09-03
 
  - Add `--disable-union-mount` option to present multiple archives in subfolders under the mount point.
