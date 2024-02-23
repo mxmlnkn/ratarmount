@@ -1467,8 +1467,61 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
             subprocess.run(
                 ["fusermount", "-u", args.unmount], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
             )
-        except Exception:
-            subprocess.run(["umount", args.unmount], check=False)
+            if args.debug >= 2:
+                print("[Info] Successfully called fusermount -u.")
+            return
+        except Exception as exception:
+            if args.debug >= 2:
+                print(f"[Warning] fusermount -u {args.unmount} failed with: {exception}")
+            if args.debug >= 3:
+                subprocess.run(["fusermount", "-V", args.unmount], check=False)
+
+        # If called from AppImage, then try to call the user-installed fusermount because FUSE might require
+        # extra permissions depending on the policy and some systems then provide a fusermount binary with
+        # ownership root and the setuid flag set.
+        if os.path.ismount(args.unmount):
+            fusermountPath = shutil.which("fusermount")
+            if fusermountPath is None:
+                fusermountPath = ""
+            for folder in os.environ.get("PATH", "").split(os.pathsep):
+                if not folder:
+                    continue
+                binaryPath = os.path.join(folder, "fusermount")
+                if fusermountPath != binaryPath and os.path.isfile(binaryPath) and os.access(binaryPath, os.X_OK):
+                    try:
+                        subprocess.run(
+                            [binaryPath, "-u", args.unmount], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                        )
+                        if args.debug >= 2:
+                            print(f"[Info] Successfully called {binaryPath} -u.")
+                        return
+                    except Exception as exception:
+                        if args.debug >= 2:
+                            print(f"[Warning] {fusermountPath} -u {args.unmount} failed with: {exception}")
+                        if args.debug >= 3:
+                            subprocess.run([fusermountPath, "-V", args.unmount], check=False)
+
+        if os.path.ismount(args.unmount):
+            try:
+                subprocess.run(["umount", args.unmount], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                if args.debug >= 2:
+                    print("[Info] Successfully called umount -u.")
+                return
+            except Exception as exception:
+                if args.debug >= 2:
+                    print(f"[Warning] umount {args.unmount} failed with: {exception}")
+
+        # Unmounting might take some time and I had cases where fusermount returned exit code 1.
+        # and still unmounted it successfully. It would be nice to automate this but it seems impossible to do
+        # reliably, without any regular expression heuristics. /proc/<pid>/fd/5 links to /dev/fuse. This could
+        # be used to reliable detect FUSE-providing processes, but we still wouldn't know which exact mount
+        # point they provide.
+        if os.path.ismount(args.unmount):
+            time.sleep(1)
+        if os.path.ismount(args.unmount):
+            print("[Error] Failed to unmount the given mount point. Alternatively, the process providing the mount ")
+            print("[Error] point can be looked for and killed, e.g., with this command:")
+            print(f"""[Error]     pkill --full 'ratarmount.*{args.unmount}' -G "$( id -g )" --newest""")
         return
 
     if args.commit_overlay:
