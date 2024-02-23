@@ -1517,14 +1517,16 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
             suffixes = ['', '-journal', '-shm', '-wal']
             toBeIgnored = [WritableFolderMountSource.hiddenDatabaseName + suffix for suffix in suffixes]
 
-            for dirpath, _, filenames in os.walk(args.write_overlay, topdown=False):
-                writeOverlay = args.write_overlay
-                if not writeOverlay.endswith('/'):
-                    writeOverlay += '/'
+            writeOverlayWithTrailingSlash = args.write_overlay
+            if not writeOverlayWithTrailingSlash.endswith('/'):
+                writeOverlayWithTrailingSlash += '/'
 
+            for dirpath, _, filenames in os.walk(args.write_overlay, topdown=False):
                 # dirpath should be a relative path (without leading slash) as seen from the overlay folder
-                if dirpath.startswith(args.write_overlay):
-                    dirpath = dirpath[len(args.write_overlay) :]
+                if dirpath.startswith(writeOverlayWithTrailingSlash):
+                    dirpath = dirpath[len(writeOverlayWithTrailingSlash) :]
+                elif dirpath == args.write_overlay:
+                    dirpath = ""
 
                 for name in filenames:
                     pathRelativeToRoot = f"{dirpath}/{name}".lstrip('/')
