@@ -1,4 +1,15 @@
 
+# Version 0.6.3 built on 2024-02-23
+
+ - Add `__enter__` and `__exit__` to `MountSource` interface.
+ - Properly close opened file objects in mount sources.
+ - Fix `open` and `read` in `SubvolumesMountSource`.
+ - Fix that `SQLiteIndexedTar` only heeded the order in `prioritizedBackends` when `rapidgzip` and `indexed_gzip`
+   are specified instead of specifying only one, which should be prioritized.
+ - Fix detection of self-extracting RAR files.
+ - Improve the error message when a file cannot be read because of a missing dependency.
+ - Improve debug message when the index does not yet contain a gzip index.
+
 # Version 0.6.2 built on 2023-12-26
 
  - Fix faulty seek forward for file opened via `RarMountSource` when whence is not `io.SEEK_SET`.
