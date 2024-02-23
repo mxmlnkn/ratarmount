@@ -1541,6 +1541,10 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
 
                     appendListFile.write(f"{pathRelativeToRoot}\0")
 
+                # Append empty folders
+                if not filenames and dirpath:
+                    appendListFile.write(f"{dirpath}\0")
+
         # TODO Support compressed archives by maybe using tarfile to read from the original and write to a temporary?
         #      GNU tar does not support --delete on compressed archives unfortunately:
         #      > This option does not operate on compressed archives.
