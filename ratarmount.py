@@ -1560,6 +1560,10 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
                 f"--file '{tarFile}'"
             )
 
+        if os.stat(deletionList).st_size == 0 and os.stat(appendList).st_size == 0:
+            print("Nothing to commit.")
+            return
+
         print()
         print("Committing is an experimental feature!")
         print('Please confirm by entering "commit". Any other input will cancel.')
