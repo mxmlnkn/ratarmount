@@ -4,6 +4,7 @@
 [![Python Version](https://img.shields.io/pypi/pyversions/ratarmountcore)](https://pypi.org/project/ratarmountcore/)
 [![Downloads](https://static.pepy.tech/badge/ratarmountcore/month)](https://pepy.tech/project/ratarmountcore)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](http://opensource.org/licenses/MIT)
+[![Changelog](https://img.shields.io/badge/Changelog-Markdown-blue)](https://github.com/mxmlnkn/ratarmount/blob/master/core/CHANGELOG.md)
 
 This is the library used as backend by ratarmount (CLI).
 For a full description including motivation and performance comparisons, see [ratarmount](https://github.com/mxmlnkn/ratarmount).

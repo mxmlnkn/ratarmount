@@ -1,6 +1,6 @@
 <div align="center">
 
-![Ratarmount Logo](https://raw.githubusercontent.com/mxmlnkn/ratarmount/master/ratarmount.svg "Purple 'ratar' and dark green 'mount'. The `raarmoun` letters pleasingly have the exact same height and the two bars of the 't's thrones over. The t-bars are animated to connect in a full horizontal line from time to time.")
+![Ratarmount Logo](https://raw.githubusercontent.com/mxmlnkn/ratarmount/master/ratarmount.svg "Purple 'ratar' and dark green 'mount'. The `raarmoun` letters pleasingly have the exact same height, and the two bars of the 't's are spread over them. The t-bars are animated to connect in a full horizontal line from time to time.")
 
 # Random Access Tar Mount (Ratarmount)
 
@@ -9,6 +9,7 @@
 [![Downloads](https://static.pepy.tech/badge/ratarmount/month)](https://pepy.tech/project/ratarmount)
 [![Conda](https://img.shields.io/conda/v/conda-forge/ratarmount?color=dark-green)](https://anaconda.org/conda-forge/ratarmount)
 </br>
+[![Changelog](https://img.shields.io/badge/Changelog-Markdown-blue)](https://github.com/mxmlnkn/ratarmount/blob/master/CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](http://opensource.org/licenses/MIT)
 [![Build Status](https://github.com/mxmlnkn/ratarmount/workflows/Tests/badge.svg)](https://github.com/mxmlnkn/ratarmount/actions)
 [![Discord](https://img.shields.io/discord/783411320354766878?label=discord)](https://discord.gg/Wra6t6akh2)
