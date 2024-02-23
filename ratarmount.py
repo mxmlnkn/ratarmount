@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import errno
 import importlib
 import json
 import math
@@ -238,7 +239,7 @@ class WritableFolderMountSource(fuse.Operations):
         # Note that we do not have to check the overlay folder assuming that it is inside the (union) mount source!
         sourceFileInfo = self.mountSource.getFileInfo(path)
         if not sourceFileInfo:
-            raise fuse.FuseOSError(fuse.errno.ENOENT)
+            raise fuse.FuseOSError(errno.ENOENT)
 
         # Initialize new metadata entry from existing file
         sfi = self.mountSource.getMountSource(sourceFileInfo)[2]
@@ -316,7 +317,7 @@ class WritableFolderMountSource(fuse.Operations):
     @overrides(fuse.Operations)
     def rename(self, old, new):
         if not self.mountSource.exists(old) or self.isDeleted(old):
-            raise fuse.FuseOSError(fuse.errno.ENOENT)
+            raise fuse.FuseOSError(errno.ENOENT)
 
         folder, name = self._splitPath(new)
 
@@ -347,7 +348,7 @@ class WritableFolderMountSource(fuse.Operations):
         # Can only hardlink to files which are also in the overlay folder.
         overlaySource = self._realpath(source)
         if not os.path.exists(overlaySource) and self.mountSource.getFileInfo(source):
-            raise fuse.FuseOSError(fuse.errno.EXDEV)
+            raise fuse.FuseOSError(errno.EXDEV)
 
         target = self._realpath(target)
 
@@ -363,18 +364,18 @@ class WritableFolderMountSource(fuse.Operations):
     @overrides(fuse.Operations)
     def rmdir(self, path):
         if not self.mountSource.exists(path) or self.isDeleted(path):
-            raise fuse.FuseOSError(fuse.errno.ENOENT)
+            raise fuse.FuseOSError(errno.ENOENT)
 
         contents = self.mountSource.listDir(path)
         if contents is not None and set(contents.keys()) - set(self.listDeleted(path)):
-            raise fuse.FuseOSError(fuse.errno.ENOTEMPTY)
+            raise fuse.FuseOSError(errno.ENOTEMPTY)
 
         try:
             if os.path.exists(self._realpath(path)):
                 os.rmdir(self._realpath(path))
         except Exception as exception:
             traceback.print_exc()
-            raise fuse.FuseOSError(fuse.errno.EIO) from exception
+            raise fuse.FuseOSError(errno.EIO) from exception
         finally:
             self._markAsDeleted(path)
 
@@ -386,7 +387,7 @@ class WritableFolderMountSource(fuse.Operations):
         #    self._open(path)   # what would the default mode even be?
         if not os.path.exists(self._realpath(path)):
             if not self.mountSource.exists(path):
-                raise fuse.FuseOSError(fuse.errno.ENOENT)
+                raise fuse.FuseOSError(errno.ENOENT)
 
             if flags & (os.O_WRONLY | os.O_RDWR):
                 self._ensureFileIsModifiable(path)
@@ -405,14 +406,14 @@ class WritableFolderMountSource(fuse.Operations):
         if not self.mountSource.exists(path) or self.isDeleted(path):
             # This is for the rare case that the file only exists in the overlay metadata database.
             self._markAsDeleted(path)
-            raise fuse.FuseOSError(fuse.errno.ENOENT)
+            raise fuse.FuseOSError(errno.ENOENT)
 
         try:
             if os.path.exists(self._realpath(path)):
                 os.unlink(self._realpath(path))
         except Exception as exception:
             traceback.print_exc()
-            raise fuse.FuseOSError(fuse.errno.EIO) from exception
+            raise fuse.FuseOSError(errno.EIO) from exception
         finally:
             self._markAsDeleted(path)
 
@@ -628,11 +629,11 @@ class FuseMount(fuse.Operations):
 
     def _getFileInfo(self, path: str) -> FileInfo:
         if self.writeOverlay and self.writeOverlay.isDeleted(path):
-            raise fuse.FuseOSError(fuse.errno.ENOENT)
+            raise fuse.FuseOSError(errno.ENOENT)
 
         fileInfo = self.mountSource.getFileInfo(path)
         if fileInfo is None:
-            raise fuse.FuseOSError(fuse.errno.ENOENT)
+            raise fuse.FuseOSError(errno.ENOENT)
 
         if not self.writeOverlay:
             return fileInfo
@@ -724,12 +725,12 @@ class FuseMount(fuse.Operations):
         except Exception as exception:
             traceback.print_exc()
             print("Caught exception when trying to open file.", fileInfo)
-            raise fuse.FuseOSError(fuse.errno.EIO) from exception
+            raise fuse.FuseOSError(errno.EIO) from exception
 
     @overrides(fuse.Operations)
     def release(self, path, fh):
         if fh not in self.openedFiles:
-            raise fuse.FuseOSError(fuse.errno.ESTALE)
+            raise fuse.FuseOSError(errno.ESTALE)
 
         openedFile = self._resolveFileHandle(fh)
         if isinstance(openedFile, int):
@@ -762,7 +763,7 @@ class FuseMount(fuse.Operations):
         except Exception as exception:
             traceback.print_exc()
             print("Caught exception when trying to read data from underlying TAR file! Returning errno.EIO.")
-            raise fuse.FuseOSError(fuse.errno.EIO) from exception
+            raise fuse.FuseOSError(errno.EIO) from exception
 
     # Methods for the write overlay which require file handle translations
 
