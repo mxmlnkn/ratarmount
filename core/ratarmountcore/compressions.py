@@ -105,12 +105,32 @@ TAR_COMPRESSION_FORMATS: Dict[str, CompressionInfo] = {
 }
 
 
+def isRarFile(fileObject) -> bool:
+    # @see https://www.rarlab.com/technote.htm#rarsign
+    # > RAR 5.0 signature consists of 8 bytes: 0x52 0x61 0x72 0x21 0x1A 0x07 0x01 0x00.
+    # > You need to search for this signature in supposed archive from beginning and up to maximum SFX module size.
+    # > Just for comparison this is RAR 4.x 7 byte length signature: 0x52 0x61 0x72 0x21 0x1A 0x07 0x00.
+    # > Self-extracting module (SFX)
+    # > Any data preceding the archive signature. Self-extracting module size and contents is not defined.
+    # > At the moment of writing this documentation RAR assumes the maximum SFX module size to not exceed 1 MB,
+    # > but this value can be increased in the future.
+    oldPosition = fileObject.tell()
+    if fileObject.read(6) == b'Rar!\x1A\x07':
+        return True
+    if 'rarfile' in sys.modules:
+        fileObject.seek(oldPosition)
+        fileObject.seek(oldPosition)
+        if rarfile.is_rarfile_sfx(fileObject):
+            return True
+    return False
+
+
 ARCHIVE_FORMATS: Dict[str, CompressionInfo] = {
     'rar': CompressionInfo(
         ['rar'],
         [],
         [CompressionModuleInfo('rarfile', lambda x: rarfile.RarFile(x))],
-        lambda x: x.read(6) == b'Rar!\x1A\x07',
+        isRarFile,
     ),
     'zip': CompressionInfo(
         ['zip'],

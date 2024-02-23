@@ -42,7 +42,7 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
             )
 
     try:
-        if 'rarfile' in sys.modules and rarfile.is_rarfile(fileOrPath):
+        if 'rarfile' in sys.modules and rarfile.is_rarfile_sfx(fileOrPath):
             return RarMountSource(fileOrPath, **options)
     except Exception as exception:
         if printDebug >= 1:
