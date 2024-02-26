@@ -423,6 +423,10 @@ class SQLiteIndex:
 
     @staticmethod
     def _openSqlDb(path: AnyStr, **kwargs) -> sqlite3.Connection:
+        # Even when given a relative path, sqlite3.connect seems to access the path absolute instead of from the
+        # current working directory! This will lead to hangs for self-bind mounts because of a recursive FUSE call.
+        # I don't know how to circumvent this here. The caller must ensure that the possible index file paths
+        # do not point to a self-bind mount point.
         sqlConnection = sqlite3.connect(path, **kwargs)
         sqlConnection.row_factory = sqlite3.Row
         sqlConnection.executescript(

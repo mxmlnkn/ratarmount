@@ -161,6 +161,8 @@ class AutoMountLayer(MountSource):
             _, deepestMountSource, deepestFileInfo = parentMountSource.getMountSource(archiveFileInfo)
             if isinstance(deepestMountSource, FolderMountSource):
                 # Open from file path on host file system in order to write out TAR index files.
+                # Care has to be taken if a folder is bind mounted onto itself because then it can happen that
+                # the file open triggers a recursive FUSE call, which then hangs up everything.
                 mountSource = openMountSource(deepestMountSource.getFilePath(deepestFileInfo), **options)
             else:
                 # This will fail with StenciledFile objects as returned by SQLiteIndexedTar mount sources and when

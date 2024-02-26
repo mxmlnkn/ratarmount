@@ -484,6 +484,11 @@ class FuseMount(fuse.Operations):
     """
 
     def __init__(self, pathToMount: Union[str, List[str]], mountPoint: str, **options) -> None:
+        self.mountPoint = os.path.realpath(mountPoint)
+        # This check is important for the self-bind test below, which assumes a folder.
+        if os.path.exists(self.mountPoint) and not os.path.isdir(self.mountPoint):
+            raise ValueError("Mount point must either not exist or be a directory!")
+
         if not isinstance(pathToMount, list):
             try:
                 os.fspath(pathToMount)
@@ -492,6 +497,7 @@ class FuseMount(fuse.Operations):
                 pass
 
         assert isinstance(pathToMount, list)
+        pathToMount = list(filter(os.path.exists, pathToMount))
 
         options['writeIndex'] = True
         if 'recursive' not in options and options.get('recursionDepth', 0) != 0:
@@ -503,15 +509,68 @@ class FuseMount(fuse.Operations):
 
         # Add write overlay as folder mount source to read from with highest priority.
         if 'writeOverlay' in options and isinstance(options['writeOverlay'], str) and options['writeOverlay']:
-            self.overlayPath = options['writeOverlay']
+            self.overlayPath = os.path.realpath(options['writeOverlay'])
             if not os.path.exists(self.overlayPath):
                 os.makedirs(self.overlayPath, exist_ok=True)
             pathToMount.append(self.overlayPath)
 
+        # Take care that bind-mounting folders to itself works
+        mountSources: Dict[str, MountSource] = {}
+        self.mountPointFd: Optional[int] = None
+        self.selfBindMount: Optional[FolderMountSource] = None
+        for path in pathToMount:
+            if os.path.realpath(path) != self.mountPoint:
+                continue
+
+            mountSource = FolderMountSource(path)
+            mountSources[os.path.basename(path)] = mountSource  # type: ignore
+            self.selfBindMount = mountSource
+            self.mountPointFd = os.open(self.mountPoint, os.O_RDONLY)
+
+            # Lazy mounting can result in locking recursive calls into our own FUSE mount point.
+            # Opening the archives is already handled correctly without calling FUSE inside AutoMountLayer.
+            # Here we need to ensure that indexes are not tried to being read from or written to our own
+            # FUSE mount point.
+            if options.get('lazyMounting', False):
+
+                def pointsIntoMountPoint(pathToTest):
+                    return os.path.commonpath([pathToTest, self.mountPoint]) == self.mountPoint
+
+                hasIndexPath = False
+
+                if 'indexFilePath' in options and isinstance(options['indexFilePath'], str):
+                    indexFilePath = os.path.realpath(options['indexFilePath'])
+                    if pointsIntoMountPoint(indexFilePath):
+                        del options['indexFilePath']
+                    else:
+                        options['indexFilePath'] = indexFilePath
+                        hasIndexPath = True
+
+                if 'indexFolders' in options and isinstance(options['indexFolders'], list):
+                    indexFolders = options['indexFolders']
+                    newIndexFolders = []
+                    for folder in indexFolders:
+                        if pointsIntoMountPoint(folder):
+                            continue
+                        newIndexFolders.append(os.path.realpath(folder))
+                    options['indexFolders'] = newIndexFolders
+                    if newIndexFolders:
+                        hasIndexPath = True
+
+                # Force in-memory indexes if no folder remains because the default for no indexFilePath being
+                # specified would be in a file in the same folder as the archive.
+                if not hasIndexPath:
+                    options['indexFilePath'] = ':memory:'
+
+            break
+
         # This also will create or load the block offsets for compressed formats
-        mountSources: Dict[str, MountSource] = {
-            os.path.basename(path): openMountSource(path, **options) for path in pathToMount
-        }
+        for path in pathToMount:
+            if os.path.realpath(path) == self.mountPoint:
+                continue
+            key = os.path.basename(path)
+            if key not in mountSources:
+                mountSources[key] = openMountSource(path, **options)
 
         self.mountSource: MountSource = (
             SubvolumesMountSource(mountSources, printDebug=self.printDebug)
@@ -539,7 +598,7 @@ class FuseMount(fuse.Operations):
         self.lastFileHandle: int = 0  # It will be incremented before being returned. It can't hurt to never return 0.
 
         if self.overlayPath:
-            self.writeOverlay = WritableFolderMountSource(os.path.realpath(self.overlayPath), self.mountSource)
+            self.writeOverlay = WritableFolderMountSource(self.overlayPath, self.mountSource)
 
             self.chmod = self.writeOverlay.chmod
             self.chown = self.writeOverlay.chown
@@ -563,18 +622,9 @@ class FuseMount(fuse.Operations):
         if mountPoint and not os.path.exists(mountPoint):
             os.mkdir(mountPoint)
             self.mountPointWasCreated = True
-        self.mountPoint = os.path.realpath(mountPoint)
 
         statResults = os.lstat(self.mountPoint)
         self.mountPointInfo = {key: getattr(statResults, key) for key in dir(statResults) if key.startswith('st_')}
-
-        # Take care that bind-mounting folders to itself works
-        self.mountPointFd: Optional[int] = None
-        self.selfBindMount: Optional[FolderMountSource] = None
-        for mountSource in mountSources.values():
-            if isinstance(mountSource, FolderMountSource) and mountSource.root == self.mountPoint:
-                self.selfBindMount = mountSource
-                self.mountPointFd = os.open(self.mountPoint, os.O_RDONLY)
 
     def __del__(self) -> None:
         try:

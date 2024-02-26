@@ -684,7 +684,9 @@ class SQLiteIndexedTar(MountSource):
             self.tarFileName = tarFileName if tarFileName else '<file object>'
         else:
             if tarFileName:
-                self.tarFileName = os.path.abspath(tarFileName)
+                # Keep the EXACT file path, do not convert to an absolute path, or else we might trigger
+                # recursive FUSE calls, which hangs everything!
+                self.tarFileName = tarFileName
             else:
                 raise RatarmountError("At least one of tarFileName and fileObject arguments should be set!")
 
