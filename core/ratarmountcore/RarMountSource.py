@@ -205,14 +205,16 @@ class RarMountSource(MountSource):
         }
 
     def _getFileInfos(self, path: str) -> List[FileInfo]:
+        # If we have a fileInfo for the given directory path, then everything is fine.
+        pathAsDir = path.strip('/') + '/'
+        if pathAsDir == '/':
+            return [MountSource._createRootFileInfo(userdata=[None])]
+
         infoList = [
             RarMountSource._convertToFileInfo(normalizedPath, info)
             for normalizedPath, info in self.files.items()
             if normalizedPath.rstrip('/') == path.lstrip('/')
         ]
-
-        # If we have a fileInfo for the given directory path, then everything is fine.
-        pathAsDir = path.strip('/') + '/'
 
         # Check whether some parent directories of files do not exist as separate entities in the archive.
         if not any(info.userdata[-1][0] == pathAsDir for info in infoList) and any(

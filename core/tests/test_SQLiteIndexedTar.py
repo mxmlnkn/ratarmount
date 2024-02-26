@@ -61,8 +61,10 @@ class TestSQLiteIndexedTarParallelized:
             recursive=False,
             parallelization=parallelization,
         ) as file:
-            assert file.listDir('/')
-            assert file.listDir('/mimi')
+            for folder in ['/', '/mimi']:
+                assert file.getFileInfo(folder)
+                assert file.fileVersions(folder) == 1
+                assert file.listDir(folder)
 
             assert not file.listDir('/mimi/01995.tar')
             info = file.getFileInfo('/mimi/01995.tar')
