@@ -222,15 +222,32 @@ class AutoMountLayer(MountSource):
         # directory but only we know the permissions of the parent folder and can apply them to the root directory.
         mountPoint, pathInMountPoint = self._findMounted(path)
         mountInfo = self.mounted[mountPoint]
-        if pathInMountPoint == '/':
+
+        originalFileVersions = 0
+        if mountPoint != '/' and pathInMountPoint == '/':
+            originalFileVersions = self.mounted['/'].mountSource.fileVersions(path)
+
+        def normalizeFileVersion(version, versions):
+            return ((version - 1) % versions + 1) % versions if versions > 1 else version
+
+        # fileVersion=0 is the most recent. Version 1..fileVersions number from the first occurrence / oldest
+        # version to the most recent, i.e., fileVersion = 0 is equivalent to fileVersion = fileVersions.
+        fileVersions = self.fileVersions(path)
+        fileVersion = normalizeFileVersion(fileVersion, fileVersions)
+        if fileVersion == 0 and pathInMountPoint == '/':
             return mountInfo.rootFileInfo
 
-        fileInfo = mountInfo.mountSource.getFileInfo(pathInMountPoint, fileVersion)
-        if fileInfo:
-            fileInfo.userdata.append(mountPoint)
+        if fileVersions <= 1 or pathInMountPoint != '/' or fileVersion == 0 or fileVersion > originalFileVersions:
+            fileInfo = mountInfo.mountSource.getFileInfo(pathInMountPoint, fileVersion - originalFileVersions)
+            if fileInfo:
+                fileInfo.userdata.append(mountPoint)
             return fileInfo
 
-        return None
+        # We are here if: fileVersions > 1 and 0 < fileVersion <= originalFileVersions and pathInMountPoint == '/'
+        fileInfo = self.mounted['/'].mountSource.getFileInfo(path, fileVersion % originalFileVersions)
+        if fileInfo:
+            fileInfo.userdata.append('/')
+        return fileInfo
 
     @overrides(MountSource)
     def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
@@ -265,7 +282,10 @@ class AutoMountLayer(MountSource):
     @overrides(MountSource)
     def fileVersions(self, path: str) -> int:
         mountPoint, pathInMountPoint = self._findMounted(path)
-        return self.mounted[mountPoint].mountSource.fileVersions(pathInMountPoint)
+        fileVersions = self.mounted[mountPoint].mountSource.fileVersions(pathInMountPoint)
+        if mountPoint != '/' and pathInMountPoint == '/':
+            fileVersions += self.mounted['/'].mountSource.fileVersions(path)
+        return fileVersions
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo) -> IO[bytes]:

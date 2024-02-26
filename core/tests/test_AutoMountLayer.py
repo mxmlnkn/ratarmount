@@ -5,6 +5,7 @@
 # pylint: disable=protected-access
 
 import os
+import stat
 import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -84,3 +85,25 @@ class TestAutoMountLayer:
             assert recursivelyMounted.listDir('/ufo_00')
             fileInfo = recursivelyMounted.getFileInfo('/ufo_00/ufo')
             assert recursivelyMounted.open(fileInfo).read() == b'iriya\n'
+
+    @staticmethod
+    def test_file_versions(parallelization):
+        options = {
+            'clearIndexCache': True,
+            'recursive': True,
+            'parallelization': parallelization,
+        }
+
+        with openMountSource(findTestFile("tests/double-compressed-nested-tar.tgz.tgz"), **options) as mountSource:
+            recursivelyMounted = AutoMountLayer(mountSource, **options)
+
+            for folder in ['/', '/nested-tar.tar.gz', '/nested-tar.tar.gz/foo', '/nested-tar.tar.gz/foo/fighter']:
+                assert recursivelyMounted.getFileInfo(folder)
+                assert recursivelyMounted.listDir(folder)
+                assert recursivelyMounted.fileVersions(folder) > 0
+
+            for mountedFile in ['/nested-tar.tar.gz']:
+                assert recursivelyMounted.fileVersions(folder) > 0
+                assert stat.S_ISREG(recursivelyMounted.getFileInfo(mountedFile, fileVersion=1).mode)
+
+            # assert recursivelyMounted.open(recursivelyMounted.getFileInfo('/ufo_00/ufo')).read() == b'iriya\n'
