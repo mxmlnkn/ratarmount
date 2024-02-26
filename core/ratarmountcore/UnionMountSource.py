@@ -38,18 +38,7 @@ class UnionMountSource(MountSource):
         self.printDebug = printDebug
         self.folderCache: Dict[str, List[MountSource]] = {"/": self.mountSources}
         self.folderCacheDepth = 0  # depth 1 means, we only cached top-level directories.
-
-        self.rootFileInfo = FileInfo(
-            # fmt: off
-            size     = 0,
-            mtime    = int(time.time()),
-            mode     = 0o777 | stat.S_IFDIR,
-            linkname = "",
-            uid      = os.getuid(),
-            gid      = os.getgid(),
-            userdata = [None],
-            # fmt: on
-        )
+        self.rootFileInfo = MountSource._createRootFileInfo(userdata=[None])
 
         if len(self.mountSources) > 1:
             self._buildFolderCache(maxCacheDepth, maxCacheEntries, maxSecondsToCache)

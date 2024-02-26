@@ -4,7 +4,6 @@
 import os
 import re
 import stat
-import time
 import traceback
 
 from dataclasses import dataclass
@@ -39,17 +38,7 @@ class AutoMountLayer(MountSource):
         self.lazyMounting: bool = self.options.get('lazyMounting', False)
         self.printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
 
-        rootFileInfo = FileInfo(
-            # fmt: off
-            size         = 0,
-            mtime        = int(time.time()),
-            mode         = 0o555 | stat.S_IFDIR,
-            linkname     = "",
-            uid          = os.getuid(),
-            gid          = os.getgid(),
-            userdata     = ['/'],
-            # fmt: on
-        )
+        rootFileInfo = MountSource._createRootFileInfo(userdata=['/'])
 
         # Mount points are specified without trailing slash and with leading slash
         # representing root of this mount source.

@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os
-import stat
-import time
-
 from typing import Dict, Iterable, IO, Optional, Tuple, Union
 
 from .MountSource import FileInfo, MountSource
@@ -23,17 +19,7 @@ class SubvolumesMountSource(MountSource):
             if '/' in name:
                 raise ValueError(f"Mount source names may not contain slashes! ({name})")
 
-        self.rootFileInfo = FileInfo(
-            # fmt: off
-            size     = 0,
-            mtime    = int(time.time()),
-            mode     = 0o777 | stat.S_IFDIR,
-            linkname = "",
-            uid      = os.getuid(),
-            gid      = os.getgid(),
-            userdata = [None],
-            # fmt: on
-        )
+        self.rootFileInfo = MountSource._createRootFileInfo(userdata=[None])
 
     def _findMountSource(self, path: str) -> Optional[Tuple[str, str]]:
         path = path.lstrip('/')
