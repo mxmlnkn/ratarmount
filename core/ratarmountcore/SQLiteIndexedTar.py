@@ -789,8 +789,7 @@ class SQLiteIndexedTar(MountSource):
                 # When loading compression offsets, the backends assume they are complete, so we have to clear them.
                 self.index.clearCompressionOffsets()
 
-            assert self.index.sqlConnection
-            pastEndOffset = self._getPastEndOffset(self.index.sqlConnection)
+            pastEndOffset = self._getPastEndOffset(self.index.getConnection())
             if not self.compression and pastEndOffset and self._checkIndexValidity():
                 archiveSize = self.tarFileObject.seek(0, io.SEEK_END)
 

@@ -247,7 +247,7 @@ class SQLiteIndex:
                 break
 
     def openInMemory(self):
-        self._openPath(':memory:')
+        self.indexFilePath, self.sqlConnection = SQLiteIndex._openPath(':memory:')
 
     def openWritable(self):
         if self.possibleIndexFilePaths and not self.preferMemory:
@@ -255,12 +255,12 @@ class SQLiteIndex:
                 if SQLiteIndex._pathIsWritable(
                     indexPath, printDebug=self.printDebug
                 ) and SQLiteIndex._pathCanBeUsedForSqlite(indexPath, printDebug=self.printDebug):
-                    self._openPath(indexPath)
+                    self.indexFilePath, self.sqlConnection = SQLiteIndex._openPath(indexPath)
                     break
         else:
             if self.printDebug >= 3 and self.preferMemory:
                 print("[Info] Create new index in memory because memory is to be preferred, e.g., for small archives.")
-            self._openPath(':memory:')
+            self.indexFilePath, self.sqlConnection = SQLiteIndex._openPath(':memory:')
 
         if not self.indexIsLoaded():
             raise InvalidIndexError(
@@ -468,19 +468,22 @@ class SQLiteIndex:
         )
         return sqlConnection
 
-    def _openPath(self, indexFilePath: Optional[str]):
-        self.indexFilePath = indexFilePath if indexFilePath else ':memory:'
+    @staticmethod
+    def _openPath(indexFilePath: Optional[str], printDebug: int = 0) -> Tuple[str, sqlite3.Connection]:
+        indexFilePath = indexFilePath if indexFilePath else ':memory:'
 
-        if self.printDebug >= 1:
-            print("Creating new SQLite index database at", self.indexFilePath)
+        if printDebug >= 1:
+            print("Creating new SQLite index database at", indexFilePath)
 
-        self.sqlConnection = SQLiteIndex._openSqlDb(self.indexFilePath)
-        tables = getSqliteTables(self.sqlConnection)
+        sqlConnection = SQLiteIndex._openSqlDb(indexFilePath)
+        tables = getSqliteTables(sqlConnection)
         if {"files", "filestmp", "parentfolders"}.intersection(tables):
             raise InvalidIndexError(
                 f"The index file {indexFilePath} already seems to contain a table. Please specify --recreate-index."
             )
-        self.sqlConnection.executescript(SQLiteIndex._CREATE_FILES_TABLE)
+        sqlConnection.executescript(SQLiteIndex._CREATE_FILES_TABLE)
+
+        return indexFilePath, sqlConnection
 
     def reloadIndexReadOnly(self):
         if not self.indexFilePath or self.indexFilePath == ':memory:' or not self.sqlConnection:
