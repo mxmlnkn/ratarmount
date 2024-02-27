@@ -36,3 +36,26 @@ class TestSQLiteIndexedTarParallelized:
         assert normpath("./././a/.././") == "/"
         assert normpath("../") == "/"
         assert normpath("../.././..") == "/"
+
+    @staticmethod
+    def test_query_normpath():
+        normpath = SQLiteIndex._queryNormpath
+        assert normpath("/") == "/"
+        assert normpath("//") == "/"
+        assert normpath("///") == "/"
+
+        assert normpath("a") == "/a"
+        assert normpath("/a") == "/a"
+        assert normpath("a/") == "/a"
+        assert normpath("/a/") == "/a"
+        assert normpath("//a//") == "/a"
+
+        assert normpath(".") == "/"
+        assert normpath("/.") == "/"
+        assert normpath("./") == "/"
+        assert normpath("/./") == "/"
+        assert normpath("//.//") == "/"
+
+        assert normpath("./././a/.././") == "/"
+        assert normpath("../") == "/.."
+        assert normpath("../.././..") == "/../../.."

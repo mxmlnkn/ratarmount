@@ -52,6 +52,9 @@ class TestSQLiteIndexedTarParallelized:
             findTestFile('single-file.tar'), writeIndex=False, parallelization=parallelization
         ) as indexedTar:
             assert indexedTar.listDir('/')
+            assert indexedTar.getFileInfo('/')
+            assert not indexedTar.getFileInfo('../')
+            assert not indexedTar.getFileInfo('../bar')
 
     @staticmethod
     def test_tar_bz2_with_parallelization(parallelization):

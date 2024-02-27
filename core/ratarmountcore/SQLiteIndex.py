@@ -546,6 +546,12 @@ class SQLiteIndex:
         # a leading dot that's why we prefix a leading slash also before calling normpath.
         return '/' + os.path.normpath('/' + path).lstrip('/')
 
+    @staticmethod
+    def _queryNormpath(path: str):
+        # os.path.normpath also collapses /../ into / and, because we prepend /, ../ gets collapsed to /.
+        # This effect is good to have for inserting rows but not for querying rows.
+        return '/' + os.path.normpath(path if path.startswith('../') else '/' + path).lstrip('/')
+
     def listDir(self, path: str) -> Optional[Dict[str, FileInfo]]:
         """
         Return a dictionary for the given directory path: { fileName : FileInfo, ... } or None
@@ -561,7 +567,7 @@ class SQLiteIndex:
         # If they should be union mounted, like is the case now, then the folder version only makes sense for
         # its attributes.
         rows = self.getConnection().execute(
-            'SELECT * FROM "files" WHERE "path" == (?)', (self.normpath(path).rstrip('/'),)
+            'SELECT * FROM "files" WHERE "path" == (?)', (self._queryNormpath(path).rstrip('/'),)
         )
         directory: Dict[str, FileInfo] = {}
         gotResults = False
@@ -582,7 +588,7 @@ class SQLiteIndex:
         if path == '/':
             return {'/': MountSource._createRootFileInfo(userdata=[SQLiteIndexedTarUserData(0, 0, False, False)])}
 
-        path, name = self.normpath(path).rsplit('/', 1)
+        path, name = self._queryNormpath(path).rsplit('/', 1)
         rows = self.getConnection().execute(
             'SELECT * FROM "files" WHERE "path" == (?) AND "name" == (?) ORDER BY "offsetheader" ASC', (path, name)
         )
@@ -611,7 +617,7 @@ class SQLiteIndex:
         if path == '/':
             return MountSource._createRootFileInfo(userdata=[SQLiteIndexedTarUserData(0, 0, False, False)])
 
-        path, name = self.normpath(path).rsplit('/', 1)
+        path, name = self._queryNormpath(path).rsplit('/', 1)
         row = (
             self.getConnection()
             .execute(
