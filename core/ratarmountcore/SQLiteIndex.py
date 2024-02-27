@@ -151,6 +151,7 @@ class SQLiteIndex:
         checkMetadata: Optional[Callable[[Dict[str, Any]], None]] = None,
         printDebug: int = 0,
         preferMemory: bool = False,
+        indexMinimumFileCount: int = 0,
     ):
         """
         indexFilePath
@@ -169,6 +170,9 @@ class SQLiteIndex:
             If True, then load existing indexes and write to explicitly given index file paths but
             if no such things are given, then create the new index in memory as if indexFilePath
             = ':memory:' was specified.
+        indexMinimumFileCount
+            If > 0, then open new databases in memory and write them out if this threshold has been
+            exceeded. It may also be written to a file if a gzip index is stored.
         """
 
         self.printDebug = printDebug
@@ -183,6 +187,24 @@ class SQLiteIndex:
         self.parentFolderCache: List[Tuple[str, str]] = []
         self.checkMetadata = checkMetadata
         self.preferMemory = preferMemory
+        self.indexMinimumFileCount = indexMinimumFileCount
+        self._insertedRowCount = 0
+
+        # Ignore minimum file count option if an index file path or index folder is configured.
+        # For latter, ignore the special empty folder [''], which means that the indexes are stored
+        # besides the archives.
+        # Why all this exceptions? Because the index-minimum-file-count, which is set by default,
+        # is only intended to avoid littering folders with index files in the common use case of mounting
+        # a folder of archives or single small archives recursively. If the user goes through the trouble
+        # of specifying an index file or folder, then littering should not be a problem as index creations
+        # are expected by the user.
+        if self.indexMinimumFileCount > 0 and not indexFilePath and (not indexFolders or not any(indexFolders)):
+            if self.printDebug >= 3:
+                print(
+                    f"[Info] Because of the given positive index minimum file count ({self.indexMinimumFileCount}) "
+                    "and because no explicit index file path is given, try to open an SQLite database in memory first."
+                )
+            self.preferMemory = True
 
     @staticmethod
     def getPossibleIndexFilePaths(
@@ -467,6 +489,26 @@ class SQLiteIndex:
         # check_same_thread=False can be used because it is read-only anyway and it allows to enable FUSE multithreading
         self.sqlConnection = SQLiteIndex._openSqlDb(f"file:{uriPath}?mode=ro", uri=True, check_same_thread=False)
 
+    def _reloadIndexOnDisk(self):
+        if not self.indexFilePath or self.indexFilePath != ':memory:' or not self.sqlConnection:
+            return
+
+        oldIndexFilePath, oldSqlConnection = self.indexFilePath, self.sqlConnection
+        self.preferMemory = False
+        self.openWritable()
+        if oldIndexFilePath == self.indexFilePath:
+            if self.printDebug >= 3:
+                print(f"[Info] Tried to write the database to disk but found no other path than: {self.indexFilePath}")
+            self.sqlConnection.close()
+            self.indexFilePath, self.sqlConnection = oldIndexFilePath, oldSqlConnection
+            return
+
+        if self.printDebug >= 3:
+            print(f"[Info] Back up database from {oldIndexFilePath} -> {self.indexFilePath}")
+        oldSqlConnection.commit()
+        oldSqlConnection.backup(self.sqlConnection)
+        oldSqlConnection.close()
+
     def ensureIntermediaryTables(self):
         connection = self.getConnection()
         tables = getSqliteTables(connection)
@@ -679,6 +721,20 @@ class SQLiteIndex:
         if not rows:
             return
 
+        self._insertedRowCount += len(rows)
+        if (
+            self._insertedRowCount > self.indexMinimumFileCount
+            and self.indexFilePath == ':memory:'
+            and self.preferMemory
+        ):
+            if self.printDebug >= 3:
+                print(
+                    f"[Info] Exceeded file count threshold ({self._insertedRowCount} > {self.indexMinimumFileCount}) "
+                    "for metadata held in memory. Will try to reopen the database on disk."
+                )
+            self.preferMemory = False
+            self._reloadIndexOnDisk()
+
         try:
             self.getConnection().executemany(
                 'INSERT OR REPLACE INTO "files" VALUES (' + ','.join('?' * len(rows[0])) + ');', rows
@@ -870,6 +926,15 @@ class SQLiteIndex:
         Will load block offsets from SQLite database to backend if a fitting table exists.
         Else it will force creation and store the block offsets of the compression backend into a new table.
         """
+        if compression and (not self.indexFilePath or self.indexFilePath == ':memory:'):
+            if self.printDebug >= 2:
+                print(
+                    f"[Info] Will try to reopen the database on disk even though the file count threshold "
+                    f"({self.indexMinimumFileCount}) might not be exceeded ({self._insertedRowCount}) because "
+                    f"the archive is compressed."
+                )
+            self._reloadIndexOnDisk()
+
         if not self.indexFilePath or self.indexFilePath == ':memory:':
             if self.printDebug >= 2:
                 print("[Info] Will skip storing compression seek data because the database is in memory.")

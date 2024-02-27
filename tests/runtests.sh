@@ -906,7 +906,7 @@ checkIndexFolderFallback()
     # Check that the special "empty" folder works signaling to store alongside the TAR
     local indexFile=${archive}.index.sqlite
     rm -f -- "$indexFile"
-    args=( --index-folders '' "$archive" "$mountFolder" )
+    args=( --index-folders '' --index-minimum-file-count 0 "$archive" "$mountFolder" )
     {
         runAndCheckRatarmount "${args[@]}" &&
         checkStat "$mountFolder/$fileInTar" &&

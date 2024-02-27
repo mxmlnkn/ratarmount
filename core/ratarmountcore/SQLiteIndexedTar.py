@@ -604,6 +604,7 @@ class SQLiteIndexedTar(MountSource):
         printDebug                   : int                       = 0,
         transformRecursiveMountPoint : Optional[Tuple[str, str]] = None,
         prioritizedBackends          : Optional[List[str]]       = None,
+        indexMinimumFileCount        : int                       = 0,
         # pylint: disable=unused-argument
         **kwargs
         # fmt: on
@@ -742,6 +743,7 @@ class SQLiteIndexedTar(MountSource):
             encoding=self.encoding,
             checkMetadata=self._checkMetadata,
             printDebug=self.printDebug,
+            indexMinimumFileCount=indexMinimumFileCount,
         )
         if clearIndexCache:
             self.index.clearIndexes()
