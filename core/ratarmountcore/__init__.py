@@ -80,6 +80,7 @@ from .SQLiteIndexedTar import SQLiteIndexedTar, SQLiteIndexedTarUserData
 from .SQLiteIndex import SQLiteIndex
 
 from .AutoMountLayer import AutoMountLayer
+from .DereferenceLayer import DereferenceLayer
 from .FileVersionLayer import FileVersionLayer
 from .UnionMountSource import UnionMountSource
 from .SubvolumesMountSource import SubvolumesMountSource
