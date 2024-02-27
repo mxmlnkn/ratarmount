@@ -45,7 +45,6 @@ from .StenciledFile import StenciledFile
 from .compressions import findAvailableOpen, getGzipInfo, TAR_COMPRESSION_FORMATS
 from .utils import (
     RatarmountError,
-    IndexNotOpenError,
     InvalidIndexError,
     CompressionError,
     ceilDiv,
@@ -789,8 +788,7 @@ class SQLiteIndexedTar(MountSource):
                 # When loading compression offsets, the backends assume they are complete, so we have to clear them.
                 self.index.clearCompressionOffsets()
 
-            assert self.index.sqlConnection
-            pastEndOffset = self._getPastEndOffset(self.index.sqlConnection)
+            pastEndOffset = self._getPastEndOffset(self.index.getConnection())
             if not self.compression and pastEndOffset and self._checkIndexValidity():
                 archiveSize = self.tarFileObject.seek(0, io.SEEK_END)
 
@@ -1364,11 +1362,8 @@ class SQLiteIndexedTar(MountSource):
                     print(f"[Warning] {arg}: index: {oldState}, current: {newState}")
 
     def _checkIndexValidity(self) -> bool:
-        if not self.index.sqlConnection:
-            raise IndexNotOpenError("This method can not be called without an opened index database!")
-
         # Check some of the first and last files in the archive and some random selection in between.
-        result = self.index.sqlConnection.execute(
+        result = self.index.getConnection().execute(
             f"""
             SELECT * FROM ( SELECT * FROM files ORDER BY offset ASC LIMIT 100 )
             UNION
