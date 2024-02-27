@@ -8,6 +8,22 @@ from .MountSource import FileInfo, MountSource
 from .utils import overrides
 
 
+def maxUpCount(path):
+    if os.path.isabs(path):
+        return 0
+    result = 0
+    upCount = 0
+    for part in path.split(os.path.sep):
+        if part == '..':
+            upCount += 1
+            result = max(result, upCount)
+        elif part in ['.', '']:
+            continue
+        else:
+            upCount -= 1
+    return result
+
+
 class FolderMountSource(MountSource):
     """
     This class manages one folder as mount source offering methods for listing folders, reading files, and others.
@@ -72,8 +88,22 @@ class FolderMountSource(MountSource):
             return None
 
         realpath = self._realpath(path)
-        linkname = os.readlink(realpath) if os.path.islink(realpath) else ""
-        return self._statsToFileInfo(os.lstat(realpath), path, linkname)
+        linkname = ""
+        if os.path.islink(realpath):
+            linkname = os.readlink(realpath)
+            # Resolve relative links that point outside the source folder because they will become invalid
+            # if they are mounted onto a different path. This relatively simply logic only works under the
+            # assumption that "path" is normalized, i.e., it does not contain links in its path and no double
+            # slashes and no '/./'. Calling os.path.normpath would remedy the latter but ONLY under the
+            # assumption that there are no symbolic links in the path, else it might make things worse.
+            if (
+                not os.path.isabs(linkname)
+                and maxUpCount(linkname) > path.strip('/').count('/')
+                and os.path.exists(realpath)
+            ):
+                realpath = os.path.realpath(realpath)
+                return self._statsToFileInfo(os.stat(realpath), realpath, "")
+        return self._statsToFileInfo(os.lstat(realpath), path.lstrip('/'), linkname)
 
     @overrides(MountSource)
     def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
@@ -92,10 +122,7 @@ class FolderMountSource(MountSource):
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo) -> IO[bytes]:
-        path = fileInfo.userdata[-1]
-        assert isinstance(path, str)
-        realpath = self._realpath(path)
-
+        realpath = self.getFilePath(fileInfo)
         try:
             return open(realpath, 'rb')
         except Exception as e:
@@ -114,4 +141,5 @@ class FolderMountSource(MountSource):
     def getFilePath(self, fileInfo: FileInfo) -> str:
         path = fileInfo.userdata[-1]
         assert isinstance(path, str)
-        return self._realpath(path)
+        # Path argument is only expected to be absolute for symbolic links pointing outside self.root.
+        return path if path.startswith('/') else self._realpath(path)

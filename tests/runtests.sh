@@ -153,7 +153,7 @@ verifyCheckSum()
 
     checksum="$( md5sum "$mountFolder/$fileInTar" 2>/dev/null | sed 's| .*||' )"
     if test "$checksum" != "$correctChecksum"; then
-        echoerr -e "\e[37mFile sum of '$fileInTar' in mounted TAR '$archive' does not match when creating index"'!\e[0m'
+        echoerr -e "\e[37mFile sum of '$fileInTar' ($checksum) in mounted TAR '$archive' does not match ($correctChecksum) when creating index"'!\e[0m'
         return 1
     fi
 }
@@ -1437,6 +1437,95 @@ checkWriteOverlayWithArchivedFiles()
     'rm' -r -- "$overlayFolder"
 }
 
+
+checkWriteOverlayWithSymbolicLinks()
+{
+    rm -f ratarmount.{stdout,stderr}.log
+
+    local mountFolder
+    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+
+    # Create test folder structure like this:
+    # /tmp
+    # +- tmp1/
+    # |  +- overlay2 -> ../tmp2
+    # |  +- bar -> ../tmp2/bar
+    # +- tmp2/
+    #    +- bar
+    local overlayFolder overlayFolder2;
+    overlayFolder=$( mktemp -d )
+    overlayFolder2=$( mktemp -d )
+    ( cd -- "$overlayFolder" && ln -s "$( realpath --relative-to "$overlayFolder" "$overlayFolder2" )" overlay2 )
+    echo foo > "${overlayFolder2}/bar"
+    ( cd -- "$overlayFolder" && ln -s "$( realpath --relative-to "$overlayFolder" "$overlayFolder2/bar" )" bar )
+
+    local args=( -P "$parallelization" -c --write-overlay "$overlayFolder" "$overlayFolder2" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}"
+        if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then returnError "$LINENO" 'Expected files in mount point'; fi
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+
+    verifyCheckSum "$mountFolder" 'overlay2/bar' '[write overlay]' d3b07384d113edec49eaa6238ad5ff00 ||
+        returnError "$LINENO" 'Failed to read linked file via mount point'
+
+    # Create file in relative symbolic link to cousin folder.
+    echo bar > "${mountFolder}/overlay2/foo"
+
+    verifyCheckSum "$mountFolder" 'overlay2/foo' '[write overlay]' c157a79031e1c40f85931829bc5fc552 ||
+        returnError "$LINENO" 'Failed to create file in write overlay'
+    verifyCheckSum "$overlayFolder" 'overlay2/foo' '[write overlay]' c157a79031e1c40f85931829bc5fc552 ||
+        returnError "$LINENO" 'Failed to create file in write overlay'
+    verifyCheckSum "$overlayFolder2" 'foo' '[write overlay]' c157a79031e1c40f85931829bc5fc552 ||
+        returnError "$LINENO" 'Failed to create file in write overlay'
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully writes to symbolically linked folders in the overlay."
+
+    'rm' -r -- "$overlayFolder" "$overlayFolder2"
+}
+
+
+checkSymbolicLinkRecursion()
+{
+    rm -f ratarmount.{stdout,stderr}.log
+
+    local mountFolder
+    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+
+    # Create test folder structure like in issue 102 with a mix of relative and absolute links to test both:
+    # /tmp
+    # +- collections/
+    # |  +- part1.gz -> /tmp/downloads/file.gz
+    # +- downloads
+    # |  +- file.gz -> ../datastore/01234567
+    # +- datastore/
+    #    +- 01234567
+    local folder;
+    folder=$( mktemp -d )
+    (
+        cd -- "$folder" &&
+        mkdir datastorage downloads collections &&
+        echo 'bar' | gzip > datastorage/01234567 &&
+        ( cd downloads && ln -s ../datastorage/01234567 file.gz ) &&
+        ( cd collections && ln -s "$folder/downloads/file.gz" part1.gz )
+    )
+
+    local args=( -P "$parallelization" -c -r -l "$folder/collections" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}"
+        if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then returnError "$LINENO" 'Expected files in mount point'; fi
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+
+    verifyCheckSum "$mountFolder" 'part1.gz/part1' '[write overlay]' c157a79031e1c40f85931829bc5fc552 ||
+        returnError "$LINENO" 'Failed to read linked file via mount point'
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully recursive mounting of symbolical links to archives."
+
+    'rm' -r -- "$folder"
+}
+
+
 checkGnuIncremental()
 {
     local archive="$1"; shift
@@ -1710,6 +1799,8 @@ if [[ ! -f tests/2k-recursive-tars.tar ]]; then
     bzip2 -q -d -k tests/2k-recursive-tars.tar.bz2
 fi
 
+checkSymbolicLinkRecursion || returnError "$LINENO" 'Symbolic link recursion failed!'
+checkWriteOverlayWithSymbolicLinks || returnError "$LINENO" 'Write overlay tests with symbolic links failed!'
 checkWriteOverlayWithNewFiles || returnError "$LINENO" 'Write overlay tests failed!'
 checkWriteOverlayWithArchivedFiles || returnError "$LINENO" 'Write overlay tests for archive files failed!'
 
