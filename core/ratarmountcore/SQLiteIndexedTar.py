@@ -1527,11 +1527,13 @@ class SQLiteIndexedTar(MountSource):
                 printDebug=printDebug,
             ):
                 isRealFile = hasattr(fileobj, 'name') and fileobj.name and os.path.isfile(fileobj.name)
-                tar_file = rapidgzip.RapidgzipFile(
-                    fileobj,
-                    parallelization=1 if isRealFile and isOnSlowDrive(fileobj.name) else parallelization,
-                    verbose=printDebug >= 2,
-                )
+                parallelization = 1 if isRealFile and isOnSlowDrive(fileobj.name) else parallelization
+                if printDebug >= 3:
+                    print(
+                        f"[Info] Parallelization to use for rapidgzip backend: {parallelization}, "
+                        f"slow drive detected: {isOnSlowDrive(fileobj.name)}"
+                    )
+                tar_file = rapidgzip.RapidgzipFile(fileobj, parallelization=parallelization, verbose=printDebug >= 2)
             else:
                 # The buffer size must be much larger than the spacing or else there will be large performance penalties
                 # even for reading sequentially, see https://github.com/pauldmccarthy/indexed_gzip/issues/89
