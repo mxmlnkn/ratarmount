@@ -19,6 +19,7 @@ class UnionMountSource(MountSource):
         maxCacheDepth: int = 1024,
         maxCacheEntries: int = 100000,
         maxSecondsToCache: float = 60,
+        # pylint: disable=unused-argument
         **options,
     ) -> None:
         """
