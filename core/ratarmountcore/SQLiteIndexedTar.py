@@ -1432,14 +1432,30 @@ class SQLiteIndexedTar(MountSource):
                     )
                 return None
 
+            # The actual open test below results in fails of test_BlockParallelReaders.py during nix
+            # build in a NixOS Docker container. The error thrown is:
+            #     self = <multiprocessing.popen_fork.Popen object at 0x7f57faca4190>
+            #     process_obj = <ForkProcess name='ForkPoolWorker-173' parent=11480 initial daemon>
+            #
+            #         def _launch(self, process_obj):
+            #             code = 1
+            #             parent_r, child_w = os.pipe()
+            #             child_r, parent_w = os.pipe()
+            #     >       self.pid = os.fork()
+            #     E       OSError: [Errno 12] Cannot allocate memory
+            #
+            #     /nix/store/sxr2igfkwhxbagri49b8krmcqz168sim-python3-3.11.8/lib/python3.11/multiprocessing/
+            #     popen_fork.py:66: OSError
+            # Furthermore, this format test
+            return compressionId
+
             try:
-                compressedFileobj = formatOpen(fileobj)
-                # Reading 1B from a single-frame zst file might require decompressing it fully in order
-                # to get uncompressed file size! Avoid that. The magic bytes should suffice mostly.
-                # TODO: Make indexed_zstd not require the uncompressed size for the read call.
-                if compressionId != 'zst':
-                    compressedFileobj.read(1)
-                compressedFileobj.close()
+                with formatOpen(fileobj) as compressedFileobj:
+                    # Reading 1B from a single-frame zst file might require decompressing it fully in order
+                    # to get uncompressed file size! Avoid that. The magic bytes should suffice mostly.
+                    # TODO: Make indexed_zstd not require the uncompressed size for the read call.
+                    if compressionId != 'zst':
+                        compressedFileobj.read(1)
                 fileobj.seek(oldOffset)
                 return compressionId
             except Exception as e:
