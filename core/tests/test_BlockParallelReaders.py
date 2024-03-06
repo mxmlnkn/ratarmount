@@ -11,7 +11,6 @@ import os
 import random
 import subprocess
 import sys
-import tempfile
 from typing import IO
 
 import indexed_zstd
@@ -22,16 +21,6 @@ import zstandard
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from ratarmountcore import ParallelXZReader, ParallelZstdReader  # noqa: E402
-
-
-testData = b"1234567890"
-tmpFile = tempfile.TemporaryFile()
-tmpFile.write(testData)
-
-
-randomTestData = os.urandom(128 * 1024)
-randomTmpFile = tempfile.TemporaryFile()
-randomTmpFile.write(randomTestData)
 
 
 def test_findBlock():
