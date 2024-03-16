@@ -331,3 +331,10 @@ echo foo >> simple-file-split.001
 echo bar >> simple-file-split.002
 
 split --numeric-suffixes=1 --number=2 --suffix-length=3 single-file.tar single-file-split.tar.
+
+
+# Self-extracting archives
+echo iriya > ufo
+zip single-file.zip
+echo 0000 > mockup-self-extracting.zip
+cat single-file.zip >> mockup-self-extracting.zip
