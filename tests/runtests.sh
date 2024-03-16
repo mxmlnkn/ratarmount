@@ -1680,6 +1680,7 @@ tests+=(
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-with-symlink.zip                foo/lighter.tar/fighter/bar
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.zip                     foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.zip                     foo/jet/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/mockup-self-extracting.zip             ufo
 
     2709a3348eb2c52302a7606ecf5860bc tests/denormal-paths.zip                     ufo
     d3b07384d113edec49eaa6238ad5ff00 tests/denormal-paths.zip                     root/bar

@@ -7,7 +7,7 @@ import traceback
 
 from typing import IO, Union
 
-from .compressions import supportedCompressions, checkForSplitFile, rarfile, zipfile
+from .compressions import checkForSplitFile, rarfile, zipfile
 from .utils import CompressionError, RatarmountError
 from .MountSource import MountSource
 from .FolderMountSource import FolderMountSource
@@ -74,23 +74,13 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
 
     if 'zipfile' in sys.modules and zipfile is not None:
         try:
-            # is_zipfile is much too lax when testing for ZIPs because it's only testing for the central directory
-            # at the end of the file not the magic bits at the beginning. Meaning, if another non-ZIP archive has
-            # zip contents at the end, then it might get misclassified! Thefore, manually check for PK at start.
-            # https://bugs.python.org/issue16735
-            # https://bugs.python.org/issue28494
-            # https://bugs.python.org/issue42096
-            # https://bugs.python.org/issue45287
-            # TODO This will not recognize self-extracting ZIP archives, so for now, those are simply not supported!
-            if isinstance(fileOrPath, str):
-                with open(fileOrPath, 'rb') as file:
-                    if supportedCompressions['zip'].checkHeader(file) and zipfile.is_zipfile(fileOrPath):
-                        return ZipMountSource(fileOrPath, **options)
-            else:
-                # TODO One problem here is when trying to read and then seek back but there also is no peek method.
-                #      https://github.com/markokr/rarfile/issues/73
-                if fileOrPath.read(2) == b'PK' and zipfile.is_zipfile(fileOrPath):
-                    return ZipMountSource(fileOrPath, **options)
+            # is_zipfile might yields some false positives, but those should then raise exceptions, which
+            # are caught, so it should be fine. See: https://bugs.python.org/issue42096
+            if zipfile.is_zipfile(fileOrPath):
+                mountSource = ZipMountSource(fileOrPath, **options)
+                if printDebug >= 2:
+                    print("[Info] Opened archive as ZIP file.")
+                return mountSource
         except Exception as exception:
             if printDebug >= 1:
                 print("[Info] Checking for ZIP file raised an exception:", exception)
