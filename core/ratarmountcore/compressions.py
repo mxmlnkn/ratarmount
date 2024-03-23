@@ -6,6 +6,8 @@ import concurrent.futures
 import os
 import struct
 import sys
+import types
+
 from typing import Callable, Dict, IO, Iterable, List, Optional, Tuple
 
 from .utils import isLatinAlpha, isLatinDigit, isLatinHexAlpha, formatNumber, ALPHA, DIGITS, HEX
@@ -61,6 +63,12 @@ if sys.version_info[0] == 3 and sys.version_info[1] > 6:
     import zipfile
 else:
     zipfile = None
+
+
+try:
+    import libarchive
+except ImportError:
+    libarchive = None
 
 
 CompressionModuleInfo = collections.namedtuple('CompressionModuleInfo', ['name', 'open'])
@@ -141,7 +149,29 @@ ARCHIVE_FORMATS: Dict[str, CompressionInfo] = {
 }
 
 
-supportedCompressions = {**TAR_COMPRESSION_FORMATS, **ARCHIVE_FORMATS}
+# TODO I cannot list all files here. There must be a better way, e.g., an libarchive API call.
+LIBARCHIVE_FORMATS: Dict[str, CompressionInfo] = {}
+if 'libarchive' in sys.modules and isinstance(libarchive, types.ModuleType):
+    LIBARCHIVE_FORMATS = {
+        extensions[0]: CompressionInfo(
+            extensions, [], [CompressionModuleInfo('libarchive', libarchive.file_reader)], headerCheck
+        )
+        for extensions, headerCheck in [
+            (['7z', '7zip'], lambda x: x.read(6) == b'7z\xBC\xAF\x27\x1C'),
+            (['ar'], lambda x: x.read(8) == b'<aiaff>\n'),
+            (['rpm'], lambda x: x.read(4) == b'\xED\xAB\xEE\xDB'),
+            (['deb'], lambda x: x.read(4) == b'\x21\x3C\x61\x72'),
+            (['xar'], lambda x: x.read(4) == b'\x78\x61\x72\x21'),
+            (['lz4'], lambda x: x.read(4) == b'\x04\x22\x4C\x5A'),
+            (['lzma'], lambda x: x.read(4) == b'\x5D\x00\x00\x80'),
+            (['lzo'], lambda x: x.read(4) == b'\x89\x4C\x5A\x4F'),
+            (['cpio'], lambda x: x.read(6) == b'\x07\x07\x07\x07'),
+            (['iso'], lambda x: True),
+        ]
+    }
+
+
+supportedCompressions = {**TAR_COMPRESSION_FORMATS, **ARCHIVE_FORMATS, **LIBARCHIVE_FORMATS}
 
 
 def findAvailableOpen(compression: str, prioritizedBackends: Optional[List[str]] = None) -> Optional[Callable]:

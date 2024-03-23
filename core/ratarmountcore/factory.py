@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import io
 import os
 import sys
 import traceback
@@ -16,6 +17,7 @@ from .SingleFileMountSource import SingleFileMountSource
 from .SQLiteIndexedTar import SQLiteIndexedTar
 from .StenciledFile import JoinedFileFromFactory
 from .ZipMountSource import ZipMountSource
+from .LibarchiveMountSource import LibarchiveMountSource
 
 
 def _openRarMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
@@ -52,10 +54,60 @@ def _openZipMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optiona
     return None
 
 
+def _openLibarchiveMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
+    if "libarchive" not in sys.modules:
+        return
+
+    printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
+
+    try:
+        # Neither python-libarchive nor libarchive support opening raw Python file objects.
+        # Test against this for better error messages.
+        # TODO Implement support for Python file objects via libarchive's custom read callback API.
+        fileDescriptorOrPath = None
+        if isinstance(fileOrPath, str):
+            fileDescriptorOrPath = fileOrPath
+        elif hasattr(fileOrPath, 'fileno'):
+            try:
+                fd = fileOrPath.fileno()
+                if isinstance(fd, int):
+                    fileDescriptorOrPath = fd
+            except io.UnsupportedOperation:
+                pass
+
+        if fileDescriptorOrPath:
+            try:
+                if printDebug >= 1:
+                    print("[Info] Trying to open archive with libarchive backend.")
+                mountSource = LibarchiveMountSource(fileDescriptorOrPath, **options)
+                if printDebug >= 1:
+                    print("[Info] Opened archive with libarchive backend.")
+                return mountSource
+            except Exception as exception:
+                if printDebug >= 1:
+                    print("[Info] Checking for libarchive file raised an exception:", exception)
+                if printDebug >= 2:
+                    traceback.print_exc()
+            finally:
+                try:
+                    if hasattr(fileOrPath, 'seek'):
+                        fileOrPath.seek(0)  # type: ignore
+                except Exception as exception:
+                    if printDebug >= 1:
+                        print("[Info] seek(0) raised an exception:", exception)
+                    if printDebug >= 2:
+                        traceback.print_exc()
+    finally:
+        if hasattr(fileOrPath, 'seek'):
+            fileOrPath.seek(0)  # type: ignore
+    return None
+
+
 _BACKENDS = {
     "rarfile": _openRarMountSource,
     "tarfile": _openTarMountSource,
     "zipfile": _openZipMountSource,
+    "libarchive": _openLibarchiveMountSource,
 }
 
 

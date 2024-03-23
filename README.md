@@ -46,6 +46,11 @@ And in contrast to [tarindexer](https://github.com/devsnd/tarindexer), which als
 
  - **Rar** as provided by [rarfile](https://github.com/markokr/rarfile) by Marko Kreen. See also the [RAR 5.0 archive format](https://www.rarlab.com/technote.htm).
  - **Zip** as provided by [zipfile](https://docs.python.org/3/library/zipfile.html), which is distributed with Python itself. See also the [ZIP File Format Specification](https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT).
+ - **Many Others** as provided by [libarchive](https://github.com/libarchive/libarchive) via [python-libarchive-c](https://github.com/Changaco/python-libarchive-c).
+   Beware that libarchive has no performant random access to files and to file contents.
+   In order to seek or open a file, in general, it needs to be assumed that the archive has to be parsed from the beginning.
+   If you have a performance-critical use case for a format only supported via libarchive,
+   then please open a feature request for a faster customized archive format implementation.
 
 
 # Table of Contents
@@ -131,10 +136,13 @@ On macOS, you have to install [macFUSE](https://osxfuse.github.io/) with:
 brew install macfuse
 ```
 
-If you are installing on a system for which there exists no manylinux wheel, then you'll have to install dependencies required to build from source:
+If you are installing on a system for which there exists no manylinux wheel, then you'll have to install further dependencies that are required to build some of the Python packages that ratarmount depends on from source:
 
 ```bash
-sudo apt install python3 python3-pip fuse build-essential software-properties-common zlib1g-dev libzstd-dev liblzma-dev cffi
+sudo apt install \
+    python3 python3-pip fuse \
+    build-essential software-properties-common \
+    zlib1g-dev libzstd-dev liblzma-dev cffi libarchive-dev
 ```
 
 ## PIP Package Installation
