@@ -1,0 +1,126 @@
+WARC/1.0
+WARC-Type: warcinfo
+Content-Type: application/warc-fields
+WARC-Date: 2015-07-08T21:55:13Z
+WARC-Record-ID: <urn:uuid:B8FDDD7C-DBB0-4EC4-BC7E-AA0B21749707>
+WARC-Filename: hello-world.warc.gz
+WARC-Block-Digest: sha1:ECBYA457KB6YATF4WP7KDF6ZXXYGADEC
+Content-Length: 300
+
+software: Wget/1.16.2 (darwin14.1.0)
+format: WARC File Format 1.0
+conformsTo: http://bibnum.bnf.fr/WARC/WARC_ISO_28500_version1_latestdraft.pdf
+robots: classic
+wget-arguments: "--warc-file" "hello-world" "http://iipc.github.io/warc-specifications/primers/web-archive-formats/hello-world.txt" 
+
+
+
+WARC/1.0
+WARC-Type: request
+WARC-Target-URI: http://iipc.github.io/warc-specifications/primers/web-archive-formats/hello-world.txt
+Content-Type: application/http;msgtype=request
+WARC-Date: 2015-07-08T21:55:13Z
+WARC-Record-ID: <urn:uuid:8DCD2661-1B5A-445C-B4F4-2ACEB69A900B>
+WARC-IP-Address: 185.31.18.133
+WARC-Warcinfo-ID: <urn:uuid:B8FDDD7C-DBB0-4EC4-BC7E-AA0B21749707>
+WARC-Block-Digest: sha1:KPXGFZD2D2326ZWSEZP3S2MJ6GMBCD4E
+Content-Length: 207
+
+GET /warc-specifications/primers/web-archive-formats/hello-world.txt HTTP/1.1
+User-Agent: Wget/1.16.2 (darwin14.1.0)
+Accept: */*
+Accept-Encoding: identity
+Host: iipc.github.io
+Connection: Keep-Alive
+
+
+
+WARC/1.0
+WARC-Type: response
+WARC-Record-ID: <urn:uuid:3C74F309-6B37-461C-B982-1B5C447C3C0E>
+WARC-Warcinfo-ID: <urn:uuid:B8FDDD7C-DBB0-4EC4-BC7E-AA0B21749707>
+WARC-Concurrent-To: <urn:uuid:8DCD2661-1B5A-445C-B4F4-2ACEB69A900B>
+WARC-Target-URI: http://iipc.github.io/warc-specifications/primers/web-archive-formats/hello-world.txt
+WARC-Date: 2015-07-08T21:55:13Z
+WARC-IP-Address: 185.31.18.133
+WARC-Block-Digest: sha1:3OMBZSE4IFAWD7XYWIYPAF575DHKSV4M
+WARC-Payload-Digest: sha1:XMABAYFTCASBJ5QATNBILSXH6PSZEMG4
+Content-Type: application/http;msgtype=response
+Content-Length: 494
+
+HTTP/1.1 200 OK
+Server: GitHub.com
+Content-Type: text/plain; charset=utf-8
+Last-Modified: Wed, 08 Jul 2015 21:53:08 GMT
+Access-Control-Allow-Origin: *
+Expires: Wed, 08 Jul 2015 22:05:13 GMT
+Cache-Control: max-age=600
+Content-Length: 13
+Accept-Ranges: bytes
+Date: Wed, 08 Jul 2015 21:55:13 GMT
+Via: 1.1 varnish
+Age: 0
+Connection: keep-alive
+X-Served-By: cache-lcy1127-LCY
+X-Cache: MISS
+X-Cache-Hits: 0
+X-Timer: S1436392513.648949,VS0,VE165
+Vary: Accept-Encoding
+
+Hello World
+
+
+
+WARC/1.0
+WARC-Type: metadata
+WARC-Record-ID: <urn:uuid:29189A0E-B75F-4450-950B-BB6D1AF9CE10>
+WARC-Warcinfo-ID: <urn:uuid:B8FDDD7C-DBB0-4EC4-BC7E-AA0B21749707>
+WARC-Target-URI: metadata://gnu.org/software/wget/warc/MANIFEST.txt
+WARC-Date: 2015-07-08T21:55:13Z
+WARC-Block-Digest: sha1:B2CRHOOYITJQSOUNGVNII5B54SBG63P2
+Content-Type: text/plain
+Content-Length: 48
+
+<urn:uuid:B8FDDD7C-DBB0-4EC4-BC7E-AA0B21749707>
+
+
+WARC/1.0
+WARC-Type: resource
+WARC-Record-ID: <urn:uuid:B38B15B6-76FF-407D-8E9C-D9871FFBDD6C>
+WARC-Warcinfo-ID: <urn:uuid:B8FDDD7C-DBB0-4EC4-BC7E-AA0B21749707>
+WARC-Concurrent-To: <urn:uuid:29189A0E-B75F-4450-950B-BB6D1AF9CE10>
+WARC-Target-URI: metadata://gnu.org/software/wget/warc/wget_arguments.txt
+WARC-Date: 2015-07-08T21:55:13Z
+WARC-Block-Digest: sha1:KTV2WSNW5VSOLYZINAXKR3LXV7T4MMGI
+Content-Type: text/plain
+Content-Length: 117
+
+"--warc-file" "hello-world" "http://iipc.github.io/warc-specifications/primers/web-archive-formats/hello-world.txt" 
+
+
+WARC/1.0
+WARC-Type: resource
+WARC-Record-ID: <urn:uuid:279F0B5B-D946-4FB5-A5E7-51DF45D7D890>
+WARC-Warcinfo-ID: <urn:uuid:B8FDDD7C-DBB0-4EC4-BC7E-AA0B21749707>
+WARC-Concurrent-To: <urn:uuid:29189A0E-B75F-4450-950B-BB6D1AF9CE10>
+WARC-Target-URI: metadata://gnu.org/software/wget/warc/wget.log
+WARC-Date: 2015-07-08T21:55:13Z
+WARC-Block-Digest: sha1:3NZMVDB5DUHNA332E57M2IS5FUFIJ24E
+Content-Type: text/plain
+Content-Length: 504
+
+Opening WARC file 'hello-world.warc.gz'.
+
+--2015-07-08 22:55:13--  http://iipc.github.io/warc-specifications/primers/web-archive-formats/hello-world.txt
+Resolving iipc.github.io... 185.31.18.133
+Connecting to iipc.github.io|185.31.18.133|:80... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 13 [text/plain]
+Saving to: 'hello-world.txt.1'
+
+     0K                                                       100%  705K=0s
+
+2015-07-08 22:55:13 (705 KB/s) - 'hello-world.txt.1' saved [13/13]
+
+
+

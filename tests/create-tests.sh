@@ -342,3 +342,44 @@ cat single-file.zip >> mockup-self-extracting.zip
 # Chimera file
 cp single-file.tar.bz2 chimera-tbz2-zip
 cat folder-symlink.zip >> chimera-tbz2-zip
+
+# Double-compressed
+7z a nested-tar.tar{.7z,}
+7z a double-compressed-nested-tar.tar.7z.7z nested-tar.tar.7z
+
+# Simple stream compressions
+# sudo apt install gzip bzip2 lzip lzip ncompress lrzip
+echo "foo fighter" > simple
+bzip2 -k simple
+gzip -k simple
+xz -k simple
+lzma -k simple
+lz4 -k simple
+lrzip simple
+lzip -k -o simple{.lzip,}  # Default extension: .lz
+lzop -k simple  # extension .lzo
+compress < simple > simple.Z
+
+wget 'https://raw.githubusercontent.com/iipc/warc-specifications/master/primers/web-archive-formats/hello-world.warc'
+
+# Libarchive-supported archive formats
+# sudo apt install binutils lcab genisoimage
+rm -rf foo
+tar tvlf single-file.tar
+ar rcs single-file.ar bar
+lcab bar single-file.cab
+xar -c -f single-file.xar bar
+for format in bin odc newc crc hpbin hpodc; do
+    echo bar | cpio --format="$format" --create > "single-file.$format.cpio"
+done
+genisoimage -o single-file.iso -V volume-foo -R -J bar
+
+# Large archive with two files to test seekability and independence of opened files.
+true > spaces-32-MiB.txt; for i in $( seq $(( 32 * 1024 )) ); do printf '%1024s' $'\n' >> spaces-32-MiB.txt; done
+true > zeros-32-MiB.txt; for i in $( seq $(( 32 * 1024 )) ); do printf '%01023d\n' 0 >> zeros-32-MiB.txt; done
+7z a two-large-files-32Ki-lines-each-1024B.7z spaces-32-MiB.txt zeros-32-MiB.txt
+
+# Large archive with two files to test seekability and independence of opened files.
+true > spaces-32-MiB.txt; for i in $( seq $(( 32 * 1024 )) ); do printf '%1023s' $'\n' >> spaces-32-MiB.txt; done
+true > zeros-32-MiB.txt; for i in $( seq $(( 32 * 1024 )) ); do printf '%01022d\n' 0 >> zeros-32-MiB.txt; done
+7z a two-large-files-32Ki-lines-each-1023B.7z spaces-32-MiB.txt zeros-32-MiB.txt
