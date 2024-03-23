@@ -1,4 +1,12 @@
 
+# Version 0.6.4 built on 2024-03-23
+
+ - Return a valid file info and file version count for `/`.
+ - Make the original archive viewable as an older file version when using `AutoMountLayer`.
+ - Resolve symbolic links pointing outside the source folder given to `FolderMountSource` to not break them.
+ - Do not return a valid `FileInfo` for invalid paths such as `../..`.
+ - Make `--index-minimum-file-count` work for the TAR backend.
+
 # Version 0.6.3 built on 2024-02-23
 
  - Add `__enter__` and `__exit__` to `MountSource` interface.
