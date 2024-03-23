@@ -2,12 +2,11 @@
 # -*- coding: utf-8 -*-
 
 import os
-import sys
 import traceback
 
 from typing import IO, Optional, Union
 
-from .compressions import checkForSplitFile, rarfile, TAR_COMPRESSION_FORMATS, zipfile
+from .compressions import checkForSplitFile, libarchive, rarfile, TAR_COMPRESSION_FORMATS, zipfile
 from .utils import CompressionError, RatarmountError
 from .MountSource import MountSource
 from .FolderMountSource import FolderMountSource
@@ -16,11 +15,12 @@ from .SingleFileMountSource import SingleFileMountSource
 from .SQLiteIndexedTar import SQLiteIndexedTar
 from .StenciledFile import JoinedFileFromFactory
 from .ZipMountSource import ZipMountSource
+from .LibarchiveMountSource import LibarchiveMountSource
 
 
 def _openRarMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
     try:
-        if 'rarfile' in sys.modules and rarfile.is_rarfile_sfx(fileOrPath):
+        if rarfile is not None and rarfile.is_rarfile_sfx(fileOrPath):
             return RarMountSource(fileOrPath, **options)
     finally:
         if hasattr(fileOrPath, 'seek'):
@@ -40,7 +40,7 @@ def _openTarMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optiona
 
 def _openZipMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
     try:
-        if 'zipfile' in sys.modules and zipfile is not None:
+        if zipfile is not None and zipfile is not None:
             # is_zipfile might yields some false positives, but those should then raise exceptions, which
             # are caught, so it should be fine. See: https://bugs.python.org/issue42096
             if zipfile.is_zipfile(fileOrPath):
@@ -52,10 +52,42 @@ def _openZipMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optiona
     return None
 
 
+def _openLibarchiveMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
+    if libarchive is None:
+        return None
+
+    printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
+
+    try:
+        try:
+            if printDebug >= 2:
+                print("[Info] Trying to open archive with libarchive backend.")
+            return LibarchiveMountSource(fileOrPath, **options)
+        except Exception as exception:
+            if printDebug >= 2:
+                print("[Info] Checking for libarchive file raised an exception:", exception)
+            if printDebug >= 3:
+                traceback.print_exc()
+        finally:
+            try:
+                if hasattr(fileOrPath, 'seek'):
+                    fileOrPath.seek(0)  # type: ignore
+            except Exception as exception:
+                if printDebug >= 1:
+                    print("[Info] seek(0) raised an exception:", exception)
+                if printDebug >= 2:
+                    traceback.print_exc()
+    finally:
+        if hasattr(fileOrPath, 'seek'):
+            fileOrPath.seek(0)  # type: ignore
+    return None
+
+
 _BACKENDS = {
     "rarfile": _openRarMountSource,
     "tarfile": _openTarMountSource,
     "zipfile": _openZipMountSource,
+    "libarchive": _openLibarchiveMountSource,
 }
 
 
@@ -103,7 +135,7 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
             result = _BACKENDS[name](fileOrPath, **options)
             if result:
                 if printDebug >= 2:
-                    print(f"[Info] Opened archive with {name} file.")
+                    print(f"[Info] Opened archive with {name} backend.")
                 return result
         except Exception as exception:
             if printDebug >= 2:

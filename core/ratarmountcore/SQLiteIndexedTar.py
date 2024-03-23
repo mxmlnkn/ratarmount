@@ -696,7 +696,8 @@ class SQLiteIndexedTar(MountSource):
             else (lambda x: x)
         )
 
-        # Determine an archive file name to show for debug output
+        # Determine an archive file name to show for debug output and as file name inside the mount point for
+        # simple non-TAR gzip/bzip2 stream-compressed files.
         self.tarFileName: str
         if fileObject:
             self.tarFileName = tarFileName if tarFileName else '<file object>'
@@ -1038,6 +1039,11 @@ class SQLiteIndexedTar(MountSource):
         if self.index.fileCount() == 0:
             if self.printDebug >= 3:
                 print(f"Did not find any file in the given TAR: {self.tarFileName}. Assuming a compressed file.")
+
+            # For some reason, this happens for single-file.iso.
+            # Tarfile does not raise an error but also does not find any files.
+            if not self.compression:
+                raise CompressionError("Tarfile returned nothing, not even an error, and the file is not compressed!")
 
             tarInfo: Optional[Any] = None
             try:

@@ -6,6 +6,8 @@ import concurrent.futures
 import os
 import struct
 import sys
+import types
+
 from typing import Callable, Dict, IO, Iterable, List, Optional, Tuple
 
 from .utils import isLatinAlpha, isLatinDigit, isLatinHexAlpha, formatNumber, ALPHA, DIGITS, HEX
@@ -61,6 +63,12 @@ if sys.version_info[0] == 3 and sys.version_info[1] > 6:
     import zipfile
 else:
     zipfile = None
+
+
+try:
+    import libarchive
+except ImportError:
+    libarchive = None
 
 
 CompressionModuleInfo = collections.namedtuple('CompressionModuleInfo', ['name', 'open'])
@@ -141,7 +149,107 @@ ARCHIVE_FORMATS: Dict[str, CompressionInfo] = {
 }
 
 
-supportedCompressions = {**TAR_COMPRESSION_FORMATS, **ARCHIVE_FORMATS}
+# libarchive support is split into filters (compressors or encoders working on a single file) and (archive) formats.
+# For now, only list formats here that are not supported by other backends, because libarchive is slower anyway.
+LIBARCHIVE_FILTER_FORMATS: Dict[str, CompressionInfo] = {}
+LIBARCHIVE_ARCHIVE_FORMATS: Dict[str, CompressionInfo] = {}
+if 'libarchive' in sys.modules and isinstance(libarchive, types.ModuleType):
+    # Filters are handily listed either in libarchive:
+    # https://github.com/libarchive/libarchive/blob/6110e9c82d8ba830c3440f36b990483ceaaea52c/libarchive/
+    #   archive_read_support_filter_by_code.c#L32
+    # Or in python-libarchive-c:
+    # https://github.com/Changaco/python-libarchive-c/blob/5f7008d876103bac84c40905d00bb6b5afbab91a/libarchive/
+    #   ffi.py#L254
+    # It is unexpected that rpm is handled as a filter. Maybe it is implemented similar to rpm2cpio?
+    LIBARCHIVE_FILTER_FORMATS = {
+        extensions[0]: CompressionInfo(
+            extensions, [], [CompressionModuleInfo('libarchive', libarchive.file_reader)], headerCheck
+        )
+        # TODO It would be nice to add support for all LZ-based formats such as lz4, lzip, lzip to rapidgzip.
+        for extensions, headerCheck in [
+            # https://github.com/libarchive/libarchive/blob/6110e9c82d8ba830c3440f36b990483ceaaea52c/libarchive/
+            # archive_read_support_filter_grzip.c#L46
+            # It is almost impossible to find the original sources or a specification:
+            # https://t2sde.org/packages/grzip
+            # ftp://ftp.ac-grenoble.fr/ge/compression/grzip-0.3.0.tar.bz2
+            (['grz', 'grzip'], lambda x: x.read(12) == b'GRZipII\x00\x02\x04:)'),
+            # https://github.com/ckolivas/lrzip/blob/master/doc/magic.header.txt
+            (['lrz', 'lrzip'], lambda x: x.read(5) == b'LRZI\x00'),
+            # https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md#general-structure-of-lz4-frame-format
+            (['lz4'], lambda x: x.read(4) == b'\x04\x22\x4D\x18'),
+            # https://www.ietf.org/archive/id/draft-diaz-lzip-09.txt
+            (['lz', 'lzip'], lambda x: x.read(5) == b'LZIP\x01'),
+            # https://github.com/jljusten/LZMA-SDK/blob/master/DOC/lzma-specification.txt
+            # https://github.com/frizb/FirmwareReverseEngineering/blob/master/IdentifyingCompressionAlgorithms.md#lzma
+            (['lzma'], lambda x: x.read(3) == b'\x5D\x00\x00'),
+            (['lzo', 'lzop'], lambda x: x.read(9) == b'\x89\x4c\x5a\x4f\x00\x0d\x0a\x1a\x0a'),
+            # https://refspecs.linuxbase.org/LSB_4.1.0/LSB-Core-generic/LSB-Core-generic/pkgformat.html
+            (['rpm'], lambda x: x.read(4) == b'\xED\xAB\xEE\xDB'),
+            # https://en.wikipedia.org/wiki/Uuencoding
+            (['uu'], lambda x: x.read(6) == b'begin '),
+            # https://github.com/file/file/blob/master/magic/Magdir/compress
+            (['Z'], lambda x: x.read(2) == b'\x1F\x9D'),
+            # Supported by SQLiteIndexedTar: bzip2, gzip, xz, zstd
+        ]
+    }
+
+    def isCpio(fileObject):
+        # http://justsolve.archiveteam.org/wiki/Cpio
+        # https://github.com/libarchive/libarchive/blob/6110e9c82d8ba830c3440f36b990483ceaaea52c/libarchive/
+        #   archive_read_support_format_cpio.c#L272
+        firstBytes = fileObject.read(5)
+        return firstBytes == b'07070' or firstBytes[:2] in [b'\x71\xC7', b'\xC7\x71']
+
+    def isISO9660(fileObject):
+        # https://www.iso.org/obp/ui/#iso:std:iso:9660:ed-1:v1:en
+        # http://www.brankin.com/main/technotes/Notes_ISO9660.htm
+        # https://en.wikipedia.org/wiki/ISO_9660
+        # https://en.wikipedia.org/wiki/Optical_disc_image
+        offset = 32 * 1024 + 1
+        udfOffset = 38 * 1024 + 1
+        buffer = fileObject.read(max(offset, udfOffset) + 4)
+        return buffer[offset : offset + 5] == b'CD001' or buffer[udfOffset : udfOffset + 4] == b'NSR0'
+
+    # Formats are handily listed either in libarchive:
+    # https://github.com/libarchive/libarchive/blob/6110e9c82d8ba830c3440f36b990483ceaaea52c/libarchive/
+    #   archive_read_support_format_all.c#L32
+    # Or in python-libarchive-c:
+    # https://github.com/Changaco/python-libarchive-c/blob/5f7008d876103bac84c40905d00bb6b5afbab91a/libarchive/
+    #   ffi.py#L243
+    LIBARCHIVE_ARCHIVE_FORMATS = {
+        extensions[0]: CompressionInfo(
+            extensions, [], [CompressionModuleInfo('libarchive', libarchive.file_reader)], headerCheck
+        )
+        for extensions, headerCheck in [
+            # https://github.com/ip7z/7zip/blob/main/DOC/7zFormat.txt
+            # https://py7zr.readthedocs.io/en/latest/archive_format.html
+            (['7z', '7zip'], lambda x: x.read(6) == b'7z\xBC\xAF\x27\x1C'),
+            (['ar'], lambda x: x.read(8) == b'<aiaff>\n'),
+            # https://download.microsoft.com/download/4/d/a/4da14f27-b4ef-4170-a6e6-5b1ef85b1baa/[ms-cab].pdf
+            (['cab'], lambda x: x.read(4) == b'MSCF'),
+            (['deb'], lambda x: x.read(4) == b'\x21\x3C\x61\x72'),
+            (['xar'], lambda x: x.read(4) == b'\x78\x61\x72\x21'),
+            (['cpio'], isCpio),
+            (['iso'], isISO9660),
+            # https://www.iso.org/standard/68004.html
+            # https://iipc.github.io/warc-specifications/specifications/warc-format/warc-1.1/#file-and-record-model
+            (['warc'], lambda x: x.read(7) == b'WARC/1.'),
+            (['xar'], lambda x: x.read(4) == b'xar!'),
+            # Supported by other backends: tar, rar, zip
+            # Not supported because it has no magic identifaction and therefore is only trouble: lha, mtree
+            # http://fileformats.archiveteam.org/wiki/LHA
+            # > LHA can be identified with high accuracy, but doing so can be laborious,
+            # > due to the lack of a signature, and other complicating factors.
+        ]
+    }
+
+
+supportedCompressions = {
+    **TAR_COMPRESSION_FORMATS,
+    **ARCHIVE_FORMATS,
+    **LIBARCHIVE_FILTER_FORMATS,
+    **LIBARCHIVE_ARCHIVE_FORMATS,
+}
 
 
 def findAvailableOpen(compression: str, prioritizedBackends: Optional[List[str]] = None) -> Optional[Callable]:

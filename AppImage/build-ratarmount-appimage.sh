@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# E.g., run this cript inside the manylinux2014 container and mount the whole ratarmount git root:
+# E.g., run this script inside the manylinux2014 container and mount the whole ratarmount git root:
 #   docker run -v$PWD:/project -it quay.io/pypa/manylinux2014_x86_64 bash
 #   cd /project/AppImage && ./build-ratarmount-appimage.sh
 
@@ -14,7 +14,9 @@ function installSystemRequirements()
     export PATH="/opt/python/cp39-cp39/bin:$PATH"
     python3 -m pip install python-appimage
     yum -y install epel-release
-    yum install -y fuse fakeroot patchelf fuse-libs libsqlite3x strace desktop-file-utils libzstd-devel
+    # We need to isntall development dependencies to build Python packages from source and we also need
+    # to install libraries such as libarchive in order to copy them into the AppImage.
+    yum install -y fuse fakeroot patchelf fuse-libs libsqlite3x strace desktop-file-utils libzstd-devel libarchive lzop
 }
 
 function installAppImageTools()
@@ -61,23 +63,53 @@ function installAppImagePythonPackages()
 function installAppImageSystemLibraries()
 {
     # Note that manylinux2014 already has libsqlite3.so.0 inside /usr/lib.
-    local libraries=()
+    # It is also a good idea to run ldd on the .so files to see what they depend on in turn.
+    # ldd /usr/lib64/libarchive.so.13
+    #    libcrypto.so.10 => /lib64/libcrypto.so.10
+    #    # https://savannah.nongnu.org/projects/acl
+    #    # Commands for Manipulating POSIX Access Control Lists
+    #    libacl.so.1 => /lib64/libacl.so.1
+    #    # https://savannah.nongnu.org/projects/attr
+    #    # Commands for Manipulating Filesystem Extended Attributes
+    #    libattr.so.1 => /lib64/libattr.so.1
+    #    # Compression backend libarries. Definitely required.
+    #    liblzo2.so.2 => /lib64/liblzo2.so.2
+    #    liblzma.so.5 => /lib64/liblzma.so.5
+    #    libbz2.so.1 => /lib64/libbz2.so.1
+    #    libxml2.so.2 => /lib64/libxml2.so.2    # For xar, which has an XML TOC.
+    #    libz.so.1 => /lib64/libz.so.1
+    # Ubiquitous libraries that probably do not and should not be bundled into the AppImage:
+    #    linux-vdso.so.1 =>
+    #    libm.so.6 => /lib64/libm.so.6
+    #    libdl.so.2 => /lib64/libdl.so.2
+    #    libc.so.6 => /lib64/libc.so.6
+    #    libpthread.so.0 => /lib64/libpthread.so.0
+    #    /lib64/ld-linux-x86-64.so.2
+    # linuxdeploy automatically bundles transitive dependencies! I only need to specify libarchive.so manually
+    # because it is dynamically loaded by python-libarchive-c, which linuxdeploy does notice automatically.
+    local libraries=( $( find /lib64/ -name 'libcrypto.so*' ) )
     if commandExists repoquery; then
-        libraries=( $( repoquery -l fuse-libs | 'grep' 'lib64.*[.]so' ) )
+        libraries+=( $( repoquery -l fuse-libs | 'grep' 'lib64.*[.]so' ) )
+        libraries+=( $( repoquery -l libarchive | 'grep' 'lib64.*[.]so' ) )
     elif commandExists dnf; then
-        libraries=( $( dnf repoquery -l fuse-libs | 'grep' 'lib64.*[.]so' ) )
+        libraries+=( $( dnf repoquery -l fuse-libs | 'grep' 'lib64.*[.]so' ) )
+        libraries+=( $( dnf repoquery -l libarchive | 'grep' 'lib64.*[.]so' ) )
     elif commandExists dpkg; then
-        libraries=( $( dpkg -L libfuse2 | 'grep' '/lib.*[.]so' ) )
+        libraries+=( $( dpkg -L libfuse2 | 'grep' '/lib.*[.]so' ) )
+        libraries+=( $( dpkg -L libarchive | 'grep' '/lib.*[.]so' ) )
     else
         echo -e "\e[31mCannot gather FUSE libs into AppImage without (dnf) repoquery.\e[0m"
     fi
+
+    echo "Bundle libraries:"
+    printf '    %s\n' "${libraries[@]}"
 
     if [[ "${#libraries[@]}" -gt 0 ]]; then
         'cp' -a "${libraries[@]}" "$APP_DIR"/usr/lib/
     fi
 
     APPIMAGE_EXTRACT_AND_RUN=1 linuxdeploy --appdir="$APP_DIR" "${libraries[@]/#/--library=}" \
-        --executable=/usr/bin/fusermount
+        --executable=$( which fusermount ) --executable=$( which lzop )
 }
 
 function trimAppImage()
@@ -129,7 +161,6 @@ function trimAppImage()
     # Remove libraries deprecated since 3.11 and to be removed in 3.13:
     # https://docs.python.org/3.13/whatsnew/3.13.html#whatsnew313-pep594
     'rm' -rf \
-           "$APP_DIR/usr/lib/libcrypt"* \
            "$APP_PYTHON_LIB/aifc.py" \
            "$APP_PYTHON_LIB/lib-dynlod/audioop"* \
            "$APP_PYTHON_LIB/chunk.py" \

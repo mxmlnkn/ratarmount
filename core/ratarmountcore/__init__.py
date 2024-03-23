@@ -72,6 +72,7 @@ from .BlockParallelReaders import BlockParallelReader, ParallelXZReader, Paralle
 from .MountSource import FileInfo, MountSource
 
 from .FolderMountSource import FolderMountSource
+from .LibarchiveMountSource import LibarchiveMountSource
 from .RarMountSource import RarMountSource
 from .ZipMountSource import ZipMountSource
 from .SQLiteIndexedTar import SQLiteIndexedTar, SQLiteIndexedTarUserData

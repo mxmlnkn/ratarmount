@@ -51,7 +51,8 @@ class RunRatarmount:
             output = stdout.read()
             errors = stderr.read()
 
-            if '[Warning]' in output or '[Error]' in output or '[Warning]' in errors or '[Error]' in errors:
+            problematicWords = ['[Warning]', '[Error]']
+            if any(word in output or word in errors for word in problematicWords):
                 print("===== stdout =====\n", output)
                 print("===== stderr =====\n", errors)
                 assert False, "There were warnings or errors during execution of ratarmount!"
@@ -83,6 +84,8 @@ class RunRatarmount:
             time.sleep(0.1)
 
 
+# 7z encryption is not supported by libarchive and therefore also not by ratarmount.
+# https://github.com/libarchive/libarchive/issues/579#issuecomment-118440525
 @pytest.mark.parametrize("compression", ["rar", "zip"])
 def test_password(tmpdir, compression):
     # The file object returned by ZipFile.open is not seekable in Python 3.6 for some reason.
@@ -94,6 +97,11 @@ def test_password(tmpdir, compression):
     mountPoint = str(tmpdir)
     with RunRatarmount(mountPoint, ['--password', password, encryptedFile]):
         assert os.path.isdir(os.path.join(mountPoint, "foo"))
+        assert os.path.isdir(os.path.join(mountPoint, "foo", "fighter"))
+        filePath = os.path.join(mountPoint, "foo", "fighter", "ufo")
+        assert os.path.exists(filePath)
+        assert os.path.isfile(filePath)
+        assert open(filePath, 'rb').read()
 
 
 @pytest.mark.parametrize("compression", ["rar", "zip"])
