@@ -56,7 +56,14 @@ class TestAutoMountLayer:
         #      other files and those other files will actually take 10x or more longer than without this test running
         #      before! It might be that the memory usage makes Python's garbage collector a bottleneck because of too
         #      many small objects?!
-        with openMountSource(findTestFile("compressed-100-times.tar.gz"), **options) as mountSource:
+        mountSource = openMountSource(findTestFile("compressed-100-times.tar.gz"), **options)
+        # TODO two problems:
+        #  - It opens with libarchive even though it use SQLiteIndexedTar!
+        #  - When opening with libarchive (which is a valid test that should be added!), the recursive
+        #    mounting not only fails (because Python file objects are not supported as input) but the contained
+        #    ufo_98.gz file is not even accessible!!!
+        #    Try with:
+        with mountSource as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
 
             assert recursivelyMounted.listDir('/')

@@ -874,6 +874,7 @@ def checkInputFileType(
         oldOffset = fileobj.tell()
         compression = None
         for compressionId, compressionInfo in supportedCompressions.items():
+            print("Test for compression", compressionId)
             try:
                 if compressionInfo.checkHeader(fileobj):
                     compression = compressionId
