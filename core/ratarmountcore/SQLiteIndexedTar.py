@@ -1169,9 +1169,12 @@ class SQLiteIndexedTar(MountSource):
         # files right after the the last non-zero block, which might be at offset 512 for empty files.
         # > The user can specify a blocking factor, which is the number of blocks per record.
         # > The default is 20, producing 10 KiB records.
-        pastEndOffset, isSparse = sqlConnection.execute(
+        result = sqlConnection.execute(
             "SELECT offset + size, issparse FROM files ORDER BY offset DESC LIMIT 1"
         ).fetchone()
+        if not result:
+            raise InvalidIndexError("The index contains no files!")
+        pastEndOffset, isSparse = result
 
         if isSparse:
             return None
