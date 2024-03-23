@@ -10,7 +10,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.factory import openMountSource  # noqa: E402
+from ratarmountcore import openMountSource, ZipMountSource, SQLiteIndexedTar  # noqa: E402
 
 
 def findTestFile(relativePathOrName):
@@ -74,8 +74,36 @@ class TestOpenMountSource:
         if os.path.exists(indexPath):
             os.remove(indexPath)
 
-        # Index file is always created for compressed files such as .tar.bz2
-        with openMountSource(chimeraFilePath, writeIndex=True) as mountSource:
+        # Check simple open and that index files are NOT created because they are too small.
+        with openMountSource(
+            chimeraFilePath, writeIndex=True, prioritizedBackends=['zipfile', 'indexed_bzip2']
+        ) as mountSource:
+            assert isinstance(mountSource, ZipMountSource)
             files = mountSource.listDir("/")
             assert files
+
+            assert not os.path.exists(indexPath)
+
+        with openMountSource(
+            chimeraFilePath,
+            writeIndex=True,
+            prioritizedBackends=['zipfile', 'indexed_bzip2'],
+            indexMinimumFileCount=0,
+            printDebug=3,
+        ) as mountSource:
+            assert isinstance(mountSource, ZipMountSource)
+            files = mountSource.listDir("/")
+            assert files
+
+            assert os.path.exists(indexPath)
+            os.remove(indexPath)
+
+        # Index file is always created for compressed files such as .tar.bz2
+        with openMountSource(
+            chimeraFilePath, writeIndex=True, prioritizedBackends=['indexed_bzip2', 'zipfile']
+        ) as mountSource:
+            assert isinstance(mountSource, SQLiteIndexedTar)
+            files = mountSource.listDir("/")
+            assert files
+
             assert os.path.exists(indexPath)
