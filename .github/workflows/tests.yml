@@ -106,7 +106,11 @@ jobs:
     - name: Install Dependencies (Linux)
       if: startsWith( matrix.os, 'ubuntu' )
       run: |
-        sudo apt-get -y install fuse bzip2 pbzip2 pixz zstd unar
+        # Libarchive calls the grzip, lrzip, lzop binaries for lrzip support. Others, such as bzip2, gzip, lz4, lzma,
+        # zstd, may also call external binaries depending on how libarchive was compiled!
+        # https://github.com/libarchive/libarchive/blob/ad5a0b542c027883d7069f6844045e6788c7d70c/libarchive/
+        #   archive_read_support_filter_lrzip.c#L68
+        sudo apt-get -y install fuse bzip2 pbzip2 pixz zstd unar lrzip lzop
         set -x
 
     - name: Install Dependencies (MacOS)

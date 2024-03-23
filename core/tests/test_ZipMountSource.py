@@ -43,6 +43,9 @@ class TestZipMountSource:
                 assert mountSource.getFileInfo(linkPath)
                 assert mountSource.fileVersions(linkPath) == 1
                 assert not mountSource.listDir(linkPath)
+                fileInfo = mountSource.getFileInfo(linkPath)
+                assert fileInfo.linkname == 'fighter'
                 with mountSource.open(mountSource.getFileInfo(linkPath)) as file:
                     # Contents of symlink is the symlink destination itself.
+                    # This behavior is not consistent with other MountSources and therefore subject to change!
                     assert file.read() == b'fighter'

@@ -1341,7 +1341,7 @@ seeking capabilities when opening that file.
         help='Specify a file with newline separated passwords for RAR and ZIP files. '
              'The passwords will be tried out in order of appearance in the file.')
 
-    moduleNames = sorted([module.name for _, info in supportedCompressions.items() for module in info.modules])
+    moduleNames = sorted(list(set(module.name for _, info in supportedCompressions.items() for module in info.modules)))
 
     advancedGroup.add_argument(
         '--use-backend', type=str, action='append',

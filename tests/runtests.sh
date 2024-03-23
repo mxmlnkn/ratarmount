@@ -251,9 +251,11 @@ checkFileInTAR()
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
     funmount "$mountFolder"
 
-    if [[ "$archive" =~ .tar ]]; then
+    # The libarchive backend does not create indexes for now because it doesn't help the poor performance much and
+    # introduces complexity with index compatibilty to other backends.
+    if [[ "$archive" =~ .tar && ! "$archive" =~ .7z$ ]]; then
         'grep' -q 'Successfully loaded offset dictionary' ratarmount.stdout.log ratarmount.stderr.log ||
-            returnError "$LINENO" "Looks like index was not loaded while executing: $RATARMOUNT_CMD ${args[*]}"
+            returnError "$LINENO" "Looks like index was not loaded for '$archive' while executing: $RATARMOUNT_CMD ${args[*]}"
     fi
 
     safeRmdir "$mountFolder"
@@ -1648,6 +1650,40 @@ rm -f tests/*.index.*
 
 tests=()
 
+if ( uname | 'grep' -q -i Linux ) && python3 -c 'import libarchive' &>/dev/null; then
+tests+=(
+    2709a3348eb2c52302a7606ecf5860bc tests/nested-with-symlink.7z                 foo/fighter/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/nested-with-symlink.7z                 foo/fighter/saucer
+    2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-with-symlink.7z                 foo/lighter.tar/fighter/bar
+    2709a3348eb2c52302a7606ecf5860bc tests/zip.7z                                 natsu.zip/ufo
+    10d6977ec2ab378e60339323c24f9308 tests/zip.7z                                 natsu.zip/foo
+    2709a3348eb2c52302a7606ecf5860bc tests/file-in-non-existing-folder.7z         foo2/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.7z                      foo/fighter/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.7z                      foo/jet/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/double-compressed-nested-tar.tar.7z.7z nested-tar.tar.7z/nested-tar.tar/foo/fighter/ufo
+
+    19696f24a91fc4e8950026f9c801a0d0 tests/simple.lzma                            simple
+    19696f24a91fc4e8950026f9c801a0d0 tests/simple.lrz                             simple
+    19696f24a91fc4e8950026f9c801a0d0 tests/simple.lz4                             simple
+    19696f24a91fc4e8950026f9c801a0d0 tests/simple.lzip                            simple
+    19696f24a91fc4e8950026f9c801a0d0 tests/simple.lzo                             simple
+    19696f24a91fc4e8950026f9c801a0d0 tests/simple.Z                               simple
+
+    d3b07384d113edec49eaa6238ad5ff00 tests/single-file.ar                         bar
+    d3b07384d113edec49eaa6238ad5ff00 tests/single-file.cab                        bar
+    d3b07384d113edec49eaa6238ad5ff00 tests/single-file.iso.bz2                    single-file.iso/bar
+    d3b07384d113edec49eaa6238ad5ff00 tests/single-file.xar                        bar
+    d3b07384d113edec49eaa6238ad5ff00 tests/single-file.bin.cpio                   bar
+    d3b07384d113edec49eaa6238ad5ff00 tests/single-file.crc.cpio                   bar
+    d3b07384d113edec49eaa6238ad5ff00 tests/single-file.hpbin.cpio                 bar
+    d3b07384d113edec49eaa6238ad5ff00 tests/single-file.hpodc.cpio                 bar
+    d3b07384d113edec49eaa6238ad5ff00 tests/single-file.newc.cpio                  bar
+    d3b07384d113edec49eaa6238ad5ff00 tests/single-file.odc.cpio                   bar
+    # The contents of files and file hierarchy of WARC is subject to change.
+    4aecced75ff52fdd39bb52dae192258f tests/hello-world.warc                       warc-specifications/primers/web-archive-formats/hello-world.txt
+)
+fi
+
 # TODO Some bug with rarfile throwing: Failed the read enough data: req=304 got=51 and then seek(0) not working?
 if ! uname | 'grep' -q -i darwin; then
 tests+=(
@@ -1657,7 +1693,7 @@ tests+=(
 )
 fi
 
-# zipfile returns unseekable file object with python 3.6. Therefore I disabled it completely there.
+# zipfile returns unseekable file object with Python 3.6. Therefore, I disabled it completely there.
 python3MinorVersion=$( python3 --version | sed -n -E 's|.* 3[.]([0-9]+)[.][0-9]+|\1|p' )
 if [[ -n "$python3MinorVersion" && "$python3MinorVersion" -gt 6 ]]; then
 if ! uname | 'grep' -q -i darwin; then

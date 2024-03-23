@@ -3,7 +3,7 @@ init-hook='import sys; sys.path.append("./core")'
 # A comma-separated list of package or module names from where C extensions may
 # be loaded. Extensions are loading into the active Python interpreter and may
 # run arbitrary code.
-extension-pkg-whitelist=indexed_gzip,indexed_bzip2,indexed_zstd,lzmaffi,rapidgzip
+extension-pkg-whitelist=indexed_gzip,indexed_bzip2,indexed_zstd,libarchive,libarchive.ffi,lzmaffi,rapidgzip
 
 # Specify a score threshold to be exceeded before program exits with error.
 fail-under=10.0
