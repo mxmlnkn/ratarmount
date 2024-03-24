@@ -67,10 +67,15 @@ class SQLiteIndex:
     #   - Add 'offsetheader' to the primary key of the 'files' table so that files which were
     #     updated in the TAR can still be accessed if necessary.
     # Version 0.3.0:
-    #   - Add arguments influencing the created index to metadata (ignore-zeros, recursive, ...)
+    #   - Add arguments influencing the created index to 'metadata' table (ignore-zeros, recursive, ...)
     # Version 0.4.0:
-    #   - Added 'gzipindexes' table, which may contain multiple blobs in contrast to 'gzipindex' table.
-    __version__ = '0.4.0'
+    #   - Add 'gzipindexes' table, which may contain multiple blobs in contrast to 'gzipindex' table.
+    # Version 0.5.0:
+    #   - Add 'backend' name to 'metadata' table. Indexes created by different backends should by default
+    #     be assumed to be incompatible, especially for chimera files, but also when one was created with
+    #     libarchive, then it will not be readable with the SQLiteIndexedTar backend because it does not
+    #     collect data offsets.
+    __version__ = '0.5.0'
 
     NUMBER_OF_METADATA_TO_VERIFY = 1000  # shouldn't take more than 1 second according to benchmarks
 
@@ -80,6 +85,9 @@ class SQLiteIndex:
     # But, making it too small would result in too many non-backwards compatible indexes being created.
     _MAX_BLOB_SIZE = 256 * 1024 * 1024  # 256 MiB
 
+    # TODO Would be nice for index verification to have columns for recursionlevel (INTEGER) and isgenerated (BOOL)
+    #      that is true for automatically inserted parent folders that do not actually exist in the archive.
+    #      How version compatible would that table change be? Test with old ratarmount versions.
     _CREATE_FILES_TABLE = """
         CREATE TABLE "files" (
             "path"          VARCHAR(65535) NOT NULL,  /* path with leading and without trailing slash */
@@ -120,7 +128,8 @@ class SQLiteIndex:
         );"""
 
     _CREATE_METADATA_TABLE = """
-        /* Empty table whose sole existence specifies that the archive has been fully processed. */
+        /* Empty table whose sole existence specifies that the archive has been fully processed.
+         * Common keys: tarstats, arguments, isGnuIncremental, backendName */
         CREATE TABLE IF NOT EXISTS "metadata" (
             "key"      VARCHAR(65535) NOT NULL, /* e.g. "tarsize" */
             "value"    VARCHAR(65535) NOT NULL  /* e.g. size in bytes as integer */
@@ -144,18 +153,35 @@ class SQLiteIndex:
 
     # Check some of the first and last files in the archive and some random selection in between.
     # Do not verify folders because parent folders and root get automatically added!
-    FROM_REGULAR_FILES = f"""FROM "files" WHERE (mode & {stat.S_IFREG}) != 0"""
+    # Ignore rows with isTar=True because recomputing this would require trying an expensive recursive mount.
+    # We cannot simply ignore rows with NOT isTar because there will be multiple entries with the same
+    # offset header for those recursive entries.
+    # We also need to ignore all rows for recursive entries because they will have the parent TAR path prepended,
+    # which the error check code is not expecting.
+    # This check is done by creating a subquery/table that gathers all recursive archives (isTar==True) that
+    # enclose the current rows offset. If there is no such archive, then the current row is non-recursive
+    # and safe to check. Unfortunately, it seems that this is quadratic in complexity and basically hangs for
+    # larger files.
+    # FROM "files" AS t1 WHERE (mode & {stat.S_IFREG}) != 0 AND NOT EXISTS (
+    #     SELECT 1 FROM "files" AS t2 WHERE isTar AND t1.offsetheader BETWEEN t2.offset AND t2.offset + t2.size - 1
+    # )
+    # As an alternative, exempt the path from the consistency check.
+    # Note also that for pure compressed files such as simple.bz2, the offsetheader can be None.
+    # These rows should also be filtered.
+    FROM_REGULAR_FILES = f"""FROM "files" WHERE (mode & {stat.S_IFREG}) != 0 AND offsetheader IS NOT NULL"""
 
     def __init__(
         self,
         indexFilePath: Optional[str],
         indexFolders: Optional[List[str]] = None,
         archiveFilePath: Optional[str] = None,
+        *,  # force all parameters after to be keyword-only
         encoding: str = tarfile.ENCODING,
         checkMetadata: Optional[Callable[[Dict[str, Any]], None]] = None,
         printDebug: int = 0,
         preferMemory: bool = False,
         indexMinimumFileCount: int = 0,
+        backendName: str = '',
     ):
         """
         indexFilePath
@@ -177,6 +203,8 @@ class SQLiteIndex:
         indexMinimumFileCount
             If > 0, then open new databases in memory and write them out if this threshold has been
             exceeded. It may also be written to a file if a gzip index is stored.
+        backendName
+            The backend name to be stored as metadata and to determine compatibility of found indexes.
         """
 
         self.printDebug = printDebug
@@ -192,6 +220,7 @@ class SQLiteIndex:
         self.checkMetadata = checkMetadata
         self.preferMemory = preferMemory
         self.indexMinimumFileCount = indexMinimumFileCount
+        self.backendName = backendName
         self._insertedRowCount = 0
 
         # Ignore minimum file count option if an index file path or index folder is configured.
@@ -393,6 +422,17 @@ class SQLiteIndex:
             print("[Warning] recreate the index using the --recreate-index option!")
             for arg, oldState, newState in differingArgs:
                 print(f"[Warning] {arg}: index: {oldState}, current: {newState}")
+
+    def checkMetadataBackend(self, metadata: Dict):
+        # Because of a lack of sufficient foresight, the backend name was not added to the index in older verions.
+        backendName = metadata.get('backendName')
+        if isinstance(backendName, str):
+            if backendName != self.backendName:
+                raise InvalidIndexError(
+                    f"Cannot open an index created with backend '{backendName}'! "
+                    f"Will stop trying to open the archive with backend '{self.backendName}'. "
+                    f"Use --recreate-index if '{backendName}' is not installed."
+                )
 
     def getIndexVersion(self):
         return self.getConnection().execute("""SELECT version FROM versions WHERE name == 'index';""").fetchone()[0]
@@ -867,6 +907,7 @@ class SQLiteIndex:
             if 'metadata' in tables:
                 metadata = dict(self.sqlConnection.execute('SELECT * FROM metadata;'))
                 if self.checkMetadata:
+                    self.checkMetadataBackend(metadata)
                     self.checkMetadata(metadata)
 
         except Exception as e:
