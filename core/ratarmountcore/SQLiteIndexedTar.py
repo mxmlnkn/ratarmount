@@ -1357,13 +1357,14 @@ class SQLiteIndexedTar(MountSource):
 
     def _checkIndexValidity(self) -> bool:
         # Check some of the first and last files in the archive and some random selection in between.
+        selectFiles = "SELECT * " + SQLiteIndex.FROM_REGULAR_FILES
         result = self.index.getConnection().execute(
             f"""
-            SELECT * FROM ( SELECT * FROM files ORDER BY offset ASC LIMIT 100 )
+            SELECT * FROM ( {selectFiles} ORDER BY offset ASC LIMIT 100 )
             UNION
-            SELECT * FROM ( SELECT * FROM files ORDER BY RANDOM() LIMIT {SQLiteIndex.NUMBER_OF_METADATA_TO_VERIFY} )
+            SELECT * FROM ( {selectFiles} ORDER BY RANDOM() LIMIT {SQLiteIndex.NUMBER_OF_METADATA_TO_VERIFY} )
             UNION
-            SELECT * FROM ( SELECT * FROM files ORDER BY offset DESC LIMIT 100 )
+            SELECT * FROM ( {selectFiles} ORDER BY offset DESC LIMIT 100 )
             ORDER BY offset
         """
         )
@@ -1399,6 +1400,11 @@ class SQLiteIndexedTar(MountSource):
                             storedFileInfo[index] = bool(storedFileInfo[index])
 
                         if tuple(storedFileInfo) != realFileInfos[0]:
+                            if self.printDebug >= 3:
+                                print("[Info] Stored file info:")
+                                print("[Info]", storedFileInfo)
+                                print("[Info] differs from recomputed one:")
+                                print("[Info]", realFileInfos[0])
                             return False
 
             return True
