@@ -494,18 +494,16 @@ checkAutomaticIndexRecreation()
     [[ $lastModification -eq $( getFileMtime "$indexFile" ) ]] ||
         returnError "$LINENO" 'Index changed even though TAR did not!'
 
-    # 3. Change contents (and timestamp) without changing the size
+    # 3. Change only the timestamp without changing the size and file metadata.
     #    (Luckily TAR is filled to 10240 Bytes anyways for very small files)
+    #    modification timestamp detection is turned off for now by default to facilitate index sharing because
+    #    the mtime check can prove problematic as the mtime changes when downloading a file.
     sleep 1 # because we are comparing timestamps with seconds precision ...
-    fileName="${fileName//e/a}"
-    echo 'momo' > "$fileName"
-    tar -cf "$archive" "$fileName"
+    touch -- "$archive"
 
-    # modification timestamp detection is turned off for now by default to facilitate index sharing because
-    # the mtime check can proove problematic as the mtime changes when downloading a file.
     runAndCheckRatarmount "$archive"
-    ! [[ -f "$mountFolder/${fileName}" ]] ||
-        returnError "$LINENO" 'Index should not have been recreated and therefore contain outdated file name!'
+    [[ $lastModification -eq $( getFileMtime "$indexFile" ) ]] ||
+        returnError "$LINENO" 'Index changed even though TAR did not except for the modification timestamp!'
     funmount "$mountFolder"
 
     runRatarmount --verify-mtime "$archive"
