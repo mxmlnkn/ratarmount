@@ -13,6 +13,14 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from ratarmountcore.factory import openMountSource  # noqa: E402
 
 
+def findTestFile(relativePathOrName):
+    for i in range(3):
+        path = os.path.sep.join([".."] * i + ["tests", relativePathOrName])
+        if os.path.exists(path):
+            return path
+    return relativePathOrName
+
+
 class TestOpenMountSource:
     @staticmethod
     def test_joining_archive(tmpdir):
@@ -58,3 +66,16 @@ class TestOpenMountSource:
             fileInfo = mountSource.getFileInfo("/foo")
             assert fileInfo
             assert mountSource.open(fileInfo).read() == result
+
+    @staticmethod
+    def test_chimera_file():
+        chimeraFilePath = findTestFile("chimera-tbz2-zip")
+        indexPath = chimeraFilePath + ".index.sqlite"
+        if os.path.exists(indexPath):
+            os.remove(indexPath)
+
+        # Index file is always created for compressed files such as .tar.bz2
+        with openMountSource(chimeraFilePath, writeIndex=True) as mountSource:
+            files = mountSource.listDir("/")
+            assert files
+            assert os.path.exists(indexPath)
