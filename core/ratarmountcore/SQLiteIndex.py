@@ -12,7 +12,7 @@ import time
 import traceback
 import urllib.parse
 
-from typing import Any, AnyStr, Callable, Dict, IO, List, Optional, Tuple
+from typing import Any, AnyStr, Callable, Dict, IO, List, Optional, Tuple, Union
 from dataclasses import dataclass
 
 try:
@@ -332,15 +332,12 @@ class SQLiteIndex:
 
     def _storeFileMetadata(self, filePath: AnyStr) -> None:
         """Adds some consistency meta information to recognize the need to update the cached TAR index"""
-
-        connection = self.getConnection()
-
         try:
             tarStats = os.stat(filePath)
             serializedTarStats = json.dumps(
                 {attr: getattr(tarStats, attr) for attr in dir(tarStats) if attr.startswith('st_')}
             )
-            connection.execute('INSERT OR REPLACE INTO "metadata" VALUES (?,?)', ("tarstats", serializedTarStats))
+            self.storeMetadataKeyValue("tarstats", serializedTarStats)
         except Exception as exception:
             print("[Warning] There was an error when adding file metadata.")
             print("[Warning] Automatic detection of changed TAR files during index loading might not work.")
@@ -349,18 +346,12 @@ class SQLiteIndex:
             if self.printDebug >= 3:
                 traceback.print_exc()
 
-    def storeMetadata(self, metadata: AnyStr, filePath: Optional[AnyStr] = None) -> None:
+    def storeMetadataKeyValue(self, key: AnyStr, value: Union[str, bytes]) -> None:
         connection = self.getConnection()
-
-        self._storeVersionsMetadata()
-
         connection.executescript(SQLiteIndex._CREATE_METADATA_TABLE)
 
-        if filePath:
-            self._storeFileMetadata(filePath)
-
         try:
-            connection.execute('INSERT OR REPLACE INTO "metadata" VALUES (?,?)', ("arguments", metadata))
+            connection.execute('INSERT OR REPLACE INTO "metadata" VALUES (?,?)', (key, value))
         except Exception as exception:
             if self.printDebug >= 2:
                 print(exception)
@@ -368,6 +359,12 @@ class SQLiteIndex:
             print("[Warning] Automatic detection of changed arguments files during index loading might not work.")
 
         connection.commit()
+
+    def storeMetadata(self, metadata: AnyStr, filePath: Optional[AnyStr] = None) -> None:
+        self._storeVersionsMetadata()
+        if filePath:
+            self._storeFileMetadata(filePath)
+        self.storeMetadataKeyValue('arguments', metadata)
 
     def dropMetadata(self):
         self.getConnection().executescript(
