@@ -30,6 +30,7 @@ class ZipMountSource(MountSource):
         verifyModificationTime : bool                      = False,
         printDebug             : int                       = 0,
         transform              : Optional[Tuple[str, str]] = None,
+        indexMinimumFileCount  : int                       = 1000,
         **options
         # fmt: on
     ) -> None:
@@ -59,7 +60,7 @@ class ZipMountSource(MountSource):
             encoding=self.encoding,
             checkMetadata=self._checkMetadata,
             printDebug=self.printDebug,
-            preferMemory=len(self.files) < options.get("indexMinimumFileCount", 1000),
+            indexMinimumFileCount=indexMinimumFileCount,
         )
 
         if clearIndexCache:

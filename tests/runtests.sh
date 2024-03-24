@@ -3,7 +3,7 @@
 cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." || { echo 'Failed to cd to ratarmount.py folder!'; exit 1; }
 
 if [[ -z "$RATARMOUNT_CMD" ]]; then
-    RATARMOUNT_CMD="python3 -X dev -W ignore::DeprecationWarning:fuse -u $( realpath -- ratarmount.py )"
+    RATARMOUNT_CMD="python3 -X dev -W ignore::DeprecationWarning:fuse -u $( realpath -- ratarmount.py ) --index-minimum-file-count 0"
     #RATARMOUNT_CMD=ratarmount
     export RATARMOUNT_CMD
 fi
@@ -906,7 +906,7 @@ checkIndexFolderFallback()
     # Check that the special "empty" folder works signaling to store alongside the TAR
     local indexFile=${archive}.index.sqlite
     rm -f -- "$indexFile"
-    args=( --index-folders '' --index-minimum-file-count 0 "$archive" "$mountFolder" )
+    args=( --index-folders '' "$archive" "$mountFolder" )
     {
         runAndCheckRatarmount "${args[@]}" &&
         checkStat "$mountFolder/$fileInTar" &&
