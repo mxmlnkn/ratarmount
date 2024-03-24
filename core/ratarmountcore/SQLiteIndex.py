@@ -142,6 +142,10 @@ class SQLiteIndex:
         );
     """
 
+    # Check some of the first and last files in the archive and some random selection in between.
+    # Do not verify folders because parent folders and root get automatically added!
+    FROM_REGULAR_FILES = f"""FROM "files" WHERE (mode & {stat.S_IFREG}) != 0"""
+
     def __init__(
         self,
         indexFilePath: Optional[str],
