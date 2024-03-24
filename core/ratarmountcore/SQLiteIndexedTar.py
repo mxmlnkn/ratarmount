@@ -1370,6 +1370,15 @@ class SQLiteIndexedTar(MountSource):
                 ).fetchone()
             )
 
+        if 'backendName' not in metadata:
+            # Checking the first two should already be enough to detect an index created with a different backend.
+            # Do not verify folders because parent folders and root get automatically added!
+            result = self.index.getConnection().execute(
+                f"""SELECT * {SQLiteIndex.FROM_REGULAR_FILES} ORDER BY offset ASC LIMIT 2;"""
+            )
+            if not self._checkRowsValidity(result):
+                raise InvalidIndexError("The first two files of the index do not match.")
+
     def _checkIndexValidity(self) -> bool:
         # Check some of the first and last files in the archive and some random selection in between.
         selectFiles = "SELECT * " + SQLiteIndex.FROM_REGULAR_FILES
@@ -1383,12 +1392,17 @@ class SQLiteIndexedTar(MountSource):
             ORDER BY offset
         """
         )
+        return self._checkRowsValidity(result)
 
+    def _checkRowsValidity(self, rows) -> bool:
         t0 = time.time()
 
         oldOffset = self.tarFileObject.tell()
+        rowCount = 0
         try:
-            for row in result:
+            for row in rows:
+                rowCount += 1
+
                 # As for the stencil size, 512 B (one TAR block) would be enough for most cases except for
                 # features like GNU LongLink which store additional metadata in further TAR blocks.
                 offsetHeader = int(row[2])
@@ -1416,6 +1430,10 @@ class SQLiteIndexedTar(MountSource):
                                 return False
                             storedFileInfo[index] = bool(storedFileInfo[index])
 
+                        # Do not compare the path because it might have the parent TAR prepended to it for
+                        # recursive TARs and this is hard to ignore any other way.
+                        storedFileInfo[0] = realFileInfos[0][0]  # path
+                        storedFileInfo[11] = realFileInfos[0][11]  # isTar
                         if tuple(storedFileInfo) != realFileInfos[0]:
                             if self.printDebug >= 3:
                                 print("[Info] Stored file info:")
@@ -1433,10 +1451,7 @@ class SQLiteIndexedTar(MountSource):
 
             if self.printDebug >= 2:
                 t1 = time.time()
-                print(
-                    f"[Info] Verifying metadata for {SQLiteIndex.NUMBER_OF_METADATA_TO_VERIFY + 200} "
-                    f"files took {t1-t0:.3f} s"
-                )
+                print(f"[Info] Verifying metadata for {rowCount} files took {t1-t0:.3f} s")
 
         return False
 
