@@ -5,8 +5,10 @@ cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." || { echo 'Failed to cd to ratarm
 if [[ -z "$RATARMOUNT_CMD" ]]; then
     RATARMOUNT_CMD="python3 -X dev -W ignore::DeprecationWarning:fuse -u $( realpath -- ratarmount.py )"
     #RATARMOUNT_CMD=ratarmount
-    export RATARMOUNT_CMD
 fi
+RATARMOUNT_CMD="$RATARMOUNT_CMD --index-minimum-file-count 0"
+export RATARMOUNT_CMD
+echo "RATARMOUNT_CMD: $RATARMOUNT_CMD"
 
 
 # MAC does not have mountpoint check!

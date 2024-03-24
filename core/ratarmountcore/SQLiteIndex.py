@@ -202,7 +202,7 @@ class SQLiteIndex:
         # a folder of archives or single small archives recursively. If the user goes through the trouble
         # of specifying an index file or folder, then littering should not be a problem as index creations
         # are expected by the user.
-        if self.indexMinimumFileCount > 0 and not indexFilePath and (not indexFolders or not any(indexFolders)):
+        if self.indexMinimumFileCount > 0 and not indexFilePath:
             if self.printDebug >= 3:
                 print(
                     f"[Info] Because of the given positive index minimum file count ({self.indexMinimumFileCount}) "
