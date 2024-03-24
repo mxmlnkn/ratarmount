@@ -29,7 +29,7 @@ from .version import __version__
 from .MountSource import FileInfo, createRootFileInfo
 from .compressions import TAR_COMPRESSION_FORMATS
 from .SQLiteBlobFile import SQLiteBlobsFile, WriteSQLiteBlobs
-from .utils import RatarmountError, IndexNotOpenError, InvalidIndexError, findModuleVersion
+from .utils import RatarmountError, IndexNotOpenError, InvalidIndexError, findModuleVersion, MismatchingIndexError
 
 
 def getSqliteTables(connection: sqlite3.Connection):
@@ -207,6 +207,9 @@ class SQLiteIndex:
         backendName
             The backend name to be stored as metadata and to determine compatibility of found indexes.
         """
+
+        if not backendName:
+            raise ValueError("A non-empty backend name must be specified!")
 
         self.printDebug = printDebug
         self.sqlConnection: Optional[sqlite3.Connection] = None
@@ -402,6 +405,7 @@ class SQLiteIndex:
         if filePath:
             self._storeFileMetadata(filePath)
         self.storeMetadataKeyValue('arguments', metadata)
+        self.storeMetadataKeyValue('backendName', self.backendName)
 
     def dropMetadata(self):
         self.getConnection().executescript(
@@ -432,9 +436,9 @@ class SQLiteIndex:
         backendName = metadata.get('backendName')
         if isinstance(backendName, str):
             if backendName != self.backendName:
-                raise InvalidIndexError(
-                    f"Cannot open an index created with backend '{backendName}'! "
-                    f"Will stop trying to open the archive with backend '{self.backendName}'. "
+                raise MismatchingIndexError(
+                    f"Cannot open an index created with backend '{backendName}'!\n"
+                    f"Will stop trying to open the archive with backend '{self.backendName}'.\n"
                     f"Use --recreate-index if '{backendName}' is not installed."
                 )
 
@@ -966,6 +970,8 @@ class SQLiteIndex:
 
         try:
             self.loadIndex(indexFilePath)
+        except MismatchingIndexError as e:
+            raise e
         except Exception as exception:
             if self.printDebug >= 3:
                 traceback.print_exc()

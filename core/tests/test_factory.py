@@ -84,6 +84,7 @@ class TestOpenMountSource:
 
             assert not os.path.exists(indexPath)
 
+        # Same as above, but force index creation by lowering the file count threshold.
         with openMountSource(
             chimeraFilePath,
             writeIndex=True,
@@ -115,14 +116,14 @@ class TestOpenMountSource:
             prioritizedBackends=['indexed_bzip2', 'zipfile'],
             indexMinimumFileCount=0,
         ) as mountSource:
-            assert isinstance(mountSource, SQLiteIndexedTar)
+            assert isinstance(mountSource, ZipMountSource)
             files = mountSource.listDir("/")
             assert files
 
-            fileInfo = mountSource.getFileInfo("/bar")
+            fileInfo = mountSource.getFileInfo("/foo/fighter/ufo")
             assert fileInfo
             with mountSource.open(fileInfo) as file:
-                assert file.read() == b"foo\n"
+                assert file.read() == b"iriya\n"
 
             assert os.path.exists(indexPath)
 
@@ -151,15 +152,15 @@ class TestOpenMountSource:
             prioritizedBackends=['zipfile', 'indexed_bzip2'],
             indexMinimumFileCount=0,
         ) as mountSource:
-            assert isinstance(mountSource, ZipMountSource)
+            assert isinstance(mountSource, SQLiteIndexedTar)
             files = mountSource.listDir("/")
             print("files:", files)
             assert files
 
-            fileInfo = mountSource.getFileInfo("/foo/fighter/ufo")
+            fileInfo = mountSource.getFileInfo("/bar")
             assert fileInfo
             with mountSource.open(fileInfo) as file:
-                assert file.read() == b"iriya\n"
+                assert file.read() == b"foo\n"
 
             assert os.path.exists(indexPath)
 

@@ -34,6 +34,10 @@ class InvalidIndexError(RatarmountError):
     """Exception for indexes being invalid, outdated, or created with different arguments."""
 
 
+class MismatchingIndexError(RatarmountError):
+    """Exception for indexes being created by a different backend."""
+
+
 class CompressionError(RatarmountError):
     """Exception for trying to open files with unsupported compression or unavailable decompression module."""
 
