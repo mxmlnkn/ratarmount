@@ -1353,16 +1353,7 @@ class SQLiteIndexedTar(MountSource):
             if self.compression == 'gz':
                 argumentsToCheck.append('gzipSeekPointSpacing')
 
-            differingArgs = []
-            for arg in argumentsToCheck:
-                if arg in indexArgs and hasattr(self, arg) and indexArgs[arg] != getattr(self, arg):
-                    differingArgs.append((arg, indexArgs[arg], getattr(self, arg)))
-            if differingArgs:
-                print("[Warning] The arguments used for creating the found index differ from the arguments ")
-                print("[Warning] given for mounting the archive now. In order to apply these changes, ")
-                print("[Warning] recreate the index using the --recreate-index option!")
-                for arg, oldState, newState in differingArgs:
-                    print(f"[Warning] {arg}: index: {oldState}, current: {newState}")
+            SQLiteIndex.checkMetadataArguments(indexArgs, self, argumentsToCheck)
 
     def _checkIndexValidity(self) -> bool:
         # Check some of the first and last files in the archive and some random selection in between.

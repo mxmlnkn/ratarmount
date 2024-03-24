@@ -374,6 +374,22 @@ class SQLiteIndex:
             """
         )
 
+    @staticmethod
+    def checkMetadataArguments(metadata: Dict, arguments, argumentsToCheck: List[str]):
+        # Check arguments used to create the found index.
+        # These are only warnings and not forcing a rebuild by default.
+        # TODO: Add option to force index rebuild on metadata mismatch?
+        differingArgs = []
+        for arg in argumentsToCheck:
+            if arg in metadata and hasattr(arguments, arg) and metadata[arg] != getattr(arguments, arg):
+                differingArgs.append((arg, metadata[arg], getattr(arguments, arg)))
+        if differingArgs:
+            print("[Warning] The arguments used for creating the found index differ from the arguments ")
+            print("[Warning] given for mounting the archive now. In order to apply these changes, ")
+            print("[Warning] recreate the index using the --recreate-index option!")
+            for arg, oldState, newState in differingArgs:
+                print(f"[Warning] {arg}: index: {oldState}, current: {newState}")
+
     def getIndexVersion(self):
         return self.getConnection().execute("""SELECT version FROM versions WHERE name == 'index';""").fetchone()[0]
 
