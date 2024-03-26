@@ -224,6 +224,8 @@ class SQLiteIndex:
         self.backendName = backendName
         self._insertedRowCount = 0
 
+        assert self.backendName
+
         # Ignore minimum file count option if an index file path or index folder is configured.
         # For latter, ignore the special empty folder [''], which means that the indexes are stored
         # besides the archives.
@@ -396,6 +398,7 @@ class SQLiteIndex:
 
     def storeMetadata(self, metadata: AnyStr, filePath: Optional[AnyStr] = None) -> None:
         self._storeVersionsMetadata()
+        self.storeMetadataKeyValue('backendName', self.backendName)
         if filePath:
             self._storeFileMetadata(filePath)
         self.storeMetadataKeyValue('arguments', metadata)

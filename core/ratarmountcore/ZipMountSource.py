@@ -62,6 +62,7 @@ class ZipMountSource(MountSource):
             checkMetadata=self._checkMetadata,
             printDebug=self.printDebug,
             indexMinimumFileCount=indexMinimumFileCount,
+            backendName='ZipMountSource',
         )
 
         if clearIndexCache:

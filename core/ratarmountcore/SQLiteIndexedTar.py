@@ -761,6 +761,7 @@ class SQLiteIndexedTar(MountSource):
             checkMetadata=self._checkMetadata,
             printDebug=self.printDebug,
             indexMinimumFileCount=indexMinimumFileCount,
+            backendName='SQLiteIndexedTar',
         )
         if clearIndexCache:
             self.index.clearIndexes()
