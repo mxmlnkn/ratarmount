@@ -770,17 +770,7 @@ class SQLiteIndexedTar(MountSource):
             if not self.hasBeenAppendedTo:  # indirectly set by a successful call to _tryLoadIndex
                 self._loadOrStoreCompressionOffsets()  # load
                 self.index.reloadIndexReadOnly()
-                # TODO The value should not matter when an index has been loaded. But maybe write this to the index
-                #      and load it in order to have the correct value without having to do a very costly recheck?
-                self._isGnuIncremental = False
                 return
-
-            # TODO This does and did not work correctly for recursive TARs because the outermost layer will change
-            #      None to a hard value and from then on it would have been fixed to that value even when called
-            #      inside createIndex.
-            # Required for _checkIndexValidity
-            if self._isGnuIncremental is None:
-                self._isGnuIncremental = self._detectGnuIncremental(self.tarFileObject)
 
             # TODO Handling appended files to compressed archives would have to account for dropping the offsets,
             #      seeking to the first appended file while not processing any metadata and still showing a progress
@@ -1281,6 +1271,16 @@ class SQLiteIndexedTar(MountSource):
         self.hasBeenAppendedTo = True
 
     def _checkMetadata(self, metadata: Dict[str, Any]) -> None:
+        # self._isGnuIncremental may be initialized during metadata check because it is required for some checks.
+        # But, if the subsequent checks fail, then we want to restore the initial value.
+        isGnuIncremental = self._isGnuIncremental
+        try:
+            self._checkMetadata2(metadata)
+        except Exception as e:
+            self._isGnuIncremental = isGnuIncremental
+            raise e
+
+    def _checkMetadata2(self, metadata: Dict[str, Any]) -> None:
         """
         Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible.
         Returns normally and sets self.index.hasBeenAppendedTo to True if the size of the archive increased
@@ -1355,6 +1355,20 @@ class SQLiteIndexedTar(MountSource):
                 argumentsToCheck.append('gzipSeekPointSpacing')
 
             SQLiteIndex.checkMetadataArguments(indexArgs, self, argumentsToCheck)
+
+        # Restore the self._isGnuIncremental flag before doing any row validation because else there could be
+        # false positive warnings regarding GNU incremental detection.
+        if 'isGnuIncremental' in metadata:
+            self._isGnuIncremental = bool(metadata['isGnuIncremental'])
+        elif self.index.sqlConnection:
+            # This can be expensive, but it should still be less expensive than rereading the first 1000 file headers
+            # and checking the type through that way. There will be a breakeven point though for very large archives.
+            # Then, it would be better to update the index to contain the 'isGnuIncremental' metadata key.
+            self._isGnuIncremental = bool(
+                self.index.sqlConnection.execute(
+                    """SELECT 1 FROM "files" WHERE hex(type) = hex("D") LIMIT 1"""
+                ).fetchone()
+            )
 
     def _checkIndexValidity(self) -> bool:
         # Check some of the first and last files in the archive and some random selection in between.
