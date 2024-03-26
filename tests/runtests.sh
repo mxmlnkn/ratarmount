@@ -3,7 +3,7 @@
 cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." || { echo 'Failed to cd to ratarmount.py folder!'; exit 1; }
 
 if [[ -z "$RATARMOUNT_CMD" ]]; then
-    RATARMOUNT_CMD="python3 -X dev -W ignore::DeprecationWarning:fuse -u $( realpath -- ratarmount.py )"
+    RATARMOUNT_CMD="python3 -X dev -W ignore::DeprecationWarning:fuse -u $( realpath -- ratarmount.py ) --index-minimum-file-count 0"
     #RATARMOUNT_CMD=ratarmount
     export RATARMOUNT_CMD
 fi
@@ -494,18 +494,16 @@ checkAutomaticIndexRecreation()
     [[ $lastModification -eq $( getFileMtime "$indexFile" ) ]] ||
         returnError "$LINENO" 'Index changed even though TAR did not!'
 
-    # 3. Change contents (and timestamp) without changing the size
+    # 3. Change only the timestamp without changing the size and file metadata.
     #    (Luckily TAR is filled to 10240 Bytes anyways for very small files)
+    #    modification timestamp detection is turned off for now by default to facilitate index sharing because
+    #    the mtime check can prove problematic as the mtime changes when downloading a file.
     sleep 1 # because we are comparing timestamps with seconds precision ...
-    fileName="${fileName//e/a}"
-    echo 'momo' > "$fileName"
-    tar -cf "$archive" "$fileName"
+    touch -- "$archive"
 
-    # modification timestamp detection is turned off for now by default to facilitate index sharing because
-    # the mtime check can proove problematic as the mtime changes when downloading a file.
     runAndCheckRatarmount "$archive"
-    ! [[ -f "$mountFolder/${fileName}" ]] ||
-        returnError "$LINENO" 'Index should not have been recreated and therefore contain outdated file name!'
+    [[ $lastModification -eq $( getFileMtime "$indexFile" ) ]] ||
+        returnError "$LINENO" 'Index changed even though TAR did not except for the modification timestamp!'
     funmount "$mountFolder"
 
     runRatarmount --verify-mtime "$archive"
@@ -906,7 +904,7 @@ checkIndexFolderFallback()
     # Check that the special "empty" folder works signaling to store alongside the TAR
     local indexFile=${archive}.index.sqlite
     rm -f -- "$indexFile"
-    args=( --index-folders '' --index-minimum-file-count 0 "$archive" "$mountFolder" )
+    args=( --index-folders '' "$archive" "$mountFolder" )
     {
         runAndCheckRatarmount "${args[@]}" &&
         checkStat "$mountFolder/$fileInTar" &&
@@ -1650,6 +1648,19 @@ rm -f tests/*.index.*
 
 tests=()
 
+if ( uname | 'grep' -q -i Linux ) && python3 -c 'import libarchive' &>/dev/null; then
+tests+=(
+    2709a3348eb2c52302a7606ecf5860bc tests/nested-with-symlink.7z                 foo/fighter/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/nested-with-symlink.7z                 foo/fighter/saucer
+    2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-with-symlink.7z                 foo/lighter.tar/fighter/bar
+    2709a3348eb2c52302a7606ecf5860bc tests/zip.7z                                 natsu.zip/ufo
+    10d6977ec2ab378e60339323c24f9308 tests/zip.7z                                 natsu.zip/foo
+    2709a3348eb2c52302a7606ecf5860bc tests/file-in-non-existing-folder.7z         foo2/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.7z                      foo/fighter/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.7z                      foo/jet/ufo
+)
+fi
+
 # TODO Some bug with rarfile throwing: Failed the read enough data: req=304 got=51 and then seek(0) not working?
 if ! uname | 'grep' -q -i darwin; then
 tests+=(
@@ -1659,7 +1670,7 @@ tests+=(
 )
 fi
 
-# zipfile returns unseekable file object with python 3.6. Therefore I disabled it completely there.
+# zipfile returns unseekable file object with Python 3.6. Therefore, I disabled it completely there.
 python3MinorVersion=$( python3 --version | sed -n -E 's|.* 3[.]([0-9]+)[.][0-9]+|\1|p' )
 if [[ -n "$python3MinorVersion" && "$python3MinorVersion" -gt 6 ]]; then
 if ! uname | 'grep' -q -i darwin; then

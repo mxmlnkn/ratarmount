@@ -338,3 +338,7 @@ echo iriya > ufo
 zip single-file.zip
 echo 0000 > mockup-self-extracting.zip
 cat single-file.zip >> mockup-self-extracting.zip
+
+# Chimera file
+cp single-file.tar.bz2 chimera-tbz2-zip
+cat folder-symlink.zip >> chimera-tbz2-zip

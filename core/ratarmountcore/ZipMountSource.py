@@ -7,6 +7,7 @@ import os
 import re
 import stat
 import tarfile
+import traceback
 from timeit import default_timer as timer
 
 from typing import Any, Dict, IO, Iterable, List, Optional, Tuple, Union
@@ -30,6 +31,7 @@ class ZipMountSource(MountSource):
         verifyModificationTime : bool                      = False,
         printDebug             : int                       = 0,
         transform              : Optional[Tuple[str, str]] = None,
+        indexMinimumFileCount  : int                       = 1000,
         **options
         # fmt: on
     ) -> None:
@@ -59,7 +61,8 @@ class ZipMountSource(MountSource):
             encoding=self.encoding,
             checkMetadata=self._checkMetadata,
             printDebug=self.printDebug,
-            preferMemory=len(self.files) < options.get("indexMinimumFileCount", 1000),
+            indexMinimumFileCount=indexMinimumFileCount,
+            backendName='ZipMountSource',
         )
 
         if clearIndexCache:
@@ -242,6 +245,36 @@ class ZipMountSource(MountSource):
             file.seek(offset, os.SEEK_SET)
             return file.read(size)
 
+    def _tryToOpenFirstFile(self):
+        # Get first row that has the regular file bit set in mode (stat.S_IFREG == 32768 == 1<<15).
+        result = self.index.getConnection().execute(
+            f"""SELECT path,name {SQLiteIndex.FROM_REGULAR_FILES} ORDER BY "offsetheader" ASC LIMIT 1;"""
+        )
+        if not result:
+            return
+        firstFile = result.fetchone()
+        if not firstFile:
+            return
+
+        if self.printDebug >= 2:
+            print(
+                "[Info] The index contains no backend name. Therefore, will try to open the first file as "
+                "an integrity check."
+            )
+        try:
+            fileInfo = self.getFileInfo(firstFile[0] + '/' + firstFile[1])
+            if not fileInfo:
+                return
+
+            with self.open(fileInfo) as file:
+                file.read(1)
+        except Exception as exception:
+            if self.printDebug >= 2:
+                print("[Info] Trying to open the first file raised an exception:", exception)
+            if self.printDebug >= 3:
+                traceback.print_exc()
+            raise InvalidIndexError("Integrity check of opening the first file failed.") from exception
+
     def _checkMetadata(self, metadata: Dict[str, Any]) -> None:
         """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
 
@@ -271,19 +304,10 @@ class ZipMountSource(MountSource):
                     f"to this SQLite index has changed ({str(archiveStats.st_mtime)})",
                 )
 
-        # Check arguments used to create the found index.
-        # These are only warnings and not forcing a rebuild by default.
-        # TODO: Add --force options?
         if 'arguments' in metadata:
-            indexArgs = json.loads(metadata['arguments'])
-            argumentsToCheck = ['encoding', 'transformPattern']
-            differingArgs = []
-            for arg in argumentsToCheck:
-                if arg in indexArgs and hasattr(self, arg) and indexArgs[arg] != getattr(self, arg):
-                    differingArgs.append((arg, indexArgs[arg], getattr(self, arg)))
-            if differingArgs:
-                print("[Warning] The arguments used for creating the found index differ from the arguments ")
-                print("[Warning] given for mounting the archive now. In order to apply these changes, ")
-                print("[Warning] recreate the index using the --recreate-index option!")
-                for arg, oldState, newState in differingArgs:
-                    print(f"[Warning] {arg}: index: {oldState}, current: {newState}")
+            SQLiteIndex.checkMetadataArguments(
+                json.loads(metadata['arguments']), self, argumentsToCheck=['encoding', 'transformPattern']
+            )
+
+        if 'backendName' not in metadata:
+            self._tryToOpenFirstFile()

@@ -3,6 +3,7 @@
 
 import io
 import json
+import math
 import multiprocessing.pool
 import os
 import platform
@@ -760,6 +761,7 @@ class SQLiteIndexedTar(MountSource):
             checkMetadata=self._checkMetadata,
             printDebug=self.printDebug,
             indexMinimumFileCount=indexMinimumFileCount,
+            backendName='SQLiteIndexedTar',
         )
         if clearIndexCache:
             self.index.clearIndexes()
@@ -769,17 +771,7 @@ class SQLiteIndexedTar(MountSource):
             if not self.hasBeenAppendedTo:  # indirectly set by a successful call to _tryLoadIndex
                 self._loadOrStoreCompressionOffsets()  # load
                 self.index.reloadIndexReadOnly()
-                # TODO The value should not matter when an index has been loaded. But maybe write this to the index
-                #      and load it in order to have the correct value without having to do a very costly recheck?
-                self._isGnuIncremental = False
                 return
-
-            # TODO This does and did not work correctly for recursive TARs because the outermost layer will change
-            #      None to a hard value and from then on it would have been fixed to that value even when called
-            #      inside createIndex.
-            # Required for _checkIndexValidity
-            if self._isGnuIncremental is None:
-                self._isGnuIncremental = self._detectGnuIncremental(self.tarFileObject)
 
             # TODO Handling appended files to compressed archives would have to account for dropping the offsets,
             #      seeking to the first appended file while not processing any metadata and still showing a progress
@@ -896,6 +888,7 @@ class SQLiteIndexedTar(MountSource):
 
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
         self.index.storeMetadata(argumentsMetadata, None if self.isFileObject else self.tarFileName)
+        self.index.storeMetadataKeyValue('isGnuIncremental', '1' if self._isGnuIncremental else '0')
 
     def _updateProgressBar(self, progressBar, fileobj: Any) -> None:
         if not progressBar:
@@ -1280,6 +1273,16 @@ class SQLiteIndexedTar(MountSource):
         self.hasBeenAppendedTo = True
 
     def _checkMetadata(self, metadata: Dict[str, Any]) -> None:
+        # self._isGnuIncremental may be initialized during metadata check because it is required for some checks.
+        # But, if the subsequent checks fail, then we want to restore the initial value.
+        isGnuIncremental = self._isGnuIncremental
+        try:
+            self._checkMetadata2(metadata)
+        except Exception as e:
+            self._isGnuIncremental = isGnuIncremental
+            raise e
+
+    def _checkMetadata2(self, metadata: Dict[str, Any]) -> None:
         """
         Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible.
         Returns normally and sets self.index.hasBeenAppendedTo to True if the size of the archive increased
@@ -1353,46 +1356,69 @@ class SQLiteIndexedTar(MountSource):
             if self.compression == 'gz':
                 argumentsToCheck.append('gzipSeekPointSpacing')
 
-            differingArgs = []
-            for arg in argumentsToCheck:
-                if arg in indexArgs and hasattr(self, arg) and indexArgs[arg] != getattr(self, arg):
-                    differingArgs.append((arg, indexArgs[arg], getattr(self, arg)))
-            if differingArgs:
-                print("[Warning] The arguments used for creating the found index differ from the arguments ")
-                print("[Warning] given for mounting the archive now. In order to apply these changes, ")
-                print("[Warning] recreate the index using the --recreate-index option!")
-                for arg, oldState, newState in differingArgs:
-                    print(f"[Warning] {arg}: index: {oldState}, current: {newState}")
+            SQLiteIndex.checkMetadataArguments(indexArgs, self, argumentsToCheck)
+
+        # Restore the self._isGnuIncremental flag before doing any row validation because else there could be
+        # false positive warnings regarding GNU incremental detection.
+        if 'isGnuIncremental' in metadata:
+            value = metadata['isGnuIncremental'].lower()
+            self._isGnuIncremental = value == 'true' or value == '1'
+        elif self.index.sqlConnection:
+            # This can be expensive, but it should still be less expensive than rereading the first 1000 file headers
+            # and checking the type through that way. There will be a breakeven point though for very large archives.
+            # Then, it would be better to update the index to contain the 'isGnuIncremental' metadata key.
+            self._isGnuIncremental = bool(
+                self.index.sqlConnection.execute(
+                    """SELECT 1 FROM "files" WHERE hex(type) = hex("D") LIMIT 1"""
+                ).fetchone()
+            )
+
+        if 'backendName' not in metadata:
+            # Checking the first two should already be enough to detect an index created with a different backend.
+            # Do not verify folders because parent folders and root get automatically added!
+            result = self.index.getConnection().execute(
+                f"""SELECT * {SQLiteIndex.FROM_REGULAR_FILES} ORDER BY offset ASC LIMIT 2;"""
+            )
+            if not self._checkRowsValidity(result):
+                raise InvalidIndexError("The first two files of the index do not match.")
 
     def _checkIndexValidity(self) -> bool:
         # Check some of the first and last files in the archive and some random selection in between.
+        selectFiles = "SELECT * " + SQLiteIndex.FROM_REGULAR_FILES
         result = self.index.getConnection().execute(
             f"""
-            SELECT * FROM ( SELECT * FROM files ORDER BY offset ASC LIMIT 100 )
+            SELECT * FROM ( {selectFiles} ORDER BY offset ASC LIMIT 100 )
             UNION
-            SELECT * FROM ( SELECT * FROM files ORDER BY RANDOM() LIMIT {SQLiteIndex.NUMBER_OF_METADATA_TO_VERIFY} )
+            SELECT * FROM ( {selectFiles} ORDER BY RANDOM() LIMIT {SQLiteIndex.NUMBER_OF_METADATA_TO_VERIFY} )
             UNION
-            SELECT * FROM ( SELECT * FROM files ORDER BY offset DESC LIMIT 100 )
+            SELECT * FROM ( {selectFiles} ORDER BY offset DESC LIMIT 100 )
             ORDER BY offset
         """
         )
+        return self._checkRowsValidity(result)
 
+    def _checkRowsValidity(self, rows) -> bool:
         t0 = time.time()
 
         oldOffset = self.tarFileObject.tell()
+        rowCount = 0
         try:
-            for row in result:
+            for row in rows:
+                rowCount += 1
+
                 # As for the stencil size, 512 B (one TAR block) would be enough for most cases except for
                 # features like GNU LongLink which store additional metadata in further TAR blocks.
-                offset_header = int(row[2])
-                with StenciledFile(fileStencils=[(self.tarFileObject, offset_header, 2 * 512)]) as file:
+                offsetHeader = int(row[2])
+                offsetData = int(row[3])
+                headerBlockCount = max(1, int(math.ceil((offsetData - offsetHeader) / 512))) * 512
+                with StenciledFile(fileStencils=[(self.tarFileObject, offsetHeader, headerBlockCount)]) as file:
                     with tarfile.open(fileobj=file, mode='r|', ignore_zeros=True, encoding=self.encoding) as archive:
                         tarInfo = next(iter(archive))
                         realFileInfos, _, _ = _TarFileMetadataReader._processTarInfo(
                             tarInfo,
                             file,  # only used for isGnuIncremental == True
                             "",  # pathPrefix
-                            offset_header,  # will be added to all offsets to get the real offset
+                            offsetHeader,  # will be added to all offsets to get the real offset
                             self._isGnuIncremental,
                             False,  # mountRecursively
                             self.transform,
@@ -1407,7 +1433,16 @@ class SQLiteIndexedTar(MountSource):
                                 return False
                             storedFileInfo[index] = bool(storedFileInfo[index])
 
+                        # Do not compare the path because it might have the parent TAR prepended to it for
+                        # recursive TARs and this is hard to ignore any other way.
+                        storedFileInfo[0] = realFileInfos[0][0]  # path
+                        storedFileInfo[11] = realFileInfos[0][11]  # isTar
                         if tuple(storedFileInfo) != realFileInfos[0]:
+                            if self.printDebug >= 3:
+                                print("[Info] Stored file info:")
+                                print("[Info]", storedFileInfo)
+                                print("[Info] differs from recomputed one:")
+                                print("[Info]", realFileInfos[0])
                             return False
 
             return True
@@ -1419,10 +1454,7 @@ class SQLiteIndexedTar(MountSource):
 
             if self.printDebug >= 2:
                 t1 = time.time()
-                print(
-                    f"[Info] Verifying metadata for {SQLiteIndex.NUMBER_OF_METADATA_TO_VERIFY + 200} "
-                    f"files took {t1-t0:.3f} s"
-                )
+                print(f"[Info] Verifying metadata for {rowCount} files took {t1-t0:.3f} s")
 
         return False
 
