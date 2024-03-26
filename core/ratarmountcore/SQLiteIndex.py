@@ -75,6 +75,7 @@ class SQLiteIndex:
     #     be assumed to be incompatible, especially for chimera files, but also when one was created with
     #     libarchive, then it will not be readable with the SQLiteIndexedTar backend because it does not
     #     collect data offsets.
+    #   - Add 'isGnuIncremental' to 'metadata' table.
     __version__ = '0.5.0'
 
     NUMBER_OF_METADATA_TO_VERIFY = 1000  # shouldn't take more than 1 second according to benchmarks

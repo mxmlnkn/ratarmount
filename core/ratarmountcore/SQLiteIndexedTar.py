@@ -887,6 +887,7 @@ class SQLiteIndexedTar(MountSource):
 
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
         self.index.storeMetadata(argumentsMetadata, None if self.isFileObject else self.tarFileName)
+        self.index.storeMetadataKeyValue('isGnuIncremental', '1' if self._isGnuIncremental else '0')
 
     def _updateProgressBar(self, progressBar, fileobj: Any) -> None:
         if not progressBar:
@@ -1359,7 +1360,8 @@ class SQLiteIndexedTar(MountSource):
         # Restore the self._isGnuIncremental flag before doing any row validation because else there could be
         # false positive warnings regarding GNU incremental detection.
         if 'isGnuIncremental' in metadata:
-            self._isGnuIncremental = bool(metadata['isGnuIncremental'])
+            value = metadata['isGnuIncremental'].lower()
+            self._isGnuIncremental = value in ('true', '1')
         elif self.index.sqlConnection:
             # This can be expensive, but it should still be less expensive than rereading the first 1000 file headers
             # and checking the type through that way. There will be a breakeven point though for very large archives.
