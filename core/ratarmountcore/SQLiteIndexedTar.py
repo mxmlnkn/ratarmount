@@ -3,6 +3,7 @@
 
 import io
 import json
+import math
 import multiprocessing.pool
 import os
 import platform
@@ -1367,15 +1368,17 @@ class SQLiteIndexedTar(MountSource):
             for row in result:
                 # As for the stencil size, 512 B (one TAR block) would be enough for most cases except for
                 # features like GNU LongLink which store additional metadata in further TAR blocks.
-                offset_header = int(row[2])
-                with StenciledFile(fileStencils=[(self.tarFileObject, offset_header, 2 * 512)]) as file:
+                offsetHeader = int(row[2])
+                offsetData = int(row[3])
+                headerBlockCount = max(1, int(math.ceil((offsetData - offsetHeader) / 512))) * 512
+                with StenciledFile(fileStencils=[(self.tarFileObject, offsetHeader, headerBlockCount)]) as file:
                     with tarfile.open(fileobj=file, mode='r|', ignore_zeros=True, encoding=self.encoding) as archive:
                         tarInfo = next(iter(archive))
                         realFileInfos, _, _ = _TarFileMetadataReader._processTarInfo(
                             tarInfo,
                             file,  # only used for isGnuIncremental == True
                             "",  # pathPrefix
-                            offset_header,  # will be added to all offsets to get the real offset
+                            offsetHeader,  # will be added to all offsets to get the real offset
                             self._isGnuIncremental,
                             False,  # mountRecursively
                             self.printDebug,
