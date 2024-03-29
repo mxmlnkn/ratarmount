@@ -3,7 +3,7 @@
 
 from typing import Dict, Iterable, IO, Optional, Tuple, Union
 
-from .MountSource import FileInfo, MountSource
+from .MountSource import FileInfo, MountSource, createRootFileInfo
 from .utils import overrides
 
 
@@ -19,7 +19,7 @@ class SubvolumesMountSource(MountSource):
             if '/' in name:
                 raise ValueError(f"Mount source names may not contain slashes! ({name})")
 
-        self.rootFileInfo = MountSource._createRootFileInfo(userdata=[None])
+        self.rootFileInfo = createRootFileInfo(userdata=[None])
 
     def _findMountSource(self, path: str) -> Optional[Tuple[str, str]]:
         path = path.lstrip('/')

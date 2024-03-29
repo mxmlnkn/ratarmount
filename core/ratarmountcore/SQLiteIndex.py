@@ -26,7 +26,7 @@ except ImportError:
     pass
 
 from .version import __version__
-from .MountSource import FileInfo, MountSource
+from .MountSource import FileInfo, createRootFileInfo
 from .compressions import TAR_COMPRESSION_FORMATS
 from .SQLiteBlobFile import SQLiteBlobsFile, WriteSQLiteBlobs
 from .utils import RatarmountError, IndexNotOpenError, InvalidIndexError, findModuleVersion
@@ -632,7 +632,7 @@ class SQLiteIndex:
         """
 
         if path == '/':
-            return {'/': MountSource._createRootFileInfo(userdata=[SQLiteIndexedTarUserData(0, 0, False, False)])}
+            return {'/': createRootFileInfo(userdata=[SQLiteIndexedTarUserData(0, 0, False, False)])}
 
         path, name = self._queryNormpath(path).rsplit('/', 1)
         rows = self.getConnection().execute(
@@ -661,7 +661,7 @@ class SQLiteIndex:
             raise RatarmountError("The specified file version must be an integer!")
 
         if path == '/':
-            return MountSource._createRootFileInfo(userdata=[SQLiteIndexedTarUserData(0, 0, False, False)])
+            return createRootFileInfo(userdata=[SQLiteIndexedTarUserData(0, 0, False, False)])
 
         path, name = self._queryNormpath(path).rsplit('/', 1)
         row = (

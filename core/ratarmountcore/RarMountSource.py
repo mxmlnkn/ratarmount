@@ -8,7 +8,7 @@ import stat
 import time
 from typing import cast, Dict, IO, Iterable, List, Optional, Union
 
-from .MountSource import FileInfo, MountSource
+from .MountSource import FileInfo, MountSource, createRootFileInfo
 from .utils import overrides
 
 try:
@@ -208,7 +208,7 @@ class RarMountSource(MountSource):
         # If we have a fileInfo for the given directory path, then everything is fine.
         pathAsDir = path.strip('/') + '/'
         if pathAsDir == '/':
-            return [MountSource._createRootFileInfo(userdata=[None])]
+            return [createRootFileInfo(userdata=[None])]
 
         infoList = [
             RarMountSource._convertToFileInfo(normalizedPath, info)

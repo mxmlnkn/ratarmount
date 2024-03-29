@@ -93,16 +93,16 @@ class MountSource(ABC):
     def __exit__(self, exception_type, exception_value, exception_traceback):
         pass
 
-    @staticmethod
-    def _createRootFileInfo(userdata: List[Any]):
-        return FileInfo(
-            # fmt: off
-            size     = 0,
-            mtime    = int(time.time()),
-            mode     = 0o777 | stat.S_IFDIR,
-            linkname = "",
-            uid      = os.getuid(),
-            gid      = os.getgid(),
-            userdata = [None],
-            # fmt: on
-        )
+
+def createRootFileInfo(userdata: List[Any]):
+    return FileInfo(
+        # fmt: off
+        size     = 0,
+        mtime    = int(time.time()),
+        mode     = 0o777 | stat.S_IFDIR,
+        linkname = "",
+        uid      = os.getuid(),
+        gid      = os.getgid(),
+        userdata = [None],
+        # fmt: on
+    )
