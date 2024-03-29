@@ -270,8 +270,8 @@ def isOnSlowDrive(filePath: str):
     # TODO make it work on Windows: https://devblogs.microsoft.com/oldnewthing/20201023-00/?p=104395
     try:
         device = os.stat(filePath).st_dev
-        with open(f"/sys/dev/block/{os.major(device)}:{os.minor(device)}/queue/rotational", 'rt') as file:
-            if file.read().strip() == "1":
+        with open(f"/sys/dev/block/{os.major(device)}:{os.minor(device)}/queue/rotational", 'rb') as file:
+            if file.read().strip() == b"1":
                 return True
     except Exception:
         pass
