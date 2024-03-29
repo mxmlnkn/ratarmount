@@ -286,6 +286,7 @@ class ParallelXZReader(BlockParallelReader):
         # This is not thread-safe! But it will be executed in a process pool, in which each worker has its own
         # global variable set. Using a global variable for this is safe because we know that there is one process pool
         # per BlockParallelReader, meaning the filename is a constant for each worker.
+        # pylint: disable=global-statement
         global _parallelXzReaderFile
         if _parallelXzReaderFile is None:
             _parallelXzReaderFile = xz.open(filename, 'rb')
@@ -316,6 +317,7 @@ class ParallelZstdReader(BlockParallelReader):
         # This is not thread-safe! But it will be executed in a process pool, in which each worker has its own
         # global variable set. Using a global variable for this is safe because we know that there is one process pool
         # per BlockParallelReader, meaning the filename is a constant for each worker.
+        # pylint: disable=global-statement
         global _parallelZstdReaderFile
         if _parallelZstdReaderFile is None:
             _parallelZstdReaderFile = indexed_zstd.IndexedZstdFile(filename)
