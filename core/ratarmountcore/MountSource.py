@@ -103,6 +103,6 @@ def createRootFileInfo(userdata: List[Any]):
         linkname = "",
         uid      = os.getuid(),
         gid      = os.getgid(),
-        userdata = [None],
+        userdata = userdata,
         # fmt: on
     )
