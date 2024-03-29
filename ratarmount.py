@@ -1401,9 +1401,10 @@ seeking capabilities when opening that file.
         if not args.mount_source or not args.mount_source[0]:
             raise argparse.ArgumentTypeError("Unmounting requires a path to the mount point!")
 
+        # Do not test with os.path.ismount or anything other because if the FUSE process was killed without
+        # unmounting, then any file system query might return with errors.
+        # https://github.com/python/cpython/issues/96328#issuecomment-2027458283
         args.unmount = args.mount_source[0]
-        if not os.path.ismount(args.unmount):
-            raise argparse.ArgumentTypeError(f"The given path to unmount ({args.unmount}) must be a mount point!")
         return args
 
     args.gzipSeekPointSpacing = int(args.gzip_seek_point_spacing * 1024 * 1024)
