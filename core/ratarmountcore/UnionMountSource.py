@@ -7,7 +7,7 @@ import time
 
 from typing import Dict, Iterable, IO, List, Optional, Set, Tuple, Union
 
-from .MountSource import FileInfo, MountSource
+from .MountSource import FileInfo, MountSource, createRootFileInfo
 from .utils import overrides
 
 
@@ -39,7 +39,7 @@ class UnionMountSource(MountSource):
         self.printDebug = printDebug
         self.folderCache: Dict[str, List[MountSource]] = {"/": self.mountSources}
         self.folderCacheDepth = 0  # depth 1 means, we only cached top-level directories.
-        self.rootFileInfo = MountSource._createRootFileInfo(userdata=[None])
+        self.rootFileInfo = createRootFileInfo(userdata=[None])
 
         if len(self.mountSources) > 1:
             self._buildFolderCache(maxCacheDepth, maxCacheEntries, maxSecondsToCache)
