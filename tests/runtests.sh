@@ -1876,12 +1876,8 @@ for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
     fi
 
     for file in "${files[@]}"; do
-        case "$( file --mime-type -- "$file" | sed 's|.*[/-]||' )" in
-            bzip2|gzip|xz|zstd|tar|rar|zip)
-                TMP_FILES_TO_CLEANUP+=( "${file}.index.sqlite" )
-                checkFileInTAR "$file" "$fileName" "$checksum"
-                ;;
-        esac
+        TMP_FILES_TO_CLEANUP+=( "${file}.index.sqlite" )
+        checkFileInTAR "$file" "$fileName" "$checksum"
         (( ++nFiles ))
     done
     cleanup
