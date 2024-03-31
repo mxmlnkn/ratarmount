@@ -573,9 +573,13 @@ class FuseMount(fuse.Operations):
                 mountSources[key] = openMountSource(path, **options)
 
         self.mountSource: MountSource = (
-            SubvolumesMountSource(mountSources, printDebug=self.printDebug)
-            if options.get('disableUnionMount', False)
-            else UnionMountSource(list(mountSources.values()), **options)
+            (
+                SubvolumesMountSource(mountSources, printDebug=self.printDebug)
+                if options.get('disableUnionMount', False)
+                else UnionMountSource(list(mountSources.values()), **options)
+            )
+            if len(mountSources) != 1
+            else next(iter(mountSources.values()))
         )
         if options.get('recursionDepth', 0):
             self.mountSource = AutoMountLayer(self.mountSource, **options)
