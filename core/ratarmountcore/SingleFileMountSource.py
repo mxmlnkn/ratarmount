@@ -25,7 +25,9 @@ class SingleFileMountSource(MountSource):
         self.mtime = int(time.time())
         self.size: int = self.fileobj.seek(0, io.SEEK_END)
 
-        self.fileInfo = FileInfo(
+    def _createFileInfo(self):
+        # This must be a function and cannot be cached into a member in order to avoid userdata being a shared list!
+        return FileInfo(
             # fmt: off
             size     = self.size,
             mtime    = self.mtime,
@@ -61,11 +63,11 @@ class SingleFileMountSource(MountSource):
             )
             return fileInfo
 
-        return self.fileInfo if path == self.path else None
+        return self._createFileInfo() if path == self.path else None
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo) -> IO[bytes]:
-        if fileInfo != self.fileInfo:
+        if fileInfo != self._createFileInfo():
             raise ValueError("Only files may be opened!")
         # Use StenciledFile so that the returned file objects can be idependently seeked!
         return StenciledFile(fileStencils=[(self.fileobj, 0, self.size)], fileObjectLock=self.fileObjectLock)
