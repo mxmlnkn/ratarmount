@@ -62,14 +62,14 @@ confidence=
 # --disable=W".
 disable=invalid-name,
         broad-except,
-        too-many-branches,
-        too-many-statements,
+        broad-exception-raised,
+        chained-comparison,  # Only available since Python 3.8
         too-many-arguments,
         too-many-instance-attributes,
         too-many-locals,
         too-many-lines,
-        too-few-public-methods,
         unnecessary-lambda,
+        # I don't need the style checker to bother me with missing docstrings and todos.
         missing-class-docstring,
         missing-function-docstring,
         missing-module-docstring,
@@ -433,7 +433,7 @@ max-attributes=7
 max-bool-expr=5
 
 # Maximum number of branch for function / method body.
-max-branches=12
+max-branches=40
 
 # Maximum number of locals for function / method body.
 max-locals=15
@@ -442,16 +442,19 @@ max-locals=15
 max-parents=7
 
 # Maximum number of public methods for a class (see R0904).
-max-public-methods=20
+max-public-methods=50
 
 # Maximum number of return / yield for function / method body.
-max-returns=6
+# The default limit was too low when considering guards as good style.
+max-returns=20
 
 # Maximum number of statements in function / method body.
-max-statements=50
+max-statements=200
 
 # Minimum number of public methods for a class (see R0903).
-min-public-methods=2
+# Even no public methods make sense when writing pure context managers.
+# Tests also often may have classes with only a single public method.
+min-public-methods=1
 
 
 [CLASSES]
