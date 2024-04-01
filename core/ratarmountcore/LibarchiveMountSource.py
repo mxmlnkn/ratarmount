@@ -302,6 +302,9 @@ class IterableArchive:
             yield entry
             self._entryIndex += 1
 
+    def readData(self, buffer, size):
+        return laffi.read_data(self._archive, buffer, size)
+
 
 class LibarchiveFile(io.RawIOBase):
     def __init__(self, file, entryIndex, fileSize, passwords: Optional[List[str]] = None, printDebug: int = 0):
@@ -309,37 +312,51 @@ class LibarchiveFile(io.RawIOBase):
         self.file = file
         self.fileSize = fileSize
         self.entryIndex = entryIndex
-        self.archive = None
-        self.entry = None
-        self.fileobj = None
         self.passwords = passwords
         self.printDebug = printDebug
+        self._archive = None
+        self._entry = None
+        self._bufferSizeMax = 1024 * 1024
+        self._buffer = None
+        self._bufferOffset = 0  # Offset in self.entry from which the buffer was read
+        self._bufferIO = None
 
         self._open()
 
     def _open(self):
-        if self.fileobj:
-            self.fileobj.close()
-            self.fileobj = None
-
-        self.archive = IterableArchive(self.file, passwords=self.passwords, printDebug=self.printDebug)
-        self.entry = None
+        self.close()
+        self._archive = IterableArchive(self.file, passwords=self.passwords, printDebug=self.printDebug)
+        self._entry = None
         entryCount = 0
-        for self.entry in self.archive:
+        for self._entry in self._archive:
             if entryCount == self.entryIndex:
-                # self.entry = entry  # TODO implement reopenable, seek-back variant for large files
-                buffer = ctypes.create_string_buffer(self.fileSize)
-                readSize = laffi.read_data(self.archive._archive, buffer, self.fileSize)
-                if readSize != self.fileSize:
-                    raise RuntimeError(
-                        f"Read {readSize} bytes but expected {self.fileSize} for entry {self.entryIndex}!"
-                    )
-                self.fileobj = io.BytesIO(buffer)
+                self._refillBuffer()
                 break
             entryCount += 1
 
-        if self.entry is None and self.fileobj is None:
+        if self._entry is None and self._bufferIO is None:
             raise ValueError(f"Failed to find archive entry {self.entryIndex}.")
+
+    def _refillBuffer(self):
+        bufferedSize = len(self._buffer) if self._buffer else 0
+        if self._bufferOffset + bufferedSize >= self.fileSize:
+            return
+
+        self._bufferOffset += bufferedSize
+        sizeToRead = min(self._bufferSizeMax, max(0, self.fileSize - self._bufferOffset))
+
+        # Reallocate buffer if we need a different size. This is necessary because I don't see an API to
+        # specify a size to io,BytesIO to make it work on a subset of the buffer without copying.
+        if sizeToRead >= self._bufferSizeMax:
+            if self._buffer is None or len(self._buffer) < self._bufferSizeMax:
+                self._buffer = ctypes.create_string_buffer(self._bufferSizeMax)
+        elif self._buffer is None or len(self._buffer) != sizeToRead:
+            self._buffer = ctypes.create_string_buffer(sizeToRead)
+
+        readSize = self._archive.readData(self._buffer, sizeToRead)
+        if readSize != sizeToRead:
+            raise RuntimeError(f"Read {readSize} bytes but expected {self.fileSize} for entry {self.entryIndex}!")
+        self._bufferIO = io.BytesIO(self._buffer)
 
     def __enter__(self):
         return self
@@ -349,15 +366,13 @@ class LibarchiveFile(io.RawIOBase):
 
     @overrides(io.RawIOBase)
     def close(self) -> None:
-        if self.fileobj:
-            self.fileobj.close()
-            self.fileobj = None
-        if self.entry:
-            del self.entry
-            self.entry = None
-        if self.archive:
-            del self.archive
-            self.archive = None
+        if self._bufferIO is not None:
+            self._bufferIO.close()
+            self._bufferIO = None
+            self._bufferOffset = 0
+        self._buffer = None
+        self._entry = None
+        self._archive = None
 
     @overrides(io.RawIOBase)
     def fileno(self) -> int:
@@ -370,30 +385,45 @@ class LibarchiveFile(io.RawIOBase):
 
     @overrides(io.RawIOBase)
     def readable(self) -> bool:
-        return self.fileobj is not None and self.fileobj.readable()
+        return self._bufferIO is not None and self._bufferIO.readable()
 
     @overrides(io.RawIOBase)
     def writable(self) -> bool:
         return False
 
+    def read1(self, size: int = -1) -> bytes:
+        if not self._bufferIO:
+            raise RuntimeError("Closed file cannot be read from!")
+        result = self._bufferIO.read(size)
+        if result:
+            return result
+        self._refillBuffer()
+        return self._bufferIO.read(size)
+
     @overrides(io.RawIOBase)
     def read(self, size: int = -1) -> bytes:
-        if not self.fileobj:
-            raise RuntimeError("Closed file cannot be read from!")
-        return self.fileobj.read(size)
+        result = bytearray()
+        while size < 0 or len(result) < size:
+            readData = self.read1(size if size < 0 else size - len(result))
+            if not readData:
+                break
+            result.extend(readData)
+        return bytes(result)
 
     def _skip(self, size: int) -> None:
-        if not self.fileobj:
+        if not self._bufferIO:
             raise RuntimeError("Closed file cannot be read from!")
-        BLKSIZE = 128 * 1024
         while size > 0:
-            data = self.fileobj.read(min(size, BLKSIZE))
+            data = self.read1(size)
             if not data:
                 break
             size -= len(data)
 
     @overrides(io.RawIOBase)
     def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
+        if not self._bufferIO:
+            raise RuntimeError("Closed file cannot be seeked!")
+
         here = self.tell()
         if whence == io.SEEK_CUR:
             offset += here
@@ -404,17 +434,22 @@ class LibarchiveFile(io.RawIOBase):
             self._skip(offset - here)
             return self.tell()
 
-        if self.fileobj:
-            self.fileobj.close()
-        self._open()
-        self._skip(offset)
+        bufferedSize = 0
+        if self._buffer:
+            bufferedSize = len(self._buffer)
+        if offset >= self._bufferOffset and offset < self._bufferOffset + bufferedSize:
+            self._bufferIO.seek(offset - self._bufferOffset)
+        else:
+            self._open()
+            self._skip(max(0, offset))
         return self.tell()
 
     @overrides(io.RawIOBase)
     def tell(self) -> int:
-        if not self.fileobj:
-            raise RuntimeError("File is not open!")
-        return self.fileobj.tell()
+        result = self._bufferOffset
+        if self._bufferIO:
+            result += self._bufferIO.tell()
+        return result
 
 
 # The implementation is similar to ZipMountSource and SQLiteIndexedTarUserData.
