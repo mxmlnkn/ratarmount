@@ -156,6 +156,9 @@ class TestLibarchiveMountSource:
         with open(findTestFile('folder-symlink.zip'), 'rb') as file:
             memoryFile = io.BytesIO(file.read())
         with IterableArchive(memoryFile) as archive:
-            for entry in archive:
+            while True:
+                entry = archive.nextEntry()
+                if entry is None:
+                    break
                 fileInfo = entry.convertToRow(0, lambda x: x)
                 assert fileInfo

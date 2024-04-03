@@ -188,6 +188,8 @@ class IterableArchive:
         self._buffer = None
         self._readCallback = None
         self._seekCallback = None
+        self._entry: Optional[ArchiveEntry] = None
+        self._eof = False
 
         self._archive = laffi.read_new()
         try:
@@ -281,26 +283,30 @@ class IterableArchive:
     def __del__(self):
         laffi.read_free(self._archive)
 
-    def __iter__(self):
-        self._entryIndex = 0
-        while True:
-            entry = ArchiveEntry(self._archive, entryIndex=self._entryIndex, encoding=self.encoding)
+    def nextEntry(self) -> Optional[ArchiveEntry]:
+        if self._eof:
+            return None
 
-            if self._entryIndex == 0 and self.printDebug >= 2:
-                formatName = laffi.format_name(self._archive)
-                if isinstance(formatName, bytes):
-                    formatName = formatName.decode()
-                # We need to try and read the first entry before format_name returns anything other than 'none'.
-                print(
-                    f"[Info] Successfully opened type '{formatName}' with libarchive. "
-                    f"Using filters: {self.filterNames()}"
-                )
+        self._entry = ArchiveEntry(self._archive, entryIndex=self._entryIndex, encoding=self.encoding)
+        if self._entryIndex == 0 and self.printDebug >= 2:
+            formatName = laffi.format_name(self._archive)
+            if isinstance(formatName, bytes):
+                formatName = formatName.decode()
+            # We need to try and read the first entry before format_name returns anything other than 'none'.
+            print(
+                f"[Info] Successfully opened type '{formatName}' with libarchive. "
+                f"Using filters: {self.filterNames()}"
+            )
 
-            if entry.eof:
-                return
+        self._entryIndex += 1
+        if self._entry.eof:
+            self._eof = True
+            return None
 
-            yield entry
-            self._entryIndex += 1
+        return self._entry
+
+    def entryIndex(self):
+        return self._entryIndex
 
     def readData(self, buffer, size):
         return laffi.read_data(self._archive, buffer, size)
@@ -326,13 +332,13 @@ class LibarchiveFile(io.RawIOBase):
     def _open(self):
         self.close()
         self._archive = IterableArchive(self.file, passwords=self.passwords, printDebug=self.printDebug)
-        self._entry = None
-        entryCount = 0
-        for self._entry in self._archive:
-            if entryCount == self.entryIndex:
+        while True:
+            self._entry = self._archive.nextEntry()
+            if self._entry is None:
+                break
+            if self._entry.entryIndex == self.entryIndex:
                 self._refillBuffer()
                 break
-            entryCount += 1
 
         if self._entry is None and self._bufferIO is None:
             raise ValueError(f"Failed to find archive entry {self.entryIndex}.")
@@ -551,7 +557,11 @@ class LibarchiveMountSource(MountSource):
 
         fileInfos = []
         with IterableArchive(self.fileOrPath, passwords=self.passwords, printDebug=self.printDebug) as archive:
-            for entry in archive:
+            while True:
+                entry = archive.nextEntry()
+                if entry is None:
+                    break
+
                 entryPath = None
                 if entry.entryIndex == 0 and self.tarFileName and entry.formatName() == b'raw':
                     libarchiveSuffixes = [s for _, info in LIBARCHIVE_FILTER_FORMATS.items() for s in info.suffixes]
