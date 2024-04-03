@@ -312,14 +312,42 @@ class IterableArchive:
         return laffi.read_data(self._archive, buffer, size)
 
 
+class IterableArchiveCache:
+    def __init__(self, cacheSize: int = 5):
+        self.cacheSize = cacheSize
+        self._cache: List[IterableArchive] = []
+
+    def insert(self, archive: IterableArchive):
+        self._cache.append(archive)
+        while len(self._cache) > self.cacheSize:
+            self._cache.pop(0)
+
+    def take(self, entryIndex: int) -> Optional[IterableArchive]:
+        qualified = [i for i in range(len(self._cache)) if self._cache[i].entryIndex() < entryIndex]
+        if not qualified:
+            return None
+        # Find the archive with the closest (highest) index not larger or equal than the requested one
+        result = max(qualified, key=lambda i: self._cache[i].entryIndex())
+        return self._cache.pop(result)
+
+
 class LibarchiveFile(io.RawIOBase):
-    def __init__(self, file, entryIndex, fileSize, passwords: Optional[List[str]] = None, printDebug: int = 0):
+    def __init__(
+        self,
+        file,
+        entryIndex,
+        fileSize,
+        passwords: Optional[List[str]] = None,
+        printDebug: int = 0,
+        archiveCache: Optional[IterableArchiveCache] = None,
+    ):
         io.RawIOBase.__init__(self)
         self.file = file
         self.fileSize = fileSize
         self.entryIndex = entryIndex
         self.passwords = passwords
         self.printDebug = printDebug
+        self._archiveCache = archiveCache
         self._archive = None
         self._entry = None
         self._bufferSizeMax = 1024 * 1024
@@ -331,7 +359,11 @@ class LibarchiveFile(io.RawIOBase):
 
     def _open(self):
         self.close()
-        self._archive = IterableArchive(self.file, passwords=self.passwords, printDebug=self.printDebug)
+
+        self._archive = self._archiveCache.take(self.entryIndex)
+        if self._archive is None:
+            self._archive = IterableArchive(self.file, passwords=self.passwords, printDebug=self.printDebug)
+
         while True:
             self._entry = self._archive.nextEntry()
             if self._entry is None:
@@ -372,6 +404,8 @@ class LibarchiveFile(io.RawIOBase):
 
     @overrides(io.RawIOBase)
     def close(self) -> None:
+        if self._archiveCache and self._archive:
+            self._archiveCache.insert(self._archive)
         if self._bufferIO is not None:
             self._bufferIO.close()
             self._bufferIO = None
@@ -487,6 +521,7 @@ class LibarchiveMountSource(MountSource):
         self.transformPattern       = transform
         self.passwords              = options.get("passwords", [])
         self.tarFileName            = tarFileName
+        self._archiveCache          = IterableArchiveCache()
         # fmt: on
 
         self.transform = (
@@ -635,6 +670,7 @@ class LibarchiveMountSource(MountSource):
             fileSize=fileInfo.size,
             passwords=self.passwords,
             printDebug=self.printDebug,
+            archiveCache=self._archiveCache,
         )
 
     @overrides(MountSource)
