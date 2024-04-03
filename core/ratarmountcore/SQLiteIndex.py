@@ -672,8 +672,20 @@ class SQLiteIndex:
         # Or, are folders assumed to be overwritten by a new folder entry in a TAR or should they be union mounted?
         # If they should be union mounted, like is the case now, then the folder version only makes sense for
         # its attributes.
+        #
+        # Order by offsetheader in order to preserve the order they appear in the archive to potentially enable
+        # faster access to the whoole archive when iterating over all files in order.
+        # Note that Python's dictionary preserves the insertion order since Python 3.6.
+        # https://docs.python.org/3.6/whatsnew/3.6.html#new-dict-implementation
+        # While it was not a guarantee to stay that way, it is guaranteed for Python 3.7+:
+        # > the insertion-order preservation nature of dict objects has been declared to be an official part of the
+        # > Python language spec.
+        # https://docs.python.org/3.11/library/stdtypes.html#dict.values
+        # > Dictionaries preserve insertion order. Note that updating a key does not affect the order.
+        # > Keys added after deletion are inserted at the end.
         rows = self.getConnection().execute(
-            'SELECT * FROM "files" WHERE "path" == (?)', (self._queryNormpath(path).rstrip('/'),)
+            'SELECT * FROM "files" WHERE "path" == (?) ORDER BY "offsetheader"',
+            (self._queryNormpath(path).rstrip('/'),),
         )
         directory: Dict[str, FileInfo] = {}
         gotResults = False

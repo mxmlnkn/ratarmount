@@ -8,8 +8,13 @@
 import io
 import os
 import sys
+import tarfile
+import tempfile
+import time
 
 import pytest
+
+from helpers import copyTestFile, findTestFile
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -17,19 +22,11 @@ from ratarmountcore import LibarchiveMountSource  # noqa: E402
 from ratarmountcore.LibarchiveMountSource import IterableArchive  # noqa: E402
 
 
-def findTestFile(relativePathOrName):
-    for i in range(3):
-        path = os.path.sep.join([".."] * i + ["tests", relativePathOrName])
-        if os.path.exists(path):
-            return path
-    return relativePathOrName
-
-
 class TestLibarchiveMountSource:
     @staticmethod
     @pytest.mark.parametrize('compression', ['7z', 'rar', 'zip'])
     def test_simple_usage(compression):
-        with LibarchiveMountSource(findTestFile('folder-symlink.' + compression)) as mountSource:
+        with copyTestFile('folder-symlink.' + compression) as path, LibarchiveMountSource(path) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
                 assert mountSource.getFileInfo(folder)
                 assert mountSource.fileVersions(folder) == 1
@@ -61,8 +58,8 @@ class TestLibarchiveMountSource:
     # @pytest.mark.parametrize("compression", ["7z", "rar", "zip"])
     @pytest.mark.parametrize('compression', ['zip'])
     def test_password(compression):
-        with LibarchiveMountSource(
-            findTestFile('encrypted-nested-tar.' + compression), passwords=['foo']
+        with copyTestFile('encrypted-nested-tar.' + compression) as path, LibarchiveMountSource(
+            path, passwords=['foo']
         ) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
                 assert mountSource.getFileInfo(folder)
@@ -79,7 +76,9 @@ class TestLibarchiveMountSource:
     @staticmethod
     @pytest.mark.parametrize('compression', ['bz2', 'gz', 'lrz', 'lz4', 'lzip', 'lzma', 'lzo', 'xz', 'Z', 'zst'])
     def test_stream_compressed(compression):
-        with LibarchiveMountSource(findTestFile('simple.' + compression), passwords=['foo']) as mountSource:
+        with copyTestFile('simple.' + compression) as path, LibarchiveMountSource(
+            path, passwords=['foo']
+        ) as mountSource:
             for folder in ['/']:
                 assert mountSource.getFileInfo(folder)
                 assert mountSource.fileVersions(folder) == 1
@@ -104,7 +103,7 @@ class TestLibarchiveMountSource:
         ],
     )
     def test_file_independence(path, lineSize):
-        with LibarchiveMountSource(findTestFile(path)) as mountSource:
+        with copyTestFile(path) as copiedPath, LibarchiveMountSource(copiedPath) as mountSource:
             with mountSource.open(mountSource.getFileInfo('zeros-32-MiB.txt')) as fileWithZeros:
                 expectedZeros = b'0' * (lineSize - 1) + b'\n'
                 assert fileWithZeros.read(lineSize) == expectedZeros
@@ -162,3 +161,78 @@ class TestLibarchiveMountSource:
                     break
                 fileInfo = entry.convertToRow(0, lambda x: x)
                 assert fileInfo
+
+    @staticmethod
+    def _createFile(tarArchive, name, contents):
+        tinfo = tarfile.TarInfo(name)
+        tinfo.size = len(contents)
+        tarArchive.addfile(tinfo, io.BytesIO(contents.encode()))
+
+    @staticmethod
+    def create_large_file(tarPath, compression, fileCount):
+        # I have committed the resulting bz2 file to save test time.
+        t0 = time.time()
+        createFile = TestLibarchiveMountSource._createFile
+        with tarfile.open(name=tarPath, mode='w:' + compression) as tarFile:
+            for i in range(fileCount):
+                createFile(tarFile, name=str(i), contents=str(i % 10))
+                if i % 50_000 == 0:
+                    print(f"Added {i} out of {fileCount} files to .tar.{compression} in {time.time() - t0:.3f} s")
+
+        # contents = str(i)
+        #   300k files for bz2 takes ~13 s and the resulting file is 986 KiB
+        #   300k files for xz takes ~26 s and the resulting file is 259 KiB
+        #   300k files for gz takes ~34 s and the resulting file is 2662 KiB
+        # contents = str(i % 10)
+        #   300k files for bz2 takes ~12 s and the resulting file is 580 KiB
+        #   300k files for xz takes ~32 s and the resulting file is 544 KiB
+        #   300k files for gz takes ~16 s and the resulting file is 2774 KiB
+        # Funny how the compressed size is larger than the str(i) case for the LZ-based compressors
+        # even though the uncompressed size is smaller! Only bz2 actually shrinks in compressed size!
+
+    @staticmethod
+    def _test_large_file(path):
+        t0 = time.time()
+        fileCount = 0
+        with LibarchiveMountSource(path) as mountSource:
+            t1 = time.time()
+            print(f"Opening {path} took {time.time() - t0:.3f} s")  # ~5 s
+            # In the worst case, reading all files can take 300k * 5s / 2 = ~9 days.
+            # In the best case, it should take roughly 5s, same as when iterating over the archive in order.
+            # The worst case happens if:
+            #  - The returned order by listDir is messed up, e.g., random in the worst case, or even this is bad:
+            #    0, 1, 10, 100, 1000, 10000, 100000, 100001, 100002, ...
+            #  - Each file open reads the archive from the beginning instead of reusing the current libarchive handle.
+            entries = mountSource.listDir('/')
+            assert isinstance(entries, dict)
+            t2 = time.time()
+            print(f"Listing all {len(entries)} files took {t2 - t1:.3f} s")  # ~2 s
+
+            fileCount = 0
+            for fileName, fileInfo in entries.items():
+                with mountSource.open(fileInfo) as file:
+                    assert file.read() == fileName[-1:].encode()
+
+                if fileCount > 0 and fileCount % 50_000 == 0:
+                    print(f"Checked {fileCount} files' contents.")
+                fileCount += 1
+
+                # Depends on the system, but accounting for 10 times slower systems should be a good margin.
+                # And we are still FAR off from the worst case time that should not happen.
+                assert time.time() - t2 < 360
+
+            print(f"Reading all {fileCount} files took {time.time() - t2:.3f} s")  # 36 s on my system
+
+            # Test seeking back for good measure
+            fileName = '2'
+            fileInfo = entries.get(fileName)
+            with mountSource.open(fileInfo) as file:
+                assert file.read() == fileName[-1:].encode()
+
+    @staticmethod
+    @pytest.mark.parametrize('compression', ['bz2', 'gz', 'xz'])
+    def test_large_file(compression):
+        path = "tar-with-300-folders-with-1000-files-1B-files.tar." + compression
+        with tempfile.NamedTemporaryFile(suffix='.' + path) as tmpTarFile:
+            TestLibarchiveMountSource.create_large_file(tmpTarFile.name, compression=compression, fileCount=300_000)
+            TestLibarchiveMountSource._test_large_file(tmpTarFile.name)
