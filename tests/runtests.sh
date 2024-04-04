@@ -54,9 +54,13 @@ cleanup()
     done
     MOUNT_POINTS_TO_CLEANUP=()
 
-    for file in "${TMP_FILES_TO_CLEANUP[@]}"; do
+    # Remove things in reversed order so that deleting folders with rmdir succeeds after having deleted all files in it.
+    local size=${#TMP_FILES_TO_CLEANUP[@]}
+    for (( i = 0; i < size; ++i )); do
+        file=${TMP_FILES_TO_CLEANUP[size - 1 - i]}
         if [ -d "$file" ]; then safeRmdir "$file"; fi
         if [ -f "$file" ]; then rm -- "$file"; fi
+        if [ -L "$file" ]; then unlink -- "$file"; fi
     done
     TMP_FILES_TO_CLEANUP=()
 }
@@ -857,7 +861,7 @@ checkIndexPathOption()
     indexFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
     indexFile="$indexFolder/ratarmount.index"
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
-    TMP_FILES_TO_CLEANUP+=( "$indexFile" "$indexFolder" )
+    TMP_FILES_TO_CLEANUP+=( "$indexFolder" "$indexFile" )
 
     # Check that index gets created at the specified location
     [ ! -f "$indexFile" ] || returnError "$LINENO" 'Index should not exist before test!'
@@ -970,7 +974,7 @@ checkIndexArgumentChangeDetection()
     indexFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
     indexFile="$indexFolder/ratarmount.index"
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
-    TMP_FILES_TO_CLEANUP+=( "$indexFile" "$indexFolder" )
+    TMP_FILES_TO_CLEANUP+=( "$indexFolder" "$indexFile" )
 
     # Create an index with default configuration
     args=( --index-file "$indexFile" "$archive" "$mountFolder" )
@@ -1037,8 +1041,12 @@ checkRecursiveFolderMounting()
     mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
+    local sourceFile targetFile
     for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
-        'cp' -- "${tests[iTest+1]}" "$archiveFolder"
+        sourceFile="${tests[iTest+1]}"
+        targetFile="$archiveFolder/$( basename -- "$sourceFile" )"
+        TMP_FILES_TO_CLEANUP+=( "$targetFile" "$targetFile.index.sqlite" )
+        'cp' -- "$sourceFile" "$archiveFolder"
     done
     runAndCheckRatarmount -P "$parallelization" -c --detect-gnu-incremental --ignore-zeros --recursive \
         "$@" "$archiveFolder" "$mountFolder"
@@ -1158,6 +1166,7 @@ checkWriteOverlayFileMetadataModifications()
     local tmpCopy
     if [[ -f "$filePath" ]]; then
         tmpCopy=$( mktemp )
+        TMP_FILES_TO_CLEANUP+=( "$tmpCopy" )
         'cp' "$filePath" "$tmpCopy"
     fi
 
@@ -1177,6 +1186,7 @@ checkWriteOverlayFileMetadataModifications()
     if [[ ! -e "$filePath" ]]; then returnError "$LINENO" 'Renamed file should exist'; fi
     if [[ -n "$tmpCopy" ]]; then
         diff -q "$tmpCopy" "$filePath" || returnError "$LINENO" 'Mismatching contents'
+        'rm' -- "$tmpCopy"
     fi
 }
 
@@ -1184,6 +1194,8 @@ checkWriteOverlayFile()
 {
     local fileSubPath="$1"
     local filePath="$mountFolder/$1"
+
+    TMP_FILES_TO_CLEANUP+=( "$filePath" )
 
     ## Create file
 
@@ -1225,6 +1237,7 @@ checkWriteOverlayWithNewFiles()
 
     local overlayFolder;
     overlayFolder=$( mktemp -d )
+    TMP_FILES_TO_CLEANUP+=( "$overlayFolder" "$overlayFolder/.ratarmount.overlay.sqlite" )
     # Create the overlay folder on some filesystem, e.g., NTFS FUSE, which does not support
     # permission changes for testing the metadata database.
     #overlayFolder=$( mktemp -d -p "$( pwd )" )
@@ -1299,7 +1312,7 @@ checkWriteOverlayWithNewFiles()
         returnError "$LINENO" 'Expected different link target for created symbolic link'
     fi
 
-    'rm' "$mountFolder/iriya"
+    cleanup
 
     echoerr "[${FUNCNAME[0]}] Tested successfully file modifications for overlay files."
 }
@@ -1316,6 +1329,7 @@ checkWriteOverlayWithArchivedFiles()
 
     local overlayFolder;
     overlayFolder=$( mktemp -d )
+    TMP_FILES_TO_CLEANUP+=( "$overlayFolder" "$overlayFolder/.ratarmount.overlay.sqlite" )
 
     local args=( -P "$parallelization" -c --write-overlay "$overlayFolder" "$archive" "$mountFolder" )
     {
@@ -1503,6 +1517,10 @@ checkSymbolicLinkRecursion()
     #    +- 01234567
     local folder;
     folder=$( mktemp -d )
+    TMP_FILES_TO_CLEANUP+=(
+        "$folder" "$folder/datastorage" "$folder/downloads" "$folder/collections"
+        "$folder/datastorage/01234567" "$folder/downloads/file.gz" "$folder/collections/part1.gz"
+    )
     (
         cd -- "$folder" &&
         mkdir datastorage downloads collections &&
@@ -1920,6 +1938,8 @@ done
 
 checkRecursiveFolderMounting
 checkRecursiveFolderMounting --lazy
+
+cleanup
 
 rm -f tests/*.index.*
 rmdir tests/*/
