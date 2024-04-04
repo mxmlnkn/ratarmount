@@ -96,6 +96,7 @@ jobs:
       run: |
         echo "uname -a: $( uname -a )"
         echo "Shell: $SHELL"
+        echo "Cores: $( nproc )"
         echo "Mount points:"; mount
 
     - uses: msys2/setup-msys2@v2
@@ -183,11 +184,21 @@ jobs:
     - name: Unit Tests
       if: ${{ !startsWith( matrix.os, 'macos' ) }}
       run: |
-        python3 -m pip install pytest
+        python3 -m pip install pytest pytest-xdist
         for file in core/tests/test_*.py tests/test_*.py; do
-            # Fusepy warns about usage of use_ns because the implicit behavior is deprecated.
-            # But there has been no development to fusepy for 4 years, so I think it should be fine to ignore.
-            pytest --disable-warnings "$file"
+            case "$file" in
+                "core/tests/test_AutoMountLayer.py"\
+                |"core/tests/test_BlockParallelReaders.py"\
+                |"core/tests/test_LibarchiveMountSource.py"\
+                |"core/tests/test_SQLiteIndexedTar.py")
+                    echo "$file"  # pytest-xdist seems to omit the test file name
+                    pytest -n auto --disable-warnings "$file"
+                    ;;
+                *)
+                  # Fusepy warns about usage of use_ns because the implicit behavior is deprecated.
+                  # But there has been no development to fusepy for 4 years, so I think it should be fine to ignore.
+                  pytest --disable-warnings "$file"
+            esac
         done
 
     - name: Regression Tests

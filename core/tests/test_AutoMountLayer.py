@@ -8,19 +8,13 @@ import os
 import stat
 import sys
 
+from helpers import copyTestFile
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import pytest  # noqa: E402
 
 from ratarmountcore import AutoMountLayer, openMountSource  # noqa: E402
-
-
-def findTestFile(relativePathOrName):
-    for i in range(3):
-        path = os.path.sep.join([".."] * i + ["tests", relativePathOrName])
-        if os.path.exists(path):
-            return path
-    return relativePathOrName
 
 
 @pytest.mark.parametrize("parallelization", [1, 2, 4])
@@ -34,7 +28,7 @@ class TestAutoMountLayer:
             'transformRecursiveMountPoint': ('.*/([^/]*).tar', r'\1'),
         }
 
-        with openMountSource(findTestFile("packed-100-times.tar.gz"), **options) as mountSource:
+        with copyTestFile("packed-100-times.tar.gz") as path, openMountSource(path, **options) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
 
             assert recursivelyMounted.listDir('/')
@@ -56,7 +50,7 @@ class TestAutoMountLayer:
         #      other files and those other files will actually take 10x or more longer than without this test running
         #      before! It might be that the memory usage makes Python's garbage collector a bottleneck because of too
         #      many small objects?!
-        with openMountSource(findTestFile("compressed-100-times.tar.gz"), **options) as mountSource:
+        with copyTestFile("compressed-100-times.tar.gz") as path, openMountSource(path, **options) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
 
             assert recursivelyMounted.listDir('/')
@@ -77,7 +71,7 @@ class TestAutoMountLayer:
         # > Recursively mounted: /ufo_805.gz
         # >  File "core/ratarmountcore/SQLiteIndexedTar.py", line 2085, in _detectTar
         # > indexed_gzip.indexed_gzip.ZranError: zran_read returned error: ZRAN_READ_FAIL (file: n/a)
-        with openMountSource(findTestFile("compressed-100-times.gz"), **options) as mountSource:
+        with copyTestFile("compressed-100-times.gz") as path, openMountSource(path, **options) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
 
             assert recursivelyMounted.listDir('/')
@@ -94,7 +88,9 @@ class TestAutoMountLayer:
             'parallelization': parallelization,
         }
 
-        with openMountSource(findTestFile("tests/double-compressed-nested-tar.tgz.tgz"), **options) as mountSource:
+        with copyTestFile("tests/double-compressed-nested-tar.tgz.tgz") as path, openMountSource(
+            path, **options
+        ) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
 
             for folder in ['/', '/nested-tar.tar.gz', '/nested-tar.tar.gz/foo', '/nested-tar.tar.gz/foo/fighter']:
