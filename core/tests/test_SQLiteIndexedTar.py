@@ -17,19 +17,13 @@ import tempfile
 
 import indexed_bzip2
 
+from helpers import copyTestFile
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import pytest  # noqa: E402
 
 from ratarmountcore import RatarmountError, SQLiteIndexedTar  # noqa: E402
-
-
-def findTestFile(relativePathOrName):
-    for i in range(3):
-        path = os.path.sep.join([".."] * i + ["tests", relativePathOrName])
-        if os.path.exists(path):
-            return path
-    return relativePathOrName
 
 
 @pytest.mark.parametrize("parallelization", [1, 2, 4])
@@ -48,8 +42,8 @@ class TestSQLiteIndexedTarParallelized:
 
     @staticmethod
     def test_context_manager(parallelization):
-        with SQLiteIndexedTar(
-            findTestFile('single-file.tar'), writeIndex=False, parallelization=parallelization
+        with copyTestFile("single-file.tar") as path, SQLiteIndexedTar(
+            path, writeIndex=False, parallelization=parallelization
         ) as indexedTar:
             assert indexedTar.listDir('/')
             assert indexedTar.getFileInfo('/')
@@ -58,8 +52,8 @@ class TestSQLiteIndexedTarParallelized:
 
     @staticmethod
     def test_tar_bz2_with_parallelization(parallelization):
-        with SQLiteIndexedTar(
-            findTestFile("2k-recursive-tars.tar.bz2"),
+        with copyTestFile("2k-recursive-tars.tar.bz2") as path, SQLiteIndexedTar(
+            path,
             clearIndexCache=True,
             recursive=False,
             parallelization=parallelization,
@@ -79,8 +73,8 @@ class TestSQLiteIndexedTarParallelized:
 
     @staticmethod
     def test_recursive_tar_bz2_with_parallelization(parallelization):
-        with SQLiteIndexedTar(
-            findTestFile("2k-recursive-tars.tar.bz2"),
+        with copyTestFile("2k-recursive-tars.tar.bz2") as path, SQLiteIndexedTar(
+            path,
             clearIndexCache=True,
             recursive=True,
             parallelization=parallelization,
@@ -98,8 +92,8 @@ class TestSQLiteIndexedTarParallelized:
 
     @staticmethod
     def test_deep_recursive(parallelization):
-        with SQLiteIndexedTar(
-            findTestFile("packed-5-times.tar.gz"),
+        with copyTestFile("packed-5-times.tar.gz") as path, SQLiteIndexedTar(
+            path,
             clearIndexCache=True,
             recursive=True,
             parallelization=parallelization,
@@ -445,9 +439,9 @@ class TestSQLiteIndexedTarParallelized:
 
         # Create a TAR large in size as well as file count
         tarPath = os.path.join(tmpdir, "foo.tar")
-        with indexed_bzip2.open(findTestFile("tar-with-300-folders-with-1000-files-0B-files.tar.bz2")) as file, open(
-            tarPath, 'wb'
-        ) as extracted:
+        with copyTestFile("tar-with-300-folders-with-1000-files-0B-files.tar.bz2") as path, indexed_bzip2.open(
+            path
+        ) as file, open(tarPath, 'wb') as extracted:
             while True:
                 data = file.read(1024 * 1024)
                 if not data:

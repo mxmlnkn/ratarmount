@@ -14,25 +14,19 @@ import time
 
 import pytest
 
+from helpers import copyTestFile, findTestFile
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from ratarmountcore import LibarchiveMountSource  # noqa: E402
 from ratarmountcore.LibarchiveMountSource import IterableArchive  # noqa: E402
 
 
-def findTestFile(relativePathOrName):
-    for i in range(3):
-        path = os.path.sep.join([".."] * i + ["tests", relativePathOrName])
-        if os.path.exists(path):
-            return path
-    return relativePathOrName
-
-
 class TestLibarchiveMountSource:
     @staticmethod
     @pytest.mark.parametrize('compression', ['7z', 'rar', 'zip'])
     def test_simple_usage(compression):
-        with LibarchiveMountSource(findTestFile('folder-symlink.' + compression)) as mountSource:
+        with copyTestFile('folder-symlink.' + compression) as path, LibarchiveMountSource(path) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
                 assert mountSource.getFileInfo(folder)
                 assert mountSource.fileVersions(folder) == 1
@@ -64,8 +58,8 @@ class TestLibarchiveMountSource:
     # @pytest.mark.parametrize("compression", ["7z", "rar", "zip"])
     @pytest.mark.parametrize('compression', ['zip'])
     def test_password(compression):
-        with LibarchiveMountSource(
-            findTestFile('encrypted-nested-tar.' + compression), passwords=['foo']
+        with copyTestFile('encrypted-nested-tar.' + compression) as path, LibarchiveMountSource(
+            path, passwords=['foo']
         ) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
                 assert mountSource.getFileInfo(folder)
@@ -82,7 +76,9 @@ class TestLibarchiveMountSource:
     @staticmethod
     @pytest.mark.parametrize('compression', ['bz2', 'gz', 'lrz', 'lz4', 'lzip', 'lzma', 'lzo', 'xz', 'Z', 'zst'])
     def test_stream_compressed(compression):
-        with LibarchiveMountSource(findTestFile('simple.' + compression), passwords=['foo']) as mountSource:
+        with copyTestFile('simple.' + compression) as path, LibarchiveMountSource(
+            path, passwords=['foo']
+        ) as mountSource:
             for folder in ['/']:
                 assert mountSource.getFileInfo(folder)
                 assert mountSource.fileVersions(folder) == 1
@@ -107,7 +103,7 @@ class TestLibarchiveMountSource:
         ],
     )
     def test_file_independence(path, lineSize):
-        with LibarchiveMountSource(findTestFile(path)) as mountSource:
+        with copyTestFile(path) as copiedPath, LibarchiveMountSource(copiedPath) as mountSource:
             with mountSource.open(mountSource.getFileInfo('zeros-32-MiB.txt')) as fileWithZeros:
                 expectedZeros = b'0' * (lineSize - 1) + b'\n'
                 assert fileWithZeros.read(lineSize) == expectedZeros
@@ -198,7 +194,7 @@ class TestLibarchiveMountSource:
     def _test_large_file(path):
         t0 = time.time()
         fileCount = 0
-        with LibarchiveMountSource(findTestFile(path)) as mountSource:
+        with LibarchiveMountSource(path) as mountSource:
             t1 = time.time()
             print(f"Opening {path} took {time.time() - t0:.3f} s")  # ~5 s
             # In the worst case, reading all files can take 300k * 5s / 2 = ~9 days.

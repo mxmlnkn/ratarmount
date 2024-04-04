@@ -1648,16 +1648,44 @@ if [[ -z "$CI" ]]; then
 
     shellcheck tests/*.sh || returnError "$LINENO" 'shellcheck failed!'
 
+    # Test runtimes 2024-04-04 on Ryzen 3900X
+    # core/tests/test_AutoMountLayer.py         in 19.05s   parallelize
+    # core/tests/test_BlockParallelReaders.py   in 57.95s   parallelize
+    # core/tests/test_LibarchiveMountSource.py  in 246.99s  parallelize
+    # core/tests/test_RarMountSource.py         in 0.08s
+    # core/tests/test_SQLiteBlobFile.py         in 0.24s
+    # core/tests/test_SQLiteIndex.py            in 0.10s
+    # core/tests/test_SQLiteIndexedTar.py       in 154.08s  parallelize
+    # core/tests/test_StenciledFile.py          in 1.91s
+    # core/tests/test_SubvolumesMountSource.py  in 0.12s
+    # core/tests/test_UnionMountSource.py       in 0.12s
+    # core/tests/test_ZipMountSource.py         in 0.09s
+    # core/tests/test_compressions.py           in 0.13s
+    # core/tests/test_factory.py                in 0.36s
+    # core/tests/test_utils.py                  in 0.22s
+    # tests/test_cli.py                         in 1.43s
+
     # Pytest has serious performance issues. It does collect all tests beforehand and does not free memory
-    # after tests have finished it seems. Or maybe that memory is a bug with indexed_gzip but the problem is
-    # that after that all tests after that one outlier also run slower. Maybe because of a Python garbage collector
-    # bug? For that reason, run each test file separately.
+    # after tests have finished it seems. Or maybe that memory is a bug with indexed_gzip. But the problem is
+    # that all tests after that one outlier also run slower! Maybe because of a Python garbage collector bug?
+    # For that reason, run each test file separately.
     for testFile in "${testFiles[@]}"; do
-        if [[ "${testFile//test_//}" != "$testFile" ]]; then
-            # Fusepy warns about usage of use_ns because the implicit behavior is deprecated.
-            # But there has been no development to fusepy for 4 years, so I think it should be fine to ignore.
-            pytest --disable-warnings "$testFile" || returnError "$LINENO" 'pytest failed!'
-        fi
+        case "$testFile" in
+            "core/tests/test_AutoMountLayer.py"\
+            |"core/tests/test_BlockParallelReaders.py"\
+            |"core/tests/test_LibarchiveMountSource.py"\
+            |"core/tests/test_SQLiteIndexedTar.py")
+                echo "$testFile"  # pytest-xdist seems to omit the test file name
+                pytest -n auto --disable-warnings "$testFile" || returnError "$LINENO" 'pytest failed!'
+                ;;
+            *)
+                if [[ "${testFile//test_//}" != "$testFile" ]]; then
+                    # Fusepy warns about usage of use_ns because the implicit behavior is deprecated.
+                    # But there has been no development to fusepy for 4 years, so I think it should be fine to ignore.
+                    pytest --disable-warnings "$testFile" || returnError "$LINENO" 'pytest failed!'
+                fi
+                ;;
+        esac
     done
 fi
 
