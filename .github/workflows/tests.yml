@@ -123,7 +123,7 @@ jobs:
         # And the error message is atrocious:
         #   cmdline.extend(args)
         #   TypeError: 'NoneType' object is not iterable
-        brew install macfuse coreutils pixz pbzip2 zstd unar
+        brew install macfuse coreutils pixz pbzip2 zstd unar libarchive lrzip lzop
         # Add brew installation binary folder to PATH so that command line tools like zstd can be found
         export PATH="$PATH:/usr/local/bin"
 
@@ -186,7 +186,6 @@ jobs:
         python3 ratarmount.py tests/simple.bz2 || [ $? != 139 ]
 
     - name: Unit Tests
-      if: ${{ !startsWith( matrix.os, 'macos' ) }}
       run: |
         python3 -m pip install pytest pytest-xdist
         for file in core/tests/test_*.py tests/test_*.py; do
