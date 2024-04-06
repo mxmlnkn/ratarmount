@@ -13,6 +13,9 @@ RATARMOUNT_CMD="$RATARMOUNT_CMD --index-minimum-file-count 0"
 export RATARMOUNT_CMD
 echo "RATARMOUNT_CMD: $RATARMOUNT_CMD"
 
+if [[ -z "$PARALLELIZATIONS" ]]; then
+    PARALLELIZATIONS="1 2 0"
+fi
 
 # MAC does not have mountpoint check!
 if ! command -v mountpoint &>/dev/null; then
@@ -1890,7 +1893,7 @@ pytestedTests+=(
 )
 
 
-for parallelization in 1 2 0; do
+for parallelization in $PARALLELIZATIONS; do
 
 echo "== Testing with -P $parallelization =="
 export parallelization

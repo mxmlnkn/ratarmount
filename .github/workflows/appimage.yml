@@ -33,6 +33,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
+        parallelization: [0, 1, 2]
 
     steps:
     - uses: actions/download-artifact@v3
@@ -66,5 +67,12 @@ jobs:
 
     - name: Regression Tests
       run: |
-        export RATARMOUNT_CMD=/usr/local/bin/ratarmount
+        # Starting up ratarmount for each very short test is quite slow, especially on the CI machine (3-5s).
+        # On my local machine, it's around 1s, which is not good, but also not bad.
+        # The AppImage extraction script is already tested in the simple tests above, so it should be fine
+        # to extract it once and then test the AppRun script, which still modifies the LD_LIBRARY_PATH and
+        # still uses the bundled libaries, i.e., it still is a good integrity test for the AppImage.
+        time /usr/local/bin/ratarmount --appimage-extract
+        export RATARMOUNT_CMD=$PWD/squashfs-root/AppRun
+        export PARALLELIZATIONS=${{ matrix.parallelization }}
         bash tests/runtests.sh

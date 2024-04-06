@@ -246,7 +246,8 @@ trimAppImage
 
 echo "Create AppImage from Modified AppDir"
 # times and sizes for ratarmount.AppImage --help on T14: --comp gzip: 1.6s, 12.50 MB, --comp xz: 3.0s, 12.88 MB
-APPIMAGE_EXTRACT_AND_RUN=1 ARCH="$APPIMAGE_ARCH" appimagetool --comp gzip --no-appstream "$APP_BASE".App{Dir,Image}
+# times and sizes for ratarmount.AppImage --help on Ryzen 3900X: --comp gzip: 1.2s, 15.09 MB, --comp xz: 2.2s, 14.59 MB
+APPIMAGE_EXTRACT_AND_RUN=1 ARCH="$APPIMAGE_ARCH" appimagetool --comp xz --no-appstream "$APP_BASE".App{Dir,Image}
 
 chmod u+x "$APP_BASE.AppImage"
 version=$( ./"$APP_BASE.AppImage" --version | sed -n -E 's|ratarmount ([0-9.]+)|\1|p' &>/dev/null )
