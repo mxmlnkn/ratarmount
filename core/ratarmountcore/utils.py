@@ -255,8 +255,8 @@ def findModuleVersion(moduleOrName: Union[str, types.ModuleType]) -> Optional[st
         moduleFilePath = getattr(module, '__file__')
         for distribution in imeta.distributions():
             try:
-                if distributionContainsFile(distribution, moduleFilePath) and 'Name' in distribution.metadata:
-                    return distribution.metadata['Name']
+                if distributionContainsFile(distribution, moduleFilePath) and 'Version' in distribution.metadata:
+                    return distribution.metadata['Version']
             except Exception:
                 pass
 
