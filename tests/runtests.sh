@@ -44,13 +44,11 @@ TMP_FILES_TO_CLEANUP=()
 MOUNT_POINTS_TO_CLEANUP=()
 cleanup()
 {
-    sleep 0.5s # Give a bit of time for the mount points to become stable before trying to unmount them
     for folder in "${MOUNT_POINTS_TO_CLEANUP[@]}"; do
         if [[ -d "$folder" ]]; then
             funmount "$folder"
         fi
     done
-    sleep 0.5s
     for folder in "${MOUNT_POINTS_TO_CLEANUP[@]}"; do
         if [[ -d "$folder" ]]; then safeRmdir "$folder"; fi
     done
@@ -163,11 +161,11 @@ verifyCheckSum()
 funmount()
 {
     local mountFolder="$1"
-    sleep 0.2s
-
     while mountpoint -- "$mountFolder" &>/dev/null; do
-        sleep 0.2s
         $RATARMOUNT_CMD -u "$mountFolder"
+        if mountpoint -- "$mountFolder" &>/dev/null; then
+            sleep 0.1s
+        fi
     done
 }
 
