@@ -1,4 +1,21 @@
 
+# Version 0.14.2 built on 2024-04-06
+
+ - Do not check mount point because of faulty `os.path.ismount`, simply try fusermount.
+ - Avoid total I/O hang when lazy-mounting a folder with archives onto itself
+ - (ratarmountcore 0.6.4) Return a valid file info and file version count for `/`.
+ - (ratarmountcore 0.6.4) Make the original archive viewable as an older file version when using `AutoMountLayer`.
+ - (ratarmountcore 0.6.4) Resolve symbolic links pointing outside the source folder given to `FolderMountSource` to not break them.
+ - (ratarmountcore 0.6.4) Do not return a valid `FileInfo` for invalid paths such as `../..`.
+ - (ratarmountcore 0.6.4) Make `--index-minimum-file-count` work for the TAR backend.
+ - (ratarmountcore 0.6.5) The index should not be created for very small archives.
+ - (ratarmountcore 0.6.5) Root file info userdata was not initialized correctly.
+ - (ratarmountcore 0.6.5) Index validation did fail for TAR entries with more than 2 metadata blocks.
+ - (ratarmountcore 0.6.5) Do not check for folder consistency because parent folders get automatically added to the index.
+ - (ratarmountcore 0.6.5) Move `_createFileInfo` out of `MountSource` class to fix "protected-access" warning.
+ - (ratarmountcore 0.6.5) Joined files (`a.001`, `a.002`) did not work because of an accidentally shared list.
+ - (ratarmountcore 0.6.5) Do not check file header for zip, only for the footer, to detect self-extracting archives.
+
 # Version 0.14.1 built on 2024-02-23
 
  - Fix `AttributeError: module 'fuse' has no attribute 'errno'`.
