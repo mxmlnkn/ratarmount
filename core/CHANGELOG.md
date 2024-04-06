@@ -1,4 +1,14 @@
 
+# Version 0.6.5 built on 2024-04-06
+
+ - The index should not be created for very small archives.
+ - Root file info userdata was not initialized correctly.
+ - Index validation did fail for TAR entries with more than 2 metadata blocks.
+ - Do not check for folder consistency because parent folders get automatically added to the index.
+ - Move `_createFileInfo` out of `MountSource` class to fix "protected-access" warning.
+ - Joined files (`a.001`, `a.002`) did not work because of an accidentally shared list.
+ - Do not check file header for zip, only for the footer, to detect self-extracting archives.
+
 # Version 0.6.4 built on 2024-03-23
 
  - Return a valid file info and file version count for `/`.
