@@ -35,12 +35,12 @@ jobs:
     - name: Lint With Flake8
       run: |
         python3 -m pip install flake8
-        flake8 *.py tests/*.py core/ratarmountcore/[^_]*.py
+        flake8 --config tests/.flake8 *.py tests/*.py core/ratarmountcore/[^_]*.py
 
     - name: Lint With Pylint
       run: |
         python3 -m pip install pylint
-        pylint *.py tests/*.py core/ratarmountcore/*.py | tee pylint.log
+        pylint --rcfile tests/.pylintrc *.py tests/*.py core/ratarmountcore/*.py | tee pylint.log
         ! 'egrep' ': E[0-9]{4}: ' pylint.log
 
     - name: Lint With Pytype
@@ -51,7 +51,7 @@ jobs:
     - name: Lint With Mypy
       run: |
         yes | python3 -m pip install --upgrade-strategy eager --upgrade types-dataclasses mypy
-        mypy *.py core/ratarmountcore/*.py
+        mypy --config-file tests/.mypy.ini *.py core/ratarmountcore/*.py
         yes | python3 -m pip uninstall types-dataclasses
 
     - name: Lint With ShellCheck

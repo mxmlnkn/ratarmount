@@ -9,6 +9,7 @@ mypy
 pandas
 pylint
 pytest
+pytest-xdist
 python-xz
 pytype
 twine

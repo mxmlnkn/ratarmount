@@ -1629,22 +1629,22 @@ if [[ -z "$CI" ]]; then
     echo "Checking files:"
     printf '    %s\n' "${files[@]}" "${testFiles[@]}"
 
-    pylint "${files[@]}" "${testFiles[@]}" | tee pylint.log
+    pylint --rcfile tests/.pylintrc "${files[@]}" "${testFiles[@]}" | tee pylint.log
     if 'grep' -E -q ': E[0-9]{4}: ' pylint.log; then
         echoerr 'There were warnings during the pylint run!'
         exit 1
     fi
     rm pylint.log
 
-    mypy "${files[@]}" || returnError "$LINENO" 'Mypy failed!'
-    mypy "${testFiles[@]}" || returnError "$LINENO" 'Mypy failed!'
+    mypy --config-file tests/.mypy.ini "${files[@]}" || returnError "$LINENO" 'Mypy failed!'
+    mypy --config-file tests/.mypy.ini "${testFiles[@]}" || returnError "$LINENO" 'Mypy failed!'
 
     pytype -d import-error -P"$( cd core && pwd ):$( pwd )" "${files[@]}" \
         || returnError "$LINENO" 'Pytype failed!'
 
     black -q --line-length 120 --skip-string-normalization "${files[@]}" "${testFiles[@]}"
 
-    flake8 "${files[@]}" "${testFiles[@]}" || returnError "$LINENO" 'Flake8 failed!'
+    flake8 --config tests/.flake8 "${files[@]}" "${testFiles[@]}" || returnError "$LINENO" 'Flake8 failed!'
 
     shellcheck tests/*.sh || returnError "$LINENO" 'shellcheck failed!'
 
