@@ -1591,6 +1591,8 @@ rm -f ratarmount.{stdout,stderr}.log
 
 # Linting only to be done locally because in CI it is in separate steps
 if [[ -z "$CI" ]]; then
+    COLUMNS=98 $RATARMOUNT_CMD --help | sed '/# Metadata Index Cache/,$d' > tests/ratarmount-help.txt
+
     files=()
     while read -r file; do
         files+=( "$file" )
