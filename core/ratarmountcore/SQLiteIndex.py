@@ -931,7 +931,7 @@ class SQLiteIndex:
         Else it will force creation and store the block offsets of the compression backend into a new table.
         """
         if compression and (not self.indexFilePath or self.indexFilePath == ':memory:'):
-            if self.printDebug >= 2:
+            if self.indexMinimumFileCount != 0 and self.printDebug >= 2:
                 print(
                     f"[Info] Will try to reopen the database on disk even though the file count threshold "
                     f"({self.indexMinimumFileCount}) might not be exceeded ({self._insertedRowCount}) because "
