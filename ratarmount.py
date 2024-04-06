@@ -980,9 +980,25 @@ class PrintVersionAction(argparse.Action):
                 if moduleVersion:
                     print(moduleName, moduleVersion)
 
-        for _, info in supportedCompressions.items():
-            for module in info.modules:
-                printModuleVersion(module.name)
+        modules = set(module.name for _, info in supportedCompressions.items() for module in info.modules)
+        for moduleName in sorted(list(modules)):
+            printModuleVersion(moduleName)
+
+        mappedFilesFolder = f"/proc/{os.getpid()}/map_files"
+        if os.path.isdir(mappedFilesFolder):
+            libraries = set(
+                os.readlink(os.path.join(mappedFilesFolder, link)) for link in os.listdir(mappedFilesFolder)
+            )
+            # Only look for shared libraries with versioning suffixed. Ignore all ending on .so.
+            libraries = set(library for library in libraries if '.so.' in library)
+
+            if libraries:
+                print()
+                print("Versioned Loaded Shared Libraries:")
+                print()
+
+            for library in sorted(list(libraries)):
+                print(library.rsplit('/', maxsplit=1)[-1])
 
         sys.exit(0)
 
