@@ -191,6 +191,16 @@ jobs:
         python3 -m pip install pytest pytest-xdist
         for file in core/tests/test_*.py tests/test_*.py; do
             case "$file" in
+              "tests/test_cli.py")
+                  if ! uname | 'grep' -q -i darwin; then
+                      # First off, n=auto seems to use the physical cores and ignores virtual ones.
+                      # Secondly, these tests scale much better than the others because most time is spent waiting for
+                      # the FUSE mount point to appear or disappear, which doesn't seem to be bottlenecked by CPU usage.
+                      python3 -X dev -W ignore::DeprecationWarning:fuse -u \
+                          -c "import pytest, re, sys; sys.exit(pytest.console_main())" \
+                          -n 16 --disable-warnings "$testFile" || returnError "$LINENO" 'pytest failed!'
+                  fi
+                  ;;
                 "core/tests/test_AutoMountLayer.py"\
                 |"core/tests/test_BlockParallelReaders.py"\
                 |"core/tests/test_LibarchiveMountSource.py"\

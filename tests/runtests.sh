@@ -3,8 +3,11 @@
 cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." || { echo 'Failed to cd to ratarmount.py folder!'; exit 1; }
 
 if [[ -z "$RATARMOUNT_CMD" ]]; then
+    TEST_EXTERNAL_COMMAND=0
     RATARMOUNT_CMD="python3 -X dev -W ignore::DeprecationWarning:fuse -u $( realpath -- ratarmount.py )"
     #RATARMOUNT_CMD=ratarmount
+else
+    TEST_EXTERNAL_COMMAND=1
 fi
 RATARMOUNT_CMD="$RATARMOUNT_CMD --index-minimum-file-count 0"
 export RATARMOUNT_CMD
@@ -1650,7 +1653,9 @@ if [[ -z "$CI" ]]; then
 
     shellcheck tests/*.sh || returnError "$LINENO" 'shellcheck failed!'
 
-    # Test runtimes 2024-04-04 on Ryzen 3900X
+    # Test runtimes 2024-04-04 on Ryzen 3900X. On the CI with nproc=4, the speedup is roughly 2x.
+    # Note that pytest-xdist doesn't scale arbitrarily because it seems to start up threads sequentially,
+    # which can take ~2s for 48 threads!
     # core/tests/test_AutoMountLayer.py         in 19.05s   parallelize -> 5.64s
     # core/tests/test_BlockParallelReaders.py   in 57.95s   parallelize -> 12.22s
     # core/tests/test_LibarchiveMountSource.py  in 246.99s  parallelize -> 74.43s
@@ -1665,7 +1670,8 @@ if [[ -z "$CI" ]]; then
     # core/tests/test_compressions.py           in 0.13s
     # core/tests/test_factory.py                in 0.36s
     # core/tests/test_utils.py                  in 0.22s
-    # tests/test_cli.py                         in 1.43s
+    # tests/test_cli.py                         in 67.09s  parallelize -> n=8: 8.91s, n=24: 4.54s, n=48: 4.33s,
+    #                                                                     n=96: 6.52s
 
     # Pytest has serious performance issues. It does collect all tests beforehand and does not free memory
     # after tests have finished it seems. Or maybe that memory is a bug with indexed_gzip. But the problem is
@@ -1673,6 +1679,14 @@ if [[ -z "$CI" ]]; then
     # For that reason, run each test file separately.
     for testFile in "${testFiles[@]}"; do
         case "$testFile" in
+            "tests/test_cli.py")
+                # First off, n=auto seems to use the physical cores and ignores virtual ones.
+                # Secondly, these tests scale much better than the others because most time is spent waiting for
+                # the FUSE mount point to appear or disappear, which doesn't seem to be bottlenecked by CPU usage.
+                python3 -X dev -W ignore::DeprecationWarning:fuse -u \
+                    -c "import pytest, re, sys; sys.exit(pytest.console_main())" \
+                    -n 24 --disable-warnings "$testFile" || returnError "$LINENO" 'pytest failed!'
+                ;;
             "core/tests/test_AutoMountLayer.py"\
             |"core/tests/test_BlockParallelReaders.py"\
             |"core/tests/test_LibarchiveMountSource.py"\
@@ -1697,9 +1711,11 @@ rm -f tests/*.index.*
 
 
 tests=()
+pytestedTests=()
 
-if ( uname | 'grep' -q -i Linux ) && python3 -c 'import libarchive' &>/dev/null; then
-tests+=(
+
+if python3 -c 'import libarchive' &>/dev/null; then
+pytestedTests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/nested-with-symlink.7z                 foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/nested-with-symlink.7z                 foo/fighter/saucer
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-with-symlink.7z                 foo/lighter.tar/fighter/bar
@@ -1732,6 +1748,7 @@ tests+=(
 )
 fi
 
+
 # TODO Some bug with rarfile throwing: Failed the read enough data: req=304 got=51 and then seek(0) not working?
 if ! uname | 'grep' -q -i darwin; then
 tests+=(
@@ -1753,7 +1770,7 @@ tests+=(
     49b996b16f59ab6c87dea31e227f8798 tests/rar-misrecognized-as-zip.rar           bag1.zip/CHANGELOG.md
 )
 fi
-tests+=(
+pytestedTests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/file-in-non-existing-folder.zip        foo2/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/rar.zip                                natsu.rar/ufo
     10d6977ec2ab378e60339323c24f9308 tests/rar.zip                                natsu.rar/foo
@@ -1774,7 +1791,15 @@ tests+=(
     f47c75614087a8dd938ba4acff252494 tests/simple-file-split.001                  simple-file-split
     f47c75614087a8dd938ba4acff252494 tests/simple-file-split.002                  simple-file-split
     d3b07384d113edec49eaa6238ad5ff00 tests/single-file-split.tar.001              bar
+    d3b07384d113edec49eaa6238ad5ff00 'tests/#not-a-good-name! Ör, is it?.tar'     bar
 
+    b026324c6904b2a9cb4b88d6d61c81d1 tests/2k-recursive-tars.tar.bz2              mimi/00001.tar/foo
+    3059b91c3562cd29457192eb3c3fe376 tests/2k-recursive-tars.tar.bz2              mimi/01234.tar.versions/1
+    8f30b20831bade7a2236edf09a55af60 tests/2k-recursive-tars.tar.bz2              mimi/01333.tar/foo
+    f95f8943f6dcf7b3c1c8c2cab5455f8b tests/2k-recursive-tars.tar.bz2              mimi/02000.tar/foo
+    c157a79031e1c40f85931829bc5fc552 tests/2k-recursive-tars.tar.bz2              mimi/foo
+)
+pytestedTests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/file-in-non-existing-folder.rar        foo2/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.rar                     foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.rar                     foo/jet/ufo
@@ -1786,7 +1811,6 @@ tests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/updated-file-implicitly-with-folder.tar bar/par/sora.versions/2/natsu
     cd85c6a5e5053c04f95e1df301c80755 tests/updated-file-implicitly-with-folder.tar bar/par/sora.versions/1
 
-    d3b07384d113edec49eaa6238ad5ff00 'tests/#not-a-good-name! Ör, is it?.tar'     bar
     d3b07384d113edec49eaa6238ad5ff00 tests/single-file.tar                        bar
 
     d3b07384d113edec49eaa6238ad5ff00 tests/single-file-with-leading-dot-slash.tar bar
@@ -1813,7 +1837,6 @@ tests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/hardlink.tar                           hardlink/natsu
     b3de7534cbc8b8a7270c996235d0c2da tests/concatenated.tar                       foo/fighter
     2709a3348eb2c52302a7606ecf5860bc tests/concatenated.tar                       foo/bar
-
     2709a3348eb2c52302a7606ecf5860bc tests/nested-symlinks.tar                    foo/foo
     2709a3348eb2c52302a7606ecf5860bc tests/nested-symlinks.tar                    foo/fighter/foo
 
@@ -1864,12 +1887,6 @@ tests+=(
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   01.sparse1.bin
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   02.normal1.bin
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   03.sparse1.bin
-
-    b026324c6904b2a9cb4b88d6d61c81d1 tests/2k-recursive-tars.tar.bz2              mimi/00001.tar/foo
-    3059b91c3562cd29457192eb3c3fe376 tests/2k-recursive-tars.tar.bz2              mimi/01234.tar.versions/1
-    8f30b20831bade7a2236edf09a55af60 tests/2k-recursive-tars.tar.bz2              mimi/01333.tar/foo
-    f95f8943f6dcf7b3c1c8c2cab5455f8b tests/2k-recursive-tars.tar.bz2              mimi/02000.tar/foo
-    c157a79031e1c40f85931829bc5fc552 tests/2k-recursive-tars.tar.bz2              mimi/foo
 )
 
 
@@ -1937,6 +1954,12 @@ if ! uname | 'grep' -q -i darwin; then
         returnError "$LINENO" 'Self-referencing hardlinks test failed!'
 fi
 
+# Intended for AppImage integration tests, for which the pytest unit tests are decidedly not sufficient
+# to detect, e.g., missing libarries in the AppImage.
+if [[ $TEST_EXTERNAL_COMMAND -eq 1 ]]; then
+    tests+=( "${pytestedTests[@]}" )
+fi
+
 for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
     checksum=${tests[iTest]}
     tarPath=${tests[iTest+1]}
@@ -1977,7 +2000,9 @@ rmdir tests/*/
 done  # for parallelization
 
 
-benchmarkDecoderBackends
+if [[ $TEST_EXTERNAL_COMMAND -eq 0 ]]; then
+    benchmarkDecoderBackends
+fi
 
 
 echo -e '\e[32mAll tests ran successfully.\e[0m'
