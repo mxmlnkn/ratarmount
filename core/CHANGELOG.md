@@ -1,4 +1,22 @@
 
+# Version 0.7.0 built on 2024-04-07
+
+ - Add libarchive backend and detection support for:
+   grzip, lrzip, lz4, lzip, lzma, lzop, rpm, uuencode, compress, 7zip, ar, cab, deb, xar, cpio, iso, war, cxar.
+ - Add `--transform` option to map each archive entry path via a regex to some user-specified one.
+ - Upgrade rapidgzip from 0.10 to 0.13 to add zlib support. Other notable features are:
+   - Window compression for reduced memory usage
+   - The rapidgzip Python library now also bundles `IndexedBzip2File` from `indexed_bzip2`.
+   - Enable checksum verification by default.
+   - Support for decompression from non-seekable inputs such as stdin.
+   - Avoid doubling memory usage during index import and export by streaming the data directly to the output file.
+ - Remove `indexed_bzip2` dependency in favor of `rapidgzip`, which in the future should support even more formats.
+ - Store backend name into the index and check that the index fits to the current backend / `MountSource`.
+ - Store `isGnuIncremental` flag in the index.
+ - Determine incremental archives from index rows to avoid seeks.
+ - `utils.findModuleVersion`: Return version not name if `__version__` does not exist.
+ - Apply specified priorities for opening all archives not just gzip.
+
 # Version 0.6.5 built on 2024-04-06
 
  - The index should not be created for very small archives.
