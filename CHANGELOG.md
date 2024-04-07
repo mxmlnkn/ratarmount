@@ -1,4 +1,18 @@
 
+# Version 0.15.0 built on 2024-04-07
+
+ - Print indicators for versions of loaded shared libraries.
+ - (ratarmountcore 0.7.0) Add libarchive backend and detection support for:
+   grzip, lrzip, lz4, lzip, lzma, lzop, rpm, uuencode, compress, 7zip, ar, cab, deb, xar, cpio, iso, war, cxar.
+ - (ratarmountcore 0.7.0) Add `--transform` option to map each archive entry path via a regex to some user-specified one.
+ - (ratarmountcore 0.7.0) Upgrade rapidgzip from 0.10 to 0.13 to add zlib support. Other notable features are:
+ - (ratarmountcore 0.7.0) Remove `indexed_bzip2` dependency in favor of `rapidgzip`, which in the future should support even more formats.
+ - (ratarmountcore 0.7.0) Store backend name into the index and check that the index fits to the current backend / `MountSource`.
+ - (ratarmountcore 0.7.0) Store `isGnuIncremental` flag in the index.
+ - (ratarmountcore 0.7.0) Determine incremental archives from index rows to avoid seeks.
+ - (ratarmountcore 0.7.0) `utils.findModuleVersion`: Return version not name if `__version__` does not exist.
+ - (ratarmountcore 0.7.0) Apply specified priorities for opening all archives not just gzip.
+
 # Version 0.14.2 built on 2024-04-06
 
  - Do not check mount point because of faulty `os.path.ismount`, simply try fusermount.
