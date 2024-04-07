@@ -107,8 +107,8 @@ They require no installation and can be simply executed like a portable executab
 If you want to install it, you can simply copy it into any of the folders listed in your `PATH`.
 
 ```bash
-appImageName=ratarmount-0.14.2-x86_64.AppImage
-wget 'https://github.com/mxmlnkn/ratarmount/releases/download/v0.14.2/$appImageName'
+appImageName=ratarmount-0.15.0-x86_64.AppImage
+wget 'https://github.com/mxmlnkn/ratarmount/releases/download/v0.15.0/$appImageName'
 chmod u+x -- "$appImageName"
 ./"$appImageName" --help  # Simple test run
 sudo cp -- "$appImageName" /usr/local/bin/ratarmount  # Example installation
