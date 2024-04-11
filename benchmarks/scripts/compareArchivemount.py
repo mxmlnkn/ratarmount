@@ -22,15 +22,15 @@ def axisValueReduction(ax, axis, reduction, init):
     for line in ax.get_lines():
         # have to use numpy here, because of:
         # https://stackoverflow.com/questions/4237914/python-max-min-builtin-functions-depend-on-parameter-order
-        x = np.array(line.get_xdata(), dtype=np.float)
-        y = np.array(line.get_ydata(), dtype=np.float)
+        x = np.array(line.get_xdata(), dtype=float)
+        y = np.array(line.get_ydata(), dtype=float)
 
         # mask not only NaNs per each x,y, but also mask all y-values whose
         # corresponding x-values are NaN!
         unmasked = np.logical_and(np.logical_not(np.isnan(x)), np.logical_not(np.isnan(y)))
         x = x[unmasked]
         y = y[unmasked]
-        unmasked = np.array([True] * len(x), dtype=np.bool)
+        unmasked = np.array([True] * len(x), dtype=bool)
         if axis == 'x' and ax.get_xscale() == 'log':
             np.logical_and(unmasked, x > 0)
         if axis == 'y' and ax.get_yscale() == 'log':
@@ -87,14 +87,14 @@ def loadData(fileName):
                     data[tool][command][compression] = []
 
                 if labels[-1] == 'startTime':
-                    data[tool][command][compression] += [np.array(row[3:-1], dtype='float')]
+                    data[tool][command][compression] += [np.array(row[3:-1], dtype=float)]
                 else:
-                    data[tool][command][compression] += [np.array(row[3], dtype='float')]
+                    data[tool][command][compression] += [np.array(row[3], dtype=float)]
 
     for key, value in data.items():
         for command, values in value.items():
             for compression, values2 in values.items():
-                data[key][command][compression] = np.array(values2, dtype='float').transpose()
+                data[key][command][compression] = np.array(values2, dtype=float).transpose()
 
     return labels[3:], data
 
@@ -244,7 +244,7 @@ def plotComparison(fileName):
     ymin = axisValueReduction(ax, 'y', np.nanmin, float('+inf'))
     ymax = axisValueReduction(ax, 'y', np.nanmax, float('-inf'))
     x = 10 ** np.linspace(np.log10(xmin), np.log10(xmax))
-    y = x ** 2
+    y = x**2
     y = y / y[-1] * ymax / 2000
     ax.plot(x[y > ymin], y[y > ymin], color='k', linestyle='--', label="quadratic scaling")
 
@@ -382,6 +382,7 @@ def plotRatarmountParallelComparison(fileName, compression):
     print("Written out:", fileName)
     return True
 
+
 def plotAccessLatency(fileName):
     fileName = dataFile
     labels, data = loadData(fileName)
@@ -422,5 +423,5 @@ if __name__ == "__main__":
 
     plotAccessLatency(dataFile)
     plotComparison(dataFile)
-    for compression in ['', 'bz2', 'xz', 'find']:
+    for compression in ['', 'bz2', 'gz', 'xz', 'find']:
         plotRatarmountParallelComparison(dataFile, compression)

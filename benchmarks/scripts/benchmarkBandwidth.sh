@@ -130,7 +130,8 @@ function benchmarkMountedCat()
 
 
 extendedBenchmarks=1
-thresholdReached=()
+thresholdReachedArchivemount=()
+thresholdReachedFuseArchive=()
 
 
 mountFolder=$( mktemp -d )
@@ -138,7 +139,7 @@ mountFolder=$( mktemp -d )
 dataFile="benchmark-bandwidths-$( date +%Y-%m-%dT%H-%M ).dat"
 echo '# tool command compression fileSize/B duration/s peakRssMemory/kiB startTime' > "$dataFile"
 
-for (( nBytesPerFile = 4 * 1024; nBytesPerFile <= 1024 * 1024 * 1024; nBytesPerFile *= 4 )); do
+for (( nBytesPerFile = 4 * 1024; nBytesPerFile <= 16 * 1024 * 1024 * 1024; nBytesPerFile *= 4 )); do
 for compression in '' '.bz2' '.gz' '.xz' '.zst'; do
     humanReadableSize=$( numfmt --to=iec-i --suffix=B "$nBytesPerFile" )
     tarFile="tar-with-$humanReadableSize-file.tar"
@@ -174,15 +175,21 @@ for compression in '' '.bz2' '.gz' '.xz' '.zst'; do
     if [[ $extendedBenchmarks -eq 1 ]]; then
         # archivemount has a performance bug for this, so stop benchmarking higher values after a threshold
         cmd=archivemount
-        if ! printf '%s\n' "${thresholdReached[@]}" | grep -q '^'"$cmd$compression"'$'; then
+        if ! printf '%s\n' "${thresholdReachedArchivemount[@]}" | grep -q '^'"$cmd$compression"'$'; then
             benchmarkMountedCat
             if [[ ${duration%%.*} -ge 10 ]]; then
-                thresholdReached+=( $cmd$compression )
+                thresholdReachedArchivemount+=( $cmd$compression )
             fi
         fi
 
+        # fuse-archive is slow for xz and bzip2, so save benchmark time by omitting these for very large files.
         cmd=fuse-archive
-        benchmarkMountedCat
+        if ! printf '%s\n' "${thresholdReachedFuseArchive[@]}" | grep -q '^'"$cmd$compression"'$'; then
+            benchmarkMountedCat
+            if [[ ${duration%%.*} -ge 20 ]]; then
+                thresholdReachedFuseArchive+=( $cmd$compression )
+            fi
+        fi
 
         # Benchmark decompression and listing with other tools for comparison
         cmd=  # clear for benchmarkCommand method because it is not relevant for these tests

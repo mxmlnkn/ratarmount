@@ -352,7 +352,7 @@ for compression in '' '.bz2' '.gz' '.xz' '.zst'; do
         esac
     fi
 
-    for cmd in  "ratarmount -P $( nproc )"; do
+    for cmd in "ratarmount -P $( nproc )"; do
         benchmark
     done
 
@@ -382,15 +382,13 @@ for compression in '' '.bz2' '.gz' '.xz' '.zst'; do
         esac
 
         # Benchmark single-core version of anything that is parallelized
-        if [[ "$compression" == '.bz2' || "$compression" == '.xz' || "$compression" == '' ]]; then
-            cmd=ratarmount
-            benchmark
-        fi
+        cmd="ratarmount -P 1"
+        benchmark
     fi
 
     # I don't have enough free space on my SSD to keep 4x 100GB large files around
     if [[ -n "$compression" &&
-          ( $( stat --format=%s -- ${tarFile}${compression} ) -gt $(( 40*1024*1024*1024 )) ) ]]
+          ( $( stat --format=%s -- ${tarFile}${compression} ) -gt $(( 1*1024*1024*1024 )) ) ]]
     then
         'rm' "${tarFile}${compression}"
     fi

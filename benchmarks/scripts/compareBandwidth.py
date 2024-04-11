@@ -21,15 +21,15 @@ def axisValueReduction(ax, axis, reduction, init):
     for line in ax.get_lines():
         # have to use numpy here, because of:
         # https://stackoverflow.com/questions/4237914/python-max-min-builtin-functions-depend-on-parameter-order
-        x = np.array(line.get_xdata(), dtype=np.float)
-        y = np.array(line.get_ydata(), dtype=np.float)
+        x = np.array(line.get_xdata(), dtype=float)
+        y = np.array(line.get_ydata(), dtype=float)
 
         # mask not only NaNs per each x,y, but also mask all y-values whose
         # corresponding x-values are NaN!
         unmasked = np.logical_and(np.logical_not(np.isnan(x)), np.logical_not(np.isnan(y)))
         x = x[unmasked]
         y = y[unmasked]
-        unmasked = np.array([True] * len(x), dtype=np.bool)
+        unmasked = np.array([True] * len(x), dtype=bool)
         if axis == 'x' and ax.get_xscale() == 'log':
             np.logical_and(unmasked, x > 0)
         if axis == 'y' and ax.get_yscale() == 'log':
@@ -321,11 +321,11 @@ def plotReadingComparison(fileName):
     # add linear scaling
     x = 10 ** np.linspace(np.log10(xmin), np.log10(xmax))
     y = x
-    y = y / y[-1] * ymax / 200
+    y = y / y[-1] * ymax / 50
     ax.plot(x[y > ymin], y[y > ymin], color='k', linestyle='-', label="linear scaling")
 
     # add quadratic scaling
-    x = 10 ** np.linspace(np.log10(xmin), np.log10(xmax) - 2)
+    x = 10 ** np.linspace(np.log10(xmin), np.log10(xmax) - 4)
     y = x ** 2
     y = y / y[-1] * ymax
     ax.plot(x[y > ymin], y[y > ymin], color='k', linestyle='--', label="quadratic scaling")
