@@ -66,6 +66,11 @@ try:
 except (ImportError, AttributeError):
     libarchive = None
 
+try:
+    import PySquashfsImage
+except ImportError:
+    PySquashfsImage = None
+
 
 CompressionModuleInfo = collections.namedtuple('CompressionModuleInfo', ['name', 'open'])
 # Defining lambdas does not yet check the names of entities used inside the lambda!
@@ -165,6 +170,72 @@ ARCHIVE_FORMATS: Dict[str, CompressionInfo] = {
         lambda x: x.read(2) == b'PK',
     ),
 }
+
+
+def isSquashFS(fileObject) -> bool:
+    offset = fileObject.tell()
+    try:
+        # https://dr-emann.github.io/squashfs/squashfs.html#_the_superblock
+        magicBytes = fileObject.read(4)
+        if magicBytes != b"hsqs":
+            return False
+
+        _inodeCount, _modificationTime, blockSize, _fragmentCount = struct.unpack('<IIII', fileObject.read(4 * 4))
+        compressor, blockSizeLog2, _flags, _idCount, major, minor = struct.unpack('<HHHHHH', fileObject.read(6 * 2))
+        # root_inode, bytes_used, id_table, xattr_table, inode_table, dir_table, frag_table, export_table =
+        # struct.unpack('<QQQQQQQQ', fileObject.read(8 * 8))
+
+        # The size of a data block in bytes. Must be a power of two between 4096 (4k) and 1048576 (1 MiB).
+        # log2 4096 = 12, log2 1024*1024 = 20
+        if blockSizeLog2 < 12 or blockSizeLog2 > 20 or 2**blockSizeLog2 != blockSize:
+            return False
+
+        if major != 4 or minor != 0:
+            return False
+
+        # Compressions: 0:None, 1:GZIP, 2:LZMA, 3:LZO, 4:XZ, 5:LZ4, 6:ZSTD
+        if compressor > 6:
+            return False
+
+    finally:
+        fileObject.seek(offset)
+
+    return True
+
+
+def findSquashFSOffset(fileObject, maxSkip=1024 * 1024) -> int:
+    """
+    Looks for the SquashFS superblock, which can be at something other than offset 0 for AppImage files.
+    """
+    # https://dr-emann.github.io/squashfs/squashfs.html#_the_superblock
+    if isSquashFS(fileObject):
+        return 0
+
+    oldOffset = fileObject.tell()
+    try:
+        magic = b"hsqs"
+        data = fileObject.read(maxSkip + len(magic))
+        magicOffset = 0
+        while True:
+            magicOffset = data.find(magic, magicOffset + 1)
+            if magicOffset < 0 or magicOffset >= len(data):
+                break
+            fileObject.seek(magicOffset)
+            if isSquashFS(fileObject):
+                return magicOffset
+    finally:
+        fileObject.seek(oldOffset)
+
+    return -1
+
+
+if 'PySquashfsImage' in sys.modules and isinstance(PySquashfsImage, types.ModuleType):
+    ARCHIVE_FORMATS['squashfs'] = CompressionInfo(
+        ['squashfs', 'AppImage', 'snap'],
+        [],
+        [CompressionModuleInfo('PySquashfsImage', lambda x: PySquashfsImage.SquashFsImage(x))],
+        lambda x: findSquashFSOffset(x) >= 0,
+    )
 
 
 # libarchive support is split into filters (compressors or encoders working on a single file) and (archive) formats.

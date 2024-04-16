@@ -21,7 +21,7 @@ jobs:
     - name: Install pip Dependencies
       run: |
         python3 -m pip install --upgrade pip
-        python3 -m pip install --user fusepy pytest
+        python3 -m pip install --user fusepy pytest lz4 PySquashfsImage
 
     - name: Style Check With Black
       run: |
@@ -118,7 +118,7 @@ jobs:
         # zstd, may also call external binaries depending on how libarchive was compiled!
         # https://github.com/libarchive/libarchive/blob/ad5a0b542c027883d7069f6844045e6788c7d70c/libarchive/
         #   archive_read_support_filter_lrzip.c#L68
-        sudo apt-get -y install libfuse2 fuse3 bzip2 pbzip2 pixz zstd unar lrzip lzop
+        sudo apt-get -y install libfuse2 fuse3 bzip2 pbzip2 pixz zstd unar lrzip lzop gcc liblzo2-dev
         set -x
 
     - name: Install Dependencies (MacOS)
@@ -130,7 +130,7 @@ jobs:
         # And the error message is atrocious:
         #   cmdline.extend(args)
         #   TypeError: 'NoneType' object is not iterable
-        brew install macfuse coreutils pixz pbzip2 zstd unar libarchive lrzip lzop
+        brew install macfuse coreutils pixz pbzip2 zstd unar libarchive lrzip lzop lzo
         # Add brew installation binary folder to PATH so that command line tools like zstd can be found
         export PATH="$PATH:/usr/local/bin"
 

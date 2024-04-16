@@ -6,13 +6,14 @@ import traceback
 
 from typing import IO, Optional, Union
 
-from .compressions import checkForSplitFile, libarchive, rarfile, TAR_COMPRESSION_FORMATS, zipfile
+from .compressions import checkForSplitFile, libarchive, PySquashfsImage, rarfile, TAR_COMPRESSION_FORMATS, zipfile
 from .utils import CompressionError, RatarmountError
 from .MountSource import MountSource
 from .FolderMountSource import FolderMountSource
 from .RarMountSource import RarMountSource
 from .SingleFileMountSource import SingleFileMountSource
 from .SQLiteIndexedTar import SQLiteIndexedTar
+from .SquashFSMountSource import SquashFSMountSource
 from .StenciledFile import JoinedFileFromFactory
 from .ZipMountSource import ZipMountSource
 from .LibarchiveMountSource import LibarchiveMountSource
@@ -40,7 +41,7 @@ def _openTarMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optiona
 
 def _openZipMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
     try:
-        if zipfile is not None and zipfile is not None:
+        if zipfile is not None:
             # is_zipfile might yields some false positives, but those should then raise exceptions, which
             # are caught, so it should be fine. See: https://bugs.python.org/issue42096
             if zipfile.is_zipfile(fileOrPath):
@@ -83,10 +84,21 @@ def _openLibarchiveMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> 
     return None
 
 
+def _openPySquashfsImage(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
+    try:
+        if PySquashfsImage is not None:
+            return SquashFSMountSource(fileOrPath, **options)
+    finally:
+        if hasattr(fileOrPath, 'seek'):
+            fileOrPath.seek(0)  # type: ignore
+    return None
+
+
 _BACKENDS = {
     "rarfile": _openRarMountSource,
     "tarfile": _openTarMountSource,
     "zipfile": _openZipMountSource,
+    "pysquashfsimage": _openPySquashfsImage,
     "libarchive": _openLibarchiveMountSource,
 }
 

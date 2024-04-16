@@ -23,7 +23,7 @@ function installSystemRequirements()
     # We need to install development dependencies to build Python packages from source and we also need
     # to install libraries such as libarchive in order to copy them into the AppImage.
     yum install -y fuse fakeroot patchelf fuse-libs libsqlite3x strace desktop-file-utils libzstd-devel \
-        libarchive libarchive-devel lzop
+        libarchive libarchive-devel lzop lzo lzo-devel
 }
 
 function installAppImageTools()
@@ -61,7 +61,7 @@ function installAppImagePythonPackages()
         "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir rapidgzip
     fi
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ../core
-    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ..
+    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ..[full]
 }
 
 function installAppImageSystemLibraries()
@@ -96,16 +96,19 @@ function installAppImageSystemLibraries()
         libraries+=( $( repoquery -l fuse-libs | 'grep' 'lib64.*[.]so' ) )
         libraries+=( $( repoquery -l libarchive | 'grep' 'lib64.*[.]so' ) )
         libraries+=( $( repoquery -l libarchive-devel | 'grep' 'lib64.*[.]so' ) )
+        libraries+=( $( repoquery -l lzo | 'grep' 'lib64.*[.]so' ) )
         libraries+=( $( repoquery -l xz-devel | 'grep' 'lib64.*[.]so' ) )
     elif commandExists dnf; then
         libraries+=( $( dnf repoquery -l fuse-libs | 'grep' 'lib64.*[.]so' ) )
         libraries+=( $( dnf repoquery -l libarchive | 'grep' 'lib64.*[.]so' ) )
         libraries+=( $( dnf repoquery -l libarchive-devel | 'grep' 'lib64.*[.]so' ) )
+        libraries+=( $( dnf repoquery -l lzo | 'grep' 'lib64.*[.]so' ) )
         libraries+=( $( dnf repoquery -l xz-devel | 'grep' 'lib64.*[.]so' ) )
     elif commandExists dpkg; then
         libraries+=( $( dpkg -L libfuse2 | 'grep' '/lib.*[.]so' ) )
         libraries+=( $( dpkg -L libarchive13 | 'grep' '/lib.*[.]so' ) )
         libraries+=( $( dpkg -L libarchive-dev | 'grep' '/lib.*[.]so' ) )
+        libraries+=( $( dpkg -L lzo | 'grep' '/lib.*[.]so' ) )
         libraries+=( $( dpkg -L liblzma5 | 'grep' '/lib.*[.]so' ) )
     else
         echo -e "\e[31mCannot gather FUSE libs into AppImage without (dnf) repoquery.\e[0m"

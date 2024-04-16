@@ -1939,7 +1939,20 @@ tests+=(
     f95f8943f6dcf7b3c1c8c2cab5455f8b tests/2k-recursive-tars.tar.bz2              mimi/02000.tar/foo
     c157a79031e1c40f85931829bc5fc552 tests/2k-recursive-tars.tar.bz2              mimi/foo
 )
+
 pytestedTests+=(
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.gzip.squashfs           foo/fighter/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lzo.squashfs            foo/fighter/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.no-compression.squashfs foo/fighter/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.xz.squashfs             foo/fighter/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.zstd.squashfs           foo/fighter/ufo
+
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.gzip.squashfs           foo/jet/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lzo.squashfs            foo/jet/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.no-compression.squashfs foo/jet/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.xz.squashfs             foo/jet/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.zstd.squashfs           foo/jet/ufo
+
     2709a3348eb2c52302a7606ecf5860bc tests/file-in-non-existing-folder.rar        foo2/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.rar                     foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.rar                     foo/jet/ufo
@@ -2099,7 +2112,7 @@ if ! uname | 'grep' -q -i darwin; then
 fi
 
 # Intended for AppImage integration tests, for which the pytest unit tests are decidedly not sufficient
-# to detect, e.g., missing libarries in the AppImage.
+# to detect, e.g., missing libraries in the AppImage.
 if [[ $TEST_EXTERNAL_COMMAND -eq 1 ]]; then
     tests+=( "${pytestedTests[@]}" )
 fi

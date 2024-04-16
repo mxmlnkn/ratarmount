@@ -27,10 +27,8 @@ from typing import Any, Callable, Dict, Iterable, IO, List, Optional, Tuple, Uni
 try:
     from ratarmountcore.fusepy import fuse
 except AttributeError as exception:
-    print("[Error] Did not find any usable FUSE installation. Please install it, e.g., with:")
-    print("[Error]  - apt install libfuse2")
-    print("[Error]  - yum install fuse fuse-libs")
-    print("[Error] Exception for bundled fusepy:", exception)
+    traceback.print_exc()
+    print("[Error] Some internal exception occurred while trying to load the bundled fusepy:", exception)
     sys.exit(1)
 except (ImportError, OSError) as exception:
     print("[Warning] Failed to load bundled fusepy. Will try to load system fusepy. Exception was:", exception)
@@ -918,7 +916,7 @@ def checkInputFileType(
                 return tarFile, compression
 
             if printDebug >= 2:
-                print(f"Archive '{tarFile}' (compression: {compression}) can't be opened!")
+                print(f"Archive '{tarFile}' (compression: {compression}) cannot be opened!")
 
             if printDebug >= 1:
                 print("[Info] Supported compressions:", list(supportedCompressions.keys()))
@@ -927,7 +925,7 @@ def checkInputFileType(
                     print("[Warning]  - apt install libarchive13")
                     print("[Warning]  - yum install libarchive")
 
-            raise argparse.ArgumentTypeError(f"Archive '{tarFile}' can't be opened!")
+            raise argparse.ArgumentTypeError(f"Archive '{tarFile}' cannot be opened!")
 
     if not findAvailableOpen(compression):
         moduleNames = [module.name for module in supportedCompressions[compression].modules]
@@ -1818,7 +1816,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
             operations=fuseOperationsObject,
             mountpoint=args.mount_point,
             foreground=args.foreground,
-            nothreads=True,  # Can't access SQLite database connection object from multiple threads
+            nothreads=True,  # Cannot access SQLite database connection object from multiple threads
             **fusekwargs,
         )
     except RuntimeError as exception:
