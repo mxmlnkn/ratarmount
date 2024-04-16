@@ -168,13 +168,6 @@ class ZipMountSource(MountSource):
             print(f"Creating offset dictionary for {self.archiveFilePath} took {t1 - t0:.2f}s")
 
     @staticmethod
-    def _cleanPath(path):
-        result = os.path.normpath(path) + ('/' if path.endswith('/') else '')
-        while result.startswith('../'):
-            result = result[3:]
-        return result
-
-    @staticmethod
     def _findPassword(fileobj: "zipfile.ZipFile", passwords):
         # If headers are encrypted, then infolist will simply return an empty list!
         files = fileobj.infolist()
