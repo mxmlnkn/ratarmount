@@ -236,12 +236,6 @@ class ZipMountSource(MountSource):
         # https://github.com/python/cpython/blob/a87c46eab3c306b1c5b8a072b7b30ac2c50651c0/Lib/zipfile/__init__.py#L1569
         return self.fileObject.open(info, 'r')  # https://github.com/pauldmccarthy/indexed_gzip/issues/85
 
-    @overrides(MountSource)
-    def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
-        with self.open(fileInfo) as file:
-            file.seek(offset, os.SEEK_SET)
-            return file.read(size)
-
     def _tryToOpenFirstFile(self):
         # Get first row that has the regular file bit set in mode (stat.S_IFREG == 32768 == 1<<15).
         result = self.index.getConnection().execute(

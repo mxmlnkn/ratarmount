@@ -272,11 +272,5 @@ class RarMountSource(MountSource):
         return cast(IO[bytes], RawFileInsideRar(lambda: self.fileObject.open(info, 'r'), info.file_size))
 
     @overrides(MountSource)
-    def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
-        with self.open(fileInfo) as file:
-            file.seek(offset, os.SEEK_SET)
-            return file.read(size)
-
-    @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
         self.fileObject.close()

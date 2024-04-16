@@ -684,12 +684,6 @@ class LibarchiveMountSource(MountSource):
             archiveCache=self._archiveCache,
         )
 
-    @overrides(MountSource)
-    def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
-        with self.open(fileInfo) as file:
-            file.seek(offset, os.SEEK_SET)
-            return file.read(size)
-
     def _checkMetadata(self, metadata: Dict[str, Any]) -> None:
         """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
         if 'tarstats' in metadata:

@@ -150,12 +150,6 @@ class FolderMountSource(MountSource):
             raise ValueError(f"Specified path '{realpath}' is not a file that can be read!") from e
 
     @overrides(MountSource)
-    def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
-        with self.open(fileInfo) as file:
-            file.seek(offset, os.SEEK_SET)
-            return file.read(size)
-
-    @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
         pass
 
