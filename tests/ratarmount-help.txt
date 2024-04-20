@@ -63,7 +63,7 @@ Index Options:
                         to save besides the TAR. --index-folder ~/.ratarmount will only test
                         ~/.ratarmount as a storage location and nothing else. Instead, it will
                         first try ~/.ratarmount and the folder "foo,9000". (default:
-                        ,/home/hypatia/.cache/ratarmount,~/.ratarmount)
+                        ,~/.cache/ratarmount,~/.ratarmount)
   --verify-mtime        By default, only the TAR file size is checked to match the one in the
                         found existing ratarmount index. If this option is specified, then also
                         check the modification timestamp. But beware that the mtime might change
