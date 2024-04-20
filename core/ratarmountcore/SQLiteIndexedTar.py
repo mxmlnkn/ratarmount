@@ -894,7 +894,7 @@ class SQLiteIndexedTar(MountSource):
             if (
                 hasattr(fileobj, 'tell_compressed')
                 and 'rapidgzip' in sys.modules
-                and (isinstance(fileobj, rapidgzip.IndexedBzip2File) or isinstance(fileobj, rapidgzip.RapidgzipFile))
+                and isinstance(fileobj, (rapidgzip.IndexedBzip2File, rapidgzip.RapidgzipFile))
             ):
                 # Note that because bz2 works on a bitstream the tell_compressed returns the offset in bits
                 progressBar.update(fileobj.tell_compressed() // 8)
