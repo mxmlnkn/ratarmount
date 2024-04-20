@@ -403,12 +403,6 @@ class LibarchiveFile(io.RawIOBase):
             raise RuntimeError(f"Read {readSize} bytes but expected {self.fileSize} for entry {self.entryIndex}!")
         self._bufferIO = io.BytesIO(self._buffer)
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exception_type, exception_value, exception_traceback):
-        self.close()
-
     @overrides(io.RawIOBase)
     def close(self) -> None:
         if self._archiveCache and self._archive:
