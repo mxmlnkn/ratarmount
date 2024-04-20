@@ -1,0 +1,5 @@
+# https://github.com/github-linguist/linguist/blob/master/docs/overrides.md
+# https://github.com/github-linguist/linguist/blob/4ac734c15a96f9e16fd12330d0cb8de82274f700/lib/linguist/languages.yml#L895
+# CSV is categorized as data and should therefore be excluded from code statistics.
+*.dat linguist-language=csv -text
+tests/ratarmount-help.txt linguist-generated
