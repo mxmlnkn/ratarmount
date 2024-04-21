@@ -22,7 +22,7 @@ And the lzmaffi backend caused problems with installing on systems because the c
 This is why it was a more experimental feature.
 But now it is more polished and even has been parallized, see the [next section](#parallel-xz-decoder-speedup).
 
-![Benchmark comparison between ratarmount and archivemount](plots/archivemount-comparison.png)
+![Benchmark comparison between ratarmount and archivemount](plots/archivemount-comparison-2021-12-27.png)
 
 
 # Speedup for Readdir Returning File Attributes
