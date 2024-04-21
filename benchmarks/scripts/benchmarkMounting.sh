@@ -10,6 +10,14 @@ set -e
 echoerr() { echo "$@" 1>&2; }
 
 
+export PATH=$PWD:$PATH
+
+cat <<"EOF" > dissect
+    target-mount -o modules=subdir,subdir=fs "$@"
+EOF
+chmod u+x dissect
+
+
 # Kinda obsolete parallelized bash version
 # For 1MiB frames, the frequent process spawning for dd and and zstd cost the most of the time!
 # Therefore, use a process pool in python to fix that speed issue.
@@ -103,6 +111,34 @@ if __name__ == '__main__':
             compressedFile.write(results.pop(0).result())
 EOF
 
+
+cat <<"EOF" > fsspec
+#!/usr/bin/env python3
+import os
+import sys
+from fsspec.implementations.tar import TarFileSystem as tafs
+
+daemonize = True
+if '-f' in sys.argv:
+    del sys.argv[sys.argv.index("-f")]
+    daemonize = False
+
+fs = tafs(sys.argv[1])
+print(f"Mount {sys.argv[1]} at {sys.argv[2]}, daemonize: {daemonize}")
+import fsspec.fuse
+
+mountPoint = os.path.abspath(sys.argv[2])
+
+if daemonize:
+    import daemon
+    with daemon.DaemonContext():
+        fsspec.fuse.run(fs, "./", mountPoint)
+else:
+    fsspec.fuse.run(fs, "./", mountPoint)
+EOF
+chmod u+x fsspec
+
+
 function createMultiFrameZstd()
 {
     python3 createMultiFrameZstd.py "$@"
@@ -114,7 +150,7 @@ function benchmarkCommand()
 
     echoerr "Running: ${commandToBenchmark[*]} ..."
 
-    if [[ "${commandToBenchmark[0]}" == 'fuse-archive' ]]; then
+    if [[ "${commandToBenchmark[0]}" == 'fuse-archive' || "${commandToBenchmark[0]}" == 'fsspec' ]]; then
         tmpFile=$( mktemp )
         # We need to keep fuse-archive in foreground until it has finished mounting to get a useful max RSS estimate!
         { /bin/time -f '%e s %M kiB max rss' "${commandToBenchmark[@]}" -f; } 2>&1 1>/dev/null |
@@ -124,19 +160,19 @@ function benchmarkCommand()
         local mountPoint
         mountPoint=${commandToBenchmark[${#commandToBenchmark[@]} -1]}
         while ! command mountpoint -q "$mountPoint"; do sleep 0.1; done
-        stat -- "$mountPoint"  &>/dev/null
+        stat -- "$mountPoint" &>/dev/null
         fusermount -u "$mountPoint"
         for (( i = 0; i < 30; ++i )); do
             if ! mountpoint -q "$mountPoint" && ! ps -p $pid &> /dev/null; then
                 break
             fi
             sleep 1s
-            echoerr "Waiting for mountpoint"
+            echoerr "Waiting for mountpoint to finish"
         done # throw error after timeout?
         rss=$( cat -- "$tmpFile" | sed -r 's|.* s ([0-9]+) kiB.*|\1|' )
         rm "$tmpFile"
 
-        # This also remounted so that we get the mount point!
+        # This also remounts so that we get the mount point!
         duration=$( { /bin/time -f '%e s %M kiB max rss' \
                           bash -c 'fuse-archive "$@" && stat "${@: -1}"' "${commandToBenchmark[@]}"; } 2>&1 1>/dev/null |
                           'grep' 'max rss' )
@@ -219,7 +255,10 @@ function createLargeTar()
     tarFile="tar-with-$nFolders-folders-with-$nFilesPerFolder-files-${nBytesPerFile}B-files.tar"
     # Transform and remove leading dot because fuse-archive had problems with that
     # https://github.com/google/fuse-archive/issues/2
-    benchmarkCommand tar --hard-dereference --dereference --sort=name -c --transform='s|^[.]/||' -C "$tarFolder" -f "$tarFile" --owner=user --group=group .
+    # This is fixed now. And NOW fsspec requires the leading dot for fsspec.fuse to work...
+    # https://github.com/fsspec/filesystem_spec/issues/1568
+    benchmarkCommand tar --hard-dereference --dereference --sort=name -c -C "$tarFolder" -f "$tarFile" \
+        --owner=user --group=group .
     'rm' -rf -- "$tarFolder"
 }
 
@@ -236,7 +275,7 @@ function benchmark()
             break
         fi
         sleep 1s
-        echoerr "Waiting for mountpoint"
+        echoerr "Waiting for mountpoint to appear"
     done # throw error after timeout?
 
     if [[ $nFolders == 1 ]]; then
@@ -356,9 +395,28 @@ for compression in '' '.bz2' '.gz' '.xz' '.zst'; do
     done
 
     if [[ $extendedBenchmarks -eq 1 ]]; then
-        for cmd in archivemount fuse-archive; do
+        # These take DAYS. So, only run these when the benchmark system changed or when there was an update to
+        # these tools, which currently looks unlikely.
+        #for cmd in archivemount fuse-archive; do
+        #    benchmark
+        #done
+
+        # fsspec, same as dissect, does not really work with zstd files:
+        # https://github.com/fsspec/filesystem_spec/issues/1590
+        # However, we can at least time the mounting time and find time.
+        for cmd in fsspec; do
             benchmark
         done
+
+        # For some reason dissect cannot seem to handle Zstandard files. I'm getting among others:
+        # <Target foo.tar.zstd>: Can't identify filesystem: <Volume name=None size=101 fs=None> [dissect.target.target]
+        # which does not appear for bzip2, gzip, and xz files. Also, the mount point is empty, which can be seen
+        # as 0s find times in the benchmarks.
+        if [[ $compression != '.zst' ]]; then
+            for cmd in dissect; do
+                benchmark
+            done
+        fi
 
         # Benchmark decompression and listing with other tools for comparison
         benchmarkCommand tar tvlf "${tarFile}${compression}"

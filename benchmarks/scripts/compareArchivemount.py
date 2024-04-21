@@ -187,6 +187,10 @@ def plot_benchmark(labels, data, ax, command, metric, tools, scalingFactor=1):
                         lines[0].set_linestyle(lineStyles[j])
                         ys = np.append(ys, yToPlot)
 
+    if len(xs) == 0:
+        print(f"[Warning] Found nothing to plot for {tool} {command} {metric}")
+        return
+
     x = 10 ** np.linspace(np.log10(np.min(xs)), np.log10(np.max(xs)))
     y = x
     y = 3 * y / y[-1] * np.max(ys)
@@ -215,9 +219,12 @@ def plot_comparison(fileName):
     availableTools = data.keys()
     tools = [
         'archivemount',
-        'ratarmount -P 24' if 'ratarmount -P 24' in availableTools else 'ratarmount',
+        'ratarmount -P 24' if 'ratarmount -P 24' in availableTools else 'ratarmount' if 'ratarmount' in availableTools else 'ratarmount -P 1',
         'fuse-archive',
+        'fsspec',
+        'dissect',
     ]
+    tools = [tool for tool in tools if tool in availableTools]
 
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(

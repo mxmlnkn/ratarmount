@@ -5,6 +5,40 @@ set -e
 echoerr() { echo "$@" 1>&2; }
 
 
+export PATH=$PWD:$PATH
+
+cat <<"EOF" > dissect
+    target-mount -o modules=subdir,subdir=fs "$@"
+EOF
+chmod u+x dissect
+
+
+cat <<"EOF" > fsspec
+#!/usr/bin/bash
+echo "BASH args: $@"
+nohup python3 -c '
+import sys
+print("Args:", sys.argv)
+from fsspec.implementations.tar import TarFileSystem as tafs
+fs = tafs(sys.argv[1])
+print(f"Mount {sys.argv[1]} at {sys.argv[2]}")
+import fsspec.fuse
+fsspec.fuse.run(fs, "./", sys.argv[2])
+' "$@" &> fsspec.log &
+
+mountFolder=${@: -1}
+while true; do
+    if mountpoint -q "$mountFolder"; then
+        break
+    fi
+    sleep 0.01
+done # throw error after timeout?
+
+ls -la "$mountFolder" &>/dev/null  # Should effectively wait until the mount point is available
+EOF
+chmod u+x fsspec
+
+
 cat <<EOF > createMultiFrameZstd.py
 import concurrent.futures
 import os
