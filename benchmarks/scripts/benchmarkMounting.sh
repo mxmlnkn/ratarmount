@@ -331,9 +331,8 @@ extendedBenchmarks=1
 
 for nFolders in 1 10 100 300 1000 2000; do
 for nBytesPerFile in 0 $(( 64 * 1024 )); do
+tarFile="tar-with-$nFolders-folders-with-$nFilesPerFolder-files-${nBytesPerFile}B-files.tar"
 for compression in '' '.bz2' '.gz' '.xz' '.zst'; do
-    tarFile="tar-with-$nFolders-folders-with-$nFilesPerFolder-files-${nBytesPerFile}B-files.tar"
-
     echoerr ""
     echoerr "Test with tar$compression archive containing $nFolders folders with each $nFilesPerFolder files with each $nBytesPerFile bytes"
 
@@ -392,8 +391,11 @@ for compression in '' '.bz2' '.gz' '.xz' '.zst'; do
     then
         'rm' "${tarFile}${compression}"
     fi
-done
-done
-done
+done  # compression
+
+find . -maxdepth 1 -name "tar-with-$nFolders-folders-with-$nFilesPerFolder-files-${nBytesPerFile}B-files.tar*" -delete
+
+done  # nBytesPerFile
+done  # nFolders
 
 rmdir "$mountFolder"

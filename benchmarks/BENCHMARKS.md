@@ -52,7 +52,8 @@ For simply TAR mounts, it might be possible and performance improving by using t
 
 ![Speedup ratarmount -P 24 over -P 1 for xz backend](plots/parallel-xz-ratarmount-comparison.png)
 
-When using all 24 logical cores (12 physical cores) for the parallel xz decoder based on top of python-xz, the speedup tops out at roughly 10 but drops to 8 for very large archives, which is still a significant improvement upon the serial version.
+When using all 24 logical cores (12 physical cores) for the parallel xz decoder based on top of python-xz, the speedup for larger archives ranges mostly between 11 and 14.
+A speedup roughly equal to the number of physical cores means that the single-core version is already well-optimized so that the simultaneous multi-threading of the CPU is not very effective.
 
 Note that the boundary case of empty files inside the TAR, does not benefit from this because decompression is not the bottleneck but instead creating the SQLite index is.
 
@@ -142,7 +143,6 @@ It has to be explicitly enabled with `-P 0`.
 ![Speedup ratarmount -P 24 over -P 1 for bz2 backend](plots/parallel-bz2-ratarmount-comparison.png)
 
 When using all 24 logical cores for the parallel bz2 decoder in `indexed_bzip2`, the speedup tops out at roughly 12, which seems to coincide with my physical cores.
-However, with only `-P 12`, the speedup will be much smaller than 12! The latter is not shown here but was observed manually.
 
 In general, the parallelization is quite trivial over the bz2 blocks but there might be issues reducing the parallel efficiency like I/O access becoming more random instead of sequential or caches being thrashed.
 
