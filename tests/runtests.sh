@@ -1505,6 +1505,61 @@ checkWriteOverlayWithSymbolicLinks()
 }
 
 
+checkWriteOverlayCommitDelete()
+{
+    local tmpFolder;
+    tmpFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mkdir "$tmpFolder/overlay"
+    TMP_FILES_TO_CLEANUP+=( "$tmpFolder" )
+
+    local archive='single-nested-folder.tar'
+    cp "tests/$archive" "$tmpFolder/"
+    archive="$tmpFolder/$archive"
+    TMP_FILES_TO_CLEANUP+=( "$archive" "$archive.index.sqlite" )
+
+    [[ $( tar -tvlf "$archive" | wc -l ) -eq 2 ]] || returnError "$LINENO" 'Expected two entries in TAR'
+
+    rm -f ratarmount.{stdout,stderr}.log
+
+    local mountFolder="$tmpFolder/mounted"
+    mkdir "$mountFolder"
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+
+    local overlayFolder="$tmpFolder/overlay"
+    TMP_FILES_TO_CLEANUP+=( "$overlayFolder" "$overlayFolder/.ratarmount.overlay.sqlite" )
+
+    local args=( -P "$parallelization" -c --write-overlay "$overlayFolder" "$archive" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}"
+        if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then returnError "$LINENO" 'Expected files in mount point'; fi
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+
+    verifyCheckSum "$mountFolder" 'foo/fighter/ufo' 'tests/single-nested-folder.tar' 2709a3348eb2c52302a7606ecf5860bc ||
+        returnError "$LINENO" 'Mismatching checksum'
+
+    # Delete file
+    'rm' "$mountFolder/foo/fighter/ufo" || returnError "$LINENO" 'Failed to delete ufo file'
+    overlayIndex="$overlayFolder/.ratarmount.overlay.sqlite"
+    [[ -f "$overlayIndex" ]] || returnError "$LINENO" "Expected $overlayIndex to be created"
+
+    funmount "$mountFolder"
+
+    args=( --commit-overlay "${args[@]}" )
+    {
+        echo commit | $RATARMOUNT_CMD "${args[@]}" >ratarmount.stdout.log 2>ratarmount.stderr.log.tmp
+        ! 'grep' -C 5 -Ei '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
+            returnError "$LINENO" "Found warnings while executing: $RATARMOUNT_CMD ${args[*]}"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+
+    tar -tvlf "$archive"
+    [[ $( tar -tvlf "$archive" | wc -l ) -eq 1 ]] || returnError "$LINENO" 'Expected one less entry in TAR'
+
+    cleanup
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully file modifications for overlay files."
+}
+
+
 checkSymbolicLinkRecursion()
 {
     rm -f ratarmount.{stdout,stderr}.log
@@ -1907,6 +1962,7 @@ checkSymbolicLinkRecursion || returnError "$LINENO" 'Symbolic link recursion fai
 checkWriteOverlayWithSymbolicLinks || returnError "$LINENO" 'Write overlay tests with symbolic links failed!'
 checkWriteOverlayWithNewFiles || returnError "$LINENO" 'Write overlay tests failed!'
 checkWriteOverlayWithArchivedFiles || returnError "$LINENO" 'Write overlay tests for archive files failed!'
+checkWriteOverlayCommitDelete || returnError "$LINENO" 'Write overlay committing deletions failed!'
 
 checkTruncated tests/truncated.tar foo/foo 5753d2a2da40d04ad7f3cc7a024b6e90
 

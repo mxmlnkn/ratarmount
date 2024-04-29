@@ -1629,14 +1629,21 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         deletionList = os.path.join(tmpFolder, "deletions.lst")
         appendList = os.path.join(tmpFolder, "append.lst")
 
+        def addToDeletionFile(deletionListFile, pathRelativeToRoot: str):
+            # Delete with and without leading slash because GNU tar matches exactly while
+            # ratarmount does not discern between these two cases.
+            deletionListFile.write(f"{pathRelativeToRoot}\0")
+            deletionListFile.write(f"/{pathRelativeToRoot}\0")
+            deletionListFile.write(f"./{pathRelativeToRoot}\0")
+
         databasePath = os.path.join(args.write_overlay, WritableFolderMountSource.hiddenDatabaseName)
         if os.path.exists(databasePath):
             uriPath = urllib.parse.quote(databasePath)
             sqlConnection = sqlite3.connect(f"file:{uriPath}?mode=ro", uri=True)
 
-            with open(deletionList, 'at', encoding=args.encoding) as file:
+            with open(deletionList, 'at', encoding=args.encoding) as deletionListFile:
                 for path, name in sqlConnection.execute("SELECT path,name FROM files WHERE deleted == 1;"):
-                    file.write(f"{path}/{name}\0")
+                    addToDeletionFile(deletionListFile, f"{path}/{name}".lstrip('/'))
 
         # Delete all files to be replaced with other files
         with open(deletionList, 'at', encoding=args.encoding) as deletionListFile, open(
@@ -1661,13 +1668,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
                     pathRelativeToRoot = f"{dirpath}/{name}".lstrip('/')
                     if pathRelativeToRoot in toBeIgnored:
                         continue
-
-                    # Delete with and without leading slash because GNU tar matches exactly while
-                    # ratarmount does not discern between these two cases.
-                    deletionListFile.write(f"{pathRelativeToRoot}\0")
-                    deletionListFile.write(f"/{pathRelativeToRoot}\0")
-                    deletionListFile.write(f"./{pathRelativeToRoot}\0")
-
+                    addToDeletionFile(deletionListFile, pathRelativeToRoot)
                     appendListFile.write(f"{pathRelativeToRoot}\0")
 
                 # Append empty folders
