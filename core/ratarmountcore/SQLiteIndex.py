@@ -949,10 +949,10 @@ class SQLiteIndex:
                 if indexVersion:
                     indexVersionTuple = _toVersionTuple(indexVersion)
                     indexAPIVersionTuple = _toVersionTuple(SQLiteIndex.__version__)
-                if indexVersionTuple and indexAPIVersionTuple and indexVersionTuple > indexAPIVersionTuple:
-                    print("[Warning] The loaded index was created with a newer version of ratarmount.")
-                    print("[Warning] If there are any problems, please update ratarmount or recreate the index")
-                    print("[Warning] with this ratarmount version using the --recreate-index option!")
+                    if indexVersionTuple and indexAPIVersionTuple and indexVersionTuple > indexAPIVersionTuple:
+                        print("[Warning] The loaded index was created with a newer version of ratarmount.")
+                        print("[Warning] If there are any problems, please update ratarmount or recreate the index")
+                        print("[Warning] with this ratarmount version using the --recreate-index option!")
             except Exception:
                 pass
 
