@@ -1037,6 +1037,7 @@ class SQLiteIndex:
                 print("[Warning] the block offsets. Subsequent loads might be slow.")
                 return
 
+            table_name = ''
             if compression == 'bz2':
                 table_name = 'bzip2blocks'
             elif compression == 'zst':
