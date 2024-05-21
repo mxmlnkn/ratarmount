@@ -401,8 +401,8 @@ class _TarFileMetadataReader:
                         print("[Warning] Please call ratarmount with the --gnu-incremental flag if there are problems.")
                         print()
 
-            tarBlocks.append(offset)
-            processedFiles += 1
+                tarBlocks.append(offset)
+                processedFiles += 1
 
             if len(tarBlocks) >= 10000 or (result is None and len(tarBlocks) > 0):
                 if result is None:
