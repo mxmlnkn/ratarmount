@@ -218,7 +218,12 @@ class IterableArchive:
         laffi.get_read_filter_function('all')(self._archive)
 
         for formatToEnable in IterableArchive.ENABLED_FORMATS if allowArchives else ['raw']:
-            laffi.get_read_format_function(formatToEnable)(self._archive)
+            try:
+                laffi.get_read_format_function(formatToEnable)(self._archive)
+            except ValueError as exception:
+                # Ignore exceptions from formats that are not supported such as "rar5" in manylinux2014.
+                if self.printDebug >= 3:
+                    print(f"[Warning] Failed to enable format {formatToEnable} because of: {exception}")
 
         if isinstance(self._file, str):
             laffi.read_open_filename_w(self._archive, self._file, os.stat(self._file).st_blksize)
