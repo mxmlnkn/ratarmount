@@ -24,8 +24,16 @@ from typing import Any, Callable, Dict, Iterable, IO, List, Optional, Tuple, Uni
 
 try:
     import fuse
-except ImportError:
-    import fusepy as fuse
+except (ImportError, OSError) as fuseException:
+    try:
+        import fusepy as fuse
+    except ImportError as fusepyException:
+        print("[Error] Did not find any FUSE installation. Please install it, e.g., with:")
+        print("[Error]  - apt install libfuse2")
+        print("[Error]  - yum install fuse fuse-libs")
+        print("[Error] Exception for fuse:", fuseException)
+        print("[Error] Exception for fusepy:", fusepyException)
+        sys.exit(1)
 
 
 try:
