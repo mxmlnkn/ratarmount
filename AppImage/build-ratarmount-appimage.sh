@@ -3,6 +3,12 @@
 # E.g., run this script inside the manylinux2014 container and mount the whole ratarmount git root:
 #   docker run -v$PWD:/project -it quay.io/pypa/manylinux2014_x86_64 bash
 #   cd /project/AppImage && ./build-ratarmount-appimage.sh
+# Should be built in the same manylinux container as used for the AppImage, or else the libarchive
+# from the surrounding system is mixed with an incompatible liblzma from the Python AppImage, resulting in:
+#     OSError: /tmp/.mount_ratarmlSdCvH/usr/lib/liblzma.so.5: version `XZ_5.2' not found
+#     (required by /tmp/.mount_ratarmlSdCvH/usr/lib/libarchive.so.13)
+# Then again, this error can be fixed by calling linxdeploy explicitly with liblzma.so.
+
 
 function commandExists()
 {
@@ -16,7 +22,8 @@ function installSystemRequirements()
     yum -y install epel-release
     # We need to isntall development dependencies to build Python packages from source and we also need
     # to install libraries such as libarchive in order to copy them into the AppImage.
-    yum install -y fuse fakeroot patchelf fuse-libs libsqlite3x strace desktop-file-utils libzstd-devel libarchive lzop
+    yum install -y fuse fakeroot patchelf fuse-libs libsqlite3x strace desktop-file-utils libzstd-devel \
+        libarchive libarchive-devel lzop
 }
 
 function installAppImageTools()
@@ -88,15 +95,27 @@ function installAppImageSystemLibraries()
     if commandExists repoquery; then
         libraries+=( $( repoquery -l fuse-libs | 'grep' 'lib64.*[.]so' ) )
         libraries+=( $( repoquery -l libarchive | 'grep' 'lib64.*[.]so' ) )
+        libraries+=( $( repoquery -l libarchive-devel | 'grep' 'lib64.*[.]so' ) )
+        libraries+=( $( repoquery -l xz-devel | 'grep' 'lib64.*[.]so' ) )
     elif commandExists dnf; then
         libraries+=( $( dnf repoquery -l fuse-libs | 'grep' 'lib64.*[.]so' ) )
         libraries+=( $( dnf repoquery -l libarchive | 'grep' 'lib64.*[.]so' ) )
+        libraries+=( $( dnf repoquery -l libarchive-devel | 'grep' 'lib64.*[.]so' ) )
+        libraries+=( $( dnf repoquery -l xz-devel | 'grep' 'lib64.*[.]so' ) )
     elif commandExists dpkg; then
         libraries+=( $( dpkg -L libfuse2 | 'grep' '/lib.*[.]so' ) )
-        libraries+=( $( dpkg -L libarchive | 'grep' '/lib.*[.]so' ) )
+        libraries+=( $( dpkg -L libarchive13 | 'grep' '/lib.*[.]so' ) )
+        libraries+=( $( dpkg -L libarchive-dev | 'grep' '/lib.*[.]so' ) )
+        libraries+=( $( dpkg -L liblzma5 | 'grep' '/lib.*[.]so' ) )
     else
         echo -e "\e[31mCannot gather FUSE libs into AppImage without (dnf) repoquery.\e[0m"
     fi
+
+    # For some reason, the simple libarchive.so file without any version suffix is only installed with the development
+    # packages! For yet another reason ctypes.util.find_library does not find libarchive.so.13 if libarchive.so
+    # does not # exist in the AppDir. However, when only libarchive.so.13 exists in the system location, it DOES
+    # find it even when libarchive.so does not exist -.-. It's really weird.
+    # https://github.com/Changaco/python-libarchive-c/issues/128
 
     echo "Bundle libraries:"
     printf '    %s\n' "${libraries[@]}"
