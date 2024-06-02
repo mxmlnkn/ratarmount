@@ -314,8 +314,8 @@ class RawJoinedFileFromFactory(io.RawIOBase):
         elif whence == io.SEEK_SET:
             self.offset = offset
 
-        if self.offset < 0:
-            raise ValueError("Trying to seek before the start of the file!")
+        # Same behavior for seeking before the file begin and after the file end as io.BytesIO.
+        self.offset = max(self.offset, 0)
         if self.offset >= self.cumsizes[-1]:
             return self.offset
 
