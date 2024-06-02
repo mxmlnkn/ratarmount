@@ -145,7 +145,7 @@ These should be preinstalled on most systems.
 On Debian-like systems like Ubuntu, you can install/update all dependencies using:
 
 ```bash
-sudo apt install python3 python3-pip fuse sqlite3 unar
+sudo apt install python3 python3-pip fuse sqlite3 unar libarchive13 lzop
 ```
 
 On macOS, you have to install [macFUSE](https://osxfuse.github.io/) with:
