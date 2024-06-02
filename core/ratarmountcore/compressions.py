@@ -63,7 +63,7 @@ else:
 
 try:
     import libarchive
-except ImportError:
+except (ImportError, AttributeError):
     libarchive = None
 
 

@@ -24,7 +24,7 @@ try:
     # Use the FFI directly because the higher-level interface does not work sufficiently for our use case.
     import libarchive.ffi as laffi
     from libarchive.exception import ArchiveError
-except ImportError:
+except (ImportError, AttributeError):
     pass
 
 
@@ -163,13 +163,15 @@ class IterableArchive:
     # Read formats list supported by python-libarchive-c:
     #   '7zip', 'all', 'ar', 'cab', 'cpio', 'empty', 'iso9660', 'lha', 'mtree',
     #   'rar', 'raw', 'tar', 'xar', 'zip', 'warc'
-    # We especially do not want mtree because it has not magic bytes and basically matches anything with newlines,
+    # We especially do not want mtree because it has no magic bytes and basically matches anything with newlines,
     # including some test text files. 'raw', 'empty', and 'all' are special input formats.
     # It seems that 'raw' cannot be combined in an or-manner. It disables all archive format recognitions and only
     # applies the filters.
     # https://github.com/libarchive/libarchive/wiki/FormatRaw#caveat-dont-mix-_raw_-with-other-handlers
     # > aveat: Don't mix _raw_ with other handlers
     # > If you are using the raw handler, you should generally not enable any other handler
+    # Note that the lz4 and zstd filters are not available in the manylinux2014 container (CentOS Linux
+    # release 7.9.2009 (Core))
     ENABLED_FORMATS = ['7zip', 'ar', 'cab', 'cpio', 'iso9660', 'lha', 'rar', 'rar5', 'tar', 'xar', 'warc', 'zip']
 
     def __init__(

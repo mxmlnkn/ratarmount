@@ -917,6 +917,13 @@ def checkInputFileType(
             if printDebug >= 2:
                 print(f"Archive '{tarFile}' (compression: {compression}) can't be opened!")
 
+            if printDebug >= 1:
+                print("[Info] Supported compressions:", list(supportedCompressions.keys()))
+                if 'deb' not in supportedCompressions:
+                    print("[Warning] It seems that the libarchive backend is not available. Try installing it with:")
+                    print("[Warning]  - apt install libarchive13")
+                    print("[Warning]  - yum install libarchive")
+
             raise argparse.ArgumentTypeError(f"Archive '{tarFile}' can't be opened!")
 
     if not findAvailableOpen(compression):
