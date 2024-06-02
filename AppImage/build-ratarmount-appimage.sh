@@ -26,7 +26,7 @@ function installAppImageTools()
     toolName='appimagetool'
     if [[ ! -x $toolName ]]; then
         curl -L -o "$toolName" \
-            "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-$platform.AppImage"
+            "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$platform.AppImage"
         chmod u+x "$toolName"
     fi
 
@@ -244,7 +244,96 @@ trimAppImage
 echo "Create AppImage from Modified AppDir"
 # times and sizes for ratarmount.AppImage --help on T14: --comp gzip: 1.6s, 12.50 MB, --comp xz: 3.0s, 12.88 MB
 # times and sizes for ratarmount.AppImage --help on Ryzen 3900X: --comp gzip: 1.2s, 15.09 MB, --comp xz: 2.2s, 14.59 MB
-APPIMAGE_EXTRACT_AND_RUN=1 ARCH="$APPIMAGE_ARCH" appimagetool --comp gzip --no-appstream "$APP_BASE".App{Dir,Image}
+# times for ratarmount --help without AppImage on Ryzen 3900X: 0.155s
+APPIMAGE_EXTRACT_AND_RUN=1 ARCH="$APPIMAGE_ARCH" appimagetool \
+    --comp zstd --mksquashfs-opt -Xcompression-level --mksquashfs-opt 22 \
+    --mksquashfs-opt -b --mksquashfs-opt 256K --no-appstream "$APP_BASE".App{Dir,Image}
+
+# Zstd benchmarks (new appimagetool implementations seem to be unable to use anything else -.-)
+#   Installed:               0.123 | 0.1467 +- 0.0005 | 0.165
+#   Extracted AppRun:        0.298 | 0.396  +- 0.0016 | 0.448  Surprisingly slow
+#   No comp : Size: 78922048 0.714 | 0.7453 +- 0.0008 | 0.802  Kinda surprising that uncompressed has this overhead
+#   Level  1: Size: 30843200 0.951 | 1.24   +- 0.004  | 1.346
+#   Level  2: Size: 29430080 1.033 | 1.294  +- 0.004  | 1.393  v 5% slower
+#   Level  3: Size: 28348736 1.018 | 1.25   +- 0.004  | 1.417
+#   Level  4: Size: 28184896 1.075 | 1.276  +- 0.003  | 1.397
+#   Level  5: Size: 27468096 0.968 | 1.242  +- 0.005  | 1.435
+#   Level  6: Size: 27050304 1.063 | 1.261  +- 0.0029 | 1.409
+#   Level  7: Size: 26939712 1.019 | 1.243  +- 0.003  | 1.371
+#   Level  8: Size: 26849600 1.032 | 1.221  +- 0.005  | 1.425
+#   Level  9: Size: 26837312 1.063 | 1.251  +- 0.003  | 1.359
+#   Level 10: Size: 26784064 1.001 | 1.214  +- 0.003  | 1.346
+#   Level 11: Size: 26747200 1.063 | 1.2446 +- 0.0027 | 1.345
+#   Level 12: Size: 26747200 1.045 | 1.224  +- 0.004  | 1.367
+#   Level 13: Size: 26681664 1.138 | 1.2473 +- 0.0030 | 1.377
+#   Level 14: Size: 26644800 1.102 | 1.23   +- 0.004  | 1.378
+#   Level 15: Size: 26632512 0.999 | 1.2543 +- 0.0026 | 1.356
+#   Level 16: Size: 25538880 1.187 | 1.3058 +- 0.0023 | 1.41   v 10% slower
+#   Level 17: Size: 25055552 1.099 | 1.275  +- 0.004  | 1.452
+#   Level 18: Size: 23929152 1.102 | 1.336  +- 0.004  | 1.51
+#   Level 19: Size: 23896384 1.231 | 1.3236 +- 0.0024 | 1.452
+#   Level 20: Size: 23896384 1.112 | 1.306  +- 0.004  | 1.435
+#   Level 21: Size: 23892288 1.093 | 1.366  +- 0.004  | 1.506
+#   Level 22: Size: 23892288 1.17  | 1.365  +- 0.003  | 1.478
+#   gzip    : Size: 27899072 0.834 | 1.0063 +- 0.0025 | 1.089  v 25-35% faster than zstd!
+#   ratarmount-0.15.0-x86_64.AppImage
+#             Size: 14804160 0.878 | 0.9857 +- 0.0021 | 1.06
+#
+# - The old gzip compression is almost 28% faster! But
+# - Levels with no size difference: 21/22, 19/20, 11/12
+# - The improvement of level 22 over level 19 or even level 18 is also miniscule.
+# - Level 17->18 was the last larger size improvement (-4.5%).
+# - Level 18->19: -0.14%
+# - Levels 2-15 are mostly equally fast looking at the minimum, average, and maximum
+#   The fastest speed for Level 1 could be said to be 10% faster but it only affects the average by 5%
+#   Levels 16-22 are roughly 10% slower for the minimum, average, and maximum
+# - Compression level doesn't seem to implact decompression time much, so simply use the highest setting.
+# - Only block sizes between 4 KiB and 1 MiB are allowed:
+#   mksquashfs: -b block size not power of two or not between 4096 and 1Mbyte
+#   I don't know what kind of default settings appimagetool uses. It seems to result in one single block,
+#   else I can't explain why it takes 3-6x as long to mount and hast 5% smaller size even compared to the
+#   largest block size of 1 MiB!
+#
+#   Level 15: Block Size:   4K Size: 33308992 0.295 | 0.3698 +- 0.0016 | 0.433 -> slower and larger! not worht it
+#   Level 15: Block Size:  16K Size: 30462272 0.236 | 0.2909 +- 0.0013 | 0.33
+#   Level 15: Block Size:  32K Size: 29618496 0.241 | 0.3074 +- 0.0012 | 0.343
+#   Level 15: Block Size:  64K Size: 28856640 0.246 | 0.3124 +- 0.0012 | 0.35
+#   Level 15: Block Size: 128K Size: 27685184 0.286 | 0.3534 +- 0.0016 | 0.412
+#   Level 15: Block Size: 256K Size: 26841408 0.335 | 0.4066 +- 0.0014 | 0.456
+#   Level 15: Block Size: 512K Size: 28815680 0.362 | 0.4342 +- 0.0014 | 0.50  -> larger and slower!?
+#   Level 15: Block Size:   1M Size: 28164416 0.476 | 0.5389 +- 0.0016 | 0.654
+#
+#   Level 22: Block Size:   4K Size: 33190208 0.30  | 0.3803 +- 0.0016 | 0.453
+#   Level 22: Block Size:  16K Size: 30310720 0.257 | 0.3048 +- 0.0009 | 0.337
+#   Level 22: Block Size:  32K Size: 29299008 0.245 | 0.3172 +- 0.0012 | 0.353
+#   Level 22: Block Size:  64K Size: 28569920 0.258 | 0.3204 +- 0.0013 | 0.363
+#   Level 22: Block Size: 128K Size: 27414848 0.267 | 0.327  +- 0.0014 | 0.393
+#   Level 22: Block Size: 256K Size: 26616128 0.327 | 0.3952 +- 0.0014 | 0.47  -> seems like an okayish tradeoff
+#   Level 22: Block Size: 512K Size: 25882944 0.416 | 0.4762 +- 0.0016 | 0.537
+#   Level 22: Block Size:   1M Size: 25313600 0.565 | 0.6092 +- 0.0013 | 0.677 -> still faster than gzip or any zstd!
+#
+# - 256K block size doesn't even have much of a speed difference between level 15 and 22.
+#
+# result="$APP_BASE.uncompressed.AppImage"
+# appimagetool --mksquashfs-opt -noI --mksquashfs-opt -noId --mksquashfs-opt -noD --mksquashfs-opt -noF \
+#     --mksquashfs-opt -noX  --no-appstream "$APP_BASE.AppDir" "$result" &>/dev/null
+# for level in $( seq 1 22 ); do
+#     result="$APP_BASE.zstd.$level.AppImage"
+#     appimagetool --comp zstd --mksquashfs-opt -Xcompression-level --mksquashfs-opt "$level" --no-appstream \
+#         "$APP_BASE.AppDir" "$result" &>/dev/null
+#     times=$( for i in $( seq 25 ); do ( time "./$result" --help ) 2>&1 | sed -nr 's/^real.*0m([0-9.]+)s/\1/p'; done )
+#     printf "Level %i: Size: %i %s\n" "$level" "$( stat -c %s "$result" )" "$( uncertainValue $times )"
+# done
+# for level in 15 22; do
+# for blockSize in 4K 16K 32K 64K 128K 256K 512K 1M; do
+#     result="$APP_BASE.zstd.$level.blocksize.$blockSize.AppImage"
+#     appimagetool --comp zstd --mksquashfs-opt -Xcompression-level --mksquashfs-opt "$level" --no-appstream \
+#         --mksquashfs-opt -b --mksquashfs-opt "$blockSize" "$APP_BASE.AppDir" "$result" &>/dev/null
+#     times=$( for i in $( seq 25 ); do ( time "./$result" --help ) 2>&1 | sed -nr 's/^real.*0m([0-9.]+)s/\1/p'; done )
+#     printf "Level %i: Block Size: %s Size: %i %s\n" "$level" "$blockSize" "$( stat -c %s "$result" )" \
+#            "$( uncertainValue $times )"
+# done
+# done
 
 chmod u+x "$APP_BASE.AppImage"
 version=$( ./"$APP_BASE.AppImage" --version | sed -n -E 's|ratarmount ([0-9.]+)|\1|p' &>/dev/null )
