@@ -1,4 +1,11 @@
 
+# Version 0.7.1 built on 2024-06-02
+
+ - Fix the missing indentation for the index version check.
+ - Make `--help` and `--version` work even if `libarchive.so` is not installed.
+ - Fix `LibarchiveMountSource` compatibility issues with older libarchive versions.
+ - Fix the exception in `StenciledFile` when seeking before the file start.
+
 # Version 0.7.0 built on 2024-04-07
 
  - Add libarchive backend and detection support for:
