@@ -309,7 +309,16 @@ class WritableFolderMountSource(fuse.Operations):
 
     @overrides(fuse.Operations)
     def chown(self, path, uid, gid):
-        self._setFileMetadata(path, lambda p: os.chown(p, uid, gid), {'uid': uid, 'gid': gid})
+        data = {}
+        if uid != -1:
+            data['uid'] = uid
+        if gid != -1:
+            data['gid'] = gid
+        # os.chown
+        # > Change the owner and group id of path to the numeric uid and gid. To leave one of the ids unchanged,
+        # > set it to -1.
+        # No reason to change the file owner in the overlay folder, which may often not even be possible.
+        self._setFileMetadata(path, lambda p: None, data)
 
     @overrides(fuse.Operations)
     def utimens(self, path, times=None):
