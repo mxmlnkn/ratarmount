@@ -262,7 +262,7 @@ class WritableFolderMountSource(fuse.Operations):
         folder, name = self._splitPath(path)
 
         existsInMetadata = self.sqlConnection.execute(
-            'SELECT COUNT(*) > 1 FROM "files" WHERE "path" == (?) and "name" == (?)', (folder, name)
+            'SELECT COUNT(*) > 0 FROM "files" WHERE "path" == (?) and "name" == (?)', (folder, name)
         ).fetchone()[0]
 
         if not existsInMetadata:
