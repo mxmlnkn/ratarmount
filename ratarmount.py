@@ -292,11 +292,11 @@ class WritableFolderMountSource(fuse.Operations):
         return FileInfo(
             # fmt: off
             size     = fileInfo.size,
-            mtime    = row['mtime'] if row['mtime'] else fileInfo.mtime,
-            mode     = row['mode'] if row['mode'] else fileInfo.mode,
+            mtime    = row['mtime'] if row['mtime'] is not None else fileInfo.mtime,
+            mode     = row['mode'] if row['mode'] is not None else fileInfo.mode,
             linkname = fileInfo.linkname,
-            uid      = row['uid'] if row['uid'] else fileInfo.uid,
-            gid      = row['gid'] if row['gid'] else fileInfo.gid,
+            uid      = row['uid'] if row['uid'] is not None else fileInfo.uid,
+            gid      = row['gid'] if row['gid'] is not None else fileInfo.gid,
             userdata = fileInfo.userdata,
             # fmt: on
         )
