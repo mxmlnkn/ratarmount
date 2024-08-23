@@ -105,7 +105,7 @@ class UnionMountSource(MountSource):
     @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         if path == '/':
-            return self.rootFileInfo
+            return self.rootFileInfo.clone()
 
         if path in self.folderCache:
             # This case might be triggered when path is a folder

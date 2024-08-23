@@ -12,7 +12,7 @@ from typing import Dict, IO, Iterable, List, Optional, Tuple, Union
 from .compressions import stripSuffixFromTarFile
 from .factory import openMountSource
 from .FolderMountSource import FolderMountSource
-from .MountSource import FileInfo, MountSource, createRootFileInfo
+from .MountSource import FileInfo, MountSource
 from .SQLiteIndexedTar import SQLiteIndexedTar, SQLiteIndexedTarUserData
 from .utils import overrides
 
@@ -38,7 +38,9 @@ class AutoMountLayer(MountSource):
         self.lazyMounting: bool = self.options.get('lazyMounting', False)
         self.printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
 
-        rootFileInfo = createRootFileInfo(userdata=['/'])
+        rootFileInfo = mountSource.getFileInfo('/')
+        assert rootFileInfo
+        rootFileInfo.userdata.append('/')
 
         # Mount points are specified without trailing slash and with leading slash
         # representing root of this mount source.
@@ -235,7 +237,7 @@ class AutoMountLayer(MountSource):
         fileVersions = self.fileVersions(path)
         fileVersion = normalizeFileVersion(fileVersion, fileVersions)
         if fileVersion == 0 and pathInMountPoint == '/':
-            return mountInfo.rootFileInfo
+            return mountInfo.rootFileInfo.clone()
 
         if fileVersions <= 1 or pathInMountPoint != '/' or fileVersion == 0 or fileVersion > originalFileVersions:
             fileInfo = mountInfo.mountSource.getFileInfo(pathInMountPoint, fileVersion - originalFileVersions)
