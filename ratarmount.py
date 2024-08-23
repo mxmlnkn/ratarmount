@@ -612,8 +612,6 @@ class FuseMount(fuse.Operations):
 
         self.mountSource = FileVersionLayer(self.mountSource)
 
-        self.rootFileInfo = FuseMount._makeMountPointFileInfoFromStats(os.stat(pathToMount[0]))
-
         # Maps handles to either opened I/O objects or os module file handles for the writeOverlay and the open flags.
         self.openedFiles: Dict[int, Tuple[int, Union[IO[bytes], int]]] = {}
         self.lastFileHandle: int = 0  # It will be incremented before being returned. It can't hurt to never return 0.
@@ -671,32 +669,6 @@ class FuseMount(fuse.Operations):
         self.lastFileHandle += 1
         self.openedFiles[self.lastFileHandle] = (flags, handle)
         return self.lastFileHandle
-
-    @staticmethod
-    def _makeMountPointFileInfoFromStats(stats: os.stat_result) -> FileInfo:
-        # make the mount point read only and executable if readable, i.e., allow directory listing
-        # clear higher bits like S_IFREG and set the directory bit instead
-        mountMode = (
-            (stats.st_mode & 0o777)
-            | stat.S_IFDIR
-            | (stat.S_IXUSR if stats.st_mode & stat.S_IRUSR != 0 else 0)
-            | (stat.S_IXGRP if stats.st_mode & stat.S_IRGRP != 0 else 0)
-            | (stat.S_IXOTH if stats.st_mode & stat.S_IROTH != 0 else 0)
-        )
-
-        fileInfo = FileInfo(
-            # fmt: off
-            size     = stats.st_size,
-            mtime    = stats.st_mtime,
-            mode     = mountMode,
-            linkname = "",
-            uid      = stats.st_uid,
-            gid      = stats.st_gid,
-            userdata = [],
-            # fmt: on
-        )
-
-        return fileInfo
 
     def _getFileInfo(self, path: str) -> FileInfo:
         if self.writeOverlay and self.writeOverlay.isDeleted(path):
