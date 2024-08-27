@@ -103,7 +103,7 @@ if not _libfuse_path:
         _libiconv = ctypes.CDLL(find_library('iconv'), ctypes.RTLD_GLOBAL)
 
         _libfuse_path = (find_library('fuse4x') or find_library('osxfuse') or
-                         find_library('fuse'))
+                         find_library('fuse') or find_library('fuse-t'))
     elif _system == 'Windows':
         try:
             import _winreg as reg
