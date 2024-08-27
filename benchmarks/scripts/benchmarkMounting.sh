@@ -174,8 +174,8 @@ function benchmarkCommand()
 
         # This also remounts so that we get the mount point!
         duration=$( { /bin/time -f '%e s %M kiB max rss' \
-                          bash -c 'fuse-archive "$@" && stat "${@: -1}"' "${commandToBenchmark[@]}"; } 2>&1 1>/dev/null |
-                          'grep' 'max rss' )
+                          bash -c "${commandToBenchmark[0]}"' "$@" && stat "${@: -1}"' "${commandToBenchmark[@]}"; } \
+                          2>&1 1>/dev/null | 'grep' 'max rss' )
 
         echoerr "Command took ${duration%% s *} s and $rss kiB"
     else
@@ -278,6 +278,10 @@ function benchmark()
         echoerr "Waiting for mountpoint to appear"
     done # throw error after timeout?
 
+    # Benchmark find first because the cat benchmark crashes fsspec with zstd files.
+    benchmarkCommand find "$mountFolder"
+    #benchmarkCommand find "$mountFolder" -type f -exec crc32 {} \;
+
     if [[ $nFolders == 1 ]]; then
         nFoldersTests=1
         nFilesTest=10
@@ -304,10 +308,8 @@ function benchmark()
     done
     done
 
-    benchmarkCommand find "$mountFolder"
-    #benchmarkCommand find "$mountFolder" -type f -exec crc32 {} \;
-
-    fusermount -u "$mountFolder"
+    # The cat tests are known to crash fsspec, which means the mount point can already be vanished at this point.
+    fusermount -u "$mountFolder" || true
 
     echoerr
 }
@@ -390,9 +392,9 @@ for compression in '' '.bz2' '.gz' '.xz' '.zst'; do
         esac
     fi
 
-    for cmd in "ratarmount -P $( nproc )"; do
-        benchmark
-    done
+    #for cmd in "ratarmount -P $( nproc )"; do
+    #    benchmark
+    #done
 
     if [[ $extendedBenchmarks -eq 1 ]]; then
         # These take DAYS. So, only run these when the benchmark system changed or when there was an update to
@@ -439,8 +441,8 @@ for compression in '' '.bz2' '.gz' '.xz' '.zst'; do
         esac
 
         # Benchmark single-core version of anything that is parallelized
-        cmd="ratarmount -P 1"
-        benchmark
+        #cmd="ratarmount -P 1"
+        #benchmark
     fi
 
     # I don't have enough free space on my SSD to keep 4x 100GB large files around

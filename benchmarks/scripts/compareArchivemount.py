@@ -9,7 +9,8 @@ import pandas as pd
 from matplotlib.lines import Line2D
 
 lineStyles = ['-', ':', (0, (1, 7)), (0, (4, 3, 1, 3)), '--']
-colors = ['tab:blue', 'tab:red', 'tab:purple', 'r']  # https://matplotlib.org/3.1.1/_images/dflt_style_changes-1.png
+# https://matplotlib.org/3.1.1/_images/dflt_style_changes-1.png
+colors = ['tab:red', 'tab:green', 'tab:blue', 'tab:purple', 'tab:orange']
 markers = ['+', 'o', '*', 'x']
 
 
@@ -103,10 +104,12 @@ def load_data(fileName, filteredFileSizes = None):
 
 
 def plot_benchmark(labels, data, ax, command, metric, tools, scalingFactor=1):
-    compressions = None
     fileSizes = None
     xs = np.array([])
     ys = np.array([])
+
+    nextCompressionIndex = 0
+    compressionToIndex = {}
 
     for i, tool in enumerate(tools):
         # Push ratarmount lines to front because that is what is of interest
@@ -120,16 +123,14 @@ def plot_benchmark(labels, data, ax, command, metric, tools, scalingFactor=1):
             print(f"[Warning] Did not find command '{command}' in data[{tool}]!")
             continue
 
-        if compressions is None:
-            compressions = sorted(data[tool][command].keys())
-        else:
-            if compressions != sorted(data[tool][command].keys()):
-                print("[Warning] Expected same set of compressions for all other parameters but got:")
-                print("[Warning]", compressions, "!=", sorted(data[tool][command].keys()))
-                print("[Warning] Cannot plot data for:", labels, tool, command, metric)
-                continue
+        compressions = sorted(data[tool][command].keys())
+        for compression in compressions:
+            if compression not in compressionToIndex:
+                compressionToIndex[compression] = nextCompressionIndex
+                nextCompressionIndex += 1
 
-        for j, compression in enumerate(compressions):
+        for compression in compressions:
+            j = compressionToIndex[compression]
             values = data[tool][command][compression]
 
             bytesPerFile = values[labels.index("nBytesPerFile")]
@@ -165,6 +166,9 @@ def plot_benchmark(labels, data, ax, command, metric, tools, scalingFactor=1):
                     ymin = np.array([np.min(y[x == xi]) for xi in xu])
                     ymax = np.array([np.max(y[x == xi]) for xi in xu])
 
+                    # ymedian? ymin? ymax? ymean?
+                    yToPlot = ymax if command == 'mount' else ymedian
+
                     if False:  # command == 'cat':
                         lines = ax.errorbar(
                             xu,
@@ -179,8 +183,6 @@ def plot_benchmark(labels, data, ax, command, metric, tools, scalingFactor=1):
                         lines[-1][0].set_linestyle(lineStyles[j])
                         ys = np.append(ymean, yToPlot)
                     else:
-                        # ymedian? ymin? ymax? ymean?
-                        yToPlot = ymax if command == 'mount' else ymedian
                         lines = ax.plot(
                             xu, yToPlot, linestyle=lineStyles[j], color=colors[i], marker=markers[k], zorder=zorder
                         )
@@ -198,7 +200,7 @@ def plot_benchmark(labels, data, ax, command, metric, tools, scalingFactor=1):
 
     for i, tool in enumerate(tools):
         ax.plot([None], [None], color=colors[i], label=tool)
-    for j, compression in enumerate(compressions):
+    for compression, j in compressionToIndex.items():
         ax.plot([None], [None], linestyle=lineStyles[j], color='0.5', label=compression)
     for k, nBytesPerFile in enumerate(fileSizes):
         ax.plot(
