@@ -1,22 +1,45 @@
-tests/*.tar*
-benchmarks/data/**/*.png
-benchmarks/**/*.tar
 *.txt
-knowledge
-/*zst
 *.diff
+benchmarks/data/**/*.png
+knowledge
 worktrees
 indexed*/
 miscellaneous/
-ratarmount++/
 *mimi*
 *momo*
 presentation/
+test-scripts/
+issue*
+notes
+
+# Related other git repositories
+/fusepy/
+/ratarmount++/
+/nix/
+/staged-recipes/
+/aur/
+
+# AppImage tooling and temporary files
 *.AppImage
 *.AppDir/
+squashfs-root/
 appimagetool
 linuxdeploy
 
+# Normally, do not commit archives. Exceptions are tests. These can be added with git add -f
+*.bz2
+*.lz4
+*.gz
+*.xz
+*.zst
+*.zstd
+*.rar
+*.zip
+*.tar
+*.snap
+*.squashfs
+*.tmp
+*.[0-9]
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
