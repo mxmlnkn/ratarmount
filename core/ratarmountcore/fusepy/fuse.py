@@ -37,7 +37,7 @@ from ctypes import (
 )
 from ctypes.util import find_library
 from platform import machine, system
-from signal import signal, SIGINT, SIG_DFL
+from signal import signal, SIGINT, SIG_DFL, SIGTERM
 from stat import S_IFDIR
 from traceback import print_exc
 
@@ -85,6 +85,10 @@ if _system == 'Windows' or _system.startswith('CYGWIN'):
 if _system == 'Windows' or _system.startswith('CYGWIN'):
     class c_timespec(ctypes.Structure):
         _fields_ = [('tv_sec', c_win_long), ('tv_nsec', c_win_long)]
+elif _system == 'OpenBSD':
+    c_time_t = ctypes.c_int64
+    class c_timespec(ctypes.Structure):
+        _fields_ = [('tv_sec', c_time_t), ('tv_nsec', ctypes.c_long)]
 else:
     class c_timespec(ctypes.Structure):
         _fields_ = [('tv_sec', ctypes.c_long), ('tv_nsec', ctypes.c_long)]
@@ -392,6 +396,45 @@ elif _system == 'Windows' or _system.startswith('CYGWIN'):
         ('st_blksize', ctypes.c_int),
         ('st_blocks', ctypes.c_longlong),
         ('st_birthtimespec', c_timespec)]
+elif _system == 'OpenBSD':
+    ENOTSUP = 91
+    c_dev_t = ctypes.c_int32
+    c_uid_t = ctypes.c_uint32
+    c_gid_t = ctypes.c_uint32
+    c_mode_t = ctypes.c_uint32
+    c_off_t = ctypes.c_int64
+    c_pid_t = ctypes.c_int32
+    c_ino_t = ctypes.c_uint64
+    c_nlink_t = ctypes.c_uint32
+    c_blkcnt_t = ctypes.c_int64
+    c_blksize_t = ctypes.c_int32
+    setxattr_t = ctypes.CFUNCTYPE(
+        ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p,
+        ctypes.POINTER(ctypes.c_byte), ctypes.c_size_t, ctypes.c_int)
+    getxattr_t = ctypes.CFUNCTYPE(
+        ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p,
+        ctypes.POINTER(ctypes.c_byte),
+        ctypes.c_size_t)
+    c_fsblkcnt_t = ctypes.c_uint64
+    c_fsfilcnt_t = ctypes.c_uint64
+    c_stat._fields_ = [
+        ('st_mode', c_mode_t),
+        ('st_dev', c_dev_t),
+        ('st_ino', c_ino_t),
+        ('st_nlink', c_nlink_t),
+        ('st_uid', c_uid_t),
+        ('st_gid', c_gid_t),
+        ('st_rdev', c_dev_t),
+        ('st_atimespec', c_timespec),
+        ('st_mtimespec', c_timespec),
+        ('st_ctimespec', c_timespec),
+        ('st_size', c_off_t),
+        ('st_blocks', c_blkcnt_t),
+        ('st_blksize', c_blksize_t),
+        ('st_flags', ctypes.c_uint32),
+        ('st_gen', ctypes.c_uint32),
+        ('st_birthtimespec', c_timespec),
+    ]
 else:
     raise NotImplementedError('%s is not supported.' % _system)
 
@@ -541,6 +584,11 @@ class fuse_operations(ctypes.Structure):
         ),
     ]
 
+if _system == "OpenBSD":
+    def fuse_main_real(argc, argv, fuse_ops_v, sizeof_fuse_ops, ctx_p):
+        return _libfuse.fuse_main(argc, argv, fuse_ops_v, ctx_p)
+else:
+    fuse_main_real =_libfuse.fuse_main_real
 
 def time_of_timespec(ts, use_ns=False):
     if use_ns:
@@ -580,6 +628,12 @@ def fuse_exit():
     Flags the native FUSE session as terminated and will cause any running FUSE
     event loops to exit on the next opportunity. (see fuse.c::fuse_exit)
     '''
+    # OpenBSD doesn't have fuse_exit
+    # instead fuse_loop() gracefully catches SIGTERM
+    if _system == "OpenBSD":
+        os.kill(os.getpid(), SIGTERM)
+        return
+
     fuse_ptr = ctypes.c_void_p(_libfuse.fuse_get_context().contents.fuse)
     _libfuse.fuse_exit(fuse_ptr)
 
@@ -668,7 +722,7 @@ class FUSE(object):
         except ValueError:
             old_handler = SIG_DFL
 
-        err = _libfuse.fuse_main_real(
+        err = fuse_main_real(
             len(args), argv, ctypes.pointer(fuse_ops),
             ctypes.sizeof(fuse_ops),
             None)
