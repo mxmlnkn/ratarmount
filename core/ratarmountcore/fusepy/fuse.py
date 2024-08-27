@@ -721,8 +721,7 @@ class FUSE(object):
             else:
                 yield '%s=%s' % (key, value)
 
-    @staticmethod
-    def _wrapper(func, *args, **kwargs):
+    def _wrapper(self, func, *args, **kwargs):
         'Decorator for the methods that follow'
 
         try:
