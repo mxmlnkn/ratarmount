@@ -736,7 +736,7 @@ class FUSE(object):
                     return func(*args, **kwargs) or 0
 
                 except OSError as e:
-                    if e.errno > 0:
+                    if isinstance(e.errno, int) and e.errno > 0:
                         log.debug(
                             "FUSE operation %s raised a %s, returning errno %s.",
                             func.__name__, type(e), e.errno, exc_info=True)
