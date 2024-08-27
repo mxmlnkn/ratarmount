@@ -4,7 +4,7 @@ cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." || { echo 'Failed to cd to ratarm
 
 if [[ -z "$RATARMOUNT_CMD" ]]; then
     TEST_EXTERNAL_COMMAND=0
-    RATARMOUNT_CMD="python3 -X dev -W ignore::DeprecationWarning:fuse -u $( realpath -- ratarmount.py )"
+    RATARMOUNT_CMD="python3 -X dev -W ignore::DeprecationWarning -u $( realpath -- ratarmount.py )"
     #RATARMOUNT_CMD=ratarmount
 else
     TEST_EXTERNAL_COMMAND=1
@@ -1748,7 +1748,7 @@ if [[ -z "$CI" ]]; then
                 # First off, n=auto seems to use the physical cores and ignores virtual ones.
                 # Secondly, these tests scale much better than the others because most time is spent waiting for
                 # the FUSE mount point to appear or disappear, which doesn't seem to be bottlenecked by CPU usage.
-                python3 -X dev -W ignore::DeprecationWarning:fuse -u \
+                python3 -X dev -W ignore::DeprecationWarning -u \
                     -c "import pytest, re, sys; sys.exit(pytest.console_main())" \
                     -n 24 --disable-warnings "$testFile" || returnError "$LINENO" 'pytest failed!'
                 ;;
