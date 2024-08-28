@@ -591,7 +591,7 @@ class fuse_operations(ctypes.Structure):
 
         ('bmap', ctypes.CFUNCTYPE(
             ctypes.c_int, ctypes.c_char_p, ctypes.c_size_t,
-            ctypes.POINTER(ctypes.c_ulonglong))),
+            ctypes.POINTER(ctypes.c_uint64))),
 
         ('flag_nullpath_ok', ctypes.c_uint, 1),
         ('flag_nopath', ctypes.c_uint, 1),
