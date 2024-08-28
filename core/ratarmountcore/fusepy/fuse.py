@@ -83,6 +83,19 @@ class c_utimbuf(ctypes.Structure):
 class c_stat(ctypes.Structure):
     pass    # Platform dependent
 
+# Beware that FUSE_LIBRARY_PATH path was unchecked! If it is set to libfuse3.so.3.14.0,
+# then it will mount without error, but when trying to access the mount point, will give:
+#     Uncaught exception from FUSE operation setxattr, returning errno.EINVAL:
+#         'utf-8' codec can't decode byte 0xe8 in position 1: invalid continuation byte
+#     Traceback (most recent call last):
+#       File "fuse.py", line 820, in _wrapper
+#         return func(*args, **kwargs) or 0
+#                ^^^^^^^^^^^^^^^^^^^^^
+#       File "fuse.py", line 991, in setxattr
+#         name.decode(self.encoding),
+#         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+#     UnicodeDecodeError: 'utf-8' codec can't decode byte 0xe8 in position 1:
+#     invalid continuation byte
 _libfuse_path = os.environ.get('FUSE_LIBRARY_PATH')
 if not _libfuse_path:
     if _system == 'Darwin':
@@ -120,6 +133,27 @@ else:
 
 if _system == 'Darwin' and hasattr(_libfuse, 'macfuse_version'):
     _system = 'Darwin-MacFuse'
+
+
+def get_fuse_version(libfuse):
+    version = libfuse.fuse_version()
+    if version < 100:
+        return version // 10, version % 10
+    if version < 1000:
+        return version // 100, version % 100
+    raise AttributeError(f"Version {version} of found library {_libfuse._name} cannot be parsed!")
+
+fuse_version_major, fuse_version_minor = get_fuse_version(_libfuse)
+if fuse_version_major == 2 and fuse_version_minor < 6:
+    raise AttributeError(
+        f"Found library {_libfuse_path} is too old: {fuse_version_major}.{fuse_version_minor}. "
+        "There have been several ABI breaks in each version. Libfuse < 2.6 is not supported!"
+    )
+if fuse_version_major != 2:
+    raise AttributeError(
+        f"Found library {_libfuse_path} has wrong major version: {fuse_version_major}. "
+        "Expected FUSE 2!"
+    )
 
 
 if _system in ('Darwin', 'Darwin-MacFuse', 'FreeBSD'):

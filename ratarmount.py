@@ -26,6 +26,12 @@ from typing import Any, Callable, Dict, Iterable, IO, List, Optional, Tuple, Uni
 
 try:
     from ratarmountcore.fusepy import fuse
+except AttributeError as exception:
+    print("[Error] Did not find any usable FUSE installation. Please install it, e.g., with:")
+    print("[Error]  - apt install libfuse2")
+    print("[Error]  - yum install fuse fuse-libs")
+    print("[Error] Exception for bundled fusepy:", exception)
+    sys.exit(1)
 except (ImportError, OSError) as exception:
     print("[Warning] Failed to load bundled fusepy. Will try to load system fusepy. Exception was:", exception)
     try:
