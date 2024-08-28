@@ -436,32 +436,19 @@ else:
             ('f_flag', ctypes.c_ulong),
             ('f_namemax', ctypes.c_ulong)]
 
-if _system == 'Windows' or _system.startswith('CYGWIN'):
-    class fuse_file_info(ctypes.Structure):
-        _fields_ = [
-            ('flags', ctypes.c_int),
-            ('fh_old', ctypes.c_int),
-            ('writepage', ctypes.c_int),
-            ('direct_io', ctypes.c_uint, 1),
-            ('keep_cache', ctypes.c_uint, 1),
-            ('flush', ctypes.c_uint, 1),
-            ('padding', ctypes.c_uint, 29),
-            ('fh', ctypes.c_uint64),
-            ('lock_owner', ctypes.c_uint64)]
-else:
-    class fuse_file_info(ctypes.Structure):
-        _fields_ = [
-            ('flags', ctypes.c_int),
-            ('fh_old', ctypes.c_ulong),
-            ('writepage', ctypes.c_int),
-            ('direct_io', ctypes.c_uint, 1),
-            ('keep_cache', ctypes.c_uint, 1),
-            ('flush', ctypes.c_uint, 1),
-            ('nonseekable', ctypes.c_uint, 1),
-            ('flock_release', ctypes.c_uint, 1),
-            ('padding', ctypes.c_uint, 27),
-            ('fh', ctypes.c_uint64),
-            ('lock_owner', ctypes.c_uint64)]
+class fuse_file_info(ctypes.Structure):
+    _fields_ = [
+        ('flags', ctypes.c_int),
+        ('fh_old', ctypes.c_ulong),
+        ('writepage', ctypes.c_int),
+        ('direct_io', ctypes.c_uint, 1),      # Introduced in libfuse 2.4
+        ('keep_cache', ctypes.c_uint, 1),     # Introduced in libfuse 2.4
+        ('flush', ctypes.c_uint, 1),          # Introduced in libfuse 2.6
+        ('nonseekable', ctypes.c_uint, 1),    # Introduced in libfuse 2.8
+        ('flock_release', ctypes.c_uint, 1),  # Introduced in libfuse 2.9
+        ('padding', ctypes.c_uint, 27),
+        ('fh', ctypes.c_uint64),
+        ('lock_owner', ctypes.c_uint64)]
 
 class fuse_context(ctypes.Structure):
     _fields_ = [
