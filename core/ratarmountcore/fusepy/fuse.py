@@ -23,6 +23,19 @@ import logging
 import os
 import warnings
 
+from ctypes import (
+    CFUNCTYPE,
+    POINTER,
+    c_char_p,
+    c_byte,
+    c_voidp,
+    c_size_t,
+    c_ssize_t,
+    c_int,
+    c_uint,
+    c_uint64,
+    c_void_p,
+)
 from ctypes.util import find_library
 from platform import machine, system
 from signal import signal, SIGINT, SIG_DFL
@@ -469,131 +482,64 @@ _libfuse.fuse_get_context.restype = ctypes.POINTER(fuse_context)
 
 class fuse_operations(ctypes.Structure):
     _fields_ = [
-        ('getattr', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.POINTER(c_stat))),
-
-        ('readlink', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.POINTER(ctypes.c_byte),
-            ctypes.c_size_t)),
-
-        ('getdir', ctypes.c_voidp),    # Deprecated, use readdir
-
-        ('mknod', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, c_mode_t, c_dev_t)),
-
-        ('mkdir', ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_char_p, c_mode_t)),
-        ('unlink', ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_char_p)),
-        ('rmdir', ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_char_p)),
-
-        ('symlink', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p)),
-
-        ('rename', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p)),
-
-        ('link', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p)),
-
-        ('chmod', ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_char_p, c_mode_t)),
-
-        ('chown', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, c_uid_t, c_gid_t)),
-
-        ('truncate', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, c_off_t)),
-
-        ('utime', ctypes.c_voidp),     # Deprecated, use utimens
-        ('open', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.POINTER(fuse_file_info))),
-
-        ('read', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.POINTER(ctypes.c_byte),
-            ctypes.c_size_t, c_off_t, ctypes.POINTER(fuse_file_info))),
-
-        ('write', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.POINTER(ctypes.c_byte),
-            ctypes.c_size_t, c_off_t, ctypes.POINTER(fuse_file_info))),
-
-        ('statfs', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.POINTER(c_statvfs))),
-
-        ('flush', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.POINTER(fuse_file_info))),
-
-        ('release', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.POINTER(fuse_file_info))),
-
-        ('fsync', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.c_int,
-            ctypes.POINTER(fuse_file_info))),
-
+        ('getattr', CFUNCTYPE(c_int, c_char_p, POINTER(c_stat))),
+        ('readlink', CFUNCTYPE(c_int, c_char_p, POINTER(c_byte), c_size_t)),
+        ('getdir', c_voidp),    # Deprecated, use readdir
+        ('mknod', CFUNCTYPE(c_int, c_char_p, c_mode_t, c_dev_t)),
+        ('mkdir', CFUNCTYPE(c_int, c_char_p, c_mode_t)),
+        ('unlink', CFUNCTYPE(c_int, c_char_p)),
+        ('rmdir', CFUNCTYPE(c_int, c_char_p)),
+        ('symlink', CFUNCTYPE(c_int, c_char_p, c_char_p)),
+        ('rename', CFUNCTYPE(c_int, c_char_p, c_char_p)),
+        ('link', CFUNCTYPE(c_int, c_char_p, c_char_p)),
+        ('chmod', CFUNCTYPE(c_int, c_char_p, c_mode_t)),
+        ('chown', CFUNCTYPE(c_int, c_char_p, c_uid_t, c_gid_t)),
+        ('truncate', CFUNCTYPE(c_int, c_char_p, c_off_t)),
+        ('utime', c_voidp),     # Deprecated, use utimens
+        ('open', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
+        ('read', CFUNCTYPE(
+            c_int, c_char_p, POINTER(c_byte),
+            c_size_t, c_off_t, POINTER(fuse_file_info))),
+        ('write', CFUNCTYPE(
+            c_int, c_char_p, POINTER(c_byte),
+            c_size_t, c_off_t, POINTER(fuse_file_info))),
+        ('statfs', CFUNCTYPE(c_int, c_char_p, POINTER(c_statvfs))),
+        ('flush', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
+        ('release', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
+        ('fsync', CFUNCTYPE(c_int, c_char_p, c_int, POINTER(fuse_file_info))),
         ('setxattr', setxattr_t),
         ('getxattr', getxattr_t),
-
-        ('listxattr', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.POINTER(ctypes.c_byte),
-            ctypes.c_size_t)),
-
-        ('removexattr', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p)),
-
-        ('opendir', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.POINTER(fuse_file_info))),
-
-        ('readdir', ctypes.CFUNCTYPE(
-            ctypes.c_int,
-            ctypes.c_char_p,
-            ctypes.c_voidp,
-            ctypes.CFUNCTYPE(
-                ctypes.c_int, ctypes.c_voidp, ctypes.c_char_p,
-                ctypes.POINTER(c_stat), c_off_t),
+        ('listxattr', CFUNCTYPE(c_int, c_char_p, POINTER(c_byte), c_size_t)),
+        ('removexattr', CFUNCTYPE(c_int, c_char_p, c_char_p)),
+        ('opendir', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
+        ('readdir', CFUNCTYPE(
+            c_int,
+            c_char_p,
+            c_voidp,
+            CFUNCTYPE(c_int, c_voidp, c_char_p, POINTER(c_stat), c_off_t),
             c_off_t,
-            ctypes.POINTER(fuse_file_info))),
+            POINTER(fuse_file_info))),
+        ('releasedir', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
+        ('fsyncdir', CFUNCTYPE(c_int, c_char_p, c_int, POINTER(fuse_file_info))),
+        ('init', CFUNCTYPE(c_voidp, c_voidp)),
+        ('destroy', CFUNCTYPE(c_voidp, c_voidp)),
+        ('access', CFUNCTYPE(c_int, c_char_p, c_int)),
+        ('create', CFUNCTYPE(c_int, c_char_p, c_mode_t, POINTER(fuse_file_info))),
+        ('ftruncate', CFUNCTYPE(c_int, c_char_p, c_off_t, POINTER(fuse_file_info))),
+        ('fgetattr', CFUNCTYPE(c_int, c_char_p, POINTER(c_stat), POINTER(fuse_file_info))),
+        ('lock', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info), c_int, c_voidp)),
+        ('utimens', CFUNCTYPE(c_int, c_char_p, POINTER(c_utimbuf))),
+        ('bmap', CFUNCTYPE(c_int, c_char_p, c_size_t, POINTER(c_uint64))),
 
-        ('releasedir', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.POINTER(fuse_file_info))),
+        ('flag_nullpath_ok', c_uint, 1),
+        ('flag_nopath', c_uint, 1),
+        ('flag_utime_omit_ok', c_uint, 1),
+        ('flag_reserved', c_uint, 29),
 
-        ('fsyncdir', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.c_int,
-            ctypes.POINTER(fuse_file_info))),
-
-        ('init', ctypes.CFUNCTYPE(ctypes.c_voidp, ctypes.c_voidp)),
-        ('destroy', ctypes.CFUNCTYPE(ctypes.c_voidp, ctypes.c_voidp)),
-
-        ('access', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.c_int)),
-
-        ('create', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, c_mode_t,
-            ctypes.POINTER(fuse_file_info))),
-
-        ('ftruncate', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, c_off_t,
-            ctypes.POINTER(fuse_file_info))),
-
-        ('fgetattr', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.POINTER(c_stat),
-            ctypes.POINTER(fuse_file_info))),
-
-        ('lock', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.POINTER(fuse_file_info),
-            ctypes.c_int, ctypes.c_voidp)),
-
-        ('utimens', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.POINTER(c_utimbuf))),
-
-        ('bmap', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.c_size_t,
-            ctypes.POINTER(ctypes.c_uint64))),
-
-        ('flag_nullpath_ok', ctypes.c_uint, 1),
-        ('flag_nopath', ctypes.c_uint, 1),
-        ('flag_utime_omit_ok', ctypes.c_uint, 1),
-        ('flag_reserved', ctypes.c_uint, 29),
-
-        ('ioctl', ctypes.CFUNCTYPE(
-            ctypes.c_int, ctypes.c_char_p, ctypes.c_uint, ctypes.c_void_p,
-            ctypes.POINTER(fuse_file_info), ctypes.c_uint, ctypes.c_void_p)),
+        ('ioctl', CFUNCTYPE(
+            c_int, c_char_p, c_uint, c_void_p,
+            POINTER(fuse_file_info), c_uint, c_void_p),
+        ),
     ]
 
 
