@@ -9,17 +9,18 @@ on:
 jobs:
   Manylinux-Appimage:
     runs-on: ubuntu-latest
-    container: quay.io/pypa/manylinux2014_x86_64
+    container: quay.io/pypa/manylinux_2_28_x86_64
     env:
       APP_PYTHON_VERSION: "3.12"
     steps:
-    # Cannot use checkout@v4 because it requires a newer GLIBC version than manylinux2014!
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Build AppImage
       working-directory: AppImage
       run: bash build-ratarmount-appimage.sh
 
+    # This action also does not work with manylinux2014 (CentOS 7) anymore,
+    # probably because CentOS 7 was EOL on 2024-06-30.
     - uses: actions/upload-artifact@v3
       with:
         name: ratarmount-x86_64.AppImage

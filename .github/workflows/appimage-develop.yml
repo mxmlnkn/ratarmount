@@ -6,12 +6,18 @@ on:
 jobs:
   Manylinux-Appimage:
     runs-on: ubuntu-latest
-    container: quay.io/pypa/manylinux2014_x86_64
+    container: quay.io/pypa/manylinux_2_28_x86_64
     env:
       APP_PYTHON_VERSION: "3.12"
     steps:
-    # Cannot use checkout@v4 because it requires a newer GLIBC version than manylinux2014!
-    - uses: actions/checkout@v3
+    - name: Checkout
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        yum install -y https://github.com/cli/cli/releases/download/v2.55.0/gh_2.55.0_linux_amd64.rpm
+        git config --global --add safe.directory "$PWD"
+        gh repo clone ${{ github.repositoryUrl }} .
+        git checkout ${{ github.sha }}
 
     - name: Build AppImage
       working-directory: AppImage
