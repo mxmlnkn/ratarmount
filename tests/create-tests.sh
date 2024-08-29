@@ -283,7 +283,7 @@ mkdir -p root
     #     -rwx------  3.0 unx  4 tx stor 22-Nov-06 17:57 folder/../././foo
     zip ../denormal-paths.zip folder/../ufo ../root/bar ./././folder/../././foo
 
-    # tar fails to clean up some ./ but cleans up most .. in the path. However, with transform, we can readd '..'!
+    # tar fails to clean up some ./ but cleans up most .. in the path. However, with transform, we can re-add '..'!
     tarc --transform 's,ufo,root/../ufo,' --transform 's,root/bar,../root/./bar,' -f ../denormal-paths.tar \
         ./folder/.././folder/./../ufo ../root/./bar ./././folder/../././foo
     # tar tvlf denormal-paths.tar
@@ -314,7 +314,7 @@ with tarfile.open("../denormal-paths-tarfile.tar", "w") as tar:
     #     tar: Exiting with failure status due to previous errors
     # Actually, even tarfile fails to read all but the 'ufo' file!
 
-    # rar automatically normalizes paths and removes leading ../ so we have to readd with -ap
+    # rar automatically normalizes paths and removes leading ../ so we have to re-add with -ap
     rar a -apfolder/../ ../denormal-paths.rar folder/../ufo
     rar a -ap../ ../denormal-paths.rar ../root/bar
     rar a -ap./././folder/../././ ../denormal-paths.rar ./././folder/../././foo

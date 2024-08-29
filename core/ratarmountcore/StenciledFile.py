@@ -30,9 +30,9 @@ class RawStenciledFile(io.RawIOBase):
         fileobj: (deprecated) Only either fileobj and stencils or fileStencils may be specified
         stencils: (deprecated) Only either fileobj and stencils or fileStencils may be specified
         fileStencils: Contains a list of (file object, offset, size) tuples. The offset and size
-                      can be seen as a cut-out of the file obejct. All cut-outs are joined
+                      can be seen as a cut-out of the file object. All cut-outs are joined
                       together in the order of the list. Note that multiple cut-outs into the
-                      same file object may be given by simply specifying the file objet multiple
+                      same file object may be given by simply specifying the file object multiple
                       times in the list.
 
         Examples:

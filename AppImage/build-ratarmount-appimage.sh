@@ -20,7 +20,7 @@ function installSystemRequirements()
     export PATH="/opt/python/cp39-cp39/bin:$PATH"
     python3 -m pip install python-appimage
     yum -y install epel-release
-    # We need to isntall development dependencies to build Python packages from source and we also need
+    # We need to install development dependencies to build Python packages from source and we also need
     # to install libraries such as libarchive in order to copy them into the AppImage.
     yum install -y fuse fakeroot patchelf fuse-libs libsqlite3x strace desktop-file-utils libzstd-devel \
         libarchive libarchive-devel lzop
@@ -300,7 +300,7 @@ APPIMAGE_EXTRACT_AND_RUN=1 ARCH="$APPIMAGE_ARCH" appimagetool \
 #
 # - The old gzip compression is almost 28% faster! But
 # - Levels with no size difference: 21/22, 19/20, 11/12
-# - The improvement of level 22 over level 19 or even level 18 is also miniscule.
+# - The improvement of level 22 over level 19 or even level 18 is also minuscule.
 # - Level 17->18 was the last larger size improvement (-4.5%).
 # - Level 18->19: -0.14%
 # - Levels 2-15 are mostly equally fast looking at the minimum, average, and maximum
@@ -313,7 +313,7 @@ APPIMAGE_EXTRACT_AND_RUN=1 ARCH="$APPIMAGE_ARCH" appimagetool \
 #   else I can't explain why it takes 3-6x as long to mount and hast 5% smaller size even compared to the
 #   largest block size of 1 MiB!
 #
-#   Level 15: Block Size:   4K Size: 33308992 0.295 | 0.3698 +- 0.0016 | 0.433 -> slower and larger! not worht it
+#   Level 15: Block Size:   4K Size: 33308992 0.295 | 0.3698 +- 0.0016 | 0.433 -> slower and larger! not worth it
 #   Level 15: Block Size:  16K Size: 30462272 0.236 | 0.2909 +- 0.0013 | 0.33
 #   Level 15: Block Size:  32K Size: 29618496 0.241 | 0.3074 +- 0.0012 | 0.343
 #   Level 15: Block Size:  64K Size: 28856640 0.246 | 0.3124 +- 0.0012 | 0.35

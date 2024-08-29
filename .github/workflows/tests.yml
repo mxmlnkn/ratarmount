@@ -32,6 +32,11 @@ jobs:
             exit 123
         fi
 
+    - name: Lint With Codespell
+      run: |
+        python3 -m pip install codespell
+        codespell --ignore-words-list fo,Nd,unx $( git ls-tree -r --name-only HEAD )
+
     - name: Lint With Flake8
       run: |
         python3 -m pip install flake8
@@ -66,7 +71,7 @@ jobs:
       matrix:
         os: [macos-13, ubuntu-latest]
         # macos-13 / macos-latest does not work anymore because the dependencies don't have any wheels,
-        # probaby because it is M1 based.
+        # probably because it is M1 based.
         # ToDo: Add windows-latest but it requires a lot of setup of the dependencies!
         #       Maybe only test ratarmount-core without most dependencies after I have split that off.
         # Oldest and newest versions should be enough. Python versions are supported 5 years from release date.

@@ -1,5 +1,6 @@
 black
 build
+codespell
 fusepy
 flake8
 indexed_bzip2

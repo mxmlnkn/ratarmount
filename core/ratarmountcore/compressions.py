@@ -254,7 +254,7 @@ if 'libarchive' in sys.modules and isinstance(libarchive, types.ModuleType):
             (['warc'], lambda x: x.read(7) == b'WARC/1.'),
             (['xar'], lambda x: x.read(4) == b'xar!'),
             # Supported by other backends: tar, rar, zip
-            # Not supported because it has no magic identifaction and therefore is only trouble: lha, mtree
+            # Not supported because it has no magic identification and therefore is only trouble: lha, mtree
             # http://fileformats.archiveteam.org/wiki/LHA
             # > LHA can be identified with high accuracy, but doing so can be laborious,
             # > due to the lack of a signature, and other complicating factors.

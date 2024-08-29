@@ -437,6 +437,6 @@ Conclusions:
     and still takes 4h anyways, so this SQLite overhead might not be all that bad. But for archives
     with 100M files it might "better" to use the nested dictionary and the custom serialization
     as long as there is enough memory.
-    ILSVRC has 2M files and takes 45min with the custom serialization whereas SQLite insertino of 2M takes 20s!
+    ILSVRC has 2M files and takes 45min with the custom serialization whereas SQLite insertion of 2M takes 20s!
 
 """

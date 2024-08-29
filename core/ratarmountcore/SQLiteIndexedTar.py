@@ -379,7 +379,7 @@ class _TarFileMetadataReader:
         self, fileObject: IO[bytes], pathPrefix: str, streamOffset: int, processPool
     ) -> Iterable[Tuple]:
         """
-        Iterates over the files inside the TAR to finde good splitting points and then extracts FileInfo tuples
+        Iterates over the files inside the TAR to find good splitting points and then extracts FileInfo tuples
         for partial TARs in parallel using the given processPool.
         """
 
@@ -475,7 +475,7 @@ class _TarFileMetadataReader:
     def _processSerial(self, fileObject: IO[bytes], pathPrefix: str, streamOffset: int) -> Iterable[Tuple]:
         """
         Opens the given fileObject using the tarfile module, iterates over all files converting their metadata to
-        FileInfo tuples and inserting those into the databse in a chunked manner using the given _setFileInfos.
+        FileInfo tuples and inserting those into the database in a chunked manner using the given _setFileInfos.
         """
 
         loadedTarFile: Any = self._openTar(fileObject)
@@ -910,7 +910,7 @@ class SQLiteIndexedTar(MountSource):
                 progressBar.update(fileobj.tell())
         except Exception as exception:
             if self.printDebug >= 1:
-                print("An exception occured when trying to update the progress bar:", exception)
+                print("An exception occurred when trying to update the progress bar:", exception)
             if self.printDebug >= 3:
                 traceback.print_exc()
 

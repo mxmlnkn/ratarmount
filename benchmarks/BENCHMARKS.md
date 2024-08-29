@@ -20,7 +20,7 @@ Furthermore, since the last benchmark, the performance for `find` could be impro
 Xz support already existed at the time of the last benchmark but it had runaway memory usage, which got fixed in python-xz 0.4.0.
 And the lzmaffi backend caused problems with installing on systems because the cffi dependency has to be installed beforehand manually and there are also no wheels.
 This is why it was a more experimental feature.
-But now it is more polished and even has been parallized, see the [next section](#parallel-xz-decoder-speedup).
+But now it is more polished and even has been parallelized, see the [next section](#parallel-xz-decoder-speedup).
 
 ![Benchmark comparison between ratarmount and archivemount](plots/archivemount-comparison-2021-12-27.png)
 
@@ -43,13 +43,13 @@ For simply TAR mounts, it might be possible and performance improving by using t
 
 ![Speedup ratarmount -P 24 over -P 1 for xz backend](plots/parallel-xz-ratarmount-comparison.png)
 
-When using all 24 logical cores (12 physical cores) for the parallel xz decoder based ontop of python-xz, the speedup tops out at roughly 10 but drops to 8 for very large archives, which is still a significant improvement upon the serial version.
+When using all 24 logical cores (12 physical cores) for the parallel xz decoder based on top of python-xz, the speedup tops out at roughly 10 but drops to 8 for very large archives, which is still a significant improvement upon the serial version.
 
 Note that the boundary case of empty files inside the TAR, does not benefit from this because decompression is not the bottleneck but instead creating the SQLite index is.
 
 In general, the parallelization is quite trivial over the xz blocks but there might be issues reducing the parallel efficiency like I/O access becoming more random instead of sequential or caches being thrashed.
 
-Xz decompression has been parallized using a simple scheme in ratarmountcore ontop of python-xz:
+Xz decompression has been parallelized using a simple scheme in ratarmountcore on top of python-xz:
 
  - For each thread in a thread pool:
    1. Seek to the specified block in constant time thanks to python-xz.

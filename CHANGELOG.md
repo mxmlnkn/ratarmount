@@ -256,7 +256,7 @@
  - Add support for concatenated TAR files.
  - Add support for hardlinks in the TAR file.
  - Add support for union mounting.
- - Add support for accessing older versions of a file if the TAR containts multiple versions.
+ - Add support for accessing older versions of a file if the TAR contains multiple versions.
  - Detect changes in TAR files and recreate the index if so.
  - Remove support for old non-SQLite index backends.
 

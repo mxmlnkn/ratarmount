@@ -432,7 +432,7 @@ class SQLiteIndex:
                 print(f"[Warning] {arg}: index: {oldState}, current: {newState}")
 
     def checkMetadataBackend(self, metadata: Dict):
-        # Because of a lack of sufficient foresight, the backend name was not added to the index in older verions.
+        # Because of a lack of sufficient foresight, the backend name was not added to the index in older versions.
         backendName = metadata.get('backendName')
         if isinstance(backendName, str):
             if backendName != self.backendName:
@@ -780,7 +780,7 @@ class SQLiteIndex:
         if len(self.parentFolderCache) > 16:
             self.parentFolderCache = self.parentFolderCache[-8:]
 
-        # TODO This method is still not perfect but I do not know how to perfect it without loosing significant
+        # TODO This method is still not perfect but I do not know how to perfect it without losing significant
         #      performance. Currently, adding implicit folders will fail when a file is overwritten implicitly with
         #      a folder and then overwritten by a file and then again overwritten by a folder. Because the parent
         #      folder was already added implicitly the first time, the second time will be skipped.
@@ -906,7 +906,7 @@ class SQLiteIndex:
                 )
 
             # Check for empty or incomplete indexes. Pretty safe to rebuild the index for these as they
-            # are so invalid, noone should miss them. So, recreate index by default for these cases.
+            # are so invalid, no one should miss them. So, recreate index by default for these cases.
             if 'files' not in tables:
                 raise InvalidIndexError("SQLite index is empty")
 

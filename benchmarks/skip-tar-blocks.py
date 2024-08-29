@@ -46,7 +46,7 @@ Manual benchmark results for:
     only iterating over tarfile without doing anything:
         19.86s 19.73s 19.74s 19.74s
 
-  => There definitely is potential to improve the createIndex routine by parellelizing the tarfile iteration!
+  => There definitely is potential to improve the createIndex routine by parallelizing the tarfile iteration!
 
 Benchmark timing method:
     t0 = time.time()

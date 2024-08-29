@@ -262,7 +262,7 @@ checkFileInTAR()
     funmount "$mountFolder"
 
     # The libarchive backend does not create indexes for now because it doesn't help the poor performance much and
-    # introduces complexity with index compatibilty to other backends.
+    # introduces complexity with index compatibility to other backends.
     if [[ "$archive" =~ .tar && ! "$archive" =~ .7z$ ]]; then
         'grep' -q 'Successfully loaded offset dictionary' ratarmount.stdout.log ratarmount.stderr.log ||
             returnError "$LINENO" "Looks like index was not loaded for '$archive' while executing: $RATARMOUNT_CMD ${args[*]}"
@@ -1706,6 +1706,12 @@ if [[ -z "$CI" ]]; then
         || returnError "$LINENO" 'Pytype failed!'
 
     black -q --line-length 120 --skip-string-normalization "${files[@]}" "${testFiles[@]}"
+
+    versionedFiles=()
+    while read -r file; do
+        versionedFiles+=( "$file" )
+    done < <( git ls-tree -r --name-only HEAD )
+    codespell --ignore-words-list fo,Nd,unx "${versionedFiles[@]}"
 
     flake8 --config tests/.flake8 "${files[@]}" "${testFiles[@]}" || returnError "$LINENO" 'Flake8 failed!'
 

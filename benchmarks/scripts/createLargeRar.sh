@@ -66,7 +66,7 @@ t0 = time.time()
 f = rarfile.RarFile(sys.argv[1])
 t1 = time.time()
 print(f"Opening the RAR took: {t1-t0:.3f} s")
-print("File Count:", len(f.infolist()))  # This is alway instant. Seems to get initialized during open
+print("File Count:", len(f.infolist()))  # This is always instant. Seems to get initialized during open
 t2 = time.time()
 print(f"Getting infolist took: {t2-t1:.3f} s")
 ' "$file"

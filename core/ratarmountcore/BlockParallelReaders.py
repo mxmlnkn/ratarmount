@@ -270,7 +270,7 @@ class ParallelXZReader(BlockParallelReader):
 
         results = []
         for _ in range(self.parallelization * 4):
-            results.append(pool.apply_async(os.getpid))  # will triger worker initialization, i.e., _tryOpenGlobalFile
+            results.append(pool.apply_async(os.getpid))  # will trigger worker initialization, i.e., _tryOpenGlobalFile
 
         pids = set()
         for result in results:

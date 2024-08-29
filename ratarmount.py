@@ -496,7 +496,7 @@ class FuseMount(fuse.Operations):
     https://github.com/libfuse/libfuse/blob/master/include/fuse.h
     https://man7.org/linux/man-pages/man3/errno.3.html
 
-    All path arguments for overriden fusepy methods do have a leading slash ('/')!
+    All path arguments for overridden fusepy methods do have a leading slash ('/')!
     This is why MountSource also should expect leading slashes in all paths.
     """
 
@@ -1601,20 +1601,20 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
 
     if args.commit_overlay:
         if not os.path.isdir(args.write_overlay):
-            raise RatarmountError("Need an existing write overlay folder for commiting changes.")
+            raise RatarmountError("Need an existing write overlay folder for committing changes.")
 
         if len(args.mount_source) != 1:
-            raise RatarmountError("Currently, only modifications to a single TAR may be commited.")
+            raise RatarmountError("Currently, only modifications to a single TAR may be committed.")
 
         tarFile = args.mount_source[0]
         compression = None
         try:
             compression = checkInputFileType(tarFile, encoding=args.encoding, printDebug=args.debug)[1]
         except Exception as exception:
-            raise RatarmountError("Currently, only modifications to a single TAR may be commited.") from exception
+            raise RatarmountError("Currently, only modifications to a single TAR may be committed.") from exception
 
         if compression is not None:
-            raise RatarmountError("Currently, only modifications to an uncompressed TAR may be commited.")
+            raise RatarmountError("Currently, only modifications to an uncompressed TAR may be committed.")
 
         try:
             with os.popen('tar --version') as pipe:

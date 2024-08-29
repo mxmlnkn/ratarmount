@@ -69,7 +69,7 @@ class SingleFileMountSource(MountSource):
     def open(self, fileInfo: FileInfo) -> IO[bytes]:
         if fileInfo != self._createFileInfo():
             raise ValueError("Only files may be opened!")
-        # Use StenciledFile so that the returned file objects can be idependently seeked!
+        # Use StenciledFile so that the returned file objects can be independently seeked!
         return StenciledFile(fileStencils=[(self.fileobj, 0, self.size)], fileObjectLock=self.fileObjectLock)
 
     @overrides(MountSource)
