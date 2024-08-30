@@ -820,7 +820,7 @@ class FuseMount(fuse.Operations):
     def create(self, path, mode, fi=None):
         if self.writeOverlay:
             return self._addNewHandle(self.writeOverlay.create(path, mode, fi), 0)
-        return super().create(path, mode, fi)
+        raise fuse.FuseOSError(errno.EROFS)
 
     @overrides(fuse.Operations)
     def write(self, path, data, offset, fh):
@@ -832,19 +832,19 @@ class FuseMount(fuse.Operations):
 
         if self._isWriteOverlayHandle(fh):
             return self.writeOverlay.write(path, data, offset, self._resolveFileHandle(fh))
-        return super().write(path, data, offset, fh)
+        raise fuse.FuseOSError(errno.EROFS)
 
     @overrides(fuse.Operations)
     def flush(self, path, fh):
         if self._isWriteOverlayHandle(fh):
             self.writeOverlay.flush(path, self._resolveFileHandle(fh))
-        return super().flush(path, fh)
+        return 0  # Nothing to flush, so return success
 
     @overrides(fuse.Operations)
     def fsync(self, path, datasync, fh):
         if self._isWriteOverlayHandle(fh):
             self.writeOverlay.fsync(path, datasync, self._resolveFileHandle(fh))
-        return super().fsync(path, datasync, fh)
+        return 0  # Nothing to flush, so return success
 
 
 def checkInputFileType(
