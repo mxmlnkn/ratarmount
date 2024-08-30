@@ -747,8 +747,7 @@ class FUSE(object):
         return self.fgetattr(path, buf, None)
 
     def readlink(self, path, buf, bufsize):
-        ret = self.operations('readlink', path.decode(self.encoding)) \
-                  .encode(self.encoding)
+        ret = self.operations('readlink', path.decode(self.encoding)).encode(self.encoding)
 
         # copies a string into the given buffer
         # (null terminated and truncated if necessary)
@@ -804,19 +803,12 @@ class FUSE(object):
         if self.raw_fi:
             return self.operations('open', path.decode(self.encoding), fi)
         else:
-            fi.fh = self.operations('open', path.decode(self.encoding),
-                                            fi.flags)
-
+            fi.fh = self.operations('open', path.decode(self.encoding), fi.flags)
             return 0
 
     def read(self, path, buf, size, offset, fip):
-        if self.raw_fi:
-          fh = fip.contents
-        else:
-          fh = fip.contents.fh
-
-        ret = self.operations('read', self._decode_optional_path(path), size,
-                                      offset, fh)
+        fh = fip.contents if self.raw_fi else fip.contents.fh
+        ret = self.operations('read', self._decode_optional_path(path), size, offset, fh)
 
         if not ret:
             return 0
@@ -830,14 +822,8 @@ class FUSE(object):
 
     def write(self, path, buf, size, offset, fip):
         data = ctypes.string_at(buf, size)
-
-        if self.raw_fi:
-            fh = fip.contents
-        else:
-            fh = fip.contents.fh
-
-        return self.operations('write', self._decode_optional_path(path), data,
-                                        offset, fh)
+        fh = fip.contents if self.raw_fi else fip.contents.fh
+        return self.operations('write', self._decode_optional_path(path), data, offset, fh)
 
     def statfs(self, path, buf):
         stv = buf.contents
@@ -849,29 +835,16 @@ class FUSE(object):
         return 0
 
     def flush(self, path, fip):
-        if self.raw_fi:
-            fh = fip.contents
-        else:
-            fh = fip.contents.fh
-
+        fh = fip.contents if self.raw_fi else fip.contents.fh
         return self.operations('flush', self._decode_optional_path(path), fh)
 
     def release(self, path, fip):
-        if self.raw_fi:
-          fh = fip.contents
-        else:
-          fh = fip.contents.fh
-
+        fh = fip.contents if self.raw_fi else fip.contents.fh
         return self.operations('release', self._decode_optional_path(path), fh)
 
     def fsync(self, path, datasync, fip):
-        if self.raw_fi:
-            fh = fip.contents
-        else:
-            fh = fip.contents.fh
-
-        return self.operations('fsync', self._decode_optional_path(path), datasync,
-                                        fh)
+        fh = fip.contents if self.raw_fi else fip.contents.fh
+        return self.operations('fsync', self._decode_optional_path(path), datasync, fh)
 
     def setxattr(self, path, name, value, size, options, *args):
         return self.operations('setxattr', path.decode(self.encoding),
@@ -923,16 +896,12 @@ class FUSE(object):
 
     def opendir(self, path, fip):
         # Ignore raw_fi
-        fip.contents.fh = self.operations('opendir',
-                                          path.decode(self.encoding))
-
+        fip.contents.fh = self.operations('opendir', path.decode(self.encoding))
         return 0
 
     def readdir(self, path, buf, filler, offset, fip):
         # Ignore raw_fi
-        for item in self.operations('readdir', self._decode_optional_path(path),
-                                               fip.contents.fh):
-
+        for item in self.operations('readdir', self._decode_optional_path(path), fip.contents.fh):
             if isinstance(item, basestring):
                 name, st, offset = item, None, 0
             else:
@@ -950,8 +919,7 @@ class FUSE(object):
 
     def releasedir(self, path, fip):
         # Ignore raw_fi
-        return self.operations('releasedir', self._decode_optional_path(path),
-                                             fip.contents.fh)
+        return self.operations('releasedir', self._decode_optional_path(path), fip.contents.fh)
 
     def fsyncdir(self, path, datasync, fip):
         # Ignore raw_fi
@@ -978,37 +946,25 @@ class FUSE(object):
             return 0
 
     def ftruncate(self, path, length, fip):
-        if self.raw_fi:
-            fh = fip.contents
-        else:
-            fh = fip.contents.fh
-
-        return self.operations('truncate', self._decode_optional_path(path),
-                                           length, fh)
+        fh = fip.contents if self.raw_fi else fip.contents.fh
+        return self.operations('truncate', self._decode_optional_path(path), length, fh)
 
     def fgetattr(self, path, buf, fip):
         ctypes.memset(buf, 0, ctypes.sizeof(c_stat))
 
         st = buf.contents
-        if not fip:
-            fh = fip
-        elif self.raw_fi:
-            fh = fip.contents
+        if fip:
+            fh = fip.contents if self.raw_fi else fip.contents.fh
         else:
-            fh = fip.contents.fh
+            fh = fip
 
         attrs = self.operations('getattr', self._decode_optional_path(path), fh)
         set_st_attrs(st, attrs, use_ns=self.use_ns)
         return 0
 
     def lock(self, path, fip, cmd, lock):
-        if self.raw_fi:
-            fh = fip.contents
-        else:
-            fh = fip.contents.fh
-
-        return self.operations('lock', self._decode_optional_path(path), fh, cmd,
-                                       lock)
+        fh = fip.contents if self.raw_fi else fip.contents.fh
+        return self.operations('lock', self._decode_optional_path(path), fh, cmd, lock)
 
     def utimens(self, path, buf):
         if buf:
@@ -1021,17 +977,11 @@ class FUSE(object):
         return self.operations('utimens', path.decode(self.encoding), times)
 
     def bmap(self, path, blocksize, idx):
-        return self.operations('bmap', path.decode(self.encoding), blocksize,
-                                       idx)
+        return self.operations('bmap', path.decode(self.encoding), blocksize, idx)
 
     def ioctl(self, path, cmd, arg, fip, flags, data):
-        if self.raw_fi:
-          fh = fip.contents
-        else:
-          fh = fip.contents.fh
-
-        return self.operations('ioctl', path.decode(self.encoding),
-            cmd, arg, fh, flags, data)
+        fh = fip.contents if self.raw_fi else fip.contents.fh
+        return self.operations('ioctl', path.decode(self.encoding), cmd, arg, fh, flags, data)
 
 
 def _nullable_dummy_function(method):
