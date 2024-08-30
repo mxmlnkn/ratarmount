@@ -14,6 +14,9 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 # mypy: ignore-errors
+# pylint: disable=too-many-public-methods,missing-module-docstring,line-too-long
+# pylint: disable=invalid-name,missing-function-docstring,missing-class-docstring,
+# pylint: disable=too-few-public-methods,unused-argument,too-many-arguments,too-many-lines
 
 # Note that for ABI forward compatibility and other issues, most C-types should be initialized
 # to 0 and the ctypes module does that for us out of the box!
@@ -33,7 +36,6 @@ from ctypes import (
     c_char_p,
     c_byte,
     c_size_t,
-    c_ssize_t,
     c_int,
     c_uint,
     c_uint64,
@@ -43,7 +45,6 @@ from ctypes.util import find_library
 from platform import machine, system
 from signal import signal, SIGINT, SIG_DFL, SIGTERM
 from stat import S_IFDIR
-from traceback import print_exc
 
 
 try:
@@ -60,11 +61,6 @@ except ImportError:
         newfunc.args = args
         newfunc.keywords = keywords
         return newfunc
-
-try:
-    basestring
-except NameError:
-    basestring = str
 
 log = logging.getLogger("fuse")
 _system = system()
@@ -100,9 +96,6 @@ else:
 class c_utimbuf(ctypes.Structure):
     _fields_ = [('actime', c_timespec), ('modtime', c_timespec)]
 
-class c_stat(ctypes.Structure):
-    pass    # Platform dependent
-
 # Beware that FUSE_LIBRARY_PATH path was unchecked! If it is set to libfuse3.so.3.14.0,
 # then it will mount without error, but when trying to access the mount point, will give:
 #     Uncaught exception from FUSE operation setxattr, returning errno.EINVAL:
@@ -125,16 +118,17 @@ if not _libfuse_path:
         _libfuse_path = (find_library('fuse4x') or find_library('osxfuse') or
                          find_library('fuse') or find_library('fuse-t'))
     elif _system == 'Windows':
+        # pytype: disable=module-attr
         try:
-            import _winreg as reg
+            import _winreg as reg  # pytype: disable=import-error
         except ImportError:
-            import winreg as reg
+            import winreg as reg  # pytype: disable=import-error
         def Reg32GetValue(rootkey, keyname, valname):
             key, val = None, None
             try:
-                key = reg.OpenKey(rootkey, keyname, 0, reg.KEY_READ | reg.KEY_WOW64_32KEY)
+                key = reg.OpenKey(rootkey, keyname, 0, reg.KEY_READ | reg.KEY_WOW64_32KEY)  # pytype: disable=import-error
                 val = str(reg.QueryValueEx(key, valname)[0])
-            except WindowsError:
+            except WindowsError:  # pylint: disable=undefined-variable  # pytype: disable=name-error
                 pass
             finally:
                 if key is not None:
@@ -143,13 +137,13 @@ if not _libfuse_path:
         _libfuse_path = Reg32GetValue(reg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WinFsp", r"InstallDir")
         if _libfuse_path:
             _libfuse_path += r"bin\winfsp-%s.dll" % ("x64" if sys.maxsize > 0xffffffff else "x86")
+        # pytype: enable=module-attr
     else:
         _libfuse_path = find_library('fuse')
 
 if not _libfuse_path:
     raise EnvironmentError('Unable to find libfuse')
-else:
-    _libfuse = ctypes.CDLL(_libfuse_path)
+_libfuse = ctypes.CDLL(_libfuse_path)
 
 if _system == 'Darwin' and hasattr(_libfuse, 'macfuse_version'):
     _system = 'Darwin-MacFuse'
@@ -196,7 +190,7 @@ if _system in ('Darwin', 'Darwin-MacFuse', 'FreeBSD'):
         ctypes.POINTER(ctypes.c_byte),
         ctypes.c_size_t, ctypes.c_uint32)
     if _system == 'Darwin':
-        c_stat._fields_ = [
+        _c_stat__fields_ = [
             ('st_dev', c_dev_t),
             ('st_mode', c_mode_t),
             ('st_nlink', ctypes.c_uint16),
@@ -216,7 +210,7 @@ if _system in ('Darwin', 'Darwin-MacFuse', 'FreeBSD'):
             ('st_lspare', ctypes.c_int32),
             ('st_qspare', ctypes.c_int64)]
     else:
-        c_stat._fields_ = [
+        _c_stat__fields_ = [
             ('st_dev', c_dev_t),
             ('st_ino', ctypes.c_uint32),
             ('st_mode', c_mode_t),
@@ -252,7 +246,7 @@ elif _system == 'Linux':
 
     # sys/stat.h
     if _machine == 'x86_64':
-        c_stat._fields_ = [
+        _c_stat__fields_ = [
             ('st_dev', c_dev_t),
             ('st_ino', ctypes.c_ulong),
             ('st_nlink', ctypes.c_ulong),
@@ -268,7 +262,7 @@ elif _system == 'Linux':
             ('st_mtimespec', c_timespec),
             ('st_ctimespec', c_timespec)]
     elif _machine == 'mips':
-        c_stat._fields_ = [
+        _c_stat__fields_ = [
             ('st_dev', c_dev_t),
             ('__pad1_1', ctypes.c_ulong),
             ('__pad1_2', ctypes.c_ulong),
@@ -306,7 +300,7 @@ elif _system == 'Linux':
             ('__pad7_13', ctypes.c_ulong),
             ('__pad7_14', ctypes.c_ulong)]
     elif _machine == 'ppc':
-        c_stat._fields_ = [
+        _c_stat__fields_ = [
             ('st_dev', c_dev_t),
             ('st_ino', ctypes.c_ulonglong),
             ('st_mode', c_mode_t),
@@ -321,8 +315,8 @@ elif _system == 'Linux':
             ('st_atimespec', c_timespec),
             ('st_mtimespec', c_timespec),
             ('st_ctimespec', c_timespec)]
-    elif _machine == 'ppc64' or _machine == 'ppc64le':
-        c_stat._fields_ = [
+    elif _machine in ('ppc64', 'ppc64le'):
+        _c_stat__fields_ = [
             ('st_dev', c_dev_t),
             ('st_ino', ctypes.c_ulong),
             ('st_nlink', ctypes.c_ulong),
@@ -338,7 +332,7 @@ elif _system == 'Linux':
             ('st_mtimespec', c_timespec),
             ('st_ctimespec', c_timespec)]
     elif _machine == 'aarch64':
-        c_stat._fields_ = [
+        _c_stat__fields_ = [
             ('st_dev', c_dev_t),
             ('st_ino', ctypes.c_ulong),
             ('st_mode', c_mode_t),
@@ -356,7 +350,7 @@ elif _system == 'Linux':
             ('st_ctimespec', c_timespec)]
     else:
         # i686, use as fallback for everything else
-        c_stat._fields_ = [
+        _c_stat__fields_ = [
             ('st_dev', c_dev_t),
             ('__pad1', ctypes.c_ushort),
             ('__st_ino', ctypes.c_ulong),
@@ -387,7 +381,7 @@ elif _system == 'Windows' or _system.startswith('CYGWIN'):
         ctypes.POINTER(ctypes.c_byte), ctypes.c_size_t, ctypes.c_int)
     getxattr_t = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p,
         ctypes.POINTER(ctypes.c_byte), ctypes.c_size_t)
-    c_stat._fields_ = [
+    _c_stat__fields_ = [
         ('st_dev', c_dev_t),
         ('st_ino', ctypes.c_ulonglong),
         ('st_mode', c_mode_t),
@@ -423,7 +417,7 @@ elif _system == 'OpenBSD':
         ctypes.c_size_t)
     c_fsblkcnt_t = ctypes.c_uint64
     c_fsfilcnt_t = ctypes.c_uint64
-    c_stat._fields_ = [
+    _c_stat__fields_ = [
         ('st_mode', c_mode_t),
         ('st_dev', c_dev_t),
         ('st_ino', c_ino_t),
@@ -442,7 +436,11 @@ elif _system == 'OpenBSD':
         ('st_birthtimespec', c_timespec),
     ]
 else:
-    raise NotImplementedError('%s is not supported.' % _system)
+    raise NotImplementedError(_system + ' is not supported.')
+
+
+class c_stat(ctypes.Structure):
+    _fields_ = _c_stat__fields_
 
 
 # https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_statvfs.h.html
@@ -698,8 +696,7 @@ else:
 def time_of_timespec(ts, use_ns=False):
     if use_ns:
         return ts.tv_sec * 10 ** 9 + ts.tv_nsec
-    else:
-        return ts.tv_sec + ts.tv_nsec / 1E9
+    return ts.tv_sec + ts.tv_nsec / 1E9
 
 def set_st_attrs(st, attrs, use_ns=False):
     for key, val in attrs.items():
@@ -745,10 +742,10 @@ def fuse_exit():
 
 class FuseOSError(OSError):
     def __init__(self, errno):
-        super(FuseOSError, self).__init__(errno, os.strerror(errno))
+        super().__init__(errno, os.strerror(errno))
 
 
-class FUSE(object):
+class FUSE():
     '''
     This class is the lower level interface and should not be subclassed under
     normal use. Its methods are called by fuse.
@@ -850,7 +847,7 @@ class FUSE(object):
                 if value is True:
                     yield key
             else:
-                yield '%s=%s' % (key, value)
+                yield f'{key}={value}'
 
     def _wrapper(self, func, *args, **kwargs):
         'Decorator for the methods that follow'
@@ -961,9 +958,8 @@ class FUSE(object):
         fi = fip.contents
         if self.raw_fi:
             return self.operations('open', path.decode(self.encoding), fi)
-        else:
-            fi.fh = self.operations('open', path.decode(self.encoding), fi.flags)
-            return 0
+        fi.fh = self.operations('open', path.decode(self.encoding), fi.flags)
+        return 0
 
     def read(self, path, buf, size, offset, fip):
         fh = fip.contents if self.raw_fi else fip.contents.fh
@@ -973,8 +969,7 @@ class FUSE(object):
             return 0
 
         retsize = len(ret)
-        assert retsize <= size, \
-            'actual amount read %d greater than expected %d' % (retsize, size)
+        assert retsize <= size, f'actual amount read {retsize} greater than expected {size}'
 
         ctypes.memmove(buf, ret, retsize)
         return retsize
@@ -1061,7 +1056,7 @@ class FUSE(object):
     def readdir(self, path, buf, filler, offset, fip):
         # Ignore raw_fi
         for item in self.operations('readdir', self._decode_optional_path(path), fip.contents.fh):
-            if isinstance(item, basestring):
+            if isinstance(item, str):
                 name, st, offset = item, None, 0
             else:
                 name, attrs, offset = item
@@ -1100,9 +1095,8 @@ class FUSE(object):
 
         if self.raw_fi:
             return self.operations('create', path, mode, fi)
-        else:
-            fi.fh = self.operations('create', path, mode, fi.flags)
-            return 0
+        fi.fh = self.operations('create', path, mode, fi.flags)
+        return 0
 
     def ftruncate(self, path, length, fip):
         fh = fip.contents if self.raw_fi else fip.contents.fh
@@ -1174,7 +1168,7 @@ def _nullable_dummy_function(method):
     return method
 
 
-class Operations(object):
+class Operations:
     '''
     This class should be subclassed and passed as an argument to FUSE on
     initialization. All operations should raise a FuseOSError exception on
@@ -1263,7 +1257,7 @@ class Operations(object):
 
         if path != '/':
             raise FuseOSError(errno.ENOENT)
-        return dict(st_mode=(S_IFDIR | 0o755), st_nlink=2)
+        return {'st_mode': (S_IFDIR | 0o755), 'st_nlink': 2}
 
     @_nullable_dummy_function
     def getxattr(self, path, name, position=0):
