@@ -847,34 +847,34 @@ class FUSE(object):
     def _wrapper(self, func, *args, **kwargs):
         'Decorator for the methods that follow'
 
+        # Catch exceptions generically so that the whole filesystem does not crash on each fusepy user
+        # error. 'init' must not fail because its return code is just stored as private_data field of
+        # struct fuse_contex.
         try:
-            if func.__name__ == "init":
-                # init may not fail, as its return code is just stored as
-                # private_data field of struct fuse_context
+            try:
                 return func(*args, **kwargs) or 0
 
-            else:
-                try:
-                    return func(*args, **kwargs) or 0
+            except OSError as e:
+                if func.__name__ == "init":
+                    raise e
+                if isinstance(e.errno, int) and e.errno > 0:
+                    log.debug(
+                        "FUSE operation %s raised a %s, returning errno %s.",
+                        func.__name__, type(e), e.errno, exc_info=True)
+                    return -e.errno
+                log.error(
+                    "FUSE operation %s raised an OSError with negative "
+                    "errno %s, returning errno.EINVAL.",
+                    func.__name__, e.errno, exc_info=True)
+                return -errno.EINVAL
 
-                except OSError as e:
-                    if isinstance(e.errno, int) and e.errno > 0:
-                        log.debug(
-                            "FUSE operation %s raised a %s, returning errno %s.",
-                            func.__name__, type(e), e.errno, exc_info=True)
-                        return -e.errno
-                    else:
-                        log.error(
-                            "FUSE operation %s raised an OSError with negative "
-                            "errno %s, returning errno.EINVAL.",
-                            func.__name__, e.errno, exc_info=True)
-                        return -errno.EINVAL
-
-                except Exception:
-                    log.error("Uncaught exception from FUSE operation %s, "
-                              "returning errno.EINVAL.",
-                              func.__name__, exc_info=True)
-                    return -errno.EINVAL
+            except Exception as e:
+                if func.__name__ == "init":
+                    raise e
+                log.error("Uncaught exception from FUSE operation %s, "
+                          "returning errno.EINVAL.",
+                          func.__name__, exc_info=True)
+                return -errno.EINVAL
 
         except BaseException as e:
             self.__critical_exception = e
