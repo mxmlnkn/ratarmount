@@ -491,6 +491,32 @@ else:
             ('f_flag', ctypes.c_ulong),
             ('f_namemax', ctypes.c_ulong)]
 
+
+if _system == 'Linux':
+    # https://github.com/torvalds/linux/blob/20371ba120635d9ab7fc7670497105af8f33eb08/include/uapi/asm-generic/fcntl.h#L195
+    class c_flock_t(ctypes.Structure):
+        _fields_ = [
+            ('l_type', ctypes.c_short),
+            ('l_whence', ctypes.c_short),
+            ('l_start', c_off_t),
+            ('l_len', c_off_t),
+            ('l_pid', c_pid_t),
+            ('l_sysid', ctypes.c_long),  # not always present
+        ]
+elif _system == 'OpenBSD':
+    # https://github.com/openbsd/src/blob/a465f6177bcfdb2ffa9f98c7ca0780392688fc0d/sys/sys/fcntl.h#L180
+    class c_flock_t(ctypes.Structure):
+        _fields_ = [
+            ('l_start', c_off_t),            # starting offset
+            ('l_len', c_off_t),              # len = 0 means until end of file
+            ('l_pid', c_pid_t),              # lock owner
+            ('l_type', ctypes.c_short),    # lock type: read/write, etc.
+            ('l_whence', ctypes.c_short),  # type of l_start
+        ]
+else:
+    c_flock_t = ctypes.c_void_p
+
+
 class fuse_file_info(ctypes.Structure):
     _fields_ = [
         ('flags', ctypes.c_int),
@@ -522,37 +548,79 @@ class fuse_context(ctypes.Structure):
 _libfuse.fuse_get_context.restype = ctypes.POINTER(fuse_context)
 
 
-class fuse_operations(ctypes.Structure):
+# FUSE_BUF_IS_FD    = (1 << 1),
+# FUSE_BUF_FD_SEEK  = (1 << 2),
+# FUSE_BUF_FD_RETRY = (1 << 3),
+fuse_buf_flags = ctypes.c_int
+
+class fuse_buf(ctypes.Structure):
     _fields_ = [
-        ('getattr', CFUNCTYPE(c_int, c_char_p, POINTER(c_stat))),
-        ('readlink', CFUNCTYPE(c_int, c_char_p, POINTER(c_byte), c_size_t)),
-        ('getdir', c_void_p),    # Deprecated, use readdir
-        ('mknod', CFUNCTYPE(c_int, c_char_p, c_mode_t, c_dev_t)),
-        ('mkdir', CFUNCTYPE(c_int, c_char_p, c_mode_t)),
-        ('unlink', CFUNCTYPE(c_int, c_char_p)),
-        ('rmdir', CFUNCTYPE(c_int, c_char_p)),
-        ('symlink', CFUNCTYPE(c_int, c_char_p, c_char_p)),
-        ('rename', CFUNCTYPE(c_int, c_char_p, c_char_p)),
-        ('link', CFUNCTYPE(c_int, c_char_p, c_char_p)),
-        ('chmod', CFUNCTYPE(c_int, c_char_p, c_mode_t)),
-        ('chown', CFUNCTYPE(c_int, c_char_p, c_uid_t, c_gid_t)),
-        ('truncate', CFUNCTYPE(c_int, c_char_p, c_off_t)),
-        ('utime', c_void_p),     # Deprecated, use utimens
-        ('open', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
-        ('read', CFUNCTYPE(
-            c_int, c_char_p, POINTER(c_byte),
-            c_size_t, c_off_t, POINTER(fuse_file_info))),
-        ('write', CFUNCTYPE(
-            c_int, c_char_p, POINTER(c_byte),
-            c_size_t, c_off_t, POINTER(fuse_file_info))),
-        ('statfs', CFUNCTYPE(c_int, c_char_p, POINTER(c_statvfs))),
-        ('flush', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
-        ('release', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
-        ('fsync', CFUNCTYPE(c_int, c_char_p, c_int, POINTER(fuse_file_info))),
-        ('setxattr', setxattr_t),
-        ('getxattr', getxattr_t),
-        ('listxattr', CFUNCTYPE(c_int, c_char_p, POINTER(c_byte), c_size_t)),
-        ('removexattr', CFUNCTYPE(c_int, c_char_p, c_char_p)),
+        ('size', ctypes.c_size_t),
+        ('flags', fuse_buf_flags),
+        ('mem', ctypes.c_void_p),
+        ('fd', ctypes.c_int),
+        ('pos', c_off_t),
+    ]
+
+class fuse_bufvec(ctypes.Structure):
+    _fields_ = [
+        ('count', ctypes.c_size_t),
+        ('idx', ctypes.c_size_t),
+        ('off', ctypes.c_size_t),
+        ('buf', ctypes.POINTER(fuse_buf)),
+    ]
+
+
+class fuse_conn_info(ctypes.Structure):  # Added in 2.6 (ABI break of "init" from 2.5->2.6)
+    _fields_ = [
+        ('proto_major', ctypes.c_uint),
+        ('proto_minor', ctypes.c_uint),
+        ('async_read', ctypes.c_uint),
+        ('max_write', ctypes.c_uint),
+        ('max_readahead', ctypes.c_uint),
+        ('capable', ctypes.c_uint),               # Added in 2.8
+        ('want', ctypes.c_uint),                  # Added in 2.8
+        ('max_background', ctypes.c_uint),        # Added in 2.9
+        ('congestion_threshold', ctypes.c_uint),  # Added in 2.9
+        ('reserved', ctypes.c_uint * 23),
+    ]
+
+fuse_pollhandle_p = ctypes.c_void_p  # Not exposed to API
+
+
+_fuse_operations_fields = [
+    ('getattr', CFUNCTYPE(c_int, c_char_p, POINTER(c_stat))),
+    ('readlink', CFUNCTYPE(c_int, c_char_p, POINTER(c_byte), c_size_t)),
+    ('getdir', c_void_p),    # Deprecated, use readdir
+    ('mknod', CFUNCTYPE(c_int, c_char_p, c_mode_t, c_dev_t)),
+    ('mkdir', CFUNCTYPE(c_int, c_char_p, c_mode_t)),
+    ('unlink', CFUNCTYPE(c_int, c_char_p)),
+    ('rmdir', CFUNCTYPE(c_int, c_char_p)),
+    ('symlink', CFUNCTYPE(c_int, c_char_p, c_char_p)),
+    ('rename', CFUNCTYPE(c_int, c_char_p, c_char_p)),
+    ('link', CFUNCTYPE(c_int, c_char_p, c_char_p)),
+    ('chmod', CFUNCTYPE(c_int, c_char_p, c_mode_t)),
+    ('chown', CFUNCTYPE(c_int, c_char_p, c_uid_t, c_gid_t)),
+    ('truncate', CFUNCTYPE(c_int, c_char_p, c_off_t)),
+    ('utime', c_void_p),     # Deprecated, use utimens
+    ('open', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
+    ('read', CFUNCTYPE(
+        c_int, c_char_p, POINTER(c_byte),
+        c_size_t, c_off_t, POINTER(fuse_file_info))),
+    ('write', CFUNCTYPE(
+        c_int, c_char_p, POINTER(c_byte),
+        c_size_t, c_off_t, POINTER(fuse_file_info))),
+    ('statfs', CFUNCTYPE(c_int, c_char_p, POINTER(c_statvfs))),
+    ('flush', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
+    ('release', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
+    ('fsync', CFUNCTYPE(c_int, c_char_p, c_int, POINTER(fuse_file_info))),
+    ('setxattr', setxattr_t),
+    ('getxattr', getxattr_t),
+    ('listxattr', CFUNCTYPE(c_int, c_char_p, POINTER(c_byte), c_size_t)),
+    ('removexattr', CFUNCTYPE(c_int, c_char_p, c_char_p)),
+]
+if fuse_version_minor >= 3:
+    _fuse_operations_fields += [
         ('opendir', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
         ('readdir', CFUNCTYPE(
             c_int,
@@ -563,16 +631,24 @@ class fuse_operations(ctypes.Structure):
             POINTER(fuse_file_info))),
         ('releasedir', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
         ('fsyncdir', CFUNCTYPE(c_int, c_char_p, c_int, POINTER(fuse_file_info))),
-        ('init', CFUNCTYPE(c_void_p, c_void_p)),
+        ('init', CFUNCTYPE(c_void_p, POINTER(fuse_conn_info))),
         ('destroy', CFUNCTYPE(c_void_p, c_void_p)),
+    ]
+if fuse_version_minor >= 5:
+    _fuse_operations_fields += [
         ('access', CFUNCTYPE(c_int, c_char_p, c_int)),
         ('create', CFUNCTYPE(c_int, c_char_p, c_mode_t, POINTER(fuse_file_info))),
         ('ftruncate', CFUNCTYPE(c_int, c_char_p, c_off_t, POINTER(fuse_file_info))),
         ('fgetattr', CFUNCTYPE(c_int, c_char_p, POINTER(c_stat), POINTER(fuse_file_info))),
-        ('lock', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info), c_int, c_void_p)),
+    ]
+if fuse_version_minor >= 6:
+    _fuse_operations_fields += [
+        ('lock', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info), c_int, POINTER(c_flock_t))),
         ('utimens', CFUNCTYPE(c_int, c_char_p, POINTER(c_utimbuf))),
         ('bmap', CFUNCTYPE(c_int, c_char_p, c_size_t, POINTER(c_uint64))),
-
+    ]
+if fuse_version_minor >= 8:
+    _fuse_operations_fields += [
         ('flag_nullpath_ok', c_uint, 1),
         ('flag_nopath', c_uint, 1),
         ('flag_utime_omit_ok', c_uint, 1),
@@ -583,6 +659,27 @@ class fuse_operations(ctypes.Structure):
             POINTER(fuse_file_info), c_uint, c_void_p),
         ),
     ]
+if fuse_version_minor >= 9:
+    _fuse_operations_fields += [
+        ('poll', CFUNCTYPE(
+            c_int, c_char_p, POINTER(fuse_file_info), fuse_pollhandle_p, POINTER(c_uint)),
+        ),
+        ('write_buf', CFUNCTYPE(
+            c_int, c_char_p, POINTER(fuse_bufvec), c_off_t, POINTER(fuse_file_info)),
+        ),
+        ('read_buf', CFUNCTYPE(
+            c_int, c_char_p, POINTER(POINTER(fuse_bufvec)),
+            c_size_t, c_off_t, POINTER(fuse_file_info)),
+        ),
+        ('flock', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info), c_int)),
+        ('fallocate', CFUNCTYPE(
+            c_int, c_char_p, c_int, c_off_t, c_off_t, POINTER(fuse_file_info)),
+        ),
+    ]
+
+class fuse_operations(ctypes.Structure):
+    _fields_ = _fuse_operations_fields
+
 
 if _system == "OpenBSD":
     def fuse_main_real(argc, argv, fuse_ops_v, sizeof_fuse_ops, ctx_p):
@@ -1037,6 +1134,26 @@ class FUSE(object):
         fh = fip.contents if self.raw_fi else fip.contents.fh
         return self.operations('ioctl', path.decode(self.encoding), cmd, arg, fh, flags, data)
 
+    def poll(self, path, fip, ph, reventsp):
+        fh = fip.contents if self.raw_fi else fip.contents.fh
+        return self.operations('poll', path.decode(self.encoding), fh, ph, reventsp)
+
+    def write_buf(self, path, buf, offset, fip):
+        fh = fip.contents if self.raw_fi else fip.contents.fh
+        return self.operations('write_buf', path.decode(self.encoding), buf, offset, fh)
+
+    def read_buf(self, path, bufpp, size, offset, fip):
+        fh = fip.contents if self.raw_fi else fip.contents.fh
+        return self.operations('read_buf', path.decode(self.encoding), bufpp, size, offset, fh)
+
+    def flock(self, path, fip, op):
+        fh = fip.contents if self.raw_fi else fip.contents.fh
+        return self.operations('flock', path.decode(self.encoding), fh, op)
+
+    def fallocate(self, path, mode, offset, size, fip):
+        fh = fip.contents if self.raw_fi else fip.contents.fh
+        return self.operations('fallocate', path.decode(self.encoding), mode, offset, size, fh)
+
 
 def _nullable_dummy_function(method):
     '''
@@ -1275,6 +1392,26 @@ class Operations(object):
     @_nullable_dummy_function
     def write(self, path, data, offset, fh):
         raise FuseOSError(errno.EROFS)
+
+    @_nullable_dummy_function
+    def poll(self, path, fh, ph, reventsp):
+        raise FuseOSError(errno.ENOSYS)
+
+    @_nullable_dummy_function
+    def write_buf(self, path, buf, offset, fh):
+        raise FuseOSError(errno.ENOSYS)
+
+    @_nullable_dummy_function
+    def read_buf(self, path, bufpp, size, offset, fh):
+        raise FuseOSError(errno.ENOSYS)
+
+    @_nullable_dummy_function
+    def flock(self, path, fh, op):
+        raise FuseOSError(errno.ENOSYS)
+
+    @_nullable_dummy_function
+    def fallocate(self, path, mode, offset, size, fh):
+        raise FuseOSError(errno.ENOSYS)
 
 
 class LoggingMixIn:
