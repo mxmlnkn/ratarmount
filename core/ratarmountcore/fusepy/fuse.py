@@ -36,6 +36,7 @@ from ctypes import (
     c_char_p,
     c_byte,
     c_size_t,
+    c_ssize_t,
     c_int,
     c_uint,
     c_uint64,
@@ -140,6 +141,8 @@ if not _libfuse_path:
         # pytype: enable=module-attr
     else:
         _libfuse_path = find_library('fuse')
+        if not _libfuse_path:
+            _libfuse_path = find_library('fuse3')
 
 if not _libfuse_path:
     raise EnvironmentError('Unable to find libfuse')
@@ -163,13 +166,63 @@ if fuse_version_major == 2 and fuse_version_minor < 6:
         f"Found library {_libfuse_path} is too old: {fuse_version_major}.{fuse_version_minor}. "
         "There have been several ABI breaks in each version. Libfuse < 2.6 is not supported!"
     )
-if fuse_version_major != 2:
+if fuse_version_major != 2 and not (fuse_version_major == 3 and _system == 'Linux'):
     raise AttributeError(
         f"Found library {_libfuse_path} has wrong major version: {fuse_version_major}. "
         "Expected FUSE 2!"
     )
+if fuse_version_major == 3 and fuse_version_minor > 16:
+    raise AttributeError(
+        f"Found library {_libfuse_path} is too new ({fuse_version_major}.{fuse_version_minor}) "
+        "and will not be used because FUSE 3 has no track record of ABI compatibility."
+    )
 
 
+# Check FUSE major version changes by cloning https://github.com/libfuse/libfuse.git
+# and check the diff with:
+#     git diff -w fuse-2.9.9 fuse-3.0.0 include/fuse.h
+# or with comments stripped and diffed:
+#    colordiff <( gcc -fpreprocessed -dD -E -P -Wno-all -x c \
+#                     <( git show fuse-2.9.9:include/fuse.h ) ) \
+#              <( gcc -fpreprocessed -dD -E -P -Wno-all -x c \
+#                 <( git show fuse-3.0.2:include/fuse.h ) )
+# and repeat for fuse_common.h and possibly over included headers, or check
+# the official changelog:
+# https://github.com/libfuse/libfuse/blob/master/ChangeLog.rst#libfuse-300-2016-12-08
+#
+# Header changes summarized:
+#  - Added enum fuse_readdir_flags, which is added as last argument to readdir.
+#  - Added enum fuse_fill_dir_flags, which is added to the fuse_fill_dir_t
+#    function callback argument to readdir.
+#  - Removed fuse_operations.getdir and related types fuse_dirh_t.
+#    Was already deprecated in favor of readdir.
+#  - Added fuse_fill_dir_flags to fuse_dirfil_t callback function pointer that
+#    is used for readdir.
+#  - Added fuse_config struct, which is the new second parameter of
+#    fuse_operations.init.
+#  - Added new fuse_file_info struct (fuse_common.h), which is added as
+#    additional arguments to:
+#    - Added as last argument to: getattr, chmod, chown, truncate, utimens.
+#    - This argument already existed for: open, read, write, flush, release, fsync,
+#      opendir, readdir, releasedir, fsyncdir, create, ftruncate, fgetattr, lock,
+#      ioctl, read_buf, fallocate, poll, write_buf, flock.
+#  - Added unsigned int flags to rename.
+#  - Removed utime in favor of utimens, which has been added in libFUSE 2.6.
+#  - Removed deprecated functions: fuse_fs_fgetattr, fuse_fs_ftruncate,
+#    fuse_invalidate, and fuse_is_lib_option.
+#  - Removed flags from fuse_operations: flag_nullpath_ok, flag_nopath,
+#    flag_utime_omit_ok, flag_reserved. These are now in the new fuse_config struct.
+#  - Added version argument to fuse_main_real, but this should not be called directly
+#    anyway and instead the fuse_main wrapper, which is unchanged should be called.
+#  - Removed first argument struct fuse_chan* from fuse_new.
+#  - Removed fuse_chan* return value from fuse_mount and fuse_chan* argument from
+#    fuse_unmount (and moved both methods from fuse_common.h into fuse.h).
+#  - Added int clone_fd argument to fuse_loop_mt.
+#  - Added macro definitions for constants FUSE_CAP_* to fuse_common.h.
+#  - Added fuse_apply_conn_info_opts to fuse_common.h, see the official changelog
+#    for reasoning.
+
+# Set non-FUSE-specific kernel type definitions.
 if _system in ('Darwin', 'Darwin-MacFuse', 'FreeBSD'):
     ENOTSUP = 45
 
@@ -523,8 +576,15 @@ else:
     c_flock_t = ctypes.c_void_p
 
 
-class fuse_file_info(ctypes.Structure):
-    _fields_ = [
+# fuse_file_info as defined in fuse_common.h. Changes in FUSE 3:
+#  - fh_old was removed
+#  - poll_events was added
+#  - writepage was added to the bitfield, but the padding was not decreased,
+#    so now there are 33 bits in total, which probably lead to some unwanted
+#    padding in libfuse 3.0.2. This has been made explicit since libfuse 3.7.0:
+#    https://github.com/libfuse/libfuse/commit/1d8e8ca94a3faa635afd1a3bd8d7d26472063a3f
+if fuse_version_major == 2:
+    _fuse_file_info_fields_ = [
         ('flags', ctypes.c_int),
         ('fh_old', ctypes.c_ulong),
         ('writepage', ctypes.c_int),
@@ -535,7 +595,45 @@ class fuse_file_info(ctypes.Structure):
         ('flock_release', ctypes.c_uint, 1),  # Introduced in libfuse 2.9
         ('padding', ctypes.c_uint, 27),
         ('fh', ctypes.c_uint64),
-        ('lock_owner', ctypes.c_uint64)]
+        ('lock_owner', ctypes.c_uint64),
+    ]
+elif fuse_version_major == 3:
+    _fuse_file_info_fields_ = [('flags', ctypes.c_int)]
+
+    _fuse_file_info_fields_bitfield = [
+        ('writepage', ctypes.c_uint, 1),
+        ('direct_io', ctypes.c_uint, 1),
+        ('keep_cache', ctypes.c_uint, 1),
+    ]
+    # Introduced in 3.15.0 and its placement is an API-incompatible change / bug!
+    # https://github.com/libfuse/libfuse/issues/1029
+    if fuse_version_minor >= 15:
+        _fuse_file_info_fields_bitfield += [
+            ('parallel_direct_writes', ctypes.c_uint, 1),
+        ]
+    _fuse_file_info_fields_bitfield += [
+        ('flush', ctypes.c_uint, 1),
+        ('nonseekable', ctypes.c_uint, 1),
+        ('flock_release', ctypes.c_uint, 1),
+    ]
+    # Further ABI-breaks.
+    if fuse_version_minor >= 5:
+        _fuse_file_info_fields_bitfield += [('cache_readdir', ctypes.c_uint, 1)]
+    if fuse_version_minor >= 11:
+        _fuse_file_info_fields_bitfield += [('noflush', ctypes.c_uint, 1)]
+
+    _fuse_file_info_fields_ += _fuse_file_info_fields_bitfield
+    _fuse_file_info_fields_ += [
+        ('padding', ctypes.c_uint, 32 - sum(x[2] for x in _fuse_file_info_fields_bitfield)),
+        ('padding2', ctypes.c_uint, 32),
+        ('fh', ctypes.c_uint64),
+        ('lock_owner', ctypes.c_uint64),
+        ('poll_events', ctypes.c_uint64),
+    ]
+
+class fuse_file_info(ctypes.Structure):
+    _fields_ = _fuse_file_info_fields_
+
 
 class fuse_context(ctypes.Structure):
     _fields_ = [
@@ -577,45 +675,101 @@ class fuse_bufvec(ctypes.Structure):
     ]
 
 
-class fuse_conn_info(ctypes.Structure):  # Added in 2.6 (ABI break of "init" from 2.5->2.6)
-    _fields_ = [
-        ('proto_major', ctypes.c_uint),
-        ('proto_minor', ctypes.c_uint),
-        ('async_read', ctypes.c_uint),
-        ('max_write', ctypes.c_uint),
-        ('max_readahead', ctypes.c_uint),
-        ('capable', ctypes.c_uint),               # Added in 2.8
-        ('want', ctypes.c_uint),                  # Added in 2.8
-        ('max_background', ctypes.c_uint),        # Added in 2.9
-        ('congestion_threshold', ctypes.c_uint),  # Added in 2.9
-        ('reserved', ctypes.c_uint * 23),
+if fuse_version_major == 2:
+    class fuse_conn_info(ctypes.Structure):  # Added in 2.6 (ABI break of "init" from 2.5->2.6)
+        _fields_ = [
+            ('proto_major', ctypes.c_uint),
+            ('proto_minor', ctypes.c_uint),
+            ('async_read', ctypes.c_uint),
+            ('max_write', ctypes.c_uint),
+            ('max_readahead', ctypes.c_uint),
+            ('capable', ctypes.c_uint),               # Added in 2.8
+            ('want', ctypes.c_uint),                  # Added in 2.8
+            ('max_background', ctypes.c_uint),        # Added in 2.9
+            ('congestion_threshold', ctypes.c_uint),  # Added in 2.9
+            ('reserved', ctypes.c_uint * 23),
+        ]
+elif fuse_version_major == 3:
+    class fuse_conn_info(ctypes.Structure):
+        _fields_ = [
+            ('proto_major', ctypes.c_uint),
+            ('proto_minor', ctypes.c_uint),
+            ('max_write', ctypes.c_uint),
+            ('max_read', ctypes.c_uint),
+            ('max_readahead', ctypes.c_uint),
+            ('capable', ctypes.c_uint),
+            ('want', ctypes.c_uint),
+            ('max_background', ctypes.c_uint),
+            ('congestion_threshold', ctypes.c_uint),
+            ('time_gran', ctypes.c_uint),
+            ('reserved', ctypes.c_uint * 22),
+        ]
+
+
+# FUSE 3-only struct for second init argument. If a FUSE 2 method is loaded but 'init_with_config'
+# overridden, then this argument will only be zero-initialized and should be ignored.
+_fuse_config_fields_ = [
+    ('set_gid', ctypes.c_int),
+    ('gid', ctypes.c_uint),
+    ('set_uid', ctypes.c_int),
+    ('uid', ctypes.c_uint),
+    ('set_mode', ctypes.c_int),
+    ('umask', ctypes.c_uint),
+    ('entry_timeout', ctypes.c_double),
+    ('negative_timeout', ctypes.c_double),
+    ('attr_timeout', ctypes.c_double),
+    ('intr', ctypes.c_int),
+    ('intr_signal', ctypes.c_int),
+    ('remember', ctypes.c_int),
+    ('hard_remove', ctypes.c_int),
+    ('use_ino', ctypes.c_int),
+    ('readdir_ino', ctypes.c_int),
+    ('direct_io', ctypes.c_int),
+    ('kernel_cache', ctypes.c_int),
+    ('auto_cache', ctypes.c_int),
+]
+if fuse_version_major == 3:
+    # Adding this member in the middle of the struct was an ABI-incompatible change!
+    if fuse_version_minor >= 11:
+        _fuse_config_fields_ += [('no_rofd_flush', ctypes.c_int)]
+
+    _fuse_config_fields_ += [
+        ('ac_attr_timeout_set', ctypes.c_int),
+        ('ac_attr_timeout', ctypes.c_double),
+        ('nullpath_ok', ctypes.c_int),
     ]
+
+    # Another ABI break as discussed here: https://lists.debian.org/debian-devel/2024/03/msg00278.html
+    # The break was in 3.14.1 NOT in 3.14.0, but I cannot query the bugfix version.
+    # I'd hope that all 3.14.0 installations have been replaced by updates to 3.14.1.
+    if fuse_version_minor >= 14:
+        _fuse_config_fields_ += [('parallel_direct_writes', ctypes.c_int)]
+
+    _fuse_config_fields_ += [
+        ('show_help', ctypes.c_int),
+        ('modules', ctypes.c_char_p),
+        ('debug', ctypes.c_int),
+    ]
+
+class fuse_config(ctypes.Structure):
+    _fields_ = _fuse_config_fields_
+
 
 fuse_pollhandle_p = ctypes.c_void_p  # Not exposed to API
 
 
-_fuse_operations_fields = [
-    ('getattr', CFUNCTYPE(c_int, c_char_p, POINTER(c_stat))),
-    ('readlink', CFUNCTYPE(c_int, c_char_p, POINTER(c_byte), c_size_t)),
-    ('getdir', c_void_p),    # Deprecated, use readdir
+# These are unchanged in FUSE 3 and therefore nice to have separate to reduce duplication.
+_fuse_operations_fields_mknod_to_symlink = [
     ('mknod', CFUNCTYPE(c_int, c_char_p, c_mode_t, c_dev_t)),
     ('mkdir', CFUNCTYPE(c_int, c_char_p, c_mode_t)),
     ('unlink', CFUNCTYPE(c_int, c_char_p)),
     ('rmdir', CFUNCTYPE(c_int, c_char_p)),
     ('symlink', CFUNCTYPE(c_int, c_char_p, c_char_p)),
-    ('rename', CFUNCTYPE(c_int, c_char_p, c_char_p)),
-    ('link', CFUNCTYPE(c_int, c_char_p, c_char_p)),
-    ('chmod', CFUNCTYPE(c_int, c_char_p, c_mode_t)),
-    ('chown', CFUNCTYPE(c_int, c_char_p, c_uid_t, c_gid_t)),
-    ('truncate', CFUNCTYPE(c_int, c_char_p, c_off_t)),
-    ('utime', c_void_p),     # Deprecated, use utimens
+]
+_fuse_operations_fields_open_to_removexattr = [
     ('open', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
-    ('read', CFUNCTYPE(
-        c_int, c_char_p, POINTER(c_byte),
-        c_size_t, c_off_t, POINTER(fuse_file_info))),
-    ('write', CFUNCTYPE(
-        c_int, c_char_p, POINTER(c_byte),
-        c_size_t, c_off_t, POINTER(fuse_file_info))),
+    ('read', CFUNCTYPE(c_int, c_char_p, POINTER(c_byte), c_size_t, c_off_t, POINTER(fuse_file_info))),
+    ('write', CFUNCTYPE(c_int, c_char_p, POINTER(c_byte), c_size_t, c_off_t, POINTER(fuse_file_info))),
     ('statfs', CFUNCTYPE(c_int, c_char_p, POINTER(c_statvfs))),
     ('flush', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
     ('release', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
@@ -625,62 +779,141 @@ _fuse_operations_fields = [
     ('listxattr', CFUNCTYPE(c_int, c_char_p, POINTER(c_byte), c_size_t)),
     ('removexattr', CFUNCTYPE(c_int, c_char_p, c_char_p)),
 ]
-if fuse_version_minor >= 3:
-    _fuse_operations_fields += [
-        ('opendir', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
-        ('readdir', CFUNCTYPE(
-            c_int,
-            c_char_p,
-            c_void_p,
-            CFUNCTYPE(c_int, c_void_p, c_char_p, POINTER(c_stat), c_off_t),
-            c_off_t,
-            POINTER(fuse_file_info))),
-        ('releasedir', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
-        ('fsyncdir', CFUNCTYPE(c_int, c_char_p, c_int, POINTER(fuse_file_info))),
-        ('init', CFUNCTYPE(c_void_p, POINTER(fuse_conn_info))),
-        ('destroy', CFUNCTYPE(c_void_p, c_void_p)),
-    ]
-if fuse_version_minor >= 5:
-    _fuse_operations_fields += [
-        ('access', CFUNCTYPE(c_int, c_char_p, c_int)),
-        ('create', CFUNCTYPE(c_int, c_char_p, c_mode_t, POINTER(fuse_file_info))),
-        ('ftruncate', CFUNCTYPE(c_int, c_char_p, c_off_t, POINTER(fuse_file_info))),
-        ('fgetattr', CFUNCTYPE(c_int, c_char_p, POINTER(c_stat), POINTER(fuse_file_info))),
-    ]
-if fuse_version_minor >= 6:
-    _fuse_operations_fields += [
-        ('lock', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info), c_int, POINTER(c_flock_t))),
-        ('utimens', CFUNCTYPE(c_int, c_char_p, POINTER(c_utimbuf))),
-        ('bmap', CFUNCTYPE(c_int, c_char_p, c_size_t, POINTER(c_uint64))),
-    ]
-if fuse_version_minor >= 8:
-    _fuse_operations_fields += [
-        ('flag_nullpath_ok', c_uint, 1),
-        ('flag_nopath', c_uint, 1),
-        ('flag_utime_omit_ok', c_uint, 1),
-        ('flag_reserved', c_uint, 29),
+_fuse_operations_fields_2_9 = [
+    ('poll', CFUNCTYPE(
+        c_int, c_char_p, POINTER(fuse_file_info), fuse_pollhandle_p, POINTER(c_uint)),
+    ),
+    ('write_buf', CFUNCTYPE(
+        c_int, c_char_p, POINTER(fuse_bufvec), c_off_t, POINTER(fuse_file_info)),
+    ),
+    ('read_buf', CFUNCTYPE(
+        c_int, c_char_p, POINTER(POINTER(fuse_bufvec)),
+        c_size_t, c_off_t, POINTER(fuse_file_info)),
+    ),
+    ('flock', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info), c_int)),
+    ('fallocate', CFUNCTYPE(
+        c_int, c_char_p, c_int, c_off_t, c_off_t, POINTER(fuse_file_info)),
+    ),
+]
 
-        ('ioctl', CFUNCTYPE(
-            c_int, c_char_p, c_uint, c_void_p,
-            POINTER(fuse_file_info), c_uint, c_void_p),
-        ),
-    ]
-if fuse_version_minor >= 9:
-    _fuse_operations_fields += [
-        ('poll', CFUNCTYPE(
-            c_int, c_char_p, POINTER(fuse_file_info), fuse_pollhandle_p, POINTER(c_uint)),
-        ),
-        ('write_buf', CFUNCTYPE(
-            c_int, c_char_p, POINTER(fuse_bufvec), c_off_t, POINTER(fuse_file_info)),
-        ),
-        ('read_buf', CFUNCTYPE(
-            c_int, c_char_p, POINTER(POINTER(fuse_bufvec)),
-            c_size_t, c_off_t, POINTER(fuse_file_info)),
-        ),
-        ('flock', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info), c_int)),
-        ('fallocate', CFUNCTYPE(
-            c_int, c_char_p, c_int, c_off_t, c_off_t, POINTER(fuse_file_info)),
-        ),
+if fuse_version_major == 2:
+    _fuse_operations_fields = [
+        ('getattr', CFUNCTYPE(c_int, c_char_p, POINTER(c_stat))),
+        ('readlink', CFUNCTYPE(c_int, c_char_p, POINTER(c_byte), c_size_t)),
+        ('getdir', c_void_p),    # Deprecated, use readdir
+    ] + _fuse_operations_fields_mknod_to_symlink + [
+        ('rename', CFUNCTYPE(c_int, c_char_p, c_char_p)),
+        ('link', CFUNCTYPE(c_int, c_char_p, c_char_p)),
+        ('chmod', CFUNCTYPE(c_int, c_char_p, c_mode_t)),
+        ('chown', CFUNCTYPE(c_int, c_char_p, c_uid_t, c_gid_t)),
+        ('truncate', CFUNCTYPE(c_int, c_char_p, c_off_t)),
+        ('utime', c_void_p),     # Deprecated, use utimens
+    ] + _fuse_operations_fields_open_to_removexattr
+    if fuse_version_minor >= 3:
+        _fuse_operations_fields += [
+            ('opendir', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
+            ('readdir', CFUNCTYPE(
+                c_int, c_char_p, c_void_p,
+                CFUNCTYPE(c_int, c_void_p, c_char_p, POINTER(c_stat), c_off_t),
+                c_off_t, POINTER(fuse_file_info))),
+            ('releasedir', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
+            ('fsyncdir', CFUNCTYPE(c_int, c_char_p, c_int, POINTER(fuse_file_info))),
+            ('init', CFUNCTYPE(c_void_p, POINTER(fuse_conn_info))),
+            ('destroy', CFUNCTYPE(c_void_p, c_void_p)),
+        ]
+    if fuse_version_minor >= 5:
+        _fuse_operations_fields += [
+            ('access', CFUNCTYPE(c_int, c_char_p, c_int)),
+            ('create', CFUNCTYPE(c_int, c_char_p, c_mode_t, POINTER(fuse_file_info))),
+            ('ftruncate', CFUNCTYPE(c_int, c_char_p, c_off_t, POINTER(fuse_file_info))),
+            ('fgetattr', CFUNCTYPE(c_int, c_char_p, POINTER(c_stat), POINTER(fuse_file_info))),
+        ]
+    if fuse_version_minor >= 6:
+        _fuse_operations_fields += [
+            ('lock', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info), c_int, POINTER(c_flock_t))),
+            ('utimens', CFUNCTYPE(c_int, c_char_p, POINTER(c_utimbuf))),
+            ('bmap', CFUNCTYPE(c_int, c_char_p, c_size_t, POINTER(c_uint64))),
+        ]
+    if fuse_version_minor >= 8:
+        _fuse_operations_fields += [
+            ('flag_nullpath_ok', c_uint, 1),
+            ('flag_nopath', c_uint, 1),
+            ('flag_utime_omit_ok', c_uint, 1),
+            ('flag_reserved', c_uint, 29),
+
+            ('ioctl', CFUNCTYPE(
+                c_int, c_char_p, c_uint, c_void_p,
+                POINTER(fuse_file_info), c_uint, c_void_p),
+            ),
+        ]
+    if fuse_version_minor >= 9:
+        _fuse_operations_fields += _fuse_operations_fields_2_9
+elif fuse_version_major == 3:
+    fuse_fill_dir_flags = ctypes.c_int  # The only flag in libfuse 3.16 is USE_FILL_DIR_PLUS = (1 << 1).
+    fuse_fill_dir_t = CFUNCTYPE(c_int, c_void_p, c_char_p, POINTER(c_stat), c_off_t, fuse_fill_dir_flags)
+
+    fuse_readdir_flags = ctypes.c_int  # The only flag in libfuse 3.16 is FUSE_READDIR_PLUS = (1 << 0).
+
+    # Generated bindings with:
+    # gcc -fpreprocessed -dD -E -P -Wno-all -x c <( git show fuse-3.16.2:include/fuse.h ) 2>/dev/null |
+    #   sed -nr '/struct fuse_operations/,$p' | sed -nr '0,/};/p' | sed -z 's|,\n *|, |g' |
+    #   sed -r '
+    #       s|const char [*]( ?[a-z_]+)?|ctypes.c_char_p|g;
+    #       s|char [*]( ?[a-z_]+)?|ctypes.POINTER(ctypes.c_byte)|g;
+    #       s|([( ])([a-z]+)_t( ?[a-z_]+)?|\1c_\2_t|g;
+    #       s|([( ])unsigned int( ?[a-z_]+)?|\1ctypes.c_uint|g;
+    #       s|([( ])int( ?[a-z_]+)?|\1ctypes.c_int|g;
+    #       s|struct (fuse_[a-z_]+) [*][*]( ?[a-z_]+)?|ctypes.POINTER(ctypes.POINTER(\1))|g;
+    #       s|struct (fuse_[a-z_]+) [*]( ?[a-z_]+)?|ctypes.POINTER(\1)|g;
+    #       s|struct (stat(vfs)?) [*]( ?[a-z_]+)?|ctypes.POINTER(c_\1)|g;
+    #       s|struct (flock) [*]( ?[a-z_]+)?|ctypes.POINTER(c_\1)|g;
+    #       s|(u?int64)_t [*]( ?[a-z_]+)?|ctypes.POINTER(ctypes.c_\1)|g;
+    #       s|void [*]( ?[a-z_]+)?|ctypes.c_void_p|g;
+    #       s|const struct timespec tv[[]2[]]|ctypes.POINTER(c_utimbuf)|g;
+    #       s|enum ([a-z_]+)|\1|g;
+    #       s|^ *||;
+    #   ' |
+    #   sed -r "s|(^[a-z_.]+) [(][*]([a-z_]+)[)] [(](.*);|('\2', ctypes.CFUNCTYPE(\1, \3),|; s|ctypes[.]||g;"
+    # Then fix the remaining problems by using pylint and by comparing with the FUSE 2 version.
+    #
+    # Removed members: getdir, utime, ftruncate, fgetattr, flag_nullpath_ok, flag_nopath, flag_utime_omit_ok
+    #  - The methods were not used by fusepy anyway.
+    #  - The flags were not exposed to fusepy callers because the fuse_operations struct is created,
+    #    given to fuse_main_real, and then forgotten about in FUSE.__init__.
+    # Methods with changed arguments:
+    #  - getattr, rename, chmod, chown, truncate, readdir, init, utimens, ioctl
+    _fuse_operations_fields = [
+        ('getattr', CFUNCTYPE(c_int, c_char_p, POINTER(c_stat), POINTER(fuse_file_info))),         # Added file info
+        ('readlink', CFUNCTYPE(c_int, c_char_p, POINTER(c_byte), c_size_t)),                       # Same as v2.9
+    ] + _fuse_operations_fields_mknod_to_symlink + [
+        ('rename', CFUNCTYPE(c_int, c_char_p, c_char_p, c_uint)),                                  # Added flags
+        ('link', CFUNCTYPE(c_int, c_char_p, c_char_p)),                                            # Same as v2.9
+        ('chmod', CFUNCTYPE(c_int, c_char_p, c_mode_t, POINTER(fuse_file_info))),                  # Added file info
+        ('chown', CFUNCTYPE(c_int, c_char_p, c_uid_t, c_gid_t, POINTER(fuse_file_info))),          # Added file info
+        ('truncate', CFUNCTYPE(c_int, c_char_p, c_off_t, POINTER(fuse_file_info))),                # Added file info
+    ] + _fuse_operations_fields_open_to_removexattr + [
+        ('opendir', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),                          # Same as v2.9
+        ('readdir', CFUNCTYPE(
+            c_int, c_char_p, c_void_p, fuse_fill_dir_t, c_off_t, POINTER(fuse_file_info),
+            fuse_readdir_flags)),                                                                  # Added flags
+        ('releasedir', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),                       # Same as v2.9
+        ('fsyncdir', CFUNCTYPE(c_int, c_char_p, c_int, POINTER(fuse_file_info))),                  # Same as v2.9
+        ('init', CFUNCTYPE(c_void_p, POINTER(fuse_conn_info), POINTER(fuse_config))),              # Added config
+        ('destroy', CFUNCTYPE(c_void_p, c_void_p)),                                                # Same as v2.9
+        ('access', CFUNCTYPE(c_int, c_char_p, c_int)),                                             # Same as v2.9
+        ('create', CFUNCTYPE(c_int, c_char_p, c_mode_t, POINTER(fuse_file_info))),                 # Same as v2.9
+        ('lock', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info), c_int, POINTER(c_flock_t))),  # Same as v2.9
+        ('utimens', CFUNCTYPE(c_int, c_char_p, POINTER(c_utimbuf), POINTER(fuse_file_info))),      # Added file info
+        ('bmap', CFUNCTYPE(c_int, c_char_p, c_size_t, POINTER(c_uint64))),                         # Same as v2.9
+        ('ioctl', CFUNCTYPE(                                                                       # Argument type
+            c_int, c_char_p, c_int if fuse_version_minor < 5 else c_uint, c_void_p,
+            POINTER(fuse_file_info), c_uint, c_void_p)),
+    ] + _fuse_operations_fields_2_9 + [
+        ('copy_file_range', CFUNCTYPE(                                                             # New
+                c_ssize_t, c_char_p, POINTER(fuse_file_info), c_off_t, c_char_p,
+                POINTER(fuse_file_info), c_off_t, c_size_t, c_int),
+            ),
+        ('lseek', CFUNCTYPE(c_off_t, c_char_p, c_off_t, c_int, POINTER(fuse_file_info))),          # New
     ]
 
 class fuse_operations(ctypes.Structure):
@@ -899,8 +1132,12 @@ class FUSE():
             return None
         return path.decode(self.encoding)
 
-    def getattr(self, path, buf):
-        return self.fgetattr(path, buf, None)
+    if fuse_version_major == 2:
+        def getattr(self, path, buf):
+            return self.fgetattr(path, buf, None)
+    elif fuse_version_major == 3:
+        def getattr(self, path, buf, fip):
+            return self.fgetattr(path, buf, None)
 
     def readlink(self, path, buf, bufsize):
         ret = self.operations('readlink', path.decode(self.encoding)).encode(self.encoding)
@@ -926,23 +1163,30 @@ class FUSE():
     def symlink(self, source, target):
         'creates a symlink `target -> source` (e.g. ln -s source target)'
 
-        return self.operations('symlink', target.decode(self.encoding),
-                                          source.decode(self.encoding))
+        return self.operations('symlink', target.decode(self.encoding), source.decode(self.encoding))
 
-    def rename(self, old, new):
-        return self.operations('rename', old.decode(self.encoding),
-                                         new.decode(self.encoding))
+    def _rename(self, old, new):
+        return self.operations('rename', old.decode(self.encoding), new.decode(self.encoding))
+
+    if fuse_version_major == 2:
+        rename = _rename
+    elif fuse_version_major == 3:
+        def rename(self, old, new, flags):
+            self._rename(old, new)
 
     def link(self, source, target):
         'creates a hard link `target -> source` (e.g. ln source target)'
 
-        return self.operations('link', target.decode(self.encoding),
-                                       source.decode(self.encoding))
+        return self.operations('link', target.decode(self.encoding), source.decode(self.encoding))
 
-    def chmod(self, path, mode):
-        return self.operations('chmod', path.decode(self.encoding), mode)
+    if fuse_version_major == 2:
+        def chmod(self, path, mode):
+            return self.operations('chmod', path.decode(self.encoding), mode)
+    elif fuse_version_major == 3:
+        def chmod(self, path, mode, fip):
+            return self.operations('chmod', path.decode(self.encoding), mode)
 
-    def chown(self, path, uid, gid):
+    def _chown(self, path, uid, gid):
         # Check if any of the arguments is a -1 that has overflowed
         if c_uid_t(uid + 1).value == 0:
             uid = -1
@@ -951,8 +1195,19 @@ class FUSE():
 
         return self.operations('chown', path.decode(self.encoding), uid, gid)
 
-    def truncate(self, path, length):
-        return self.operations('truncate', path.decode(self.encoding), length)
+    if fuse_version_major == 2:
+        def chown(self, path, uid, gid):
+            return self._chown(path, uid, gid)
+    elif fuse_version_major == 3:
+        def chown(self, path, uid, gid, fip):
+            return self._chown(path, uid, gid)
+
+    if fuse_version_major == 2:
+        def truncate(self, path, length):
+            return self.operations('truncate', path.decode(self.encoding), length)
+    elif fuse_version_major == 3:
+        def truncate(self, path, length, fip):
+            return self.operations('truncate', path.decode(self.encoding), length)
 
     def open(self, path, fip):
         fi = fip.contents
@@ -1114,7 +1369,7 @@ class FUSE():
     # fuse_entry_out entry_out in the fuse_direntplus struct. fuse_attr has 16 members.
     # https://github.com/torvalds/linux/blob/1934261d897467a924e2afd1181a74c1cbfa2c1d/include/uapi/linux/
     #     fuse.h#L263C1-L280C3
-    def readdir(self, path, buf, filler, offset, fip):
+    def _readdir(self, path, buf, filler, offset, fip):
         # Ignore raw_fi
         for item in self.operations('readdir', self._decode_optional_path(path), fip.contents.fh):
             if isinstance(item, str):
@@ -1129,10 +1384,24 @@ class FUSE():
                 else:
                     st = None
 
-            if filler(buf, name.encode(self.encoding), st, offset) != 0:
-                break
+            if fuse_version_major == 2:
+                if filler(buf, name.encode(self.encoding), st, offset) != 0:
+                    break
+            elif fuse_version_major == 3:
+                if filler(buf, name.encode(self.encoding), st, offset, 0) != 0:
+                    break
 
         return 0
+
+    if fuse_version_major == 2:
+        def readdir(self, path, buf, filler, offset, fip):
+            return self._readdir(path, buf, filler, offset, fip)
+    elif fuse_version_major == 3:
+        def readdir(self, path, buf, filler, offset, fip, flags):
+            # TODO if bit 0 (FUSE_READDIR_PLUS) is set in flags, then we might want to gather more metadata
+            #      and return it in "filler" with bit 1 (FUSE_FILL_DIR_PLUS) being set.
+            # Ignore raw_fi
+            return self._readdir(path, buf, filler, offset, fip)
 
     def releasedir(self, path, fip):
         # Ignore raw_fi
@@ -1142,9 +1411,20 @@ class FUSE():
         # Ignore raw_fi
         return self.operations('fsyncdir', self._decode_optional_path(path),
                                            datasync, fip.contents.fh)
+    def _init(self, conn, config):
+        if hasattr(
+            self.operations, "init_with_config"
+        ) and not getattr(self.operations.init_with_config, "libfuse_ignore", False):
+            self.operations.init_with_config(conn, config)
+        else:
+            self.operations("init", "/")
 
-    def init(self, conn):
-        return self.operations('init', '/')
+    if fuse_version_major == 2:
+        def init(self, conn):
+            self._init(conn, fuse_config())
+    else:
+        def init(self, conn, config):
+            self._init(conn, config)
 
     def destroy(self, private_data):
         return self.operations('destroy', '/')
@@ -1182,7 +1462,7 @@ class FUSE():
         fh = fip.contents if self.raw_fi else fip.contents.fh
         return self.operations('lock', self._decode_optional_path(path), fh, cmd, lock)
 
-    def utimens(self, path, buf):
+    def _utimens(self, path, buf):
         if buf:
             atime = time_of_timespec(buf.contents.actime, use_ns=self.use_ns)
             mtime = time_of_timespec(buf.contents.modtime, use_ns=self.use_ns)
@@ -1191,6 +1471,12 @@ class FUSE():
             times = None
 
         return self.operations('utimens', path.decode(self.encoding), times)
+
+    if fuse_version_major == 2:
+        utimens = _utimens
+    elif fuse_version_major == 3:
+        def utimens(self, path, buf, fip):
+            self._utimens(path, buf)
 
     def bmap(self, path, blocksize, idx):
         return self.operations('bmap', path.decode(self.encoding), blocksize, idx)
@@ -1332,6 +1618,15 @@ class Operations:
         Called on filesystem initialization. (Path is always /)
 
         Use it instead of __init__ if you start threads on initialization.
+        '''
+
+    @_nullable_dummy_function
+    def init_with_config(self, conn_info, config_3):
+        '''
+        Called on filesystem initialization. Same function as 'init' but with more parameters.
+        Only either 'init' or 'init_with_config' should be overridden.
+        Use it instead of __init__ if you start threads on initialization.
+        Argument config_3 should be ignored when a FUSE 2 library is loaded.
         '''
 
     @_nullable_dummy_function
