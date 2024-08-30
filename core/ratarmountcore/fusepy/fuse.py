@@ -701,7 +701,7 @@ class FUSE(object):
                 check_name = check_name[1:]
 
             val = getattr(operations, check_name, None)
-            if val is None:
+            if val is None or getattr(val, 'libfuse_ignore', False):
                 continue
 
             # Function pointer members are tested for using the
@@ -1082,6 +1082,18 @@ class FUSE(object):
         return self.operations('ioctl', path.decode(self.encoding),
             cmd, arg, fh, flags, data)
 
+
+def _nullable_dummy_function(method):
+    '''
+    Marks the given method as to be ignored by the 'FUSE' class.
+    This makes it possible to add methods with the self-documenting function signatures
+    while still not giving any actual callbacks to libfuse as long as these methods are
+    not overwritten by a method in a subclassed 'Operations' class.
+    '''
+    method.libfuse_ignore = True
+    return method
+
+
 class Operations(object):
     '''
     This class should be subclassed and passed as an argument to FUSE on
@@ -1090,6 +1102,15 @@ class Operations(object):
 
     When in doubt of what an operation should do, check the FUSE header file
     or the corresponding system call man page.
+
+    Any method that is not overwritten will not be set up for libfuse.
+    This has the side effect that libfuse can implement fallbacks in case
+    callbacks are not implemented. For example 'read' will be used when 'read_buf'
+    is not implemented.
+
+    This has the side effect that trace debug output, enabled with -o debug,
+    for these FUSE function will not be printed. To enable the debug output,
+    it should be overwritten with a method simply raising FuseOSError(errno.ENOSYS).
     '''
 
     def __call__(self, op, *args):
@@ -1097,17 +1118,23 @@ class Operations(object):
             raise FuseOSError(errno.EFAULT)
         return getattr(self, op)(*args)
 
+    @_nullable_dummy_function
     def access(self, path, amode):
         return 0
 
-    bmap = None
+    @_nullable_dummy_function
+    def bmap(self, path, blocksize, idx):
+        pass
 
+    @_nullable_dummy_function
     def chmod(self, path, mode):
         raise FuseOSError(errno.EROFS)
 
+    @_nullable_dummy_function
     def chown(self, path, uid, gid):
         raise FuseOSError(errno.EROFS)
 
+    @_nullable_dummy_function
     def create(self, path, mode, fi=None):
         '''
         When raw_fi is False (default case), fi is None and create should
@@ -1119,20 +1146,28 @@ class Operations(object):
 
         raise FuseOSError(errno.EROFS)
 
+    @_nullable_dummy_function
     def destroy(self, path):
         'Called on filesystem destruction. Path is always /'
 
-        pass
-
+    @_nullable_dummy_function
     def flush(self, path, fh):
         return 0
 
+    @_nullable_dummy_function
     def fsync(self, path, datasync, fh):
         return 0
 
+    @_nullable_dummy_function
     def fsyncdir(self, path, datasync, fh):
         return 0
 
+    # Either fgetattr or getattr must be non-null or else libfuse 2.6 will segfault
+    # with auto-cache enabled. In FUSE 2.9.9, 3.16, setting this to nullptr, should work fine.
+    # https://github.com/libfuse/libfuse/blob/0a0db26bd269562676b6251e8347f4b89907ace3/lib/fuse.c#L1483-L1486
+    # That particular location seems to have been fixed in 2.8.0 and 2.7.0, but not in 2.6.5.
+    # It seems to have been fixed only by accident in feature commit:
+    # https://github.com/libfuse/libfuse/commit/3a7c00ec0c156123c47b53ec1cd7ead001fa4dfb
     def getattr(self, path, fh=None):
         '''
         Returns a dictionary with keys identical to the stat C structure of
@@ -1149,9 +1184,11 @@ class Operations(object):
             raise FuseOSError(errno.ENOENT)
         return dict(st_mode=(S_IFDIR | 0o755), st_nlink=2)
 
+    @_nullable_dummy_function
     def getxattr(self, path, name, position=0):
         raise FuseOSError(ENOTSUP)
 
+    @_nullable_dummy_function
     def init(self, path):
         '''
         Called on filesystem initialization. (Path is always /)
@@ -1159,27 +1196,33 @@ class Operations(object):
         Use it instead of __init__ if you start threads on initialization.
         '''
 
-        pass
-
-    def ioctl(self, path, cmd, arg, fip, flags, data):
+    @_nullable_dummy_function
+    def ioctl(self, path, cmd, arg, fh, flags, data):
         raise FuseOSError(errno.ENOTTY)
 
+    @_nullable_dummy_function
     def link(self, target, source):
         'creates a hard link `target -> source` (e.g. ln source target)'
 
         raise FuseOSError(errno.EROFS)
 
+    @_nullable_dummy_function
     def listxattr(self, path):
         return []
 
-    lock = None
+    @_nullable_dummy_function
+    def lock(self, path, fh, cmd, lock):
+        raise FuseOSError(errno.ENOSYS)
 
+    @_nullable_dummy_function
     def mkdir(self, path, mode):
         raise FuseOSError(errno.EROFS)
 
+    @_nullable_dummy_function
     def mknod(self, path, mode, dev):
         raise FuseOSError(errno.EROFS)
 
+    @_nullable_dummy_function
     def open(self, path, flags):
         '''
         When raw_fi is False (default case), open should return a numerical
@@ -1193,16 +1236,19 @@ class Operations(object):
 
         return 0
 
+    @_nullable_dummy_function
     def opendir(self, path):
         'Returns a numerical file handle.'
 
         return 0
 
+    @_nullable_dummy_function
     def read(self, path, size, offset, fh):
         'Returns a string containing the data requested.'
 
         raise FuseOSError(errno.EIO)
 
+    @_nullable_dummy_function
     def readdir(self, path, fh):
         '''
         Can return either a list of names, or a list of (name, attrs, offset)
@@ -1211,27 +1257,35 @@ class Operations(object):
 
         return ['.', '..']
 
+    @_nullable_dummy_function
     def readlink(self, path):
         raise FuseOSError(errno.ENOENT)
 
+    @_nullable_dummy_function
     def release(self, path, fh):
         return 0
 
+    @_nullable_dummy_function
     def releasedir(self, path, fh):
         return 0
 
+    @_nullable_dummy_function
     def removexattr(self, path, name):
         raise FuseOSError(ENOTSUP)
 
+    @_nullable_dummy_function
     def rename(self, old, new):
         raise FuseOSError(errno.EROFS)
 
+    @_nullable_dummy_function
     def rmdir(self, path):
         raise FuseOSError(errno.EROFS)
 
+    @_nullable_dummy_function
     def setxattr(self, path, name, value, options, position=0):
         raise FuseOSError(ENOTSUP)
 
+    @_nullable_dummy_function
     def statfs(self, path):
         '''
         Returns a dictionary with keys identical to the statvfs C structure of
@@ -1243,22 +1297,27 @@ class Operations(object):
 
         return {}
 
+    @_nullable_dummy_function
     def symlink(self, target, source):
         'creates a symlink `target -> source` (e.g. ln -s source target)'
 
         raise FuseOSError(errno.EROFS)
 
+    @_nullable_dummy_function
     def truncate(self, path, length, fh=None):
         raise FuseOSError(errno.EROFS)
 
+    @_nullable_dummy_function
     def unlink(self, path):
         raise FuseOSError(errno.EROFS)
 
+    @_nullable_dummy_function
     def utimens(self, path, times=None):
         'Times is a (atime, mtime) tuple. If None use current time.'
 
         return 0
 
+    @_nullable_dummy_function
     def write(self, path, data, offset, fh):
         raise FuseOSError(errno.EROFS)
 
