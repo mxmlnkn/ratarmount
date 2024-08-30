@@ -28,7 +28,6 @@ from ctypes import (
     POINTER,
     c_char_p,
     c_byte,
-    c_voidp,
     c_size_t,
     c_ssize_t,
     c_int,
@@ -465,11 +464,11 @@ class fuse_file_info(ctypes.Structure):
 
 class fuse_context(ctypes.Structure):
     _fields_ = [
-        ('fuse', ctypes.c_voidp),
+        ('fuse', ctypes.c_void_p),
         ('uid', c_uid_t),
         ('gid', c_gid_t),
         ('pid', c_pid_t),
-        ('private_data', ctypes.c_voidp),
+        ('private_data', ctypes.c_void_p),
         # Added in 2.8. Note that this is an ABI break because programs compiled against 2.7
         # will allocate a smaller struct leading to out-of-bound accesses when used for a 2.8
         # shared library! It shouldn't hurt the other way around to have a larger struct than
@@ -484,7 +483,7 @@ class fuse_operations(ctypes.Structure):
     _fields_ = [
         ('getattr', CFUNCTYPE(c_int, c_char_p, POINTER(c_stat))),
         ('readlink', CFUNCTYPE(c_int, c_char_p, POINTER(c_byte), c_size_t)),
-        ('getdir', c_voidp),    # Deprecated, use readdir
+        ('getdir', c_void_p),    # Deprecated, use readdir
         ('mknod', CFUNCTYPE(c_int, c_char_p, c_mode_t, c_dev_t)),
         ('mkdir', CFUNCTYPE(c_int, c_char_p, c_mode_t)),
         ('unlink', CFUNCTYPE(c_int, c_char_p)),
@@ -495,7 +494,7 @@ class fuse_operations(ctypes.Structure):
         ('chmod', CFUNCTYPE(c_int, c_char_p, c_mode_t)),
         ('chown', CFUNCTYPE(c_int, c_char_p, c_uid_t, c_gid_t)),
         ('truncate', CFUNCTYPE(c_int, c_char_p, c_off_t)),
-        ('utime', c_voidp),     # Deprecated, use utimens
+        ('utime', c_void_p),     # Deprecated, use utimens
         ('open', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
         ('read', CFUNCTYPE(
             c_int, c_char_p, POINTER(c_byte),
@@ -515,19 +514,19 @@ class fuse_operations(ctypes.Structure):
         ('readdir', CFUNCTYPE(
             c_int,
             c_char_p,
-            c_voidp,
-            CFUNCTYPE(c_int, c_voidp, c_char_p, POINTER(c_stat), c_off_t),
+            c_void_p,
+            CFUNCTYPE(c_int, c_void_p, c_char_p, POINTER(c_stat), c_off_t),
             c_off_t,
             POINTER(fuse_file_info))),
         ('releasedir', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
         ('fsyncdir', CFUNCTYPE(c_int, c_char_p, c_int, POINTER(fuse_file_info))),
-        ('init', CFUNCTYPE(c_voidp, c_voidp)),
-        ('destroy', CFUNCTYPE(c_voidp, c_voidp)),
+        ('init', CFUNCTYPE(c_void_p, c_void_p)),
+        ('destroy', CFUNCTYPE(c_void_p, c_void_p)),
         ('access', CFUNCTYPE(c_int, c_char_p, c_int)),
         ('create', CFUNCTYPE(c_int, c_char_p, c_mode_t, POINTER(fuse_file_info))),
         ('ftruncate', CFUNCTYPE(c_int, c_char_p, c_off_t, POINTER(fuse_file_info))),
         ('fgetattr', CFUNCTYPE(c_int, c_char_p, POINTER(c_stat), POINTER(fuse_file_info))),
-        ('lock', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info), c_int, c_voidp)),
+        ('lock', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info), c_int, c_void_p)),
         ('utimens', CFUNCTYPE(c_int, c_char_p, POINTER(c_utimbuf))),
         ('bmap', CFUNCTYPE(c_int, c_char_p, c_size_t, POINTER(c_uint64))),
 
