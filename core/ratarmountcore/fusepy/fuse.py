@@ -15,6 +15,10 @@
 
 # mypy: ignore-errors
 
+# Note that for ABI forward compatibility and other issues, most C-types should be initialized
+# to 0 and the ctypes module does that for us out of the box!
+# https://github.com/python/cpython/blob/f8a736b8e14ab839e1193cb1d3955b61c316d048/Lib/test/test_ctypes/test_numbers.py#L95
+
 from __future__ import print_function, absolute_import, division
 
 import ctypes
@@ -229,22 +233,24 @@ if _system in ('Darwin', 'Darwin-MacFuse', 'FreeBSD'):
 elif _system == 'Linux':
     ENOTSUP = 95
 
-    c_dev_t = ctypes.c_ulonglong
-    c_fsblkcnt_t = ctypes.c_ulonglong
-    c_fsfilcnt_t = ctypes.c_ulonglong
-    c_gid_t = ctypes.c_uint
-    c_mode_t = ctypes.c_uint
-    c_off_t = ctypes.c_longlong
-    c_pid_t = ctypes.c_int
-    c_uid_t = ctypes.c_uint
-    setxattr_t = ctypes.CFUNCTYPE(
+    # https://man7.org/linux/man-pages/man0/sys_types.h.0p.html
+    c_dev_t = ctypes.c_ulonglong        # sys/types.h
+    c_fsblkcnt_t = ctypes.c_ulonglong   # sys/statvfs.h
+    c_fsfilcnt_t = ctypes.c_ulonglong   # sys/statvfs.h
+    c_gid_t = ctypes.c_uint             # sys/types.h
+    c_mode_t = ctypes.c_uint            # sys/types.h
+    c_off_t = ctypes.c_longlong         # sys/types.h
+    c_pid_t = ctypes.c_int              # sys/types.h
+    c_uid_t = ctypes.c_uint             # sys/types.h
+    setxattr_t = ctypes.CFUNCTYPE(      # sys/xattr.h
         ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p,
         ctypes.POINTER(ctypes.c_byte), ctypes.c_size_t, ctypes.c_int)
 
-    getxattr_t = ctypes.CFUNCTYPE(
+    getxattr_t = ctypes.CFUNCTYPE(      # sys/xattr.h
         ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p,
         ctypes.POINTER(ctypes.c_byte), ctypes.c_size_t)
 
+    # sys/stat.h
     if _machine == 'x86_64':
         c_stat._fields_ = [
             ('st_dev', c_dev_t),
@@ -439,6 +445,7 @@ else:
     raise NotImplementedError('%s is not supported.' % _system)
 
 
+# https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_statvfs.h.html
 if _system == 'FreeBSD':
     c_fsblkcnt_t = ctypes.c_uint64
     c_fsfilcnt_t = ctypes.c_uint64
@@ -450,6 +457,7 @@ if _system == 'FreeBSD':
         ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p,
         ctypes.POINTER(ctypes.c_byte), ctypes.c_size_t)
 
+    # https://github.com/freebsd/freebsd-src/blob/b1c3a4d75f4ff74218434a11cdd4e56632e13711/sys/sys/statvfs.h#L57-L68
     class c_statvfs(ctypes.Structure):
         _fields_ = [
             ('f_bavail', c_fsblkcnt_t),
@@ -476,6 +484,7 @@ elif _system == 'Windows' or _system.startswith('CYGWIN'):
             ('f_flag', c_win_ulong),
             ('f_namemax', c_win_ulong)]
 else:
+    # https://sourceware.org/git?p=glibc.git;a=blob;f=bits/statvfs.h;h=ea89d9004d834c81874de00b5e3f5617d3096ccc;hb=HEAD#l33
     class c_statvfs(ctypes.Structure):
         _fields_ = [
             ('f_bsize', ctypes.c_ulong),
@@ -487,7 +496,6 @@ else:
             ('f_ffree', c_fsfilcnt_t),
             ('f_favail', c_fsfilcnt_t),
             ('f_fsid', ctypes.c_ulong),
-            # ('unused', ctypes.c_int),
             ('f_flag', ctypes.c_ulong),
             ('f_namemax', ctypes.c_ulong)]
 
