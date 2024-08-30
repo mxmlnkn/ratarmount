@@ -54,7 +54,7 @@ log = logging.getLogger("fuse")
 _system = system()
 _machine = machine()
 
-if _system == 'Windows':
+if _system == 'Windows' or _system.startswith('CYGWIN'):
     # NOTE:
     #
     # sizeof(long)==4 on Windows 32-bit and 64-bit
