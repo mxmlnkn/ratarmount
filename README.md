@@ -184,7 +184,7 @@ The hard requirements are `fusepy` and for Python versions older than 3.7.0 `dat
 
 # Benchmarks
 
-![Benchmark comparison between ratarmount, archivemount, and fuse-archive](benchmarks/plots/archivemount-comparison.png)
+![Benchmark comparison between ratarmount, archivemount, and fuse-archive](benchmarks/plots/archivemount-comparison-2022-02-19.png)
 
 
  - Not shown in the benchmarks, but ratarmount can mount files with **preexisting index sidecar files** in under a second making it **vastly more efficient** compared to archivemount for every **subsequent mount**.
