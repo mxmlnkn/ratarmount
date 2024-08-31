@@ -731,7 +731,7 @@ class FuseMount(fuse.Operations):
         tuples. attrs is a dict as in getattr.
         '''
 
-        files = self.mountSource.listDir(path)
+        files = self.mountSource.listDirModeOnly(path)
 
         # we only need to return these special directories. FUSE automatically expands these and will not ask
         # for paths like /../foo/./../bar, so we don't need to worry about cleaning such paths
@@ -749,9 +749,9 @@ class FuseMount(fuse.Operations):
         deletedFiles = self.writeOverlay.listDeleted(path) if self.writeOverlay else []
 
         if isinstance(files, dict):
-            for key, fileInfo in files.items():
-                if key not in deletedFiles:
-                    yield key, self._fileInfoToDict(fileInfo), 0
+            for name, mode in files.items():
+                if name not in deletedFiles:
+                    yield name, {'st_mode': mode}, 0
         elif files is not None:
             for key in files:
                 if key not in deletedFiles:
