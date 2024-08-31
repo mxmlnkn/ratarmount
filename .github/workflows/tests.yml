@@ -118,7 +118,7 @@ jobs:
         # zstd, may also call external binaries depending on how libarchive was compiled!
         # https://github.com/libarchive/libarchive/blob/ad5a0b542c027883d7069f6844045e6788c7d70c/libarchive/
         #   archive_read_support_filter_lrzip.c#L68
-        sudo apt-get -y install fuse bzip2 pbzip2 pixz zstd unar lrzip lzop
+        sudo apt-get -y install libfuse2 fuse3 bzip2 pbzip2 pixz zstd unar lrzip lzop
         set -x
 
     - name: Install Dependencies (MacOS)
@@ -219,11 +219,18 @@ jobs:
                   pytest --disable-warnings "$file"
             esac
         done
+        python3 tests/tests.py
 
-    - name: Regression Tests
+    - name: Regression Tests (FUSE 3)
       if: ${{ !startsWith( matrix.os, 'macos' ) }}
       run: |
-        python3 tests/tests.py
+        export FUSE_LIBRARY_PATH=$( dpkg -L libfuse3-3 | 'grep' -F .so | head -1 )
+        ratarmount --version
+        bash tests/runtests.sh
+
+    - name: Regression Tests (FUSE 2)
+      if: ${{ !startsWith( matrix.os, 'macos' ) }}
+      run: |
         bash tests/runtests.sh
 
     - name: Module tests without fusepy
