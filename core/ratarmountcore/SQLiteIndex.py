@@ -687,16 +687,45 @@ class SQLiteIndex:
         # https://docs.python.org/3.11/library/stdtypes.html#dict.values
         # > Dictionaries preserve insertion order. Note that updating a key does not affect the order.
         # > Keys added after deletion are inserted at the end.
-        rows = self.getConnection().execute(
-            'SELECT * FROM "files" WHERE "path" == (?) ORDER BY "offsetheader"',
-            (self._queryNormpath(path).rstrip('/'),),
+
+        # https://www.sqlite.org/pragma.html#pragma_table_info
+        columns = [row[0] for row in self.getConnection().execute("SELECT name FROM PRAGMA_TABLE_INFO('files');")]
+        selected_columns = ['name', 'size', 'mtime', 'mode', 'linkname', 'uid', 'gid', 'offset', 'istar']
+        # Both were added in index 0.2.0.
+        if 'offsetheader' in columns and 'issparse' in columns:
+            selected_columns += ['offsetheader', 'issparse']
+
+        def rowToFileInfo(cursor, row) -> Tuple[str, FileInfo]:
+            return row[0], FileInfo(
+                # fmt: off
+                size     = row[1],
+                mtime    = row[2],
+                mode     = row[3],
+                linkname = row[4],
+                uid      = row[5],
+                gid      = row[6],
+                userdata = [SQLiteIndexedTarUserData(
+                    offset       = row[7],
+                    offsetheader = row[9] if len(row) > 9 else 0,
+                    istar        = row[8],
+                    issparse     = row[10] if len(row) > 10 else False,
+                )],
+                # fmt: on
+            )
+
+        oldRowFactory = self.getConnection().row_factory
+        self.getConnection().row_factory = rowToFileInfo
+        directory: Dict[str, FileInfo] = dict(
+            self.getConnection().execute(
+                'SELECT ' + ','.join(selected_columns) + ' FROM "files" WHERE "path" == (?) ORDER BY "offsetheader"',
+                (self._queryNormpath(path).rstrip('/'),),
+            )
         )
-        directory: Dict[str, FileInfo] = {}
-        gotResults = False
-        for row in rows:
-            gotResults = True
-            if row['name']:
-                directory[row['name']] = self._rowToFileInfo(row)
+        self.getConnection().row_factory = oldRowFactory
+
+        gotResults = bool(directory)
+        if '' in directory:
+            del directory['']
         return directory if gotResults else None
 
     def fileVersions(self, path: str) -> Dict[str, FileInfo]:
