@@ -1764,7 +1764,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         fusekwargs['modules'] = 'subdir'
         fusekwargs['subdir'] = args.prefix
 
-    if args.mount_point in args.mount_source and os.path.isdir(args.mount_point) and os.listdir(args.mount_point):
+    if os.path.isdir(args.mount_point) and os.listdir(args.mount_point):
         if hasNonEmptySupport():
             fusekwargs['nonempty'] = True
 
