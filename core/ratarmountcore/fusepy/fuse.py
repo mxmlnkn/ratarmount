@@ -609,7 +609,7 @@ def set_st_attrs(st, attrs, use_ns=False):
             else:
                 timespec.tv_sec = int(val)
                 timespec.tv_nsec = int((val - timespec.tv_sec) * 1E9)
-        elif hasattr(st, key):
+        elif getattr(st, key, None) is not None:
             setattr(st, key, val)
 
 
