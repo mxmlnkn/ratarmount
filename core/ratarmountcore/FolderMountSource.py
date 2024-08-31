@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import stat
 from typing import Dict, IO, Iterable, Optional, Union
 
 from .MountSource import FileInfo, MountSource
@@ -115,6 +116,26 @@ class FolderMountSource(MountSource):
             os.fsdecode(dirEntry.name): FolderMountSource._dirEntryToFileInfo(dirEntry, path, realpath)
             for dirEntry in os.scandir(realpath)
         }
+
+    @overrides(MountSource)
+    def listDirModeOnly(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+        realpath = self._realpath(path)
+        if not os.path.isdir(realpath):
+            return None
+
+        # https://docs.python.org/3/library/os.html#os.scandir
+        # > All os.DirEntry methods may perform a system call, but is_dir() and is_file() usually
+        # > only require a system call for symbolic links; os.DirEntry.stat() always requires a
+        # > system call on Unix but only requires one for symbolic links on Windows.
+        # Unfortunately, I am not sure whether it would be sufficient to build the file mode from these
+        # two getters. For now, I'd say that all the esoteric stuff is simply not supported.
+        def makeMode(dirEntry):
+            mode = stat.S_IFDIR if dirEntry.is_dir(follow_symlinks=False) else stat.S_IFREG
+            if dirEntry.is_symlink():
+                mode = stat.S_IFLNK
+            return mode
+
+        return {os.fsdecode(dirEntry.name): makeMode(dirEntry) for dirEntry in os.scandir(realpath)}
 
     @overrides(MountSource)
     def fileVersions(self, path: str) -> int:
