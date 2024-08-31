@@ -1053,6 +1053,67 @@ class FUSE():
         fip.contents.fh = self.operations('opendir', path.decode(self.encoding))
         return 0
 
+    # == About readdir and what should be returned ==
+    #
+    # Study the implementation in 2.9.9 in fuse.c
+    # https://github.com/libfuse/libfuse/blob/fuse_2_9_bugfix/lib/fuse.c
+    # Libfuse is split in a high-level and low-level API. We use the former, which calls the latter.
+    # The call chain:
+    #
+    #  1. The fuse_lowlevel_ops.readdir callback is initialized with fuse_lib_readdir.
+    #     This still gets an inode as argument from the low-level interface.
+    #  2. readdir_fill: If the high-level API callback fuse_operations.readdir is set, then the inode is
+    #     converted to a path via get_path -> get_path_common -> try_get_path -> get_node -> get_node_nocheck,
+    #     which looks up f->id_table.array[hashid_hash(f, nodeid)], so yeah, basically a std::unorderd_map,
+    #     and calls fuse_fs_readdir with the path.
+    #  3. fuse_fs_readdir: calls the readdir callback if set, or the getdir callback with a "filler" callback.
+    #  4. The filler callback is specified in readdir_fill and is simply fill_dir
+    #  5. fill_dir copies the full struct stat argument if given and calls fuse_add_direntry with it.
+    #  6. fuse_lowlevel.c:fuse_add_direntry -> fuse_add_dirent
+    #  7. fuse_add_dirent basically only copies the inode and the mode!!! NOTHING ELSE:
+    #             struct fuse_dirent *dirent = (struct fuse_dirent *) buf;
+    #       dirent->ino = stbuf->st_ino;
+    #       dirent->off = off;
+    #       dirent->namelen = namelen;
+    #       dirent->type = (stbuf->st_mode & 0170000) >> 12;
+    #       strncpy(dirent->name, name, namelen);
+    #     Everything we do to fill the whole stat struct is for naught!
+    #     ONLY "stbuf->st_mode & 0170000" IS USED. ONLY 4 BITS.
+    #     https://github.com/torvalds/linux/blob/1934261d897467a924e2afd1181a74c1cbfa2c1d/include/uapi/linux/stat.h#L9
+    #         #define S_IFMT  00170000
+    #         #define S_IFSOCK 0140000
+    #         #define S_IFLNK  0120000
+    #         #define S_IFREG  0100000
+    #         #define S_IFBLK  0060000
+    #         #define S_IFDIR  0040000
+    #         #define S_IFCHR  0020000
+    #         #define S_IFIFO  0010000
+    #         #define S_ISUID  0004000
+    #         #define S_ISGID  0002000
+    #         #define S_ISVTX  0001000
+    #      -> I'm not sure whether all of these are actually required. It may also be that file and directory
+    #         would suffice.
+    #
+    # The important thing to know here is that fuse_dirent, the struct defined by the Linux Kernel FUSE API:
+    #     https://github.com/torvalds/linux/blob/1934261d897467a924e2afd1181a74c1cbfa2c1d/include/uapi/linux/
+    #         fuse.h#L1005-L1010
+    #     https://man7.org/linux/man-pages/man4/fuse.4.html
+    # Only has members for ino, off, nameln, type, and name. Everything else is cruft added by the libfuse
+    # abstraction layer.
+    #
+    # This changes a bit with FUSE 3, which also adds support for readdir_plus. However, when talking about
+    # FUSE 3, we are only talking about a major version change in libfuse, not the Kernel FUSE API, I think.
+    #
+    # Steps 1-4 are the same as in FUSE 2.9
+    # Step 4: The filler callback can be chosen via the new flags argument to readdir:
+    #         fuse_fill_dir_t filler = (flags & FUSE_READDIR_PLUS) ? fill_dir_plus : fill_dir;
+    # Steps 5-7 are still the same when the FUSE_READDIR_PLUS flag is not set, which is the default!
+    # If it is set, then the fill_dir_plus filler callback calls fuse_add_direntry_plus instead of
+    # fuse_add_direntry.
+    # fuse_add_direntry_plus converts the stat struct in the fuse_attr attr member of the
+    # fuse_entry_out entry_out in the fuse_direntplus struct. fuse_attr has 16 members.
+    # https://github.com/torvalds/linux/blob/1934261d897467a924e2afd1181a74c1cbfa2c1d/include/uapi/linux/
+    #     fuse.h#L263C1-L280C3
     def readdir(self, path, buf, filler, offset, fip):
         # Ignore raw_fi
         for item in self.operations('readdir', self._decode_optional_path(path), fip.contents.fh):
@@ -1062,7 +1123,9 @@ class FUSE():
                 name, attrs, offset = item
                 if attrs:
                     st = c_stat()
-                    set_st_attrs(st, attrs, use_ns=self.use_ns)
+                    # ONLY THE MODE IS USED BY FUSE! The caller may skip everything else.
+                    if 'st_mode' in attrs:
+                        setattr(st, 'st_mode', attrs['st_mode'])
                 else:
                     st = None
 
