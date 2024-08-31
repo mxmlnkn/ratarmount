@@ -174,34 +174,54 @@ class RarMountSource(MountSource):
     def isImmutable(self) -> bool:
         return True
 
+    # TODO How to behave with files in archive with absolute paths? Currently, they would never be shown.
+    @staticmethod
+    def _getName(folderPath, filePath):
+        if not filePath.startswith(folderPath):
+            return None
+
+        filePath = filePath[len(folderPath) :].strip('/')
+        if not filePath:
+            return None
+
+        # This effectively adds all parent paths as folders. It is easy to create
+        # RARs and ZIPs with nested files without information on the parent directories!
+        if '/' in filePath:
+            firstSlash = filePath.index('/')
+            filePath = filePath[:firstSlash]
+
+        return filePath
+
     @overrides(MountSource)
     def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         path = path.strip('/')
         if path:
             path += '/'
 
-        # TODO How to behave with files in archive with absolute paths? Currently, they would never be shown.
-        def getName(filePath):
-            if not filePath.startswith(path):
-                return None
+        # The "filename" member is wrongly named as it returns the full path inside the archive not just the name part.
+        return {
+            self._getName(path, normalizedPath): self._convertToFileInfo(normalizedPath, info)
+            for normalizedPath, info in self.files.items()
+            if self._getName(path, normalizedPath)
+        }
 
-            filePath = filePath[len(path) :].strip('/')
-            if not filePath:
-                return None
+    @overrides(MountSource)
+    def listDirModeOnly(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+        path = path.strip('/')
+        if path:
+            path += '/'
 
-            # This effectively adds all parent paths as folders. It is easy to create
-            # RARs and ZIPs with nested files without information on the parent directories!
-            if '/' in filePath:
-                firstSlash = filePath.index('/')
-                filePath = filePath[:firstSlash]
-
-            return filePath
+        def _getMode(info: "rarfile.RarInfo") -> int:
+            mode = 0o555 | (stat.S_IFDIR if info.is_dir() else stat.S_IFREG)
+            if info.file_redir:
+                mode = 0o555 | stat.S_IFLNK
+            return mode
 
         # The "filename" member is wrongly named as it returns the full path inside the archive not just the name part.
         return {
-            getName(normalizedPath): self._convertToFileInfo(normalizedPath, info)
+            self._getName(path, normalizedPath): _getMode(info)
             for normalizedPath, info in self.files.items()
-            if getName(normalizedPath)
+            if self._getName(path, normalizedPath)
         }
 
     def _getFileInfos(self, path: str) -> List[FileInfo]:
