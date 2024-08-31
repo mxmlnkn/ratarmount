@@ -1681,7 +1681,8 @@ if [[ -z "$CI" ]]; then
             'grep' -v -F '__init__.py' |
             'grep' -v 'benchmarks/' |
             'grep' -v -F 'setup.py' |
-            'grep' -v 'test.*.py'
+            'grep' -v 'test.*.py' |
+            'grep' -v 'fuse.py'
     )
 
     testFiles=()
@@ -1707,11 +1708,11 @@ if [[ -z "$CI" ]]; then
 
     black -q --line-length 120 --skip-string-normalization "${files[@]}" "${testFiles[@]}"
 
-    versionedFiles=()
+    filesToSpellCheck=()
     while read -r file; do
-        versionedFiles+=( "$file" )
-    done < <( git ls-tree -r --name-only HEAD )
-    codespell --ignore-words-list fo,Nd,unx "${versionedFiles[@]}"
+        filesToSpellCheck+=( "$file" )
+    done < <( git ls-tree -r --name-only HEAD | grep -v -E '[.](pdf|dat|tar|zst|7z|xar|cab|cpio|gz|rar|tgz|tbz2|bz2|zip|xz|ar|001|002|png|zlib|Z|lrz|lzma|lzo|lzip|lz4|zlib|snar)' )
+    codespell --ignore-words-list fo,Nd,unx "${filesToSpellCheck[@]}"
 
     flake8 --config tests/.flake8 "${files[@]}" "${testFiles[@]}" || returnError "$LINENO" 'Flake8 failed!'
 
