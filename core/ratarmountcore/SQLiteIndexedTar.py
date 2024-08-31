@@ -1114,6 +1114,10 @@ class SQLiteIndexedTar(MountSource):
         return self.index.listDir(path)
 
     @overrides(MountSource)
+    def listDirModeOnly(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+        return self.index.listDirModeOnly(path)
+
+    @overrides(MountSource)
     def fileVersions(self, path: str) -> int:
         fileVersions = self.index.fileVersions(path)
         return len(fileVersions) if isinstance(fileVersions, dict) else 0

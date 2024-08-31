@@ -728,6 +728,30 @@ class SQLiteIndex:
             del directory['']
         return directory if gotResults else None
 
+    def listDirModeOnly(self, path: str) -> Optional[Dict[str, int]]:
+        """
+        Return a dictionary mapping file names to file modes for the given directory path or None
+        if the path does not exist.
+
+        path : full path to file where '/' denotes TAR's root, e.g., '/', or '/foo'
+        """
+
+        # See comments in listDir.
+        # The only difference here is that we do not request all columns, but only two in a tuple.
+        oldRowFactory = self.getConnection().row_factory
+        self.getConnection().row_factory = None
+        rows = self.getConnection().execute(
+            'SELECT name,mode FROM "files" WHERE "path" == (?) ORDER BY "offsetheader"',
+            (self._queryNormpath(path).rstrip('/'),),
+        )
+        self.getConnection().row_factory = oldRowFactory
+
+        directory = {row[0]: row[1] for row in rows}
+        gotResults = bool(directory)
+        if '' in directory:
+            del directory['']
+        return directory if gotResults else None
+
     def fileVersions(self, path: str) -> Dict[str, FileInfo]:
         """
         Return metadata for all versions of a file possibly appearing more than once
