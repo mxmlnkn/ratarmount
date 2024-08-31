@@ -251,10 +251,7 @@ class AutoMountLayer(MountSource):
             fileInfo.userdata.append('/')
         return fileInfo
 
-    @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
-        mountPoint, pathInMountPoint = self._findMounted(path)
-        files = self.mounted[mountPoint].mountSource.listDir(pathInMountPoint)
+    def _appendMountPoints(self, path: str, files, onlyMode: bool):
         if not files:
             return None
 
@@ -277,9 +274,23 @@ class AutoMountLayer(MountSource):
                     if isinstance(files, set):
                         files.add(folderName)
                     else:
-                        files.update({folderName: mountInfo.rootFileInfo})
+                        files.update({folderName: mountInfo.rootFileInfo.mode if onlyMode else mountInfo.rootFileInfo})
 
         return files
+
+    @overrides(MountSource)
+    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+        mountPoint, pathInMountPoint = self._findMounted(path)
+        return self._appendMountPoints(
+            path, self.mounted[mountPoint].mountSource.listDir(pathInMountPoint), onlyMode=False
+        )
+
+    @overrides(MountSource)
+    def listDirModeOnly(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+        mountPoint, pathInMountPoint = self._findMounted(path)
+        return self._appendMountPoints(
+            path, self.mounted[mountPoint].mountSource.listDirModeOnly(pathInMountPoint), onlyMode=True
+        )
 
     @overrides(MountSource)
     def fileVersions(self, path: str) -> int:
