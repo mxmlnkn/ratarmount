@@ -121,11 +121,18 @@ function installAppImageSystemLibraries()
     printf '    %s\n' "${libraries[@]}"
 
     if [[ "${#libraries[@]}" -gt 0 ]]; then
+        existingLibraries=()
+        for library in "${libraries[@]}"; do
+            if [[ -e "$library" ]]; then
+                existingLibraries+=( "$library" )
+            fi
+        done
+        libraries=( "${existingLibraries[@]}" )
         'cp' -a "${libraries[@]}" "$APP_DIR"/usr/lib/
     fi
 
     APPIMAGE_EXTRACT_AND_RUN=1 linuxdeploy --appdir="$APP_DIR" "${libraries[@]/#/--library=}" \
-        --executable=$( which fusermount ) --executable=$( which lzop )
+        --executable="$( which fusermount )" --executable="$( which lzop )"
 }
 
 function trimAppImage()
