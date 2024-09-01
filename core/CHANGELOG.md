@@ -1,4 +1,8 @@
 
+# Version 0.7.2 built on 2024-09-01
+
+ - Userdata for root file info was wrong in `AutoMountLayer`.
+
 # Version 0.7.1 built on 2024-06-02
 
  - Fix the missing indentation for the index version check.
