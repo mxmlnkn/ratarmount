@@ -1,4 +1,10 @@
 
+# Version 0.15.2 built on 2024-09-01
+
+ - Setting either the owner or group for a file with `--write-overlay` would reset the group or user respectively.
+ - Setting owner or group to 0 (root) with `--write-overlay` was not working.
+ - (ratarmountcore 0.7.2) Fix error when combining `--recursive` or `--recursion-depth` with `--write-overlay`.
+
 # Version 0.15.1 built on 2024-06-02
 
  - Show install suggestions when FUSE is missing.
