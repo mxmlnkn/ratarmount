@@ -695,7 +695,7 @@ class SQLiteIndex:
         if 'offsetheader' in columns and 'issparse' in columns:
             selected_columns += ['offsetheader', 'issparse']
 
-        def rowToFileInfo(cursor, row) -> Tuple[str, FileInfo]:
+        def rowToFileInfo(cursor, row) -> Tuple[str, FileInfo]:  # pylint: disable=unused-argument
             return row[0], FileInfo(
                 # fmt: off
                 size     = row[1],

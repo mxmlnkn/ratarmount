@@ -13,11 +13,12 @@ import stat
 import tarfile
 
 from timeit import default_timer as timer
-from typing import Any, Callable, Dict, IO, Iterable, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, IO, List, Optional, Tuple, Union
 
 from .compressions import LIBARCHIVE_FILTER_FORMATS
 from .MountSource import FileInfo, MountSource
 from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
+from .SQLiteIndexMountSource import SQLiteIndexMountSource
 from .utils import InvalidIndexError, overrides
 
 try:
@@ -494,7 +495,7 @@ class LibarchiveFile(io.RawIOBase):
 
 
 # The implementation is similar to ZipMountSource and SQLiteIndexedTarUserData.
-class LibarchiveMountSource(MountSource):
+class LibarchiveMountSource(SQLiteIndexMountSource):
     def __init__(
         self,
         # fmt: off
@@ -546,23 +547,22 @@ class LibarchiveMountSource(MountSource):
         #  - Seeking to a file takes on average half as time much as creating the index. I.e., the overhead for
         #    creating the index feels relatively insignificant assuming that more than 2 files are accessed.
         indexFilePath = ':memory:'
-        self.index = SQLiteIndex(
-            indexFilePath,
-            indexFolders=indexFolders,
-            archiveFilePath=self.archiveFilePath,
-            encoding=self.encoding,
-            checkMetadata=self._checkMetadata,
-            printDebug=self.printDebug,
-            indexMinimumFileCount=indexMinimumFileCount,
-            backendName='LibarchiveMountSource',
+        super().__init__(
+            SQLiteIndex(
+                indexFilePath,
+                indexFolders=indexFolders,
+                archiveFilePath=self.archiveFilePath,
+                encoding=self.encoding,
+                checkMetadata=self._checkMetadata,
+                printDebug=self.printDebug,
+                indexMinimumFileCount=indexMinimumFileCount,
+                backendName='LibarchiveMountSource',
+            ),
+            clearIndexCache=clearIndexCache,
         )
-
-        if clearIndexCache:
-            self.index.clearIndexes()
 
         isFileObject = False  # Not supported yet
 
-        self.index.openExisting()
         if self.index.indexIsLoaded():
             metadata = dict(self.index.getConnection().execute('SELECT * FROM metadata;'))
             if 'backend' not in metadata or metadata['backend'] != 'libarchive':
@@ -632,37 +632,9 @@ class LibarchiveMountSource(MountSource):
         self.index.storeMetadata(argumentsMetadata, self.archiveFilePath)
         self.index.storeMetadataKeyValue('backend', 'libarchive')
 
-    def __enter__(self):
-        return self
-
-    @overrides(MountSource)
-    def __exit__(self, exception_type, exception_value, exception_traceback):
-        self.index.close()
-
     def __del__(self):
         # TODO check that all objects are really closed to avoid memory leaks
         pass
-
-    @overrides(MountSource)
-    def isImmutable(self) -> bool:
-        return True
-
-    @overrides(MountSource)
-    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
-        return self.index.getFileInfo(path, fileVersion=fileVersion)
-
-    @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
-        return self.index.listDir(path)
-
-    @overrides(MountSource)
-    def listDirModeOnly(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
-        return self.index.listDirModeOnly(path)
-
-    @overrides(MountSource)
-    def fileVersions(self, path: str) -> int:
-        fileVersions = self.index.fileVersions(path)
-        return len(fileVersions) if isinstance(fileVersions, dict) else 0
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo):

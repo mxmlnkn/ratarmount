@@ -17,7 +17,7 @@ import time
 import traceback
 
 from timeit import default_timer as timer
-from typing import Any, Callable, cast, Dict, Generator, IO, Iterable, List, Optional, Tuple, Union
+from typing import Any, Callable, cast, Dict, Generator, IO, Iterable, List, Optional, Tuple
 
 try:
     import indexed_gzip
@@ -37,6 +37,7 @@ except ImportError:
 from .MountSource import FileInfo, MountSource
 from .ProgressBar import ProgressBar
 from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
+from .SQLiteIndexMountSource import SQLiteIndexMountSource
 from .StenciledFile import StenciledFile
 from .compressions import detectCompression, findAvailableOpen, getGzipInfo, TAR_COMPRESSION_FORMATS
 from .utils import (
@@ -579,7 +580,7 @@ class _TarFileMetadataReader:
         return []
 
 
-class SQLiteIndexedTar(MountSource):
+class SQLiteIndexedTar(SQLiteIndexMountSource):
     """
     This class reads once through the whole TAR archive and stores TAR file offsets
     for all contained files in an index to support fast seeking to a given file.
@@ -749,19 +750,19 @@ class SQLiteIndexedTar(MountSource):
         if indexFolders and isinstance(indexFolders, str):
             indexFolders = [indexFolders]
 
-        self.index = SQLiteIndex(
-            indexFilePath,
-            indexFolders=indexFolders,
-            archiveFilePath=None if self.isFileObject else self.tarFileName,
-            encoding=self.encoding,
-            checkMetadata=self._checkMetadata,
-            printDebug=self.printDebug,
-            indexMinimumFileCount=indexMinimumFileCount,
-            backendName='SQLiteIndexedTar',
+        super().__init__(
+            SQLiteIndex(
+                indexFilePath,
+                indexFolders=indexFolders,
+                archiveFilePath=None if self.isFileObject else self.tarFileName,
+                encoding=self.encoding,
+                checkMetadata=self._checkMetadata,
+                printDebug=self.printDebug,
+                indexMinimumFileCount=indexMinimumFileCount,
+                backendName='SQLiteIndexedTar',
+            ),
+            clearIndexCache=clearIndexCache,
         )
-        if clearIndexCache:
-            self.index.clearIndexes()
-        self.index.openExisting()
 
         if self.index.indexIsLoaded():
             if not self.hasBeenAppendedTo:  # indirectly set by a successful call to _tryLoadIndex
@@ -858,12 +859,9 @@ class SQLiteIndexedTar(MountSource):
 
         return False
 
-    def __enter__(self):
-        return self
-
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
-        self.index.close()
+        super().__exit__(exception_type, exception_value, exception_traceback)
 
         if self.tarFileObject:
             self.tarFileObject.close()
@@ -1100,27 +1098,6 @@ class SQLiteIndexedTar(MountSource):
             )
             # fmt: on
             self.index.setFileInfo(fileInfo)
-
-    @overrides(MountSource)
-    def isImmutable(self) -> bool:
-        return True
-
-    @overrides(MountSource)
-    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
-        return self.index.getFileInfo(path, fileVersion=fileVersion)
-
-    @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
-        return self.index.listDir(path)
-
-    @overrides(MountSource)
-    def listDirModeOnly(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
-        return self.index.listDirModeOnly(path)
-
-    @overrides(MountSource)
-    def fileVersions(self, path: str) -> int:
-        fileVersions = self.index.fileVersions(path)
-        return len(fileVersions) if isinstance(fileVersions, dict) else 0
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo) -> IO[bytes]:
