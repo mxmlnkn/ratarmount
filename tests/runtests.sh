@@ -1942,12 +1942,16 @@ tests+=(
 
 pytestedTests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.gzip.squashfs           foo/fighter/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lz4.squashfs            foo/fighter/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lzma.squashfs           foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lzo.squashfs            foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.no-compression.squashfs foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.xz.squashfs             foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.zstd.squashfs           foo/fighter/ufo
 
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.gzip.squashfs           foo/jet/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lz4.squashfs            foo/jet/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lzma.squashfs           foo/jet/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lzo.squashfs            foo/jet/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.no-compression.squashfs foo/jet/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.xz.squashfs             foo/jet/ufo

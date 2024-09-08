@@ -10,9 +10,20 @@ import re
 import stat
 import tarfile
 import traceback
+import zlib
 from timeit import default_timer as timer
 
 from typing import Any, Dict, IO, List, Optional, Tuple, Union
+
+try:
+    import deflate
+except ImportError:
+    deflate = None
+
+try:
+    from isal import isal_zlib
+except ImportError:
+    isal_zlib = None  # type: ignore
 
 try:
     import PySquashfsImage
@@ -55,11 +66,80 @@ except ImportError:
             raise NotImplementedError
 
 
+try:
+    from PySquashfsImage.compressor import Compression, Compressor, compressors
+except ImportError:
+    Compressor = object
+
 from .compressions import findSquashFSOffset
 from .MountSource import FileInfo, MountSource
 from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
 from .SQLiteIndexMountSource import SQLiteIndexMountSource
 from .utils import InvalidIndexError, overrides
+
+
+class IsalZlibDecompressor(Compressor):
+    name = "gzip"
+
+    def __init__(self):
+        self._decompress = zlib.decompress if isal_zlib is None else isal_zlib.decompress
+
+    def uncompress(self, src, size, outsize):
+        return self._decompress(src)
+
+
+class LibdeflateZlibDecompressor(Compressor):
+    name = "gzip"
+
+    def __init__(self):
+        self._lib = deflate
+
+    def uncompress(self, src, size, outsize):
+        # Beware: https://github.com/dcwatson/deflate/issues/41
+        return self._lib.zlib_decompress(src, outsize)
+
+
+class LZ4Compressor(Compressor):
+    name = "lz4"
+
+    def __init__(self):
+        import lz4.block
+
+        self._lib = lz4.block
+
+    def uncompress(self, src, size, outsize):
+        return self._lib.decompress(src, outsize)
+
+
+class LZMACompressor(Compressor):
+    name = "lzma"
+
+    def __init__(self, blockSize):
+        self._blockSize = blockSize
+        try:
+            import lzma
+        except ImportError:
+            from backports import lzma
+        self._lib = lzma
+
+    def uncompress(self, src, size, outsize):
+        # https://github.com/plougher/squashfs-tools/blob/a04910367d64a5220f623944e15be282647d77ba/squashfs-tools/
+        #   lzma_wrapper.c#L40
+        # res = LzmaCompress(dest + LZMA_HEADER_SIZE, &outlen, src, size, dest,
+        #                    &props_size, 5, block_size, 3, 0, 2, 32, 1);
+        # https://github.com/jljusten/LZMA-SDK/blob/781863cdf592da3e97420f50de5dac056ad352a5/C/LzmaLib.h#L96
+        # -> level=5, dictSize=block_size, lc=3, lp=0, pb=2, fb=32, numThreads=1
+        # https://github.com/plougher/squashfs-tools/blob/a04910367d64a5220f623944e15be282647d77ba/squashfs-tools/
+        #   lzma_wrapper.c#L30
+        # For some reason, squashfs does not store raw lzma but adds a custom header of 5 B and 8 B little-endian
+        # uncompressed size, which can be read with struct.unpack('<Q', src[5:5+8]))
+        LZMA_PROPS_SIZE = 5
+        LZMA_HEADER_SIZE = LZMA_PROPS_SIZE + 8
+        return self._lib.decompress(
+            src[LZMA_HEADER_SIZE:],
+            format=self._lib.FORMAT_RAW,
+            filters=[{"id": self._lib.FILTER_LZMA1, 'lc': 3, 'lp': 0, 'pb': 2, 'dict_size': self._blockSize}],
+        )
 
 
 class SquashFSFile(io.RawIOBase):
@@ -208,6 +288,8 @@ class SquashFSImage(SquashFsImage):
      - Adds thread locks around the underlying file object so that multiple file objects can be opened and used
        from multiple threads concurrently.
      - Uses libdeflate or ISA-L if installed, which a generally faster than the standard zlib.
+     - Fixes lz4 support. (Merged into PySquashfsImage upstream, but not released yet.)
+     - Adds lzma support. (Merged into PySquashfsImage upstream, but not released yet.)
 
     Beware that we are overwriting and using "private" methods starting with underscores!
     That's why we need to pin to an exact PySquashfsImage release.
@@ -217,6 +299,21 @@ class SquashFSImage(SquashFsImage):
     def __init__(self, *args, **kwargs):
         self._real_root = None
         super().__init__(*args, **kwargs)  # Calls overridden _initialize
+
+    @overrides(SquashFsImage)
+    def _get_compressor(self, compression_id):
+        if compression_id == Compression.ZLIB:
+            if deflate is not None:
+                return LibdeflateZlibDecompressor()
+            if isal_zlib is not None:
+                return IsalZlibDecompressor()
+        if compression_id == Compression.LZ4:
+            return LZ4Compressor()
+        if compression_id == Compression.LZMA:
+            return LZMACompressor(self._sblk.block_size)
+        if compression_id not in compressors:
+            raise ValueError("Unknown compression method " + compression_id)
+        return compressors[compression_id]()
 
     @overrides(SquashFsImage)
     def _initialize(self):

@@ -56,6 +56,7 @@ full = [
     "lz4 ~= 4.0.0",
     "python-lzo ~= 1.0",
     "zstandard ~= 0.22.0",
+    "isal ~= 1.0",
 ]
 bzip2 = []
 gzip = []
@@ -70,6 +71,7 @@ squashfs = [
     "lz4 ~= 4.0.0",
     "python-lzo ~= 1.0",
     "zstandard ~= 0.22.0",
+    "isal ~= 1.0",
 ]
 
 [project.scripts]

@@ -60,6 +60,7 @@ full = [
     "lz4 ~= 4.0.0",
     "python-lzo ~= 1.0",
     "zstandard ~= 0.22.0",
+    "isal ~= 1.0",
 ]
 bzip2 = ["rapidgzip >= 0.13.1"]
 gzip = ["indexed_gzip >= 1.6.3, < 2.0"]
@@ -69,6 +70,7 @@ squashfs = [
     "lz4 ~= 4.0.0",
     "python-lzo ~= 1.0",
     "zstandard ~= 0.22.0",
+    "isal ~= 1.0",
 ]
 xz = ["python-xz ~= 0.4.0"]
 zip = []

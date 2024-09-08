@@ -5,6 +5,7 @@
 # pylint: disable=wrong-import-position
 # pylint: disable=protected-access
 
+import importlib
 import io
 import os
 import struct
@@ -18,6 +19,17 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from ratarmountcore.compressions import findSquashFSOffset  # noqa: E402
 from ratarmountcore.SquashFSMountSource import SquashFSMountSource  # noqa: E402
+
+
+compressionsToTest = []
+if importlib.util.find_spec('PySquashfsImage'):
+    compressionsToTest = ['no-compression', 'gzip', 'lzma', 'xz']
+    if importlib.util.find_spec('lz4') is not None:
+        compressionsToTest.append('lz4')
+    if importlib.util.find_spec('lzo') is not None:
+        compressionsToTest.append('lzo')
+    if importlib.util.find_spec('zstandard') is not None:
+        compressionsToTest.append('zstd')
 
 
 class TestSquashfsMountSource:
@@ -37,7 +49,7 @@ class TestSquashfsMountSource:
         assert findSquashFSOffset(io.BytesIO(b"0" * 1234 + validHeader + validHeader)) == 1234
 
     @staticmethod
-    @pytest.mark.parametrize('compression', ['no-compression', 'gzip', 'lzo', 'xz', 'zstd'])
+    @pytest.mark.parametrize('compression', compressionsToTest)
     def test_simple_usage(compression):
         with copyTestFile(f'folder-symlink.{compression}.squashfs') as path, SquashFSMountSource(path) as mountSource:
             with open(path, 'rb') as file:
