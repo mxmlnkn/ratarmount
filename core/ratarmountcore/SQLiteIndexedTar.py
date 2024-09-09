@@ -1502,7 +1502,9 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                         f"[Info] Parallelization to use for rapidgzip backend: {parallelization}, "
                         f"slow drive detected: {isOnSlowDrive(fileobj.name)}"
                     )
-                tar_file = rapidgzip.RapidgzipFile(fileobj, parallelization=parallelization, verbose=printDebug >= 2)
+                tar_file = rapidgzip.RapidgzipFile(
+                    fileobj, parallelization=parallelization, verbose=printDebug >= 2, chunk_size=gzipSeekPointSpacing
+                )
             else:
                 # The buffer size must be much larger than the spacing or else there will be large performance penalties
                 # even for reading sequentially, see https://github.com/pauldmccarthy/indexed_gzip/issues/89
