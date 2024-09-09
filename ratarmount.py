@@ -262,7 +262,7 @@ class WritableFolderMountSource(fuse.Operations):
         folder, name = self._splitPath(path)
 
         self.sqlConnection.execute(
-            f'INSERT OR REPLACE INTO "files" VALUES ({",".join(["?"]*7)})',
+            f'INSERT OR REPLACE INTO "files" VALUES ({",".join(["?"] * 7)})',
             (folder, name, sfi.mtime, sfi.mode, sfi.uid, sfi.gid, False),
         )
 

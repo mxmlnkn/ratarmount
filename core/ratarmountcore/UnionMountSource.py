@@ -95,7 +95,7 @@ class UnionMountSource(MountSource):
         if self.printDebug >= 1:
             print(
                 f"Cached mount sources for {len(self.folderCache)} folders up to a depth of "
-                f"{self.folderCacheDepth} in {t1-t0:.3}s for faster union mount."
+                f"{self.folderCacheDepth} in {t1 - t0:.3}s for faster union mount."
             )
 
     @overrides(MountSource)
