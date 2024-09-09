@@ -34,6 +34,9 @@ except ImportError:
     class SquashFsImage:  # type: ignore
         def __init__(self, fd, offset: int = 0, closefd: bool = True) -> None:
             self._sblk: Any = None
+            self._offset = 0
+            self._fd = fd
+            self._comp = None
 
         def __iter__(self):
             pass
@@ -71,7 +74,7 @@ from ratarmountcore.formats import findSquashFSOffset
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
 from ratarmountcore.SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
-from ratarmountcore.utils import overrides
+from ratarmountcore.utils import openPreadable, overrides
 
 
 class IsalZlibDecompressor(Compressor):
@@ -372,6 +375,20 @@ class SquashFSImage(SquashFsImage):
                 cls = PySquashfsImage.filetype[entry["type"]]
                 yield self._join_inode_offset(start_block, offset), cls(self, inode, entry["name"], directory)
 
+    def _read_data_block(self, start, size):
+        compressedSizeBlock = PySquashfsImage.SQUASHFS_COMPRESSED_SIZE_BLOCK(size)
+        offset = self._offset + start
+
+        if hasattr(self._fd, 'pread'):
+            data = self._fd.pread(compressedSizeBlock, offset)
+        else:
+            self._fd.seek(offset)
+            data = self._fd.read(compressedSizeBlock)
+
+        if PySquashfsImage.SQUASHFS_COMPRESSED_BLOCK(size):
+            return self._comp.uncompress(data, compressedSizeBlock, self._sblk.block_size)
+        return data
+
     @property
     def _root(self):
         if self._real_root is None:
@@ -404,9 +421,13 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         **options
         # fmt: on
     ) -> None:
+        # Beware: We should not turn of file buffering because PySquashfsImage does LOTS of very small reads to
+        #         read lists of integers to parse the SquashFS superblock. It would be nice to buffer this
+        #         on the parser side, but for now, leave the file object buffered and instead try to use unbuffered
+        #         reads for file accesses only.
         if isinstance(fileOrPath, str):
             openedFile = True
-            file: IO[bytes] = open(fileOrPath, 'rb')
+            file: IO[bytes] = openPreadable(fileOrPath)
         else:
             openedFile = False
             file = fileOrPath
