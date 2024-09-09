@@ -90,6 +90,9 @@ class MountSource(ABC):
     def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
         # Because we only do a single seek before closing the file again, buffering makes no sense.
         with self.open(fileInfo, buffering=0) as file:
+            pread = getattr(file, 'pread', None)
+            if pread:
+                return pread(size, offset)
             file.seek(offset)
             return file.read(size)
 

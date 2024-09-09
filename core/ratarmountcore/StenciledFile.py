@@ -139,17 +139,24 @@ class RawStenciledFile(io.RawIOBase):
 
         # Note that seek and read of the file object itself do not seem to check against this and
         # instead lead to a segmentation fault in the multithreading tests.
-        if self.fileObjects[i].closed:
+        fileObject = self.fileObjects[i]
+        if fileObject.closed:
             raise ValueError("A closed file cannot be read from!")
 
         offsetInsideStencil = self.offset - self.cumsizes[i]
         assert offsetInsideStencil >= 0
         assert offsetInsideStencil < self.sizes[i]
-        self.fileObjects[i].seek(self.offsets[i] + offsetInsideStencil, io.SEEK_SET)
+        offset = self.offsets[i] + offsetInsideStencil
 
         # Read as much as requested or as much as the current contiguous region / stencil still contains.
         readableSize = min(size, self.sizes[i] - (self.offset - self.cumsizes[i]))
-        tmp = self.fileObjects[i].read(readableSize)
+
+        if hasattr(fileObject, 'pread'):
+            tmp = fileObject.pread(readableSize, offset)
+        else:
+            fileObject.seek(offset, io.SEEK_SET)
+            tmp = fileObject.read(readableSize)
+
         self.offset += len(tmp)
         return tmp
 
