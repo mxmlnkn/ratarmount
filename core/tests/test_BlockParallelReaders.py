@@ -199,7 +199,9 @@ class TestParallelZstdReader:
                 with open(tmpPath, 'wb') as file:
                     size = blockSize * blocksPerStream
                     file.write(base64.b64encode(os.urandom(size))[:size])
-                subprocess.run(['zstd', f'--block-size={blockSize}', '--compress', '--force', tmpPath], check=True)
+                subprocess.run(
+                    ['zstd', '-q', f'--block-size={blockSize}', '--compress', '--force', tmpPath], check=True
+                )
                 with open(tmpPath + '.zst', 'rb') as file:
                     archive.write(file.read())
 
