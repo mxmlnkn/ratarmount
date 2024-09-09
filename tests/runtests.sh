@@ -1340,7 +1340,9 @@ checkWriteOverlayWithArchivedFiles()
     local args=( -P "$parallelization" -c --write-overlay "$overlayFolder" "$archive" "$mountFolder" )
     {
         runAndCheckRatarmount "${args[@]}"
-        if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then returnError "$LINENO" 'Expected files in mount point'; fi
+        if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then
+            returnError "$LINENO" 'Expected files in mount point'
+        fi
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
 
     verifyCheckSum "$mountFolder" 'foo/fighter/ufo' 'tests/nested-tar.tar' 2709a3348eb2c52302a7606ecf5860bc ||
@@ -1398,7 +1400,9 @@ checkWriteOverlayWithArchivedFiles()
     'rm' -rf "$overlayFolder"
     {
         runAndCheckRatarmount "${args[@]}"
-        if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then returnError "$LINENO" 'Expected files in mount point'; fi
+        if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then
+            returnError "$LINENO" 'Expected files in mount point'
+        fi
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
 
 
@@ -1433,7 +1437,9 @@ checkWriteOverlayWithArchivedFiles()
     'rm' -rf "$overlayFolder"
     {
         runAndCheckRatarmount "${args[@]}"
-        if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then returnError "$LINENO" 'Expected files in mount point'; fi
+        if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then
+            returnError "$LINENO" 'Expected files in mount point'
+        fi
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
 
     ## Rename archive file
@@ -1483,7 +1489,9 @@ checkWriteOverlayWithSymbolicLinks()
     local args=( -P "$parallelization" -c --write-overlay "$overlayFolder" "$overlayFolder2" "$mountFolder" )
     {
         runAndCheckRatarmount "${args[@]}"
-        if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then returnError "$LINENO" 'Expected files in mount point'; fi
+        if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then
+            returnError "$LINENO" 'Expected files in mount point'
+        fi
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
 
     verifyCheckSum "$mountFolder" 'overlay2/bar' '[write overlay]' d3b07384d113edec49eaa6238ad5ff00 ||
@@ -1531,7 +1539,9 @@ checkWriteOverlayCommitDelete()
     local args=( -P "$parallelization" -c --write-overlay "$overlayFolder" "$archive" "$mountFolder" )
     {
         runAndCheckRatarmount "${args[@]}"
-        if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then returnError "$LINENO" 'Expected files in mount point'; fi
+        if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then
+            returnError "$LINENO" 'Expected files in mount point'
+        fi
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
 
     verifyCheckSum "$mountFolder" 'foo/fighter/ufo' 'tests/single-nested-folder.tar' 2709a3348eb2c52302a7606ecf5860bc ||
@@ -1593,7 +1603,9 @@ checkSymbolicLinkRecursion()
     local args=( -P "$parallelization" -c -r -l "$folder/collections" "$mountFolder" )
     {
         runAndCheckRatarmount "${args[@]}"
-        if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then returnError "$LINENO" 'Expected files in mount point'; fi
+        if [[ -z "$( find "$mountFolder" -mindepth 1 2>/dev/null )" ]]; then
+            returnError "$LINENO" 'Expected files in mount point'
+        fi
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
 
     verifyCheckSum "$mountFolder" 'part1.gz/part1' '[write overlay]' c157a79031e1c40f85931829bc5fc552 ||
@@ -1661,6 +1673,69 @@ checkTruncated()
     cleanup
 
     echoerr "[${FUNCNAME[0]}] Tested successfully '$fileInTar' in '$archive' for checksum $correctChecksum"
+
+    return 0
+}
+
+
+getBlockSize()
+{
+    python3 -c 'import os, sys; print(os.statvfs(sys.argv[1]))' "$1"
+}
+
+
+checkStatfs()
+{
+    rm -f ratarmount.{stdout,stderr}.log
+
+    local mountFolder
+    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+
+    local overlayFolder
+    overlayFolder=$( mktemp -d )
+    echo 'foo' > "$overlayFolder/bar"
+
+    local args=( -P "$parallelization" -c "$overlayFolder" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+
+    getBlockSize "$mountFolder" >/dev/null || returnError "$LINENO" 'Failed to create file in write overlay'
+    getBlockSize "$mountFolder/bar" >/dev/null || returnError "$LINENO" 'Failed to create file in write overlay'
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully statfs to mounted folder."
+
+    'rm' -r -- "$overlayFolder"
+
+    return 0
+}
+
+
+checkStatfsWriteOverlay()
+{
+    rm -f ratarmount.{stdout,stderr}.log
+
+    local mountFolder
+    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+
+    local overlayFolder overlayFolder2
+    overlayFolder=$( mktemp -d )
+    overlayFolder2=$( mktemp -d )
+    echo 'foo' > "$overlayFolder2/bar"
+
+    local args=( -P "$parallelization" -c --write-overlay "$overlayFolder" "$overlayFolder2" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+
+    getBlockSize "$mountFolder" >/dev/null || returnError "$LINENO" 'Failed to create file in write overlay'
+    getBlockSize "$mountFolder/bar" >/dev/null || returnError "$LINENO" 'Failed to create file in write overlay'
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully statfs to mounted folder with write overlay."
+
+    'rm' -r -- "$overlayFolder" "$overlayFolder2"
 
     return 0
 }
@@ -1965,6 +2040,8 @@ if [[ ! -f tests/2k-recursive-tars.tar ]]; then
     bzip2 -q -d -k tests/2k-recursive-tars.tar.bz2
 fi
 
+checkStatfs || returnError "$LINENO" 'Statfs failed!'
+checkStatfsWriteOverlay || returnError "$LINENO" 'Statfs with write overlay failed!'
 checkSymbolicLinkRecursion || returnError "$LINENO" 'Symbolic link recursion failed!'
 checkWriteOverlayWithSymbolicLinks || returnError "$LINENO" 'Write overlay tests with symbolic links failed!'
 checkWriteOverlayWithNewFiles || returnError "$LINENO" 'Write overlay tests failed!'

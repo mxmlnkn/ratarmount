@@ -125,6 +125,7 @@ class WritableFolderMountSource(fuse.Operations):
         self.root: str = path
         self.mountSource = mountSource
         self.sqlConnection = self._openSqlDb(os.path.join(path, self.hiddenDatabaseName))
+        self._statfs = self._getStatfsForFolder(self.root)
 
         # Add table if necessary
         tables = [row[0] for row in self.sqlConnection.execute('SELECT name FROM sqlite_master WHERE type = "table";')]
@@ -138,6 +139,25 @@ class WritableFolderMountSource(fuse.Operations):
         assert stat.S_ISREG(fileInfo.mode)
         assert isinstance(databaseMountSource, FolderMountSource)
         assert databaseMountSource.root == self.root
+
+    @staticmethod
+    def _getStatfsForFolder(path: str) -> Dict[str, Any]:
+        result = os.statvfs(path)
+        return {
+            key: getattr(result, key)
+            for key in (
+                'f_bavail',
+                'f_bfree',
+                'f_blocks',
+                'f_bsize',
+                'f_favail',
+                'f_ffree',
+                'f_files',
+                'f_flag',
+                'f_frsize',
+                'f_namemax',
+            )
+        }
 
     @staticmethod
     def _openSqlDb(path: str, **kwargs) -> sqlite3.Connection:
@@ -162,6 +182,7 @@ class WritableFolderMountSource(fuse.Operations):
         """
         os.fchdir(fd)
         self.root = '.'
+        self._statfs = self._getStatfsForFolder(self.root)
 
     @staticmethod
     def _splitPath(path: str) -> Tuple[str, str]:
@@ -471,22 +492,7 @@ class WritableFolderMountSource(fuse.Operations):
 
     @overrides(fuse.Operations)
     def statfs(self, path):
-        stv = os.statvfs(self._realpath(path))
-        return dict(
-            (key, getattr(stv, key))
-            for key in (
-                'f_bavail',
-                'f_bfree',
-                'f_blocks',
-                'f_bsize',
-                'f_favail',
-                'f_ffree',
-                'f_files',
-                'f_flag',
-                'f_frsize',
-                'f_namemax',
-            )
-        )
+        return self._statfs
 
 
 class FuseMount(fuse.Operations):
