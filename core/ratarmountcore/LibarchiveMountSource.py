@@ -38,9 +38,6 @@ class ArchiveEntry:
         self.entryIndex = entryIndex
         self._fileInfoRow: Optional[Tuple] = None
 
-        if self.eof:
-            return
-
     def __del__(self):
         laffi.entry_free(self._entry)
 

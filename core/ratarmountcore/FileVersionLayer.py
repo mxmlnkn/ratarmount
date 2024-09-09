@@ -5,7 +5,7 @@ import os
 import stat
 
 
-from typing import Dict, IO, Iterable, Optional, Tuple, Union
+from typing import Any, Dict, IO, Iterable, Optional, Tuple, Union
 
 from .MountSource import FileInfo, MountSource
 from .utils import overrides
@@ -236,3 +236,7 @@ class FileVersionLayer(MountSource):
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
         self.mountSource.__exit__(exception_type, exception_value, exception_traceback)
+
+    @overrides(MountSource)
+    def statfs(self) -> Dict[str, Any]:
+        return self.mountSource.statfs()

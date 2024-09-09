@@ -72,6 +72,18 @@ class MountSource(ABC):
                     a default buffer size equal to the file(system)'s block size or Python's io.DEFAULT_BUFFER_SIZE.
         """
 
+    def statfs(self) -> Dict[str, Any]:
+        """
+        Returns a dictionary with keys named like the POSIX statvfs struct.
+        https://pubs.opengroup.org/onlinepubs/009695399/basedefs/sys/statvfs.h.html
+        Keys may be missing. Either an empty dictionary should be returned, or at least f_bsize and f_namemax
+        should be initialized because that's what libfuse returns per default if the statfs call is not implemented.
+        If statfs is not implemented / the returned dictionary call is empty, libfuse will return default values:
+            {'f_bsize': 512, 'f_namemax': 255}
+        https://github.com/libfuse/libfuse/blob/373ddc7eae7b0c684fc4ab29d8addfa3b9e99e1e/lib/fuse.c#L1962-L1975
+        """
+        return {}
+
     def fileVersions(self, path: str) -> int:
         return 1 if self.exists(path) else 0
 
@@ -124,3 +136,24 @@ def createRootFileInfo(userdata: List[Any]):
         userdata = userdata,
         # fmt: on
     )
+
+
+def mergeStatfs(values: Iterable[Dict[str, Any]], printDebug: int = 0):
+    result = {}
+    for statfs in values:
+        for key, value in statfs.items():
+            if key not in result:
+                result[key] = value
+                continue
+
+            if key in ('f_bsize', 'f_frsize'):
+                result[key] = max(result[key], value)
+                continue
+
+            if key == 'f_namemax':
+                result[key] = min(result[key], value)
+                continue
+
+            if result[key] != value and printDebug >= 1:
+                print(f"[Warning] Failed to merge statfs values ({value}, {result[key]}) for key: {key}.")
+    return result

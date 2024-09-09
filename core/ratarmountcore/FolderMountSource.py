@@ -3,7 +3,7 @@
 
 import os
 import stat
-from typing import Dict, IO, Iterable, Optional, Union
+from typing import Any, Dict, IO, Iterable, Optional, Union
 
 from .MountSource import FileInfo, MountSource
 from .utils import overrides
@@ -32,6 +32,7 @@ class FolderMountSource(MountSource):
 
     def __init__(self, path: str) -> None:
         self.root: str = path
+        self._statfs = FolderMountSource._getStatfsForFolder(self.root)
 
     def setFolderDescriptor(self, fd: int) -> None:
         """
@@ -41,6 +42,22 @@ class FolderMountSource(MountSource):
         """
         os.fchdir(fd)
         self.root = '.'
+        self._statfs = FolderMountSource._getStatfsForFolder(self.root)
+
+    @staticmethod
+    def _getStatfsForFolder(path: str):
+        result = os.statvfs(path)
+        return {
+            'f_bsize': result.f_bsize,
+            'f_frsize': result.f_frsize,
+            'f_blocks': result.f_blocks,
+            'f_bfree': 0,
+            'f_bavail': 0,
+            'f_files': result.f_files,
+            'f_ffree': 0,
+            'f_favail': 0,
+            'f_namemax': result.f_namemax,
+        }
 
     def _realpath(self, path: str) -> str:
         """Path given relative to folder root. Leading '/' is acceptable"""
@@ -148,6 +165,10 @@ class FolderMountSource(MountSource):
             return open(realpath, 'rb', buffering=buffering)
         except Exception as e:
             raise ValueError(f"Specified path '{realpath}' is not a file that can be read!") from e
+
+    @overrides(MountSource)
+    def statfs(self) -> Dict[str, Any]:
+        return self._statfs.copy()
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):

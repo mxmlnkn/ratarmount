@@ -490,7 +490,7 @@ class WritableFolderMountSource(fuse.Operations):
 
     @overrides(fuse.Operations)
     def statfs(self, path):
-        return self._statfs
+        return self._statfs.copy()
 
 
 class FuseMount(fuse.Operations):
@@ -511,6 +511,11 @@ class FuseMount(fuse.Operations):
     All path arguments for overridden fusepy methods do have a leading slash ('/')!
     This is why MountSource also should expect leading slashes in all paths.
     """
+
+    # Use a relatively large minimum 256 KiB block size to get filesystem users to use larger reads
+    # because reads have a relative large overhead because of the fusepy, libfuse, kernel FUSE, SQLite,
+    # ratarmountcore, StenciledFile, and other layers they have to go through.
+    MINIMUM_BLOCK_SIZE = 256 * 1024
 
     def __init__(self, pathToMount: Union[str, List[str]], mountPoint: str, **options) -> None:
         self.mountPoint = os.path.realpath(mountPoint)
@@ -649,8 +654,6 @@ class FuseMount(fuse.Operations):
             self.mknod = self.writeOverlay.mknod
             self.truncate = self.writeOverlay.truncate
 
-            self.statfs = self.writeOverlay.statfs
-
         # Create mount point if it does not exist
         self.mountPointWasCreated = False
         if mountPoint and not os.path.exists(mountPoint):
@@ -722,11 +725,13 @@ class FuseMount(fuse.Operations):
         statDict['st_mtime'] = int(statDict['st_mtime'])
         statDict['st_nlink'] = 1  # TODO: this is wrong for files with hardlinks
 
-        # du by default sums disk usage (the number of blocks used by a file)
-        # instead of file size directly. Tar files are usually a series of 512B
-        # blocks, so we report a 1-block header + ceil(filesize / 512).
-        statDict['st_blksize'] = 512
-        statDict['st_blocks'] = 1 + ((fileInfo.size + 511) // 512)
+        # `du` sums disk usage (the number of blocks used by a file) instead of the file sizes by default.
+        # So, we need to return some valid values. Tar files are usually a series of 512 B blocks, but this
+        # block size is also used by Python as the default read call size, so it should be something larger
+        # for better performance.
+        blockSize = FuseMount.MINIMUM_BLOCK_SIZE
+        statDict['st_blksize'] = blockSize
+        statDict['st_blocks'] = 1 + ((fileInfo.size + blockSize - 1) // blockSize)
 
         return statDict
 
@@ -863,6 +868,30 @@ class FuseMount(fuse.Operations):
         if self._isWriteOverlayHandle(fh):
             self.writeOverlay.fsync(path, datasync, self._resolveFileHandle(fh))
         return 0  # Nothing to flush, so return success
+
+    @overrides(fuse.Operations)
+    def statfs(self, path):
+        # The filesystem block size is used, e.g., by Python as the default buffer size and therefore the
+        # default (p)read size when possible. For network file systems such as Lustre, or block compression
+        # such as in SquashFS, this proved to be highly insufficient to reach optimal performance!
+        # Note that there are some efforts to get rid of Python's behavior to use the block size and to
+        # increase the fixed default buffer size:
+        # https://github.com/python/cpython/issues/117151
+        if self.writeOverlay:
+            # Merge the block size from other mount sources while throwing away b_free and similar members
+            # that are set to 0 because those are read-only mount sources.
+            keys = ['f_bsize', 'f_frsize']
+            result = self.writeOverlay.statfs(path).copy()
+            result.update({key: value for key, value in self.mountSource.statfs().items() if key in keys})
+
+        result = self.mountSource.statfs()
+
+        # Use a relatively large minimum 256 KiB block size to direct filesystem users to use larger reads
+        # because they have a relative large overhead because of the fusepy, libfuse, kernel FUSE, SQLite,
+        # ratarmountcore, StenciledFile, and other layers.
+        for key in ['f_bsize', 'f_frsize']:
+            result[key] = max(result.get(key, 0), FuseMount.MINIMUM_BLOCK_SIZE)
+        return result
 
 
 def checkInputFileType(

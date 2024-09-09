@@ -1176,6 +1176,17 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         self.tarFileObject.seek(tarFileInfo.offset + offset, os.SEEK_SET)
         return self.tarFileObject.read(size)
 
+    @overrides(MountSource)
+    def statfs(self) -> Dict[str, Any]:
+        return {
+            'f_bsize': self.blockSize,
+            'f_frsize': self.blockSize,
+            'f_bfree': 0,
+            'f_bavail': 0,
+            'f_ffree': 0,
+            'f_favail': 0,
+        }
+
     @staticmethod
     def _getPastEndOffset(sqlConnection: sqlite3.Connection) -> Optional[int]:
         """

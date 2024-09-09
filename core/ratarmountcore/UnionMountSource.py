@@ -5,9 +5,9 @@ import os
 import stat
 import time
 
-from typing import Dict, Iterable, IO, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, Iterable, IO, List, Optional, Set, Tuple, Union
 
-from .MountSource import FileInfo, MountSource, createRootFileInfo
+from .MountSource import FileInfo, MountSource, createRootFileInfo, mergeStatfs
 from .utils import overrides
 
 
@@ -220,6 +220,10 @@ class UnionMountSource(MountSource):
         # Because all mount sources are mounted at '/', we do not have to append
         # the mount point path returned by getMountSource to the mount point '/'.
         return mountSource.getMountSource(sourceFileInfo)
+
+    @overrides(MountSource)
+    def statfs(self) -> Dict[str, Any]:
+        return mergeStatfs([mountSource.statfs() for mountSource in self.mountSources], printDebug=self.printDebug)
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):

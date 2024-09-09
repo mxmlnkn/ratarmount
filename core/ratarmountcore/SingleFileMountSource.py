@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 
 import io
+import os
 import stat
 import threading
 import time
-from typing import cast, Dict, IO, Iterable, Optional, Union
+from typing import Any, cast, Dict, IO, Iterable, Optional, Union
 
 from .MountSource import FileInfo, MountSource
 from .StenciledFile import RawStenciledFile, StenciledFile
@@ -28,6 +29,25 @@ class SingleFileMountSource(MountSource):
         self.fileobj = fileobj
         self.mtime = int(time.time())
         self.size: int = self.fileobj.seek(0, io.SEEK_END)
+
+        fileno = None
+        try:
+            fileno = self.fileobj.fileno()
+        except Exception:
+            pass
+
+        self._statfs = {}
+        if fileno is not None:
+            statfs = os.fstat(fileno)
+            self._statfs = {
+                'f_bsize': statfs.st_blksize,
+                'f_frsize': statfs.st_blksize,
+                'f_blocks': statfs.st_blocks,
+                'f_bfree': 0,
+                'f_bavail': 0,
+                'f_ffree': 0,
+                'f_favail': 0,
+            }
 
     def _createFileInfo(self):
         # This must be a function and cannot be cached into a member in order to avoid userdata being a shared list!
@@ -92,6 +112,10 @@ class SingleFileMountSource(MountSource):
     @overrides(MountSource)
     def isImmutable(self) -> bool:
         return True
+
+    @overrides(MountSource)
+    def statfs(self) -> Dict[str, Any]:
+        return self._statfs.copy()
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):

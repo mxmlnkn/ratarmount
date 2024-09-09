@@ -7,12 +7,12 @@ import stat
 import traceback
 
 from dataclasses import dataclass
-from typing import Dict, IO, Iterable, List, Optional, Tuple, Union
+from typing import Any, Dict, IO, Iterable, List, Optional, Tuple, Union
 
 from .compressions import stripSuffixFromTarFile
 from .factory import openMountSource
 from .FolderMountSource import FolderMountSource
-from .MountSource import FileInfo, MountSource
+from .MountSource import FileInfo, MountSource, mergeStatfs
 from .SQLiteIndexedTar import SQLiteIndexedTar, SQLiteIndexedTarUserData
 from .utils import overrides
 
@@ -321,6 +321,12 @@ class AutoMountLayer(MountSource):
 
         deeperMountPoint, deeperMountSource, deeperFileInfo = mountSource.getMountSource(sourceFileInfo)
         return os.path.join(mountPoint, deeperMountPoint.lstrip('/')), deeperMountSource, deeperFileInfo
+
+    @overrides(MountSource)
+    def statfs(self) -> Dict[str, Any]:
+        return mergeStatfs(
+            [mountInfo.mountSource.statfs() for _, mountInfo in self.mounted.items()], printDebug=self.printDebug
+        )
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):

@@ -547,6 +547,25 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         assert isinstance(extendedFileInfo, SQLiteIndexedTarUserData)
         return self.image.open(self.image.read_inode(extendedFileInfo.offsetheader))
 
+    @overrides(MountSource)
+    def statfs(self) -> Dict[str, Any]:
+        blockSize = 512
+        try:
+            blockSize = os.fstat(self.rawFileObject.fileno()).st_blksize
+        except Exception:
+            pass
+
+        blockSize = max(blockSize, self.image._sblk.block_size)
+        return {
+            'f_bsize': blockSize,
+            'f_frsize': blockSize,
+            'f_bfree': 0,
+            'f_bavail': 0,
+            'f_ffree': 0,
+            'f_favail': 0,
+            'f_namemax': 256,
+        }
+
     def _tryToOpenFirstFile(self):
         # Get first row that has the regular file bit set in mode (stat.S_IFREG == 32768 == 1<<15).
         result = self.index.getConnection().execute(
