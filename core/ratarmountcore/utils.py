@@ -414,3 +414,17 @@ def create_folder_from_file_permissions(mode: int) -> int:
         | (stat.S_IXGRP if mode & stat.S_IRGRP != 0 else 0)
         | (stat.S_IXOTH if mode & stat.S_IROTH != 0 else 0)
     )
+
+
+def openPreadable(pathOrFd: Union[int, str], buffering: int = -1, closefd: bool = True) -> IO[bytes]:
+    fd = pathOrFd if isinstance(pathOrFd, int) else os.open(pathOrFd, os.O_RDONLY)
+    fileObject = open(fd, 'rb', buffering=buffering, closefd=closefd)
+    assert fileObject.fileno() == fd
+    assert not hasattr(fileObject, 'pread')
+
+    # Inject a pread method so that RawStenciledFile can use that!
+    def pread(size: int, offset: int):
+        return os.pread(fd, size, offset)
+
+    setattr(fileObject, 'pread', pread)
+    return fileObject
