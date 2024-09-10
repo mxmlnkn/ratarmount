@@ -11,9 +11,9 @@ from .utils import overrides, _DummyContext
 
 class RawStenciledFile(io.RawIOBase):
     # For a reference implementation based on RawIOBase, see "class SocketIO(io.RawIOBase)" in:
-    #   https://github.com/python/cpython/tree/main/Lib/socket.py#L662
+    #   https://github.com/python/cpython/blob/00ffdf27367fb9aef247644a96f1a9ffb5be1efe/Lib/socket.py#L683
     # or others implementations inside cpython:
-    #   https://github.com/python/cpython/tree/main/Lib/_compression.py#L66
+    #   https://github.com/python/cpython/blob/00ffdf27367fb9aef247644a96f1a9ffb5be1efe/Lib/_compression.py#L33
     # For the internals of RawIOBase and others, see:
     #   https://github.com/python/cpython/tree/main/Lib/_pyio.py#L619
     """A file abstraction layer giving a stenciled view to an underlying file."""
@@ -130,34 +130,43 @@ class RawStenciledFile(io.RawIOBase):
             byteView[: len(readBytes)] = readBytes
         return len(readBytes)
 
+    def _read1_unlocked(self, size):
+        assert size >= 0
+
+        i = self._findStencil(self.offset)
+        if i >= len(self.sizes):
+            return b''
+
+        # Note that seek and read of the file object itself do not seem to check against this and
+        # instead lead to a segmentation fault in the multithreading tests.
+        if self.fileObjects[i].closed:
+            raise ValueError("A closed file cannot be read from!")
+
+        offsetInsideStencil = self.offset - self.cumsizes[i]
+        assert offsetInsideStencil >= 0
+        assert offsetInsideStencil < self.sizes[i]
+        self.fileObjects[i].seek(self.offsets[i] + offsetInsideStencil, io.SEEK_SET)
+
+        # Read as much as requested or as much as the current contiguous region / stencil still contains.
+        readableSize = min(size, self.sizes[i] - (self.offset - self.cumsizes[i]))
+        tmp = self.fileObjects[i].read(readableSize)
+        self.offset += len(tmp)
+        return tmp
+
     @overrides(io.RawIOBase)
     def read(self, size: int = -1) -> bytes:
         if size == -1:
             size = self.cumsizes[-1] - self.offset
+        elif size == 0:
+            return b''
 
-        # This loop works in a kind of leapfrog fashion. On each even loop iteration it seeks to the next stencil
-        # and on each odd iteration it reads the data and increments the offset inside the stencil!
         result = b''
-        i = self._findStencil(self.offset)
-        if i >= len(self.sizes):
-            return result
-
         with self.fileObjectLock if self.fileObjectLock else _DummyContext():
-            # Note that seek and read of the file object itself do not seem to check against this and
-            # instead lead to a segmentation fault in the multithreading tests.
-            if self.fileObjects[i].closed:
-                raise ValueError("A closed file can't be read from!")
-
-            offsetInsideStencil = self.offset - self.cumsizes[i]
-            assert offsetInsideStencil >= 0
-            assert offsetInsideStencil < self.sizes[i]
-            self.fileObjects[i].seek(self.offsets[i] + offsetInsideStencil, io.SEEK_SET)
-
-            # Read as much as requested or as much as the current contiguous region / stencil still contains
-            readableSize = min(size, self.sizes[i] - (self.offset - self.cumsizes[i]))
-            tmp = self.fileObjects[i].read(readableSize)
-            self.offset += len(tmp)
-            result += tmp
+            while len(result) < size:
+                tmp = self._read1_unlocked(size - len(result))
+                if not tmp:
+                    break
+                result += tmp
 
         return result
 
