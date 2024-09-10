@@ -257,7 +257,7 @@ class SQLiteIndex:
 
         defaultIndexFilePath = archiveFilePath + ".index.sqlite"
         if not indexFolders:
-            return [defaultIndexFilePath]
+            return [defaultIndexFilePath, ':memory:']
 
         possibleIndexFilePaths = []
         indexPathAsName = defaultIndexFilePath.replace("/", "_")
