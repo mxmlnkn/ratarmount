@@ -119,3 +119,17 @@ While FUSE is (at least in the Unix world) a [Kernel feature](https://man7.org/l
        The order is unspecified by POSIX. What the current approach with `set_st_attrs` adds is silent
        ignoring of unknown keys. This may or may not be what one wants and the same can be achieved by
        testing `c_stat` with `hasattr` before setting values. This style guide should be documented.
+
+
+# Transfer commits from ratarmount to fusepy fork repository
+
+```bash
+# In ratarmount repo root
+# https://stackoverflow.com/questions/13339027/git-am-should-ignore-something-in-commit-message-startswith
+git format-patch -k -o patches d62b502~..fusepy
+# In fusepy repo
+sed -i 's|core/ratarmountcore/fusepy/||g; s|fusepy: ||g; s' patches/*
+# Manually remove the ratarmount.py diff in
+# patches/0005-fix-fusepy-Avoid-libfuse3-being-used-when-given-via-.patch
+git am -k patches/*
+```
