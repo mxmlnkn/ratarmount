@@ -55,7 +55,7 @@ full = [
     "libarchive-c ~= 5.1, < 6.0",
     "python-xz ~= 0.4.0",
     "rapidgzip >= 0.13.1",
-    "rarfile ~= 4.0",
+    "rarfile ~= 4.1",
     "PySquashfsImage == 0.9.0",
     "lz4 ~= 4.0.0",
     "python-lzo ~= 1.0",
@@ -64,7 +64,8 @@ full = [
 ]
 bzip2 = ["rapidgzip >= 0.13.1"]
 gzip = ["indexed_gzip >= 1.6.3, < 2.0"]
-rar = ["rarfile ~= 4.0"]
+# Need >= 4.1 because of https://github.com/markokr/rarfile/issues/73
+rar = ["rarfile ~= 4.1"]
 squashfs = [
     "PySquashfsImage == 0.9.0",
     "lz4 ~= 4.0.0",

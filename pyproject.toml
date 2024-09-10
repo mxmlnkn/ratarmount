@@ -42,7 +42,8 @@ dependencies = [
     'dataclasses; python_version < "3.7.0"',
     "python-xz ~= 0.4.0",
     "rapidgzip >= 0.13.1",
-    "rarfile ~= 4.0",
+    # Need >= 4.1 because of https://github.com/markokr/rarfile/issues/73
+    "rarfile ~= 4.1",
     "libarchive-c ~= 5.1, < 6.0",
 ]
 

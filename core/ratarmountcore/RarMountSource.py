@@ -2,11 +2,10 @@
 # -*- coding: utf-8 -*-
 
 import datetime
-import io
 import os
 import stat
 import time
-from typing import cast, Dict, IO, Iterable, List, Optional, Union
+from typing import Dict, IO, Iterable, List, Optional, Union
 
 from .MountSource import FileInfo, MountSource, createRootFileInfo
 from .utils import overrides
@@ -15,79 +14,6 @@ try:
     import rarfile
 except ImportError:
     pass
-
-
-class RawFileInsideRar(io.RawIOBase):
-    """
-    This class works around the CRC error issue by reopening the file when seeking back.
-    This will be slower for uncompressed files but not for compressed files because
-    the seek implementation of rarfile also reopens the file on seeking back.
-    https://github.com/markokr/rarfile/issues/73
-    https://rarfile.readthedocs.io/api.html#rarfile.RarExtFile.seek
-    > On uncompressed files, the seeking works by actual seeks so it’s fast.
-    > On compressed files it's slow - forward seeking happens by reading ahead,
-    > backwards by re-opening and decompressing from the start.
-    """
-
-    def __init__(self, reopen, file_size):
-        io.RawIOBase.__init__(self)
-        self.reopen = reopen
-        self.fileobj = reopen()
-        self.file_size = file_size
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exception_type, exception_value, exception_traceback):
-        self.close()
-
-    @overrides(io.RawIOBase)
-    def close(self) -> None:
-        self.fileobj.close()
-
-    @overrides(io.RawIOBase)
-    def fileno(self) -> int:
-        # This is a virtual Python level file object and therefore does not have a valid OS file descriptor!
-        raise io.UnsupportedOperation()
-
-    @overrides(io.RawIOBase)
-    def seekable(self) -> bool:
-        return self.fileobj.seekable()
-
-    @overrides(io.RawIOBase)
-    def readable(self) -> bool:
-        return self.fileobj.readable()
-
-    @overrides(io.RawIOBase)
-    def writable(self) -> bool:
-        return False
-
-    @overrides(io.RawIOBase)
-    def readall(self) -> bytes:
-        return self.fileobj.readall()
-
-    @overrides(io.RawIOBase)
-    def readinto(self, buffer) -> int:
-        return self.fileobj.readinto(buffer)
-
-    @overrides(io.RawIOBase)
-    def read(self, size: int = -1) -> bytes:
-        return self.fileobj.read(size)
-
-    @overrides(io.RawIOBase)
-    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
-        if whence == io.SEEK_CUR:
-            offset += self.tell()
-        elif whence == io.SEEK_END:
-            offset += self.file_size
-
-        if offset < self.tell():
-            self.fileobj = self.reopen()
-        return self.fileobj.seek(offset, io.SEEK_SET)
-
-    @overrides(io.RawIOBase)
-    def tell(self) -> int:
-        return self.fileobj.tell()
 
 
 class RarMountSource(MountSource):
@@ -269,7 +195,7 @@ class RarMountSource(MountSource):
     def open(self, fileInfo: FileInfo) -> IO[bytes]:
         info = fileInfo.userdata[-1][1]
         assert isinstance(info, rarfile.RarInfo)
-        return cast(IO[bytes], RawFileInsideRar(lambda: self.fileObject.open(info, 'r'), info.file_size))
+        return self.fileObject.open(info, 'r')
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
