@@ -1299,7 +1299,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 oldOffset = self.tarFileObject.tell()
                 try:
                     with StenciledFile(fileStencils=[fileStencil]) as file:
-                        if file.read() != b"\0" * 1024:
+                        if file.read(1025) != b"\0" * 1024:
                             if self.printDebug >= 2:
                                 print(
                                     "[Info] Probably has been appended to because no EOF zero-byte blocks could "
