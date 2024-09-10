@@ -716,11 +716,14 @@ class SQLiteIndex:
             # Locking mode exclusive leads to a measurable speedup. E.g., find on 2k recursive files tar
             # improves from ~1s to ~0.4s!
             # https://blog.devart.com/increasing-sqlite-performance.html
+            # Increase the cache size to avoid I/O interfering with benchmarks.
+            # TODO make this adjustable via a command line option?
             """
             PRAGMA LOCKING_MODE = EXCLUSIVE;
             PRAGMA TEMP_STORE = MEMORY;
             PRAGMA JOURNAL_MODE = OFF;
             PRAGMA SYNCHRONOUS = OFF;
+            PRAGMA cache_size = -65536;
             """
         )
         return sqlConnection
