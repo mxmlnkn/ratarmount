@@ -782,7 +782,7 @@ class FuseMount(fuse.Operations):
             # but store information to reopen it for write access on write calls.
             # @see https://man7.org/linux/man-pages/man2/open.2.html
             # > The argument flags must include one of the following access modes: O_RDONLY, O_WRONLY, or O_RDWR.
-            return self._addNewHandle(self.mountSource.open(fileInfo), flags)
+            return self._addNewHandle(self.mountSource.open(fileInfo, buffering=0), flags)
         except Exception as exception:
             traceback.print_exc()
             print("Caught exception when trying to open file.", fileInfo)
