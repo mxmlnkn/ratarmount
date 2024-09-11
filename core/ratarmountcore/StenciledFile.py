@@ -190,6 +190,21 @@ class RawStenciledFile(io.RawIOBase):
     def tell(self) -> int:
         return self.offset
 
+    @overrides(io.RawIOBase)
+    def readall(self) -> bytes:
+        # It is necessary to implement this, or else the io.RawIOBase.readall implementation would use
+        # io.DEFAULT_BUFFER_SIZE (8 KiB). Notably, this would ignore the block size configured in BufferedReader,
+        # when calling read(-1) on it because it thinks that raw.readall is a fast-path, but in this case is ~100x
+        # slower than 4 MiB reads equal to the Lustre-advertised block size.
+        # https://github.com/python/cpython/issues/85624
+        chunks = []
+        while True:
+            result = self.read()
+            if not result:
+                break
+            chunks.append(result)
+        return b"".join(chunks)
+
 
 class RawJoinedFileFromFactory(io.RawIOBase):
     def __init__(self, file_object_factories: List[Callable[[], IO[bytes]]], file_lock=None) -> None:
