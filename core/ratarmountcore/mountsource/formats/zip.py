@@ -30,7 +30,30 @@ class ZipMountSource(SQLiteIndexMountSource):
 
         if isinstance(fileOrPath, Path):
             fileOrPath = str(fileOrPath)
-        self.fileObject = zipfile.ZipFile(fileOrPath, 'r')
+        # Disable buffering for self.rawFileObject because a buffer size of 4 MiB based on the block size is used on
+        # Lustre and this leads to bad performance for random-like accesses / accesses to small files. Note that
+        # buffering is not that important because zipfile is optimized to use large reads, e.g.,:
+        #  - The central directory is read with a single read call:
+        #    https://github.com/python/cpython/blob/b2afe2aae487ebf89897e22c01d9095944fd334f/Lib/zipfile/__init__.py#L1472
+        #  - Opening a file is pretty ok, although it could be better. It does separate reads for:
+        #    - The local file header:
+        #      https://github.com/python/cpython/blob/b2afe2aae487ebf89897e22c01d9095944fd334f/Lib/zipfile/__init__.py#L1651
+        #    - The file name field
+        #      https://github.com/python/cpython/blob/b2afe2aae487ebf89897e22c01d9095944fd334f/Lib/zipfile/__init__.py#L1658C21-L1658C29
+        #    - Then seeks over the extra field and creates the ZipExtFile object.
+        #    - ZipExtFile only does an additional 12 B read for encrypted files, else it will behave like an
+        #      unbuffered filer reader from here on out but with a minimum read size of 4096 B:
+        #      https://github.com/python/cpython/blob/b2afe2aae487ebf89897e22c01d9095944fd334f/Lib/zipfile/__init__.py#L871
+        # fmt: off
+        self.rawFileObject          = open(fileOrPath, 'rb', buffering=0) if isinstance(fileOrPath, str) else fileOrPath
+        self.fileObject             = zipfile.ZipFile(self.rawFileObject, 'r')
+        self.archiveFilePath        = fileOrPath if isinstance(fileOrPath, str) else None
+        self.encoding               = encoding
+        self.verifyModificationTime = verifyModificationTime
+        self.printDebug             = printDebug
+        self.options                = options
+        self.transformPattern       = transform
+        # fmt: on
 
         ZipMountSource._find_password(self.fileObject, options.get("passwords", []))
         self.files = {info.header_offset: info for info in self.fileObject.infolist()}
@@ -133,6 +156,8 @@ class ZipMountSource(SQLiteIndexMountSource):
         super().close()
         if fileObject := getattr(self, 'fileObject', None):
             fileObject.close()
+        if rawFileObject := getattr(self, 'rawFileObject', None):
+            rawFileObject.close()
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
