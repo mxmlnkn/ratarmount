@@ -657,6 +657,9 @@ class FuseMount(fuse.Operations):
         statResults = os.lstat(self.mountPoint)
         self.mountPointInfo = {key: getattr(statResults, key) for key in dir(statResults) if key.startswith('st_')}
 
+        if self.printDebug >= 1:
+            print("Created mount point at:", self.mountPoint)
+
     def __del__(self) -> None:
         try:
             if self.mountPointWasCreated:
