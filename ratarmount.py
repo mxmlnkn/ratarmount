@@ -544,15 +544,20 @@ class FuseMount(fuse.Operations):
             pathToMount.append(self.overlayPath)
 
         # Take care that bind-mounting folders to itself works
-        mountSources: Dict[str, MountSource] = {}
+        mountSources: List[Tuple[str, MountSource]] = []
         self.mountPointFd: Optional[int] = None
         self.selfBindMount: Optional[FolderMountSource] = None
         for path in pathToMount:
             if os.path.realpath(path) != self.mountPoint:
+                # This also will create or load the block offsets for compressed formats
+                mountSources.append((os.path.basename(path), openMountSource(path, **options)))
+                continue
+
+            if self.mountPointFd is not None:
                 continue
 
             mountSource = FolderMountSource(path)
-            mountSources[os.path.basename(path)] = mountSource  # type: ignore
+            mountSources.append((os.path.basename(path), mountSource))
             self.selfBindMount = mountSource
             self.mountPointFd = os.open(self.mountPoint, os.O_RDONLY)
 
@@ -591,25 +596,23 @@ class FuseMount(fuse.Operations):
                 if not hasIndexPath:
                     options['indexFilePath'] = ':memory:'
 
-            break
+        def createMultiMount() -> MountSource:
+            if not options.get('disableUnionMount', False):
+                return UnionMountSource([x[1] for x in mountSources], **options)
 
-        # This also will create or load the block offsets for compressed formats
-        for path in pathToMount:
-            if os.path.realpath(path) == self.mountPoint:
-                continue
-            key = os.path.basename(path)
-            if key not in mountSources:
-                mountSources[key] = openMountSource(path, **options)
+            # Create unique keys.
+            submountSources: Dict[str, MountSource] = {}
+            suffix = 1
+            for key, mountSource in mountSources:
+                if key in submountSources:
+                    while f"{key}.{suffix}" in submountSources:
+                        suffix += 1
+                    submountSources[f"{key}.{suffix}"] = mountSource
+                else:
+                    submountSources[key] = mountSource
+            return SubvolumesMountSource(submountSources, printDebug=self.printDebug)
 
-        self.mountSource: MountSource = (
-            (
-                SubvolumesMountSource(mountSources, printDebug=self.printDebug)
-                if options.get('disableUnionMount', False)
-                else UnionMountSource(list(mountSources.values()), **options)
-            )
-            if len(mountSources) != 1
-            else next(iter(mountSources.values()))
-        )
+        self.mountSource: MountSource = mountSources[0][1] if len(mountSources) == 1 else createMultiMount()
         if options.get('recursionDepth', 0):
             self.mountSource = AutoMountLayer(self.mountSource, **options)
 

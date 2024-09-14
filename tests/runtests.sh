@@ -67,6 +67,7 @@ cleanup()
         if [ -d "$file" ]; then safeRmdir "$file"; fi
         if [ -f "$file" ]; then rm -- "$file"; fi
         if [ -L "$file" ]; then unlink -- "$file"; fi
+        if [ -e "$file" ]; then echo "Failed to clean up: $file"; fi
     done
     TMP_FILES_TO_CLEANUP=()
 }
@@ -622,8 +623,25 @@ checkUnionMount()
     verifyCheckSum "$mountPoint" "ufo" "<folder union mount>" 2709a3348eb2c52302a7606ecf5860bc ||
         returnError "$LINENO" 'Checksum mismatches!'
 
+    funmount "$mountPoint"
+
+    # Check whether union mounting of two folders with the same name works.
+    mkdir -p "folder2/subfolder"
+    echo 'hallo' > "folder2/subfolder/world-de"
+
+    runAndCheckRatarmount -c "folder1/subfolder" "folder2/subfolder" "$mountPoint"
+
+    checkStat "$mountPoint/world" || returnError "$LINENO" 'Could not stat file!'
+    checkStat "$mountPoint/world-de" || returnError "$LINENO" 'Could not stat file!'
+
+    verifyCheckSum "$mountPoint" "world" "<folder union mount>" b1946ac92492d2347c6235b4d2611184 ||
+        returnError "$LINENO" 'Checksum mismatches!'
+    verifyCheckSum "$mountPoint" "world-de" "<folder union mount>" aee97cb3ad288ef0add6c6b5b5fae48a ||
+        returnError "$LINENO" 'Checksum mismatches!'
+
     # Clean up
 
+    funmount "$mountPoint"
     safeRmdir "$mountPoint"
     cd .. || returnError "$LINENO" 'Could not cd to parent in order to clean up!'
     rm -rf -- "$tmpFolder" || returnError "$LINENO" 'Something went wrong. Should have been able to clean up!'
@@ -1263,6 +1281,14 @@ checkWriteOverlayWithNewFiles()
     # Check file inside an archive folder which does not exist in the overlay (yet)
     checkWriteOverlayFile 'foo/iriya'
 
+    TMP_FILES_TO_CLEANUP+=(
+        "$overlayFolder/base"
+        "$overlayFolder/foo"
+        "$overlayFolder/foo/base"
+        "$overlayFolder/iriya"
+        "$overlayFolder/sighting"
+    )
+
     ## Test folder creation, modification, and deletion
     mkdir "$mountFolder/base"
     if [[ ! -d "$mountFolder/base" ]]; then returnError "$LINENO" 'Folder could not be created'; fi
@@ -1318,6 +1344,8 @@ checkWriteOverlayWithNewFiles()
         returnError "$LINENO" 'Expected different link target for created symbolic link'
     fi
 
+
+    'rm' -r -- "$overlayFolder"
     cleanup
 
     echoerr "[${FUNCNAME[0]}] Tested successfully file modifications for overlay files."
@@ -1486,6 +1514,14 @@ checkWriteOverlayWithSymbolicLinks()
     echo foo > "${overlayFolder2}/bar"
     ( cd -- "$overlayFolder" && ln -s "$( realpath --relative-to "$overlayFolder" "$overlayFolder2/bar" )" bar )
 
+    TMP_FILES_TO_CLEANUP+=(
+        "$overlayFolder"
+        "$overlayFolder2"
+        "${overlayFolder2}/overlay2"
+        "${overlayFolder2}/overlay2/foo"
+        "${overlayFolder2}/bar"
+    )
+
     local args=( -P "$parallelization" -c --write-overlay "$overlayFolder" "$overlayFolder2" "$mountFolder" )
     {
         runAndCheckRatarmount "${args[@]}"
@@ -1509,6 +1545,7 @@ checkWriteOverlayWithSymbolicLinks()
 
     echoerr "[${FUNCNAME[0]}] Tested successfully writes to symbolically linked folders in the overlay."
 
+    cleanup
     'rm' -r -- "$overlayFolder" "$overlayFolder2"
 }
 
