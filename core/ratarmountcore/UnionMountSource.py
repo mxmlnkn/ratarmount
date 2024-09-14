@@ -192,11 +192,11 @@ class UnionMountSource(MountSource):
         return self._listDir(path, onlyMode=True)
 
     @overrides(MountSource)
-    def open(self, fileInfo: FileInfo) -> IO[bytes]:
+    def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
         mountSource = fileInfo.userdata.pop()
         try:
             assert isinstance(mountSource, MountSource)
-            return mountSource.open(fileInfo)
+            return mountSource.open(fileInfo, buffering=buffering)
         finally:
             fileInfo.userdata.append(mountSource)
 

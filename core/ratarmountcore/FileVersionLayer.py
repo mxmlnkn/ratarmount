@@ -222,8 +222,8 @@ class FileVersionLayer(MountSource):
         return self.mountSource.fileVersions(path)
 
     @overrides(MountSource)
-    def open(self, fileInfo: FileInfo) -> IO[bytes]:
-        return self.mountSource.open(fileInfo)
+    def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
+        return self.mountSource.open(fileInfo, buffering=buffering)
 
     @overrides(MountSource)
     def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:

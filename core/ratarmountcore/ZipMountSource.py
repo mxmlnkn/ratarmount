@@ -198,7 +198,8 @@ class ZipMountSource(SQLiteIndexMountSource):
         self.fileObject.close()
 
     @overrides(MountSource)
-    def open(self, fileInfo: FileInfo) -> IO[bytes]:
+    def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
+        # I do not see any obvious option to zipfile.ZipFile to apply the specified buffer size.
         assert fileInfo.userdata
         extendedFileInfo = fileInfo.userdata[-1]
         assert isinstance(extendedFileInfo, SQLiteIndexedTarUserData)

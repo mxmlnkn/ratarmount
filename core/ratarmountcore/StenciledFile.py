@@ -352,11 +352,13 @@ class RawJoinedFileFromFactory(io.RawIOBase):
 
 class StenciledFile(io.BufferedReader):
     def __init__(
-        self,
-        fileStencils: List[Tuple[IO, int, int]],
-        fileObjectLock=None,
+        self, fileStencils: List[Tuple[IO, int, int]], fileObjectLock=None, bufferSize=io.DEFAULT_BUFFER_SIZE
     ) -> None:
-        super().__init__(RawStenciledFile(fileStencils, fileObjectLock))
+        """
+        bufferSize: Gets forwarded to io.BufferedReader.__init__ buffer_size argument and has the same semantic,
+                    i.e., must be > 0. If it should be unbuffered, use RawStenciledFile directly instead.
+        """
+        super().__init__(RawStenciledFile(fileStencils, fileObjectLock), buffer_size=bufferSize)
 
 
 class JoinedFile(io.BufferedReader):

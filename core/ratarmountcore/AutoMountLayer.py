@@ -301,9 +301,9 @@ class AutoMountLayer(MountSource):
         return fileVersions
 
     @overrides(MountSource)
-    def open(self, fileInfo: FileInfo) -> IO[bytes]:
+    def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
         _, mountSource, sourceFileInfo = self.getMountSource(fileInfo)
-        return mountSource.open(sourceFileInfo)
+        return mountSource.open(sourceFileInfo, buffering=buffering)
 
     @overrides(MountSource)
     def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:

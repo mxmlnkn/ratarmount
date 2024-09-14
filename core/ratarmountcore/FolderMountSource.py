@@ -142,10 +142,10 @@ class FolderMountSource(MountSource):
         return 1 if self.exists(path) else 0
 
     @overrides(MountSource)
-    def open(self, fileInfo: FileInfo) -> IO[bytes]:
+    def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
         realpath = self.getFilePath(fileInfo)
         try:
-            return open(realpath, 'rb')
+            return open(realpath, 'rb', buffering=buffering)
         except Exception as e:
             raise ValueError(f"Specified path '{realpath}' is not a file that can be read!") from e
 

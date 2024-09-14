@@ -38,7 +38,7 @@ from .MountSource import FileInfo, MountSource
 from .ProgressBar import ProgressBar
 from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
 from .SQLiteIndexMountSource import SQLiteIndexMountSource
-from .StenciledFile import StenciledFile
+from .StenciledFile import RawStenciledFile, StenciledFile
 from .compressions import detectCompression, findAvailableOpen, getGzipInfo, TAR_COMPRESSION_FORMATS
 from .utils import (
     RatarmountError,
@@ -732,6 +732,27 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 fileObject.close()
             raise RatarmountError(f"File object ({fileObjectInfo}) could not be opened as a TAR file!")
 
+        self.blockSize = 512
+        if self.rawFileObject:
+            try:
+                self.blockSize = os.fstat(self.rawFileObject.fileno()).st_blksize
+            except Exception:
+                pass
+        elif self.tarFileObject:
+            try:
+                self.blockSize = os.fstat(self.tarFileObject.fileno()).st_blksize
+            except Exception:
+                pass
+
+        if self.compression == 'gz':
+            self.blockSize = max(self.blockSize, gzipSeekPointSpacing)
+        elif self.compression == 'bzip2':
+            # There is no API yet to query the exact block size, but most bzip2 files have 900K blocks.
+            # The bzip2 block size is in reference to the BWT buffer, so the decompressed block data will be
+            # larger to some extend. Therefore, 1 MiB blocks should be an alright guess for all bzip2 files.
+            self.blockSize = 1024 * 1024
+        # TODO derive some meaningful block sizes for zstd and xz
+
         self.fileObjectLock = threading.Lock()
 
         if self.compression == 'xz':
@@ -1099,8 +1120,20 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             # fmt: on
             self.index.setFileInfo(fileInfo)
 
+    def _openStencil(self, offset: int, size: int, buffering: int) -> IO[bytes]:
+        if buffering == 0:
+            return cast(IO[bytes], RawStenciledFile([(self.tarFileObject, offset, size)], self.fileObjectLock))
+        return cast(
+            IO[bytes],
+            StenciledFile(
+                [(self.tarFileObject, offset, size)],
+                self.fileObjectLock,
+                bufferSize=self.blockSize if buffering == -1 else buffering,
+            ),
+        )
+
     @overrides(MountSource)
-    def open(self, fileInfo: FileInfo) -> IO[bytes]:
+    def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
         assert fileInfo.userdata
         tarFileInfo = fileInfo.userdata[-1]
         assert isinstance(tarFileInfo, SQLiteIndexedTarUserData)
@@ -1108,16 +1141,14 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         # This is not strictly necessary but it saves two file object layers and therefore might be more performant.
         # Furthermore, non-sparse files should be the much more likely case anyway.
         if not tarFileInfo.issparse:
-            return cast(
-                IO[bytes], StenciledFile([(self.tarFileObject, tarFileInfo.offset, fileInfo.size)], self.fileObjectLock)
-            )
+            return self._openStencil(tarFileInfo.offset, fileInfo.size, buffering)
 
         # The TAR file format is very simple. It's just a concatenation of TAR blocks. There is not even a
         # global header, only the TAR block headers. That's why we can simply cut out the TAR block for
         # the sparse file using StenciledFile and then use tarfile on it to expand the sparse file correctly.
         tarBlockSize = tarFileInfo.offset - tarFileInfo.offsetheader + fileInfo.size
 
-        tarSubFile = StenciledFile([(self.tarFileObject, tarFileInfo.offsetheader, tarBlockSize)], self.fileObjectLock)
+        tarSubFile = self._openStencil(tarFileInfo.offsetheader, tarBlockSize, buffering)
         # TODO It might be better to somehow call close on tarFile but the question is where and how.
         #      It would have to be appended to the __exit__ method of fileObject like if being decorated.
         #      For now this seems to work either because fileObject does not require tarFile to exist
@@ -1298,7 +1329,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 fileStencil = (self.tarFileObject, pastEndOffset, 1024)
                 oldOffset = self.tarFileObject.tell()
                 try:
-                    with StenciledFile(fileStencils=[fileStencil]) as file:
+                    with RawStenciledFile(fileStencils=[fileStencil]) as file:
                         if file.read(1025) != b"\0" * 1024:
                             if self.printDebug >= 2:
                                 print(
@@ -1437,7 +1468,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
             if self.printDebug >= 2:
                 t1 = time.time()
-                print(f"[Info] Verifying metadata for {rowCount} files took {t1-t0:.3f} s")
+                print(f"[Info] Verifying metadata for {rowCount} files took {t1 - t0:.3f} s")
 
         return False
 

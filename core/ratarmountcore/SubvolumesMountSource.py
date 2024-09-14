@@ -86,12 +86,12 @@ class SubvolumesMountSource(MountSource):
         return self._listDir(path, onlyMode=True)
 
     @overrides(MountSource)
-    def open(self, fileInfo: FileInfo) -> IO[bytes]:
+    def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
         subvolume = fileInfo.userdata.pop()
         if subvolume is None:
             raise ValueError(f"Found subvolume is None for fileInfo: {fileInfo}")
         try:
-            return self.mountSources[subvolume].open(fileInfo)
+            return self.mountSources[subvolume].open(fileInfo, buffering=buffering)
         finally:
             fileInfo.userdata.append(subvolume)
 

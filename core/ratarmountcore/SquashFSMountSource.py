@@ -36,7 +36,7 @@ except ImportError:
     # We need to define this for @overrides and pytype, but it also is a nice documentation
     # for the expected members in PySquashfsImage.SquashFsImage.
     class SquashFsImage:  # type: ignore
-        def __init__(self, fd, offset=0, closefd=True):
+        def __init__(self, fd, offset: int = 0, closefd: bool = True) -> None:
             self._sblk: Any = None
 
         def __iter__(self):
@@ -415,7 +415,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
             raise ValueError("Not a valid SquashFS image!")
 
         # fmt: off
-        self.fileObject             = SquashFSImage(self.rawFileObject, offset=offset)
+        self.image                  = SquashFSImage(self.rawFileObject, offset=offset)
         self.archiveFilePath        = fileOrPath if isinstance(fileOrPath, str) else None
         self.encoding               = encoding
         self.verifyModificationTime = verifyModificationTime
@@ -516,7 +516,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
 
         # TODO Doing this in a chunked manner with generators would make it work better for large archives.
         fileInfos = []
-        for inodeOffset, info in self.fileObject:
+        for inodeOffset, info in self.image:
             fileInfos.append(self._convertToRow(inodeOffset, info))
         self.index.setFileInfos(fileInfos)
 
@@ -534,14 +534,18 @@ class SquashFSMountSource(SQLiteIndexMountSource):
     def __exit__(self, exception_type, exception_value, exception_traceback):
         super().__exit__(exception_type, exception_value, exception_traceback)
         self.rawFileObject.close()
-        self.fileObject.close()
+        self.image.close()
 
     @overrides(MountSource)
-    def open(self, fileInfo: FileInfo) -> IO[bytes]:
+    def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
+        # The buffering is ignored for now because SquashFS has an inherent buffering based on the block size
+        # configured in the SquashFS image. It probably makes no sense to reduce or increase that buffer size.
+        # Decreasing may reduce memory usage, but with Python and other things, memory usage is not a priority
+        # in ratarmount as long as it is bounded for very large archives.
         assert fileInfo.userdata
         extendedFileInfo = fileInfo.userdata[-1]
         assert isinstance(extendedFileInfo, SQLiteIndexedTarUserData)
-        return self.fileObject.open(self.fileObject.read_inode(extendedFileInfo.offsetheader))
+        return self.image.open(self.image.read_inode(extendedFileInfo.offsetheader))
 
     def _tryToOpenFirstFile(self):
         # Get first row that has the regular file bit set in mode (stat.S_IFREG == 32768 == 1<<15).

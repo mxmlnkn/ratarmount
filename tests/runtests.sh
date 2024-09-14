@@ -1545,8 +1545,8 @@ checkWriteOverlayWithSymbolicLinks()
 
     echoerr "[${FUNCNAME[0]}] Tested successfully writes to symbolically linked folders in the overlay."
 
-    cleanup
     'rm' -r -- "$overlayFolder" "$overlayFolder2"
+    cleanup
 }
 
 

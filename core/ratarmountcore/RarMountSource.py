@@ -192,7 +192,8 @@ class RarMountSource(MountSource):
         return len(self._getFileInfos(path))
 
     @overrides(MountSource)
-    def open(self, fileInfo: FileInfo) -> IO[bytes]:
+    def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
+        # I do not see any obvious option to rarfile.RarFile to apply the specified buffer size.
         info = fileInfo.userdata[-1][1]
         assert isinstance(info, rarfile.RarInfo)
         return self.fileObject.open(info, 'r')

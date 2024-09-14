@@ -65,14 +65,19 @@ class MountSource(ABC):
         pass
 
     @abstractmethod
-    def open(self, fileInfo: FileInfo) -> IO[bytes]:
-        pass
+    def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
+        """
+        buffering : Behaves similarly to Python's built-in open call. A value of 0 should disable buffering.
+                    Any value larger than 1 should be the buffer size. The default of -1 may result in
+                    a default buffer size equal to the file(system)'s block size or Python's io.DEFAULT_BUFFER_SIZE.
+        """
 
     def fileVersions(self, path: str) -> int:
         return 1 if self.exists(path) else 0
 
     def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
-        with self.open(fileInfo) as file:
+        # Because we only do a single seek before closing the file again, buffering makes no sense.
+        with self.open(fileInfo, buffering=0) as file:
             file.seek(offset)
             return file.read(size)
 

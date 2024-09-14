@@ -637,7 +637,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
         pass
 
     @overrides(MountSource)
-    def open(self, fileInfo: FileInfo):
+    def open(self, fileInfo: FileInfo, buffering=-1):
         assert fileInfo.userdata
         tarFileInfo = fileInfo.userdata[-1]
         assert isinstance(tarFileInfo, SQLiteIndexedTarUserData)
