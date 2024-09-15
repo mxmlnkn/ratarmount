@@ -388,3 +388,11 @@ true > zeros-32-MiB.txt; for i in $( seq $(( 32 * 1024 )) ); do printf '%01023d\
 true > spaces-32-MiB.txt; for i in $( seq $(( 32 * 1024 )) ); do printf '%1023s' $'\n' >> spaces-32-MiB.txt; done
 true > zeros-32-MiB.txt; for i in $( seq $(( 32 * 1024 )) ); do printf '%01022d\n' 0 >> zeros-32-MiB.txt; done
 7z a two-large-files-32Ki-lines-each-1023B.7z spaces-32-MiB.txt zeros-32-MiB.txt
+
+# Would be nice to have this without sudo, but I don't want to create test cases with the same program being tested.
+head -c $(( 1024 * 1024 )) /dev/zero > 'folder-symlink.fat'
+mkfs.fat 'folder-symlink.fat'
+mkdir mounted
+sudo mount 'folder-symlink.fat' mounted
+( cd mounted && sudo unzip ../tests/folder-symlink.zip )
+sudo umount mounted

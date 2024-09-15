@@ -6,9 +6,18 @@ import traceback
 
 from typing import IO, Optional, Union
 
-from .compressions import checkForSplitFile, libarchive, PySquashfsImage, rarfile, TAR_COMPRESSION_FORMATS, zipfile
+from .compressions import (
+    checkForSplitFile,
+    libarchive,
+    PySquashfsImage,
+    pyfatfs,
+    rarfile,
+    TAR_COMPRESSION_FORMATS,
+    zipfile,
+)
 from .utils import CompressionError, RatarmountError
 from .MountSource import MountSource
+from .FATMountSource import FATMountSource
 from .FolderMountSource import FolderMountSource
 from .RarMountSource import RarMountSource
 from .SingleFileMountSource import SingleFileMountSource
@@ -94,12 +103,23 @@ def _openPySquashfsImage(fileOrPath: Union[str, IO[bytes]], **options) -> Option
     return None
 
 
+def _openFATImage(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
+    try:
+        if pyfatfs is not None:
+            return FATMountSource(fileOrPath, **options)
+    finally:
+        if hasattr(fileOrPath, 'seek'):
+            fileOrPath.seek(0)  # type: ignore
+    return None
+
+
 _BACKENDS = {
     "rarfile": _openRarMountSource,
     "tarfile": _openTarMountSource,
     "zipfile": _openZipMountSource,
     "pysquashfsimage": _openPySquashfsImage,
     "libarchive": _openLibarchiveMountSource,
+    "pyfatfs": _openFATImage,
 }
 
 

@@ -45,6 +45,8 @@ dependencies = [
     # Need >= 4.1 because of https://github.com/markokr/rarfile/issues/73
     "rarfile ~= 4.1",
     "libarchive-c ~= 5.1, < 6.0",
+    # Pin to < 3.12 because of https://github.com/nathanhi/pyfatfs/issues/41
+    'pyfatfs ~= 1.0; python_version < "3.12.0"',
 ]
 
 [project.readme]

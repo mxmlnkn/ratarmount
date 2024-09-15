@@ -60,6 +60,11 @@ function installAppImagePythonPackages()
     else
         "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir rapidgzip
     fi
+
+    # https://github.com/nathanhi/pyfatfs/issues/41
+    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir \
+        'git+https://github.com/mxmlnkn/pyfatfs.git@master#egginfo=pyfatfs'
+
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ../core
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ..[full]
 }
