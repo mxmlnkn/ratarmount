@@ -45,6 +45,7 @@ And in contrast to [tarindexer](https://github.com/devsnd/tarindexer), which als
 *Other supported archive formats:*
 
  - **Rar** as provided by [rarfile](https://github.com/markokr/rarfile) by Marko Kreen. See also the [RAR 5.0 archive format](https://www.rarlab.com/technote.htm).
+ - **SquashFS, AppImage, Snap** as provided by [PySquashfsImage](https://github.com/matteomattei/PySquashfsImage) by Matteo Mattei. There seems to be no authoritative, open format specification, only [this nicely-done reverse-engineered description](https://dr-emann.github.io/squashfs/squashfs.html), I assume based on the [source code](https://github.com/plougher/squashfs-tools). Note that [Snaps](https://snapcraft.io/docs/the-snap-format) and [Appimages](https://github.com/AppImage/AppImageSpec/blob/master/draft.md#type-2-image-format) are both SquashFS images, with an executable prepended for AppImages.
  - **Zip** as provided by [zipfile](https://docs.python.org/3/library/zipfile.html), which is distributed with Python itself. See also the [ZIP File Format Specification](https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT).
  - **Many Others** as provided by [libarchive](https://github.com/libarchive/libarchive) via  [python-libarchive-c](https://github.com/Changaco/python-libarchive-c).
    - Formats with tests:
@@ -100,6 +101,13 @@ The latter might require [installing additional dependencies](#system-dependenci
 pip install ratarmount
 ```
 
+If you want all features, some of which may possibly result in installation errors on some systems, install with:
+
+```bash
+pip install ratarmount[full]
+```
+
+
 ## Installation via AppImage
 
 The [AppImage](https://appimage.org/) files are attached under "Assets" on the [releases page](https://github.com/mxmlnkn/ratarmount/releases).
@@ -145,13 +153,13 @@ These should be preinstalled on most systems.
 On Debian-like systems like Ubuntu, you can install/update all dependencies using:
 
 ```bash
-sudo apt install python3 python3-pip fuse sqlite3 unar libarchive13 lzop
+sudo apt install python3 python3-pip fuse sqlite3 unar libarchive13 lzop gcc liblzo2-dev
 ```
 
-On macOS, you have to install [macFUSE](https://osxfuse.github.io/) with:
+On macOS, you have to install [macFUSE](https://osxfuse.github.io/) and other optional dependencies with:
 
 ```bash
-brew install macfuse
+brew install macfuse unar libarchive lrzip lzop lzo
 ```
 
 If you are installing on a system for which there exists no manylinux wheel, then you'll have to install further dependencies that are required to build some of the Python packages that ratarmount depends on from source:
@@ -160,7 +168,7 @@ If you are installing on a system for which there exists no manylinux wheel, the
 sudo apt install \
     python3 python3-pip fuse \
     build-essential software-properties-common \
-    zlib1g-dev libzstd-dev liblzma-dev cffi libarchive-dev
+    zlib1g-dev libzstd-dev liblzma-dev cffi libarchive-dev liblzo2-dev gcc
 ```
 
 ## PIP Package Installation
