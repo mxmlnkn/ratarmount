@@ -60,6 +60,11 @@ function installAppImagePythonPackages()
     else
         "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir rapidgzip
     fi
+
+    # https://github.com/nathanhi/pyfatfs/issues/41
+    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir \
+        'git+https://github.com/mxmlnkn/pyfatfs.git@master#egginfo=pyfatfs'
+
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ../core
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ..[full]
 
@@ -78,6 +83,12 @@ function installAppImagePythonPackages()
 
     # These are untested but small enough that we can just install them for now. Maybe they even work.
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir gcsfs adlfs dropboxdrivefs
+
+    # Need to install it manually because it is disabled for Python >=3.12 because of:
+    # https://github.com/nathanhi/pyfatfs/issues/41
+    # And we need to apply a patch for that.
+    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir pyfatfs
+    patch -u "$( find "$APP_DIR" -type f -name FatIO.py )" pyfatfs-issue-41.patch
 }
 
 function installAppImageSystemLibraries()

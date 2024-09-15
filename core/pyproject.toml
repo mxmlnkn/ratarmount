@@ -148,6 +148,7 @@ zstd = [
     'indexed_zstd >= 1.2.2, < 2.0; platform_system!="Windows"',
 ]
 7z = ["libarchive-c ~= 5.1, < 6.0"]
+fat = ["pyfatfs ~= 1.0"]
 
 [tool.setuptools]
 license-files = [

@@ -3,6 +3,7 @@
 
 import collections
 import concurrent.futures
+import io
 import os
 import struct
 import sys
@@ -70,6 +71,13 @@ try:
     import PySquashfsImage
 except ImportError:
     PySquashfsImage = None
+
+try:
+    import pyfatfs
+    from pyfatfs import PyFat
+except ImportError:
+    pyfatfs = None
+    PyFat = None
 
 
 CompressionModuleInfo = collections.namedtuple('CompressionModuleInfo', ['name', 'open'])
@@ -246,6 +254,36 @@ if 'PySquashfsImage' in sys.modules and isinstance(PySquashfsImage, types.Module
         [],
         [CompressionModuleInfo('PySquashfsImage', lambda x: PySquashfsImage.SquashFsImage(x))],
         lambda x: findSquashFSOffset(x) >= 0,
+    )
+
+
+def isFATImage(fileObject) -> bool:
+    offset = fileObject.tell()
+    try:
+        fs = PyFat.PyFat()
+        # TODO Avoid possibly slow full FAT parsing here. Only do some quick checks such as PyFatFS.PyFat.parse_header
+        #      Calling __set_fp instead of set_fp avoids that but it is not part of the public interface per convention!
+        fs._PyFat__set_fp(fileObject)
+        fs.is_read_only = True
+        try:
+            fs.parse_header()
+            return True
+        except (pyfatfs.PyFATException, ValueError):
+            return False
+        finally:
+            # Reset file object so that it does not get closed! Cannot be None because that is checked.
+            fs._PyFat__fp = io.BytesIO()
+
+    finally:
+        fileObject.seek(offset)
+
+
+if 'pyfatfs' in sys.modules and isinstance(pyfatfs, types.ModuleType):
+    ARCHIVE_FORMATS['fat'] = CompressionInfo(
+        ['fat', 'img', 'dd', 'fat12', 'fat16', 'fat32', 'raw'],
+        [],
+        [CompressionModuleInfo('pyfatfs', lambda x: x)],
+        lambda x: isFATImage(x),
     )
 
 
