@@ -1936,7 +1936,7 @@ tests+=(
 fi
 
 # zipfile returns unseekable file object with Python 3.6. Therefore, I disabled it completely there.
-python3MinorVersion=$( python3 --version | sed -n -E 's|.* 3[.]([0-9]+)[.][0-9]+|\1|p' )
+python3MinorVersion=$( python3 -c 'import sys; print(sys.version_info.minor)' )
 if [[ -n "$python3MinorVersion" && "$python3MinorVersion" -gt 6 ]]; then
 if ! uname | 'grep' -q -i darwin; then
 tests+=(
@@ -1977,6 +1977,14 @@ tests+=(
     c157a79031e1c40f85931829bc5fc552 tests/2k-recursive-tars.tar.bz2              mimi/foo
 )
 
+# https://github.com/indygreg/python-zstandard/issues/238
+if [[ -n "$python3MinorVersion" && "$python3MinorVersion" -ge 14 ]]; then
+pytestedTests+=(
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.zstd.squashfs           foo/fighter/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.zstd.squashfs           foo/jet/ufo
+)
+fi
+
 pytestedTests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.gzip.squashfs           foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lz4.squashfs            foo/fighter/ufo
@@ -1984,7 +1992,6 @@ pytestedTests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lzo.squashfs            foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.no-compression.squashfs foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.xz.squashfs             foo/fighter/ufo
-    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.zstd.squashfs           foo/fighter/ufo
 
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.gzip.squashfs           foo/jet/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lz4.squashfs            foo/jet/ufo
@@ -1992,7 +1999,6 @@ pytestedTests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lzo.squashfs            foo/jet/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.no-compression.squashfs foo/jet/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.xz.squashfs             foo/jet/ufo
-    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.zstd.squashfs           foo/jet/ufo
 
     2709a3348eb2c52302a7606ecf5860bc tests/file-in-non-existing-folder.rar        foo2/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.rar                     foo/fighter/ufo

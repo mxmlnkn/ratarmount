@@ -69,12 +69,13 @@ jobs:
 
     strategy:
       matrix:
-        os: [macos-13, ubuntu-latest]
+        os: ['macos-13', 'ubuntu-latest']
         # macos-13 / macos-latest does not work anymore because the dependencies don't have any wheels,
         # probably because it is M1 based.
         # ToDo: Add windows-latest but it requires a lot of setup of the dependencies!
         #       Maybe only test ratarmount-core without most dependencies after I have split that off.
         # Oldest and newest versions should be enough. Python versions are supported 5 years from release date.
+        # https://endoflife.date/python
         # 3.5 was released 2015-09-13 and end-of-life was 2020-09-13
         # 3.6 was released 2016-12-23 and end-of-life was 2021-12-23
         # 3.7 was released 2018-06-27 and end-of-life was 2023-06-27
@@ -84,7 +85,11 @@ jobs:
         # 3.11 was released 2022-10-24 and end-of-life will be 2027-10
         # 3.12 was released 2023-10-02 and end-of-life will be 2028-10
         # 3.13 is to be released 2024-10
-        python-version: ['3.8', '3.12']
+        # 3.14 is to be released 2025-10
+        python-version: ['3.8', '3.12', '3.13.0-rc.2']
+        include:
+        - os: ubuntu-latest
+          python-version: '3.14.0-alpha.0'
 
     defaults:
       run:
@@ -139,7 +144,7 @@ jobs:
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade wheel
         python3 -m pip install --upgrade setuptools
-        python3 -m pip install --upgrade-strategy eager --upgrade cython twine build zstandard fusepy cffi
+        python3 -m pip install --upgrade-strategy eager --upgrade twine build fusepy cffi
 
     - name: Test Startup With Only One Compression Dependency
       run: |

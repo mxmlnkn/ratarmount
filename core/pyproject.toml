@@ -59,19 +59,43 @@ full = [
     "PySquashfsImage == 0.9.0",
     "lz4 ~= 4.0.0",
     "python-lzo ~= 1.0",
-    "zstandard ~= 0.22.0",
-    "isal ~= 1.0",
+    # https://peps.python.org/pep-0508/
+    # Need at least 0.23.0 for Python 3.13 support.
+    # https://github.com/indygreg/python-zstandard/issues/223
+    # The old zstandard-python versions for Python < 3.8 are untested because they are EOL.
+    "zstandard ~= 0.20.0; python_version == '3.6'",
+    "zstandard ~= 0.21.0; python_version == '3.7'",
+    # With Python 3.14, I get ImportError: cannot import name 'ByteString' from 'typing' via
+    # zstandard/__init__.py:21.
+    # https://github.com/indygreg/python-zstandard/issues/238
+    "zstandard ~= 0.23.0; python_version >= '3.8' and python_version < '3.14'",
+    # With Python 3.14, when building the wheel, I get:
+    # /usr/bin/ld: cannot find /tmp/tmpcuw21d78/bin/isa-l.a: No such file or directory
+    'isal ~= 1.0; python_version < "3.14.0"',
 ]
 bzip2 = ["rapidgzip >= 0.13.1"]
 gzip = ["indexed_gzip >= 1.6.3, < 2.0"]
 # Need >= 4.1 because of https://github.com/markokr/rarfile/issues/73
 rar = ["rarfile ~= 4.1"]
+# For now, only optional (and installed in the AppImage) because it is unstable and depends on many other packages
+# that do not even have up-to-date wheels, i.e., will fail to install if, e.g., gcc and liblzo2-dev are not installed.
 squashfs = [
     "PySquashfsImage == 0.9.0",
     "lz4 ~= 4.0.0",
     "python-lzo ~= 1.0",
-    "zstandard ~= 0.22.0",
-    "isal ~= 1.0",
+    # https://peps.python.org/pep-0508/
+    # Need at least 0.23.0 for Python 3.13 support.
+    # https://github.com/indygreg/python-zstandard/issues/223
+    # The old zstandard-python versions for Python < 3.8 are untested because they are EOL.
+    "zstandard ~= 0.20.0; python_version == '3.6'",
+    "zstandard ~= 0.21.0; python_version == '3.7'",
+    # With Python 3.14, I get ImportError: cannot import name 'ByteString' from 'typing' via
+    # zstandard/__init__.py:21.
+    # https://github.com/indygreg/python-zstandard/issues/238
+    "zstandard ~= 0.23.0; python_version >= '3.8' and python_version < '3.14'",
+    # With Python 3.14, when building the wheel, I get:
+    # /usr/bin/ld: cannot find /tmp/tmpcuw21d78/bin/isa-l.a: No such file or directory
+    'isal ~= 1.0; python_version < "3.14.0"',
 ]
 xz = ["python-xz ~= 0.4.0"]
 zip = []

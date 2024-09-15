@@ -16,7 +16,12 @@ from typing import IO
 import indexed_zstd
 import pytest
 import xz
-import zstandard
+
+try:
+    # May not be installed with Python 3.14 because of incompatibilities.
+    import zstandard
+except ImportError:
+    zstandard = None  # type: ignore
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -207,6 +212,9 @@ class TestParallelZstdReader:
 
     @staticmethod
     def _testSequentialReading(archivePath: str, bufferSize: int, parallelization: int):
+        if zstandard is None:
+            return
+
         with indexed_zstd.IndexedZstdFile(archivePath) as serialFile, (
             SeekableZstd(archivePath) if parallelization == 1 else ParallelZstdReader(archivePath, parallelization)
         ) as parallelFile:
@@ -225,6 +233,9 @@ class TestParallelZstdReader:
 
     @staticmethod
     def _testRandomReads(archivePath: str, samples: int, parallelization: int):
+        if zstandard is None:
+            return
+
         with indexed_zstd.IndexedZstdFile(archivePath) as serialFile, (
             SeekableZstd(archivePath) if parallelization == 1 else ParallelZstdReader(archivePath, parallelization)
         ) as parallelFile:
