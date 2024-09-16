@@ -52,28 +52,14 @@ file = "README.md"
 content-type = "text/markdown"
 
 [project.optional-dependencies]
-full = [
-    "PySquashfsImage == 0.9.0",
-    "lz4 ~= 4.0.0",
-    "python-lzo ~= 1.0",
-    "zstandard ~= 0.22.0",
-    "isal ~= 1.0",
-]
-bzip2 = []
-gzip = []
-rar = []
-xz = []
-zip = []
-zstd = []
-# For now, only optional (and installed in the AppImage) because it is unstable and depends on many other packages
-# that do not even have up-to-date wheels, i.e., will fail to install if, e.g., gcc and liblzo2-dev are not installed.
-squashfs = [
-    "PySquashfsImage == 0.9.0",
-    "lz4 ~= 4.0.0",
-    "python-lzo ~= 1.0",
-    "zstandard ~= 0.22.0",
-    "isal ~= 1.0",
-]
+full = ["ratarmountcore[full]"]
+bzip2 = ["ratarmountcore[bzip2]"]
+gzip = ["ratarmountcore[gzip]"]
+rar = ["ratarmountcore[rar]"]
+xz = ["ratarmountcore[xz]"]
+zip = ["ratarmountcore[zip]"]
+zstd = ["ratarmountcore[zstd]"]
+squashfs = ["ratarmountcore[squashfs]"]
 
 [project.scripts]
 ratarmount = "ratarmount:cli"
