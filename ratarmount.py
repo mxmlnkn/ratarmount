@@ -518,6 +518,10 @@ class FuseMount(fuse.Operations):
     MINIMUM_BLOCK_SIZE = 256 * 1024
 
     def __init__(self, pathToMount: Union[str, List[str]], mountPoint: str, **options) -> None:
+        self.printDebug: int = int(options.get('printDebug', 0))
+        self.writeOverlay: Optional[WritableFolderMountSource] = None
+        self.overlayPath: Optional[str] = None
+
         self.mountPoint = os.path.realpath(mountPoint)
         # This check is important for the self-bind test below, which assumes a folder.
         if os.path.exists(self.mountPoint) and not os.path.isdir(self.mountPoint):
@@ -536,10 +540,6 @@ class FuseMount(fuse.Operations):
         options['writeIndex'] = True
         if 'recursive' not in options and options.get('recursionDepth', 0) != 0:
             options['recursive'] = True
-
-        self.printDebug: int = int(options.get('printDebug', 0))
-        self.writeOverlay: Optional[WritableFolderMountSource] = None
-        self.overlayPath: Optional[str] = None
 
         # Add write overlay as folder mount source to read from with highest priority.
         if 'writeOverlay' in options and isinstance(options['writeOverlay'], str) and options['writeOverlay']:
@@ -676,13 +676,15 @@ class FuseMount(fuse.Operations):
         try:
             if self.mountPointFd is not None:
                 os.close(self.mountPointFd)
-        except Exception:
-            pass
+        except Exception as exception:
+            if self.printDebug >= 1:
+                print("[Warning] Failed to close mount point folder descriptor because of:", exception)
 
         try:
             self.mountSource.__exit__(None, None, None)
-        except Exception:
-            pass
+        except Exception as exception:
+            if self.printDebug >= 1:
+                print("[Warning] Failed to tear down root mount source because of:", exception)
 
     def _addNewHandle(self, handle, flags):
         # Note that fh in fuse_common.h is 64-bit and Python also supports 64-bit (long integers) out of the box.
