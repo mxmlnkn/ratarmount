@@ -593,7 +593,11 @@ class SQLiteIndex:
 
     def finalize(self):
         try:
-            queriedLibSqliteVersion = sqlite3.connect(":memory:").execute("select sqlite_version();").fetchone()
+            # Note that the with-statement does not automatically close a connection!
+            # https://discuss.python.org/t/implicitly-close-sqlite3-connections-with-context-managers/33320
+            connection = sqlite3.connect(":memory:")
+            queriedLibSqliteVersion = connection.execute("select sqlite_version();").fetchone()
+            connection.close()
             libSqliteVersion = tuple(int(x) for x in queriedLibSqliteVersion[0].split('.'))
         except Exception:
             libSqliteVersion = (0, 0, 0)
