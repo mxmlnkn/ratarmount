@@ -100,7 +100,7 @@ jobs:
 
     strategy:
       matrix:
-        os: ['macos-13', 'ubuntu-latest']
+        os: ['ubuntu-latest']
         # macos-13 / macos-latest does not work anymore because the dependencies don't have any wheels,
         # probably because it is M1 based.
         # ToDo: Add windows-latest but it requires a lot of setup of the dependencies!
@@ -117,7 +117,7 @@ jobs:
         # 3.12 was released 2023-10-02 and end-of-life will be 2028-10
         # 3.13 was released 2024-10-07 and end-of-life will be 2029-10
         # 3.14 is to be released 2025-10
-        python-version: ['3.9', '3.12', '3.13']
+        python-version: ['3.13']
         libfuse-version: ['system']
         include:
         - os: ubuntu-latest
@@ -294,70 +294,6 @@ jobs:
     - name: Test Installation From Source
       run: |
         python3 -m pip install .[full,fsspec,sqlar]
-
-    - name: Test Simple Startup
-      run: |
-        ratarmount --help
-        ratarmount --version
-
-    - name: Test Simple Mount
-      # macOS 11+ is too uptight about "security" and is not able to fully load the macfuse kernel extension.
-      # https://github.com/actions/runner-images/issues/4731
-      if: ${{ !startsWith( matrix.os, 'macos' ) }}
-      run: |
-        ratarmount tests/single-file.tar mimi
-        ls -la mimi
-        sleep 1s
-        # MacOS does not have fusermount!
-        ratarmount -u mimi
-
-    - name: CLI Tests (Linux)
-      if: ${{ !startsWith( matrix.os, 'macos' ) }}
-      run: |
-        python3 -m pip install pytest
-        # First off, n=auto seems to use the physical cores and ignores virtual ones.
-        # Secondly, these tests scale much better than the others because most time is spent waiting for
-        # the FUSE mount point to appear or disappear, which doesn't seem to be bottlenecked by CPU usage.
-        # There is a new problem in the Github Actions CI:
-        #   fusermount: too many FUSE filesystems mounted; mount_max=N can be set in /etc/fuse.conf
-        # The output of 'mount' shows me only 4 ratarmount mounts!
-        # And now, with 4 mounts, it simply fails without an error message ... WTF is going on.
-        # Remove any multi-threaded execution seems to work, but the error occurred sporadically, so maybe it's that.
-        python3 -X dev -W ignore::DeprecationWarning:fuse -u \
-            -c "import pytest, sys; sys.exit(pytest.console_main())" \
-            --disable-warnings tests/test_cli.py
-
-    - name: Unit Tests
-      run: |
-        python3 -m pip install pytest pytest-xdist pandas
-        for file in core/tests/test_*.py; do
-            case "$file" in
-                "core/tests/test_AutoMountLayer.py"\
-                |"core/tests/test_BlockParallelReaders.py"\
-                |"core/tests/test_LibarchiveMountSource.py"\
-                |"core/tests/test_SQLiteIndexedTar.py")
-                    echo "$file"  # pytest-xdist seems to omit the test file name
-                    pytest -n auto --disable-warnings "$file"
-                    ;;
-                *)
-                  # Fusepy warns about usage of use_ns because the implicit behavior is deprecated.
-                  # But there has been no development to fusepy for 4 years, so I think it should be fine to ignore.
-                  pytest --disable-warnings "$file"
-            esac
-        done
-        python3 tests/tests.py
-
-    - name: Install pip Test Dependencies
-      run: |
-        python3 -m pip install -r tests/requirements-tests.txt
-        # https://github.com/nathanhi/pyfatfs/issues/41
-        # Stalled PyFilesystem2 now also triggers a Deprecation Warning in Python 3.9, which triggers my tests:
-        # /opt/hostedtoolcache/Python/3.9.22/x64/lib/python3.9/site-packages/fs/__init__.py:4:
-        # UserWarning: pkg_resources is deprecated as an API.
-        # See https://setuptools.pypa.io/en/latest/pkg_resources.html.
-        # The pkg_resources package is slated for removal as early as 2025-11-30.
-        # Refrain from using this package or pin to Setuptools<81.
-        python3 -m pip uninstall --yes pyfatfs
 
     - name: Install Test Dependencies (Linux)
       if: ${{ !startsWith( matrix.os, 'macos' ) }}

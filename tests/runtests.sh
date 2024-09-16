@@ -5,6 +5,7 @@ cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." || { echo 'Failed to cd to git ro
 #export PYTHONTRACEMALLOC=1
 
 if [[ -z "$RATARMOUNT_CMD" ]]; then
+    export PYTHONTRACEMALLOC=1
     TEST_EXTERNAL_COMMAND=0
     # I don't see a way to call a non-installed module folder via an absolute path.
     # Therefore, this will use the non-installed 'ratarmount' module in the current folder if it exists,
