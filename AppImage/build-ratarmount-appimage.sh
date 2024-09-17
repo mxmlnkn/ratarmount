@@ -67,6 +67,18 @@ function installAppImagePythonPackages()
 
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ../core
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ..[full]
+
+    # ratarmount-0.10.0-manylinux2014_x86_64.AppImage (the first one!) was 13.6 MB
+    # ratarmount-v0.11.3-manylinux2014_x86_64.AppImage was 13.6 MB
+    # ratarmount-0.12.0-manylinux2014_x86_64.AppImage was 26.3 MB thanks to an error with the trime-down script.
+    # ratarmount-0.15.0-x86_64.AppImage was 14.8 MB
+    # ratarmount-0.15.1-x86_64.AppImage was 13.3 MB (manylinux_2014)
+    # ratarmount-0.15.2-x86_64.AppImage was 11.7 MB (manylinux_2_28)
+    # At this point, with pyfatfs, the AppImage is/was 13.0 MB. Extracts to 45.1 MB
+    # This bloats the AppImage to 23.7 MB, which is still ok, I guess. Extracts to 83.1 MB
+    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir requests aiohttp paramiko smbprotocol pygit2 fsspec
+    # This bloats the AppImage to 38.5 MB :/. Extracts to 121.0 MB
+    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir s3fs gcsfs adlfs dropbox dropboxdrivefs
 }
 
 function installAppImageSystemLibraries()

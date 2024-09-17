@@ -74,9 +74,39 @@ full = [
     'isal ~= 1.0; python_version < "3.14.0"',
     # Pin to < 3.12 because of https://github.com/nathanhi/pyfatfs/issues/41
     'pyfatfs ~= 1.0; python_version < "3.12.0"',
+    # fsspec:
+    "requests",
+    "aiohttp",
+    "paramiko",
+    "smbprotocol",
+    "pygit2",
+    "fsspec",
+    "s3fs",
+    "gcsfs",
+    "adlfs",
+    "dropbox",
+    "dropboxdrivefs",
 ]
 bzip2 = ["rapidgzip >= 0.13.1"]
 gzip = ["indexed_gzip >= 1.6.3, < 2.0"]
+fsspec = [
+    # Copy-pasted from fsspec[full] list. Some were excluded because they are too unproportionally large.
+    "requests",
+    "aiohttp",
+    "paramiko",
+    "smbprotocol",  # build error in Python 3.13
+    "pygit2",  # build error in Python 3.13
+    "fsspec",
+    "s3fs",
+    "gcsfs",
+    "adlfs",  # build error in Python 3.13
+    "dropbox",
+    "dropboxdrivefs",
+    # "dask", "distributed" : ~34 MB, ~10 MB gzip-compressed
+    # "pyarrow >= 1" : ~196 MB, ~60 MB gzip-compressed, build error in Python 3.13
+    # "ocifs" : ~350 MB
+    # "panel" : only for fsspec GUI
+]
 # Need >= 4.1 because of https://github.com/markokr/rarfile/issues/73
 rar = ["rarfile ~= 4.1"]
 # For now, only optional (and installed in the AppImage) because it is unstable and depends on many other packages
