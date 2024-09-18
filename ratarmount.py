@@ -681,7 +681,9 @@ class FuseMount(fuse.Operations):
                 print("[Warning] Failed to close mount point folder descriptor because of:", exception)
 
         try:
-            self.mountSource.__exit__(None, None, None)
+            # If there is some exception in the constructor, then some members may not exist!
+            if hasattr(self, 'mountSource'):
+                self.mountSource.__exit__(None, None, None)
         except Exception as exception:
             if self.printDebug >= 1:
                 print("[Warning] Failed to tear down root mount source because of:", exception)
