@@ -99,15 +99,17 @@ TAR_COMPRESSION_FORMATS: Dict[str, CompressionInfo] = {
     'bz2': CompressionInfo(
         ['bz2', 'bzip2'],
         ['tb2', 'tbz', 'tbz2', 'tz2'],
-        [CompressionModuleInfo('rapidgzip', lambda x: rapidgzip.IndexedBzip2File(x))],  # type: ignore
+        [CompressionModuleInfo('rapidgzip', lambda x, parallelization=0: rapidgzip.IndexedBzip2File(x, parallelization=parallelization))],  # type: ignore
         lambda x: (x.read(4)[:3] == b'BZh' and x.read(6) == (0x314159265359).to_bytes(6, 'big')),
     ),
     'gz': CompressionInfo(
         ['gz', 'gzip'],
         ['taz', 'tgz'],
         [
-            CompressionModuleInfo('rapidgzip', lambda x: rapidgzip.RapidgzipFile(x)),
-            CompressionModuleInfo('indexed_gzip', lambda x: indexed_gzip.IndexedGzipFile(fileobj=x)),
+            CompressionModuleInfo(
+                'rapidgzip', lambda x, parallelization=1: rapidgzip.RapidgzipFile(x, parallelization=parallelization)
+            ),
+            CompressionModuleInfo('indexed_gzip', lambda x, parallelization=1: indexed_gzip.IndexedGzipFile(fileobj=x)),
         ],
         lambda x: x.read(2) == b'\x1F\x8B',
     ),
@@ -116,21 +118,25 @@ TAR_COMPRESSION_FORMATS: Dict[str, CompressionInfo] = {
         ['txz'],
         # Prioritize xz over lzmaffi
         [
-            CompressionModuleInfo('xz', lambda x: xz.open(x)),
-            CompressionModuleInfo('lzmaffi', lambda x: lzmaffi.open(x)),
+            CompressionModuleInfo('xz', lambda x, parallelization=1: xz.open(x)),
+            CompressionModuleInfo('lzmaffi', lambda x, parallelization=1: lzmaffi.open(x)),
         ],
         lambda x: x.read(6) == b"\xFD7zXZ\x00",
     ),
     'zst': CompressionInfo(
         ['zst', 'zstd'],
         ['tzst'],
-        [CompressionModuleInfo('indexed_zstd', lambda x: indexed_zstd.IndexedZstdFile(x.fileno()))],
+        [CompressionModuleInfo('indexed_zstd', lambda x, parallelization=1: indexed_zstd.IndexedZstdFile(x.fileno()))],
         lambda x: x.read(4) == (0xFD2FB528).to_bytes(4, 'little'),
     ),
     'zlib': CompressionInfo(
         ['zz', 'zlib'],
         [],
-        [CompressionModuleInfo('rapidgzip', lambda x: rapidgzip.RapidgzipFile(x))],
+        [
+            CompressionModuleInfo(
+                'rapidgzip', lambda x, parallelization=0: rapidgzip.RapidgzipFile(x, parallelization=parallelization)
+            )
+        ],
         checkZlibHeader,
     ),
 }
@@ -555,7 +561,10 @@ def detectCompression(
             return None
 
         try:
-            compressedFileobj = formatOpen(fileobj)
+            # Disable parallelization because it may lead to unnecessary expensive prefetching.
+            # We only need to read 1 byte anyway to verify correctness.
+            compressedFileobj = formatOpen(fileobj, parallelization=1)
+
             # Reading 1B from a single-frame zst file might require decompressing it fully in order
             # to get uncompressed file size! Avoid that. The magic bytes should suffice mostly.
             # TODO: Make indexed_zstd not require the uncompressed size for the read call.
