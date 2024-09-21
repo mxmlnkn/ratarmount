@@ -3,10 +3,10 @@
 
 import collections
 import concurrent.futures
-import io
 import os
 import struct
 import sys
+import traceback
 import types
 
 from typing import Callable, Dict, IO, Iterable, List, Optional, Tuple
@@ -524,7 +524,12 @@ def getGzipInfo(fileobj: IO[bytes]) -> Optional[Tuple[str, int]]:
 def detectCompression(
     fileobj: IO[bytes], prioritizedBackends: Optional[List[str]], printDebug: int = 0
 ) -> Optional[str]:
-    if not isinstance(fileobj, io.IOBase) or not fileobj.seekable():
+    # isinstance(fileobj, io.IOBase) does not work for everything, e.g., for paramiko.sftp_file.SFTPFile
+    # because it does not inherit from io.IOBase. Therefore, do duck-typing and test for required methods.
+    if any(not hasattr(fileobj, method) for method in ['seekable', 'seek', 'read', 'tell']) or not fileobj.seekable():
+        if printDebug >= 3:
+            print("[Warning] Cannot detect compression for give Python object that does not look like a file object.")
+            traceback.print_exc()
         return None
 
     oldOffset = fileobj.tell()
@@ -563,6 +568,8 @@ def detectCompression(
             if printDebug >= 2:
                 print(f"[Warning] A given file with magic bytes for {compressionId} could not be opened because:")
                 print(e)
+            if printDebug >= 3:
+                traceback.print_exc()
             fileobj.seek(oldOffset)
 
     return None
