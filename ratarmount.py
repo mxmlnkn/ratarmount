@@ -534,8 +534,10 @@ class FuseMount(fuse.Operations):
             except Exception:
                 pass
 
-        assert isinstance(pathToMount, list)
+        hadPathsToMount = bool(pathToMount)
         pathToMount = list(filter(os.path.exists, pathToMount))
+        if hadPathsToMount and not pathToMount:
+            raise ValueError("No paths to mount left over after filtering!")
 
         options['writeIndex'] = True
         if 'recursive' not in options and options.get('recursionDepth', 0) != 0:
@@ -548,6 +550,9 @@ class FuseMount(fuse.Operations):
                 os.makedirs(self.overlayPath, exist_ok=True)
             pathToMount.append(self.overlayPath)
 
+        assert isinstance(pathToMount, list)
+        if not pathToMount:
+            raise ValueError("No paths to mount given!")
         # Take care that bind-mounting folders to itself works
         mountSources: List[Tuple[str, MountSource]] = []
         self.mountPointFd: Optional[int] = None
@@ -1493,7 +1498,7 @@ seeking capabilities when opening that file.
     if os.path.isdir(args.mount_source[-1]) or not os.path.exists(args.mount_source[-1]):
         args.mount_point = args.mount_source[-1]
         args.mount_source = args.mount_source[:-1]
-    if not args.mount_source:
+    if not args.mount_source and not args.write_overlay:
         raise argparse.ArgumentTypeError(
             "You must at least specify one path to a valid TAR file or union mount source directory!"
         )
