@@ -37,6 +37,16 @@ jobs:
         parallelization: [0, 1, 2]
 
     steps:
+    - uses: actions/checkout@v4
+      with:
+        # We need one tag for testing the git mount.
+        # This is BROKEN! God damn it. Is anything working at all...
+        # https://github.com/actions/checkout/issues/1781
+        fetch-tags: true
+
+    - name: Fetch tag for tests
+      run: git fetch origin refs/tags/v0.15.2:refs/tags/v0.15.2
+
     - uses: actions/download-artifact@v3
       with:
         name: ratarmount-x86_64.AppImage
@@ -52,12 +62,17 @@ jobs:
         # These are required for creating test files on the fly not for ratarmount!
         sudo apt-get -y install bzip2 pixz zstd unar fuse
 
+    - name: Install pip Test Dependencies
+      run: |
+        python3 -m pip install -r tests/requirements-tests.txt
+        # Explicitly install pygit2 even on Python 3.13+ because we have set up libgit2 manually.
+        python3 -m pip install pygit2
+        python3 -c 'import pygit2'
+
     - name: Test Simple Startup
       run: |
         ratarmount --help
         ratarmount --version
-
-    - uses: actions/checkout@v4
 
     - name: Test Simple Mount
       run: |
@@ -65,6 +80,13 @@ jobs:
         ls -la mimi
         sleep 1s
         ratarmount -u mimi
+
+    - name: Install pip Test Dependencies
+      run: |
+        python3 -m pip install -r tests/requirements-tests.txt
+        # Explicitly install pygit2 even on Python 3.13+ because we have set up libgit2 manually.
+        python3 -m pip install pygit2
+        python3 -c 'import pygit2'
 
     - name: Regression Tests
       run: |

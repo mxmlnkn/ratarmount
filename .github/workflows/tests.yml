@@ -21,7 +21,7 @@ jobs:
     - name: Install pip Dependencies
       run: |
         python3 -m pip install --upgrade pip
-        python3 -m pip install --user fusepy pytest lz4 PySquashfsImage
+        python3 -m pip install --user fusepy pytest lz4 PySquashfsImage asyncssh
 
     - name: Style Check With Black
       run: |
@@ -35,7 +35,8 @@ jobs:
     - name: Lint With Codespell
       run: |
         python3 -m pip install codespell
-        codespell --ignore-words-list fo,Nd,unx $( git ls-tree -r --name-only HEAD | 'grep' -E '[.](py|md|txt|sh|yml)' )
+        # fsspec uses cachable instead of cacheable ...
+        codespell --ignore-words-list fo,Nd,unx,cachable $( git ls-tree -r --name-only HEAD | 'grep' -E '[.](py|md|txt|sh|yml)' )
 
     - name: Lint With Flake8
       run: |
@@ -98,6 +99,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        # We need one tag for testing the git mount.
+        # This is BROKEN! God damn it. Is anything working at all...
+        # https://github.com/actions/checkout/issues/1781
+        fetch-tags: true
+
+    - name: Fetch tag for tests
+      run: git fetch origin refs/tags/v0.15.2:refs/tags/v0.15.2
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
@@ -123,8 +132,21 @@ jobs:
         # zstd, may also call external binaries depending on how libarchive was compiled!
         # https://github.com/libarchive/libarchive/blob/ad5a0b542c027883d7069f6844045e6788c7d70c/libarchive/
         #   archive_read_support_filter_lrzip.c#L68
-        sudo apt-get -y install libfuse2 fuse3 bzip2 pbzip2 pixz zstd unar lrzip lzop gcc liblzo2-dev
-        set -x
+        sudo apt-get -y install libfuse2 fuse3 bzip2 pbzip2 pixz zstd unar lrzip lzop gcc liblzo2-dev ruby-webrick
+
+    - name: Install Dependencies For Unreleased Python Versions (Linux)
+      if: >
+        startsWith( matrix.os, 'ubuntu' ) && (
+          matrix.python-version == '3.13.0-rc.3' ||
+          matrix.python-version == '3.14.0-alpha.0')
+      run: |
+        #libgit2-dev is too old on Ubuntu 22.04. Leads to error about missing git2/sys/errors.h
+        #sudo apt-get -y install libgit2-dev
+        sudo apt-get -y install cmake
+        git clone --branch v1.7.2 --depth 1 https://github.com/libgit2/libgit2.git
+        ( cd libgit2 && mkdir build && cd build && cmake .. && cmake --build . && sudo cmake --build . -- install )
+        echo "PATH=$PATH:/usr/local/bin" >> "$GITHUB_ENV"
+        echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib" >> "$GITHUB_ENV"
 
     - name: Install Dependencies (MacOS)
       if: startsWith( matrix.os, 'macos' )
@@ -137,7 +159,16 @@ jobs:
         #   TypeError: 'NoneType' object is not iterable
         brew install macfuse coreutils pixz pbzip2 zstd unar libarchive lrzip lzop lzo
         # Add brew installation binary folder to PATH so that command line tools like zstd can be found
-        export PATH="$PATH:/usr/local/bin"
+        echo PATH="$PATH:/usr/local/bin" >> "$GITHUB_ENV"
+
+    - name: Install Dependencies For Unreleased Python Versions (MacOS)
+      if: >
+        startsWith( matrix.os, 'macos' ) && (
+          matrix.python-version == '3.13.0-rc.3' ||
+          matrix.python-version == '3.14.0-alpha.0')
+      run: |
+        brew install libgit2@1.7
+        brew link libgit2@1.7 --force
 
     - name: Install pip Dependencies
       run: |
@@ -225,6 +256,13 @@ jobs:
             esac
         done
         python3 tests/tests.py
+
+    - name: Install pip Test Dependencies
+      run: |
+        python3 -m pip install -r tests/requirements-tests.txt
+        # Explicitly install pygit2 even on Python 3.13+ because we have set up libgit2 manually.
+        python3 -m pip install pygit2
+        python3 -c 'import pygit2'
 
     - name: Regression Tests (FUSE 3)
       if: ${{ !startsWith( matrix.os, 'macos' ) }}

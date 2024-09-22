@@ -183,6 +183,7 @@ class SQLiteIndex:
         preferMemory: bool = False,
         indexMinimumFileCount: int = 0,
         backendName: str = '',
+        ignoreCurrentFolder: bool = False,
     ):
         """
         indexFilePath
@@ -206,6 +207,9 @@ class SQLiteIndex:
             exceeded. It may also be written to a file if a gzip index is stored.
         backendName
             The backend name to be stored as metadata and to determine compatibility of found indexes.
+        ignoreCurrentFolder
+            If true, then do not store the index into the current path. This was introduced for URL
+            opened as file objects but may be useful for any archive given via a file object.
         """
 
         if not backendName:
@@ -217,7 +221,7 @@ class SQLiteIndex:
         self.indexFilePath: Optional[str] = None
         self.encoding = encoding
         self.possibleIndexFilePaths = SQLiteIndex.getPossibleIndexFilePaths(
-            indexFilePath, indexFolders, archiveFilePath
+            indexFilePath, indexFolders, archiveFilePath, ignoreCurrentFolder
         )
         # stores which parent folders were last tried to add to database and therefore do exist
         self.parentFolderCache: List[Tuple[str, str]] = []
@@ -247,7 +251,10 @@ class SQLiteIndex:
 
     @staticmethod
     def getPossibleIndexFilePaths(
-        indexFilePath: Optional[str], indexFolders: Optional[List[str]] = None, archiveFilePath: Optional[str] = None
+        indexFilePath: Optional[str],
+        indexFolders: Optional[List[str]] = None,
+        archiveFilePath: Optional[str] = None,
+        ignoreCurrentFolder: bool = False,
     ) -> List[str]:
         if indexFilePath:
             return [] if indexFilePath == ':memory:' else [os.path.abspath(os.path.expanduser(indexFilePath))]
@@ -265,7 +272,7 @@ class SQLiteIndex:
             if folder:
                 indexPath = os.path.join(folder, indexPathAsName)
                 possibleIndexFilePaths.append(os.path.abspath(os.path.expanduser(indexPath)))
-            else:
+            elif not ignoreCurrentFolder:
                 possibleIndexFilePaths.append(defaultIndexFilePath)
         return possibleIndexFilePaths
 
@@ -563,6 +570,9 @@ class SQLiteIndex:
         self.sqlConnection = SQLiteIndex._openSqlDb(f"file:{uriPath}?mode=ro", uri=True, check_same_thread=False)
 
     def _reloadIndexOnDisk(self):
+        if self.printDebug >= 2:
+            print("[Info] Try to reopen SQLite database on disk at:", self.indexFilePath)
+            print("other index paths:", self.possibleIndexFilePaths)
         if not self.indexFilePath or self.indexFilePath != ':memory:' or not self.sqlConnection:
             return
 

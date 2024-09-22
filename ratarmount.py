@@ -52,6 +52,12 @@ try:
 except ImportError:
     pass
 
+try:
+    import fsspec
+except ImportError:
+    fsspec = None  # type: ignore
+
+
 import ratarmountcore as core
 from ratarmountcore import (
     AutoMountLayer,
@@ -536,7 +542,7 @@ class FuseMount(fuse.Operations):
                 pass
 
         hadPathsToMount = bool(pathToMount)
-        pathToMount = list(filter(os.path.exists, pathToMount))
+        pathToMount = list(filter(lambda x: os.path.exists(x) or '://' in x, pathToMount))
         if hadPathsToMount and not pathToMount:
             raise ValueError("No paths to mount left over after filtering!")
 
@@ -931,6 +937,18 @@ def checkInputFileType(
 ) -> Tuple[str, Optional[str]]:
     """Raises an exception if it is not an accepted archive format else returns the real path and compression type."""
 
+    splitURI = tarFile.split('://')
+    if len(splitURI) > 1:
+        protocol = splitURI[0]
+        if fsspec is None:
+            raise argparse.ArgumentTypeError("Detected an URI, but fsspec was not found. Try: pip install fsspec.")
+        if protocol not in fsspec.available_protocols():
+            raise argparse.ArgumentTypeError(
+                f"URI: {tarFile} uses an unknown protocol. Protocols known by fsspec are: "
+                + ', '.join(fsspec.available_protocols())
+            )
+        return tarFile, None
+
     if not os.path.isfile(tarFile):
         raise argparse.ArgumentTypeError(f"File '{tarFile}' is not a file!")
     tarFile = os.path.realpath(tarFile)
@@ -1140,6 +1158,12 @@ Examples:
  - ratarmount folder1 folder2 mountpoint
  - ratarmount folder archive.zip folder
  - ratarmount -o modules=subdir,subdir=squashfs-root archive.squashfs mountpoint
+ - ratarmount http://server.org:80/archive.rar folder folder
+ - ratarmount ssh://hostname:22/relativefolder/ mountpoint
+ - ratarmount ssh://hostname:22//tmp/tmp-abcdef/ mountpoint
+ - ratarmount github://mxmlnkn:ratarmount@v0.15.2/tests/single-file.tar mountpoint
+ - AWS_ACCESS_KEY_ID=aaaaaaaaaaaaaaaaaaaa AWS_SECRET_ACCESS_KEY=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \\
+   ratarmount s3://127.0.0.1/bucket/single-file.tar mounted
 
 For further information, see the ReadMe on the project's homepage:
 
@@ -1436,8 +1460,9 @@ For further information, see the ReadMe on the project's homepage:
     # This is a hack but because we have two positional arguments (and want that reflected in the auto-generated help),
     # all positional arguments, including the mountpath will be parsed into the tar file path's namespace and we have to
     # manually separate them depending on the type.
-    if os.path.isdir(args.mount_source[-1]) or not os.path.exists(args.mount_source[-1]):
-        args.mount_point = args.mount_source[-1]
+    lastArgument = args.mount_source[-1]
+    if '://' not in lastArgument and (os.path.isdir(lastArgument) or not os.path.exists(lastArgument)):
+        args.mount_point = lastArgument
         args.mount_source = args.mount_source[:-1]
     if not args.mount_source and not args.write_overlay:
         raise argparse.ArgumentTypeError(
@@ -1491,6 +1516,8 @@ For further information, see the ReadMe on the project's homepage:
             args.mount_point = os.path.splitext(args.mount_source[0])[0]
         else:
             args.mount_point = autoMountPoint
+        if '://' in args.mount_point:
+            args.mount_point = "ratarmount.mounted"
     args.mount_point = os.path.abspath(args.mount_point)
 
     # Preprocess the --index-folders list as a string argument
@@ -1830,7 +1857,7 @@ def main():
 
     try:
         cli(args)
-    except (FileNotFoundError, RatarmountError, argparse.ArgumentTypeError) as exception:
+    except (FileNotFoundError, RatarmountError, argparse.ArgumentTypeError, ValueError) as exception:
         print("[Error]", exception)
         if debug >= 3:
             traceback.print_exc()

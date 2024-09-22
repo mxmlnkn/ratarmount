@@ -61,6 +61,7 @@ xz = ["ratarmountcore[xz]"]
 zip = ["ratarmountcore[zip]"]
 zstd = ["ratarmountcore[zstd]"]
 squashfs = ["ratarmountcore[squashfs]"]
+fsspec = ["ratarmountcore[fsspec]"]
 
 [project.scripts]
 ratarmount = "ratarmount:cli"

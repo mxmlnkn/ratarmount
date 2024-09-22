@@ -704,6 +704,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 self.tarFileName = tarFileName
             else:
                 raise RatarmountError("At least one of tarFileName and fileObject arguments should be set!")
+        self._fileNameIsURL = re.match('[A-Za-z0-9]*://', self.tarFileName) is not None
 
         # If no fileObject given, then self.tarFileName is the path to the archive to open.
         if not fileObject:
@@ -771,16 +772,19 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         if indexFolders and isinstance(indexFolders, str):
             indexFolders = [indexFolders]
 
+        archiveFilePath = self.tarFileName if not self.isFileObject or self._fileNameIsURL else None
+
         super().__init__(
             SQLiteIndex(
                 indexFilePath,
                 indexFolders=indexFolders,
-                archiveFilePath=None if self.isFileObject else self.tarFileName,
+                archiveFilePath=archiveFilePath,
                 encoding=self.encoding,
                 checkMetadata=self._checkMetadata,
                 printDebug=self.printDebug,
                 indexMinimumFileCount=indexMinimumFileCount,
                 backendName='SQLiteIndexedTar',
+                ignoreCurrentFolder=self.isFileObject and self._fileNameIsURL,
             ),
             clearIndexCache=clearIndexCache,
         )
@@ -829,9 +833,9 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
         # Open new database when we didn't find an existing one.
         if not self.index.indexIsLoaded():
-            # Simply open in memory without an error even if writeIndex is True but when not indication
-            # for a index file location has been given.
-            if writeIndex and (indexFilePath or not self.isFileObject):
+            # Simply open in memory without an error even if writeIndex is True but when no indication
+            # for an index file location has been given.
+            if writeIndex and (indexFilePath or self._getArchivePath() or not self.isFileObject):
                 self.index.openWritable()
             else:
                 self.index.openInMemory()
@@ -890,6 +894,9 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         if not self.isFileObject and self.rawFileObject:
             self.rawFileObject.close()
 
+    def _getArchivePath(self) -> Optional[str]:
+        return None if self.tarFileName == '<file object>' else self.tarFileName
+
     def _storeMetadata(self) -> None:
         argumentsToSave = [
             'mountRecursively',
@@ -902,6 +909,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         ]
 
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
+        # The second argument must be a path to a file to call os.stat with, not simply a file name.
         self.index.storeMetadata(argumentsMetadata, None if self.isFileObject else self.tarFileName)
         self.index.storeMetadataKeyValue('isGnuIncremental', '1' if self._isGnuIncremental else '0')
 

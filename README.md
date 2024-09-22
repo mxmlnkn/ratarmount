@@ -24,6 +24,7 @@ And in contrast to [tarindexer](https://github.com/devsnd/tarindexer), which als
 
 *Capabilities:*
 
+ - **Random Access:** Care was taken to achieve fast random access inside compressed streams for bzip2, gzip, xz, and zstd and inside TAR files by building indices containing seek points.
  - **Highly Parallelized:** By default, all cores are used for parallelized algorithms like for the gzip, bzip2, and xz decoders.
    This can yield huge speedups on most modern processors but requires more main memory.
    It can be controlled or completely turned off using the `-P <cores>` option.
@@ -34,42 +35,11 @@ And in contrast to [tarindexer](https://github.com/devsnd/tarindexer), which als
  - **Union Mounting:** Multiple TARs, compressed files, and bind mounted folders can be mounted under the same mountpoint.
  - **Write Overlay:** A folder can be specified as write overlay.
    All changes below the mountpoint will be redirected to this folder and deletions are tracked so that all changes can be applied back to the archive.
+ - **Remote Files and Folders:** A remote archive or whole folder structure can be mounted similar to tools like [sshfs](https://github.com/libfuse/sshfs) thanks to the [filesystem_spec](https://github.com/fsspec/filesystem_spec) project.
+   These can be specified with URIs as explained in the section ["Remote Files"](#remote-files).
+   Supported remote protocols include: FTP, HTTP, HTTPS, SFTP, [SSH](https://github.com/fsspec/sshfs), Git, Github, [S3](https://github.com/fsspec/s3fs), Samba [v2 and v3](https://github.com/jborean93/smbprotocol), Dropbox, ... Many of these are very experimental and may be slow. Please open a feature request if further backends are desired.
 
-*TAR compressions supported for random access:*
-
- - **BZip2** as provided by [indexed_bzip2](https://github.com/mxmlnkn/indexed_bzip2) as a backend, which is a refactored and extended version of [bzcat](https://github.com/landley/toybox/blob/c77b66455762f42bb824c1aa8cc60e7f4d44bdab/toys/other/bzcat.c) from [toybox](https://landley.net/code/toybox/). See also the [reverse engineered specification](https://github.com/dsnet/compress/blob/master/doc/bzip2-format.pdf).
- - **Gzip** and **Zlib** as provided by [rapidgzip](https://github.com/mxmlnkn/rapidgzip) or [indexed_gzip](https://github.com/pauldmccarthy/indexed_gzip) by Paul McCarthy. See also [RFC1952](https://tools.ietf.org/html/rfc1952) and [RFC1950](https://tools.ietf.org/html/rfc1950).
- - **Xz** as provided by [python-xz](https://github.com/Rogdham/python-xz) by Rogdham or [lzmaffi](https://github.com/r3m0t/backports.lzma) by Tomer Chachamu. See also [The .xz File Format](https://tukaani.org/xz/xz-file-format.txt).
- - **Zstd** as provided by [indexed_zstd](https://github.com/martinellimarco/indexed_zstd) by Marco Martinelli. See also [Zstandard Compression Format](https://github.com/facebook/zstd/blob/master/doc/zstd_compression_format.md).
-
-*Other supported archive formats:*
-
- - **Rar** as provided by [rarfile](https://github.com/markokr/rarfile) by Marko Kreen. See also the [RAR 5.0 archive format](https://www.rarlab.com/technote.htm).
- - **SquashFS, AppImage, Snap** as provided by [PySquashfsImage](https://github.com/matteomattei/PySquashfsImage) by Matteo Mattei. There seems to be no authoritative, open format specification, only [this nicely-done reverse-engineered description](https://dr-emann.github.io/squashfs/squashfs.html), I assume based on the [source code](https://github.com/plougher/squashfs-tools). Note that [Snaps](https://snapcraft.io/docs/the-snap-format) and [Appimages](https://github.com/AppImage/AppImageSpec/blob/master/draft.md#type-2-image-format) are both SquashFS images, with an executable prepended for AppImages.
- - **Zip** as provided by [zipfile](https://docs.python.org/3/library/zipfile.html), which is distributed with Python itself. See also the [ZIP File Format Specification](https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT).
- - **Many Others** as provided by [libarchive](https://github.com/libarchive/libarchive) via  [python-libarchive-c](https://github.com/Changaco/python-libarchive-c).
-   - Formats with tests:
-     [7z](https://github.com/ip7z/7zip/blob/main/DOC/7zFormat.txt),
-     ar,
-     [cab](https://download.microsoft.com/download/4/d/a/4da14f27-b4ef-4170-a6e6-5b1ef85b1baa/[ms-cab].pdf),
-     compress, cpio,
-     [iso](http://www.brankin.com/main/technotes/Notes_ISO9660.htm),
-     [lrzip](https://github.com/ckolivas/lrzip),
-     [lzma](https://www.7-zip.org/a/lzma-specification.7z),
-     [lz4](https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md),
-     [lzip](https://www.ietf.org/archive/id/draft-diaz-lzip-09.txt),
-     lzo,
-     [warc](https://iipc.github.io/warc-specifications/specifications/warc-format/warc-1.0/),
-     xar.
-   - Untested formats that might work or not: deb, grzip,
-     [rpm](https://refspecs.linuxbase.org/LSB_4.1.0/LSB-Core-generic/LSB-Core-generic/pkgformat.html),
-     [uuencoding](https://en.wikipedia.org/wiki/Uuencoding).
-   - Beware that libarchive has no performant random access to files and to file contents.
-     In order to seek or open a file, in general, it needs to be assumed that the archive has to be parsed from the beginning.
-     If you have a performance-critical use case for a format only supported via libarchive,
-     then please open a feature request for a faster customized archive format implementation.
-     The hope would be to add suitable stream compressors such as "short"-distance LZ-based compressions to [rapidgzip](https://github.com/mxmlnkn/rapidgzip).
-
+A complete list of supported formats can be found [here](supported-formats).
 
 # Examples
 
@@ -79,6 +49,11 @@ And in contrast to [tarindexer](https://github.com/devsnd/tarindexer), which als
  - `ratarmount folder1 folder2 mountpoint` to bind-mount a merged view of two (or more) folders under `mountpoint`.
  - `ratarmount folder archive.zip folder` to mount a merged view of a folder on top of archive contents.
  - `ratarmount -o modules=subdir,subdir=squashfs-root archive.squashfs mountpoint` to mount an archive subfolder `squashfs-root` under `mountpoint`.
+ - `ratarmount http://server.org:80/archive.rar folder folder` Mount an archive that is accessible via HTTP range requests.
+ - `ratarmount ssh://hostname:22/relativefolder/ mountpoint` Mount a folder hierarchy via SSH.
+ - `ratarmount ssh://hostname:22//tmp/tmp-abcdef/ mountpoint`
+ - `ratarmount github://mxmlnkn:ratarmount@v0.15.2/tests/ mountpoint` Mount a github repo as if it was checked out at the given tag or SHA or branch.
+ - `AWS_ACCESS_KEY_ID=01234567890123456789 AWS_SECRET_ACCESS_KEY=0123456789012345678901234567890123456789 ratarmount s3://127.0.0.1/bucket/single-file.tar mounted` Mount an archive inside an S3 bucket reachable via a custom endpoint with the given credentials. Bogus credentials may be necessary for unsecured endpoints.
 
 
 # Table of Contents
@@ -89,6 +64,9 @@ And in contrast to [tarindexer](https://github.com/devsnd/tarindexer), which als
       1. [Arch Linux](#arch-linux)
    3. [System Dependencies for PIP Installation (Rarely Necessary)](#system-dependencies-for-pip-installation-rarely-necessary)
    4. [PIP Package Installation](#pip-package-installation)
+2. [Supported Formats](#supported-formats)
+   1. [TAR compressions supported for random access](tar-compressions-supported-for-random-access)
+   2. [Other supported archive formats](other-supported-archive-formats)
 2. [Benchmarks](#benchmarks)
 3. [The Problem](#the-problem)
 4. [The Solution](#the-solution)
@@ -99,7 +77,9 @@ And in contrast to [tarindexer](https://github.com/devsnd/tarindexer), which als
    4. [File versions](#file-versions)
    5. [Compressed non-TAR files](#compressed-non-tar-files)
    6. [Xz and Zst Files](#xz-and-zst-files)
-   7. [As a Library](#as-a-library)
+   7. [Remote Files](#remote-files)
+   8. [Writable Mounting](#writable-mounting)
+   9. [As a Library](#as-a-library)
 
 
 # Installation
@@ -131,6 +111,9 @@ chmod u+x -- "$appImageName"
 ./"$appImageName" --help  # Simple test run
 sudo cp -- "$appImageName" /usr/local/bin/ratarmount  # Example installation
 ```
+
+<details>
+<summary>Other Installation Methods</summary>
 
 ## Installation via Package Manager
 
@@ -198,6 +181,45 @@ python3 -m pip install --user --force-reinstall \
 If there are troubles with the compression backend dependencies, you can try the pip `--no-deps` argument.
 Ratarmount will work without the compression backends.
 The hard requirements are `fusepy` and for Python versions older than 3.7.0 `dataclasses`.
+
+</details>
+
+# Supported Formats
+
+## TAR compressions supported for random access
+
+ - **BZip2** as provided by [indexed_bzip2](https://github.com/mxmlnkn/indexed_bzip2) as a backend, which is a refactored and extended version of [bzcat](https://github.com/landley/toybox/blob/c77b66455762f42bb824c1aa8cc60e7f4d44bdab/toys/other/bzcat.c) from [toybox](https://landley.net/code/toybox/). See also the [reverse engineered specification](https://github.com/dsnet/compress/blob/master/doc/bzip2-format.pdf).
+ - **Gzip** and **Zlib** as provided by [rapidgzip](https://github.com/mxmlnkn/rapidgzip) or [indexed_gzip](https://github.com/pauldmccarthy/indexed_gzip) by Paul McCarthy. See also [RFC1952](https://tools.ietf.org/html/rfc1952) and [RFC1950](https://tools.ietf.org/html/rfc1950).
+ - **Xz** as provided by [python-xz](https://github.com/Rogdham/python-xz) by Rogdham or [lzmaffi](https://github.com/r3m0t/backports.lzma) by Tomer Chachamu. See also [The .xz File Format](https://tukaani.org/xz/xz-file-format.txt).
+ - **Zstd** as provided by [indexed_zstd](https://github.com/martinellimarco/indexed_zstd) by Marco Martinelli. See also [Zstandard Compression Format](https://github.com/facebook/zstd/blob/master/doc/zstd_compression_format.md).
+
+## Other supported archive formats
+
+ - **Rar** as provided by [rarfile](https://github.com/markokr/rarfile) by Marko Kreen. See also the [RAR 5.0 archive format](https://www.rarlab.com/technote.htm).
+ - **SquashFS, AppImage, Snap** as provided by [PySquashfsImage](https://github.com/matteomattei/PySquashfsImage) by Matteo Mattei. There seems to be no authoritative, open format specification, only [this nicely-done reverse-engineered description](https://dr-emann.github.io/squashfs/squashfs.html), I assume based on the [source code](https://github.com/plougher/squashfs-tools). Note that [Snaps](https://snapcraft.io/docs/the-snap-format) and [Appimages](https://github.com/AppImage/AppImageSpec/blob/master/draft.md#type-2-image-format) are both SquashFS images, with an executable prepended for AppImages.
+ - **Zip** as provided by [zipfile](https://docs.python.org/3/library/zipfile.html), which is distributed with Python itself. See also the [ZIP File Format Specification](https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT).
+ - **Many Others** as provided by [libarchive](https://github.com/libarchive/libarchive) via  [python-libarchive-c](https://github.com/Changaco/python-libarchive-c).
+   - Formats with tests:
+     [7z](https://github.com/ip7z/7zip/blob/main/DOC/7zFormat.txt),
+     ar,
+     [cab](https://download.microsoft.com/download/4/d/a/4da14f27-b4ef-4170-a6e6-5b1ef85b1baa/[ms-cab].pdf),
+     compress, cpio,
+     [iso](http://www.brankin.com/main/technotes/Notes_ISO9660.htm),
+     [lrzip](https://github.com/ckolivas/lrzip),
+     [lzma](https://www.7-zip.org/a/lzma-specification.7z),
+     [lz4](https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md),
+     [lzip](https://www.ietf.org/archive/id/draft-diaz-lzip-09.txt),
+     lzo,
+     [warc](https://iipc.github.io/warc-specifications/specifications/warc-format/warc-1.0/),
+     xar.
+   - Untested formats that might work or not: deb, grzip,
+     [rpm](https://refspecs.linuxbase.org/LSB_4.1.0/LSB-Core-generic/LSB-Core-generic/pkgformat.html),
+     [uuencoding](https://en.wikipedia.org/wiki/Uuencoding).
+   - Beware that libarchive has no performant random access to files and to file contents.
+     In order to seek or open a file, in general, it needs to be assumed that the archive has to be parsed from the beginning.
+     If you have a performance-critical use case for a format only supported via libarchive,
+     then please open a feature request for a faster customized archive format implementation.
+     The hope would be to add suitable stream compressors such as "short"-distance LZ-based compressions to [rapidgzip](https://github.com/mxmlnkn/rapidgzip).
 
 
 # Benchmarks
@@ -501,6 +523,31 @@ lbzip2 -cd well-compressed-file.bz2 | createMultiFrameZstd $(( 4*1024*1024 )) > 
 ```
 
 </details>
+
+
+# Remote Files
+
+The [fsspec](https://github.com/fsspec/filesystem_spec) API backend adds support for mounting many remote archive or folders:
+
+ - `git://[path-to-repo:][ref@]path/to/file`
+   Uses the current path if no repository path is specified.
+ - `github://org:repo@[sha]/path-to/file-or-folder`
+   E.g. github://mxmlnkn:ratarmount@v0.15.2/tests/single-file.tar
+ - `http[s]://hostname[:port]/path-to/archive.rar`
+ - `s3://[endpoint-hostname[:port]]/bucket[/single-file.tar[?versionId=some_version_id]]`
+   Will default to AWS according to the Boto3 library defaults when no endpoint is specified.
+   Boto3 will check, among others, [these environment variables](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html), for credentials:
+    - `AWS_ACCESS_KEY_ID`
+    - `AWS_SECRET_ACCESS_KEY`
+    - `AWS_SESSION_TOKEN`
+    - `AWS_DEFAULT_REGION`, e.g., `us-west-1`
+   fsspec/s3fs furthermore supports these environment variables:
+    - [`FSSPEC_S3_ENDPOINT_URL`](https://github.com/fsspec/s3fs/pull/704), e.g., `http://127.0.0.1:8053`
+ - `[s]ftp://[user[:password]@]hostname[:port]/path-to/archive.rar`
+ - `ssh://[user[:password]@]hostname[:port]/path-to/archive.rar`
+ - `smb://[workgroup;][user:password@]server[:port]/share/folder/file.tar`
+
+Many others fsspec-based projects may also work when installed.
 
 
 # Writable Mounting

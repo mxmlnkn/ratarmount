@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# pylint: disable=no-member,abstract-method
+# Disable pylint errors. See https://github.com/fsspec/filesystem_spec/issues/1678
+
 import os
+import sys
 import traceback
+import warnings
 
 from typing import IO, Optional, Union
 
@@ -10,6 +15,7 @@ from .compressions import checkForSplitFile, libarchive, PySquashfsImage, rarfil
 from .utils import CompressionError, RatarmountError
 from .MountSource import MountSource
 from .FolderMountSource import FolderMountSource
+from .FSSpecMountSource import FSSpecMountSource
 from .RarMountSource import RarMountSource
 from .SingleFileMountSource import SingleFileMountSource
 from .SQLiteIndexedTar import SQLiteIndexedTar
@@ -17,6 +23,23 @@ from .SquashFSMountSource import SquashFSMountSource
 from .StenciledFile import JoinedFileFromFactory
 from .ZipMountSource import ZipMountSource
 from .LibarchiveMountSource import LibarchiveMountSource
+
+try:
+    import fsspec
+    import fsspec.utils
+    import fsspec.implementations.http
+except ImportError:
+    fsspec = None  # type: ignore
+
+try:
+    from sshfs import SSHFileSystem
+
+    class FixedSSHFileSystem(SSHFileSystem):
+        protocols = ["sftp", "ssh", "scp"]
+        cachable = False
+
+except ImportError:
+    SSHFileSystem = None  # type: ignore
 
 
 def _openRarMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
@@ -103,8 +126,110 @@ _BACKENDS = {
 }
 
 
+def openFsspec(url, options, printDebug: int) -> Optional[Union[MountSource, IO[bytes], str]]:
+    splitURI = url.split('://', 1)
+    protocol = splitURI[0] if len(splitURI) > 1 else ''
+    if not protocol:
+        return None
+
+    if protocol == 'file':
+        return splitURI[1]
+
+    if not fsspec:
+        print("[Warning] An URL was detected but fsspec is not installed. You may want to install it with:")
+        print("[Warning]     python3 -m pip install ratarmount[fsspec]")
+        return None
+
+    result = None
+    try:
+        if printDebug >= 3:
+            print("[Info] Try to open with fsspec")
+
+        # Suppress warning about (default!) encoding not being support for Python<3.9 -.-.
+        if sys.version_info < (3, 9) and protocol == 'ftp':
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                openFile = fsspec.open(url)
+        elif protocol in FixedSSHFileSystem.protocols:
+            fs = FixedSSHFileSystem(**FixedSSHFileSystem._get_kwargs_from_urls(url))  # pytype: disable=attribute-error
+
+            # Remove one leading / in order to add support for relative paths. E.g.:
+            #   ssh://127.0.0.1/relative/path
+            #   ssh://127.0.0.1//home/user/relative/path
+            path = fsspec.utils.infer_storage_options(url)['path']
+            if path.startswith("/"):
+                path = path[1:]
+            if not path:
+                path = "."
+            openFile = fsspec.core.OpenFile(fs, path)
+        else:
+            openFile = fsspec.open(url)
+        assert isinstance(openFile, fsspec.core.OpenFile)
+
+        if printDebug >= 3:
+            print("[Info] Opened file fsspec:", openFile, "filesystem:", openFile.fs)
+
+        # Note that http:// URLs are always files. Folders are only regex-parsed HTML files!
+        # By checking with isdir instead of isfile, we give isdir a higher precedence.
+        # Also note that isdir downloads the whole file!
+        # https://github.com/fsspec/filesystem_spec/issues/1707
+        if isinstance(openFile.fs, fsspec.implementations.http.HTTPFileSystem):
+            info = openFile.fs.info(openFile.path)
+            if info.get('mimetype', None) == 'text/html' and openFile.fs.isdir(openFile.path):
+                return FSSpecMountSource(openFile)
+        elif openFile.fs.isdir(openFile.path):
+            return FSSpecMountSource(openFile)
+
+        # This open call can fail with FileNotFoundError, IsADirectoryError, and probably others.
+        result = openFile.open()  # pylint: disable=no-member
+
+        # Avoid resource leaks, e.g., when the seek check fails.
+        oldDel = getattr(result, '__del__', None)
+
+        def newDel():
+            if callable(oldDel):
+                oldDel()
+            result.close()
+
+        result.__del__ = newDel
+
+        # Check that seeking works. May fail when, e.g., the HTTP server does not support range requests.
+        # Use https://github.com/danvk/RangeHTTPServer for testing purposes because
+        # "python3 -m http.server 9000" does not have range support. Use "python3 -m RangeHTTPServer 9000".
+        result.seek(1)
+        result.read(1)
+        result.seek(0)
+
+        # Add tarFileName argument so that mounting a TAR file via SSH can create a properly named index
+        # file inside ~/.cache/ratarmount.
+        if 'tarFileName' not in options:
+            options['tarFileName'] = url
+
+        # Note that asycnssh SSHFile does/did not implement seekable correctly!
+        # https://github.com/fsspec/sshfs/pull/50
+        if 'sshfs.file.SSHFile' in str(type(result)):
+            result.seekable = lambda: True  # type:ignore
+    except Exception as exception:
+        if result and hasattr(result, 'close'):
+            result.close()
+        if printDebug >= 1:
+            print("[Warning] Trying to open with fsspec raised an exception:", exception)
+        if printDebug >= 3:
+            traceback.print_exc()
+    return result
+
+
 def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource:
     printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
+
+    if isinstance(fileOrPath, str):
+        result = openFsspec(fileOrPath, options, printDebug=printDebug)
+        if isinstance(result, MountSource):
+            return result
+        if isinstance(result, str) or result is not None:
+            fileOrPath = result
+            if not isinstance(fileOrPath, str) and printDebug >= 3:
+                print("[Info] Opened remote file with fsspec.")
 
     joinedFileName = ''
     if isinstance(fileOrPath, str):

@@ -99,7 +99,12 @@ TAR_COMPRESSION_FORMATS: Dict[str, CompressionInfo] = {
     'bz2': CompressionInfo(
         ['bz2', 'bzip2'],
         ['tb2', 'tbz', 'tbz2', 'tz2'],
-        [CompressionModuleInfo('rapidgzip', lambda x, parallelization=0: rapidgzip.IndexedBzip2File(x, parallelization=parallelization))],  # type: ignore
+        [
+            CompressionModuleInfo(
+                'rapidgzip',
+                (lambda x, parallelization=0: rapidgzip.IndexedBzip2File(x, parallelization=parallelization)),
+            )
+        ],
         lambda x: (x.read(4)[:3] == b'BZh' and x.read(6) == (0x314159265359).to_bytes(6, 'big')),
     ),
     'gz': CompressionInfo(
@@ -532,9 +537,21 @@ def detectCompression(
 ) -> Optional[str]:
     # isinstance(fileobj, io.IOBase) does not work for everything, e.g., for paramiko.sftp_file.SFTPFile
     # because it does not inherit from io.IOBase. Therefore, do duck-typing and test for required methods.
-    if any(not hasattr(fileobj, method) for method in ['seekable', 'seek', 'read', 'tell']) or not fileobj.seekable():
+    expectedMethods = ['seekable', 'seek', 'read', 'tell']
+    isFileObject = any(not hasattr(fileobj, method) for method in expectedMethods)
+    if isFileObject or not fileobj.seekable():
+        if printDebug >= 2:
+            seekable = fileobj.seekable() if isFileObject else None
+            print(
+                f"[Warning] Cannot detect compression for given Python object {fileobj} "
+                f"because it does not look like a file object or is not seekable ({seekable})."
+            )
         if printDebug >= 3:
-            print("[Warning] Cannot detect compression for give Python object that does not look like a file object.")
+            print(dir(fileobj))
+            for name in ['readable', 'seekable', 'writable', 'closed', 'tell']:
+                method = getattr(fileobj, name, None)
+                if method is not None:
+                    print(f"  fileobj.{name}:", method() if callable(method) else method)
             traceback.print_exc()
         return None
 

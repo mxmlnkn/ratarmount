@@ -205,6 +205,12 @@ Examples:
  - ratarmount folder1 folder2 mountpoint
  - ratarmount folder archive.zip folder
  - ratarmount -o modules=subdir,subdir=squashfs-root archive.squashfs mountpoint
+ - ratarmount http://server.org:80/archive.rar folder folder
+ - ratarmount ssh://hostname:22/relativefolder/ mountpoint
+ - ratarmount ssh://hostname:22//tmp/tmp-abcdef/ mountpoint
+ - ratarmount github://mxmlnkn:ratarmount@v0.15.2/tests/single-file.tar mountpoint
+ - AWS_ACCESS_KEY_ID=aaaaaaaaaaaaaaaaaaaa AWS_SECRET_ACCESS_KEY=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+   ratarmount s3://127.0.0.1/bucket/single-file.tar mounted
 
 For further information, see the ReadMe on the project's homepage:
 

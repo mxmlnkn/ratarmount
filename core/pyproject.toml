@@ -72,9 +72,53 @@ full = [
     # With Python 3.14, when building the wheel, I get:
     # /usr/bin/ld: cannot find /tmp/tmpcuw21d78/bin/isa-l.a: No such file or directory
     'isal ~= 1.0; python_version < "3.14.0"',
+    # Pin to < 3.12 because of https://github.com/nathanhi/pyfatfs/issues/41
+    'pyfatfs ~= 1.0; python_version < "3.12.0"',
+    # fsspec:
+    "requests",
+    "aiohttp",
+    "sshfs",  # For performance, asyncssh > 2.17 would be recommended: https://github.com/ronf/asyncssh/issues/691
+    # Need newer pyopenssl than comes with Ubuntu 22.04.
+    # https://github.com/ronf/asyncssh/issues/690
+    "pyopenssl>=23",
+    "smbprotocol",
+    # pygit2 1.15 introduced many breaking changes!
+    # https://github.com/libgit2/pygit2/issues/1316
+    # https://github.com/fsspec/filesystem_spec/pull/1703
+    # build error in Python 3.13 because it requires libgit2 1.8.1 and there are no wheels
+    "pygit2<1.15",
+    "fsspec",
+    "s3fs",
+    #"gcsfs",  # untested
+    #"adlfs",  # untested. build error in Python 3.13
+    #"dropboxdrivefs",  # untested
 ]
 bzip2 = ["rapidgzip >= 0.13.1"]
 gzip = ["indexed_gzip >= 1.6.3, < 2.0"]
+fsspec = [
+    # Copy-pasted from fsspec[full] list. Some were excluded because they are too unproportionally large.
+    "requests",
+    "aiohttp",
+    "sshfs",  # For performance, asyncssh > 2.17 would be recommended: https://github.com/ronf/asyncssh/issues/691
+    # Need newer pyopenssl than comes with Ubuntu 22.04.
+    # https://github.com/ronf/asyncssh/issues/690
+    "pyopenssl>=23",
+    "smbprotocol",  # build error in Python 3.13
+    # pygit2 1.15 introduced many breaking changes!
+    # https://github.com/libgit2/pygit2/issues/1316
+    # https://github.com/fsspec/filesystem_spec/pull/1703
+    # build error in Python 3.13 because it requires libgit2 1.8.1 and there are no wheels
+    "pygit2<1.15",
+    "fsspec",
+    "s3fs",
+    #"gcsfs",  # untested
+    #"adlfs",  # untested. build error in Python 3.13
+    #"dropboxdrivefs",  # untested
+    # "dask", "distributed" : ~34 MB, ~10 MB gzip-compressed
+    # "pyarrow >= 1" : ~196 MB, ~60 MB gzip-compressed, build error in Python 3.13
+    # "ocifs" : ~350 MB
+    # "panel" : only for fsspec GUI
+]
 # Need >= 4.1 because of https://github.com/markokr/rarfile/issues/73
 rar = ["rarfile ~= 4.1"]
 # For now, only optional (and installed in the AppImage) because it is unstable and depends on many other packages
