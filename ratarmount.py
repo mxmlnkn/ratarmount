@@ -1753,6 +1753,14 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
             print("Nothing to commit.")
             return
 
+        def runWithoutLocale(*args, check=True, **kwargs):
+            adjustedEnvironment = os.environ.copy()
+            for key in [k for k in adjustedEnvironment.keys() if k.startswith('LC_')]:
+                del adjustedEnvironment[key]
+            adjustedEnvironment['LC_LANG'] = 'C'
+            adjustedEnvironment['LANGUAGE'] = 'C'
+            return subprocess.run(*args, env=adjustedEnvironment, check=check, **kwargs)
+
         print()
         print("Committing is an experimental feature!")
         print('Please confirm by entering "commit". Any other input will cancel.')
@@ -1760,7 +1768,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         try:
             if input() == 'commit':
                 if os.stat(deletionList).st_size > 0:
-                    tarDelete = subprocess.run(
+                    tarDelete = runWithoutLocale(
                         [
                             "tar",
                             "--delete",
@@ -1788,7 +1796,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
                         raise RatarmountError("There were problems when trying to delete files.")
 
                 if os.stat(appendList).st_size > 0:
-                    subprocess.run(
+                    runWithoutLocale(
                         [
                             "tar",
                             "--append",
