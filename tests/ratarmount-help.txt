@@ -197,3 +197,15 @@ Advanced Options:
                         -p /var/log/apt/ can be specified so that the mount target directory
                         >directly< contains history.log. (default: )
 
+Examples:
+
+ - ratarmount archive.tar.gz
+ - ratarmount --recursive archive.tar mountpoint
+ - ratarmount folder mountpoint
+ - ratarmount folder1 folder2 mountpoint
+ - ratarmount folder archive.zip folder
+ - ratarmount -o modules=subdir,subdir=squashfs-root archive.squashfs mountpoint
+
+For further information, see the ReadMe on the project's homepage:
+
+    https://github.com/mxmlnkn/ratarmount

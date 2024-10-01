@@ -1107,102 +1107,20 @@ With ratarmount, you can:
   - Union mount a list of TARs, compressed files, and folders to a mount point
     for read-only access
 ''',
+        # The examples should be kept synchronized with the README.md!
         epilog='''\
-# Metadata Index Cache
+Examples:
 
-In order to reduce the mounting time, the created index for random access
-to files inside the tar will be saved to one of these locations. These
-locations are checked in order and the first, which works sufficiently, will
-be used. This is the default location order:
+ - ratarmount archive.tar.gz
+ - ratarmount --recursive archive.tar mountpoint
+ - ratarmount folder mountpoint
+ - ratarmount folder1 folder2 mountpoint
+ - ratarmount folder archive.zip folder
+ - ratarmount -o modules=subdir,subdir=squashfs-root archive.squashfs mountpoint
 
-  1. <path to tar>.index.sqlite
-  2. ~/.ratarmount/<path to tar: '/' -> '_'>.index.sqlite
-     E.g., ~/.ratarmount/_media_cdrom_programm.tar.index.sqlite
+For further information, see the ReadMe on the project's homepage:
 
-This list of fallback folders can be overwritten using the `--index-folders`
-option. Furthermore, an explicitly named index file may be specified using
-the `--index-file` option. If `--index-file` is used, then the fallback
-folders, including the default ones, will be ignored!
-
-# Bind Mounting
-
-The mount sources can be TARs and/or folders.  Because of that, ratarmount
-can also be used to bind mount folders read-only to another path similar to
-`bindfs` and `mount --bind`. So, for:
-
-    ratarmount folder mountpoint
-
-all files in `folder` will now be visible in mountpoint.
-
-# Union Mounting
-
-If multiple mount sources are specified, the sources on the right side will be
-added to or update existing files from a mount source left of it. For example:
-
-    ratarmount folder1 folder2 mountpoint
-
-will make both, the files from folder1 and folder2, visible in mountpoint.
-If a file exists in both multiple source, then the file from the rightmost
-mount source will be used, which in the above example would be `folder2`.
-
-If you want to update / overwrite a folder with the contents of a given TAR,
-you can specify the folder both as a mount source and as the mount point:
-
-    ratarmount folder file.tar folder
-
-The FUSE option -o nonempty will be automatically added if such a usage is
-detected. If you instead want to update a TAR with a folder, you only have to
-swap the two mount sources:
-
-    ratarmount file.tar folder folder
-
-# File versions
-
-If a file exists multiple times in a TAR or in multiple mount sources, then
-the hidden versions can be accessed through special <file>.versions folders.
-For example, consider:
-
-    ratarmount folder updated.tar mountpoint
-
-and the file `foo` exists both in the folder and as two different versions
-in `updated.tar`. Then, you can list all three versions using:
-
-    ls -la mountpoint/foo.versions/
-        dr-xr-xr-x 2 user group     0 Apr 25 21:41 .
-        dr-x------ 2 user group 10240 Apr 26 15:59 ..
-        -r-x------ 2 user group   123 Apr 25 21:41 1
-        -r-x------ 2 user group   256 Apr 25 21:53 2
-        -r-x------ 2 user group  1024 Apr 25 22:13 3
-
-In this example, the oldest version has only 123 bytes while the newest and
-by default shown version has 1024 bytes. So, in order to look at the oldest
-version, you can simply do:
-
-    cat mountpoint/foo.versions/1
-
-Note that these version numbers are the same as when used with tar's
-`--occurrence=N` option.
-
-## Prefix Removal
-
-Use `ratarmount -o modules=subdir,subdir=<prefix>` to remove path prefixes
-using the FUSE `subdir` module. Because it is a standard FUSE feature, the
-`-o ...` argument should also work for other FUSE applications.
-
-When mounting an archive created with absolute paths, e.g.,
-`tar -P cf /var/log/apt/history.log`, you would see the whole `var/log/apt`
-hierarchy under the mount point. To avoid that, specified prefixes can be
-stripped from paths so that the mount target directory **directly** contains
-`history.log`. Use `ratarmount -o modules=subdir,subdir=/var/log/apt/` to do
-so. The specified path to the folder inside the TAR will be mounted to root,
-i.e., the mount point.
-
-# Compressed non-TAR files
-
-If you want a compressed file not containing a TAR, e.g., `foo.bz2`, then
-you can also use ratarmount for that. The uncompressed view will then be
-mounted to `<mountpoint>/foo` and you will be able to leverage ratarmount's
-seeking capabilities when opening that file.
+    https://github.com/mxmlnkn/ratarmount
 ''',
     )
 

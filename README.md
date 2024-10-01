@@ -71,6 +71,16 @@ And in contrast to [tarindexer](https://github.com/devsnd/tarindexer), which als
      The hope would be to add suitable stream compressors such as "short"-distance LZ-based compressions to [rapidgzip](https://github.com/mxmlnkn/rapidgzip).
 
 
+# Examples
+
+ - `ratarmount archive.tar.gz` to mount a compressed archive at a folder called `archive` and make its contents browsable.
+ - `ratarmount --recursive archive.tar mountpoint` to mount the archive and recursively all its contained archives under a folder called `mountpoint`.
+ - `ratarmount folder mountpoint` to bind-mount a folder.
+ - `ratarmount folder1 folder2 mountpoint` to bind-mount a merged view of two (or more) folders under `mountpoint`.
+ - `ratarmount folder archive.zip folder` to mount a merged view of a folder on top of archive contents.
+ - `ratarmount -o modules=subdir,subdir=squashfs-root archive.squashfs mountpoint` to mount an archive subfolder `squashfs-root` under `mountpoint`.
+
+
 # Table of Contents
 
 1. [Installation](#installation)
