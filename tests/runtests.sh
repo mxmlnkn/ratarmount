@@ -1823,7 +1823,7 @@ if [[ -z "$CI" ]]; then
     filesToSpellCheck=()
     while read -r file; do
         filesToSpellCheck+=( "$file" )
-    done < <( git ls-tree -r --name-only HEAD | grep -v -E '[.](pdf|dat|tar|zst|7z|xar|cab|cpio|gz|rar|tgz|tbz2|bz2|zip|xz|ar|001|002|png|zlib|Z|lrz|lzma|lzo|lzip|lz4|zlib|snar)' )
+    done < <( git ls-tree -r --name-only HEAD | 'grep' -E '[.](py|md|txt|sh|yml)' )
     codespell --ignore-words-list fo,Nd,unx "${filesToSpellCheck[@]}"
 
     flake8 --config tests/.flake8 "${files[@]}" "${testFiles[@]}" || returnError "$LINENO" 'Flake8 failed!'
