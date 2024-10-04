@@ -9,7 +9,7 @@ indexed_zstd
 mypy
 pandas
 pylint
-pytest
+pytest>=8  # pytest 7 did not work with pytest-xdist 3.5.0
 pytest-xdist
 python-xz
 pytype
