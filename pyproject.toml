@@ -45,6 +45,7 @@ dependencies = [
     # Need >= 4.1 because of https://github.com/markokr/rarfile/issues/73
     "rarfile ~= 4.1",
     "libarchive-c ~= 5.1, < 6.0",
+    "fast_zip_decryption",
 ]
 
 [project.readme]

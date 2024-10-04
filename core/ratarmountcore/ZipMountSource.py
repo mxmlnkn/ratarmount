@@ -18,6 +18,12 @@ from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
 from .SQLiteIndexMountSource import SQLiteIndexMountSource
 from .utils import InvalidIndexError, overrides
 
+try:
+    # Importing this patches the zipfile module as a "side" effect!
+    import fast_zip_decryption  # pylint: disable=unused-import
+except (ImportError, Exception):
+    pass
+
 
 class ZipMountSource(SQLiteIndexMountSource):
     def __init__(

@@ -1883,6 +1883,11 @@ if [[ -z "$CI" ]]; then
 fi
 
 
+# We need to run these tests without pytest because, for some reason,
+# pytest slows the zip decryption fix down from 0.1 s to 1.1 s?!
+python3 tests/test_ZipMountSource.py
+
+
 rm -f tests/*.index.*
 'cp' 'tests/single-file.tar' 'tests/#not-a-good-name! Ör, is it?.tar'
 
