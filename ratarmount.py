@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import threading
 import time
 import traceback
 import urllib.parse
@@ -517,7 +518,7 @@ class FuseMount(fuse.Operations):
     # ratarmountcore, StenciledFile, and other layers they have to go through.
     MINIMUM_BLOCK_SIZE = 256 * 1024
 
-    def __init__(self, pathToMount: Union[str, List[str]], mountPoint: str, **options) -> None:
+    def __init__(self, pathToMount: Union[str, List[str]], mountPoint: str, foreground: bool = True, **options) -> None:
         self.printDebug: int = int(options.get('printDebug', 0))
         self.writeOverlay: Optional[WritableFolderMountSource] = None
         self.overlayPath: Optional[str] = None
@@ -671,7 +672,24 @@ class FuseMount(fuse.Operations):
         if self.printDebug >= 1:
             print("Created mount point at:", self.mountPoint)
 
-    def __del__(self) -> None:
+        # Note that this will not detect threads started in shared libraries, only those started via "threading".
+        if not foreground and self.printDebug >= 1 and len(threading.enumerate()) > 1:
+            threadNames = [thread.name for thread in threading.enumerate() if thread.name != "MainThread"]
+            # Fix FUSE hangs with: https://unix.stackexchange.com/a/713621/111050
+            raise ValueError(
+                "Daemonizing FUSE into the background may result in errors or unkillable hangs because "
+                f"there are threads still open: {', '.join(threadNames)}!\nCall ratarmount with -f or --foreground."
+            )
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if hasattr(super(), "__exit__"):
+            super().__exit__(type, value, traceback)
+        self._close()
+
+    def _close(self) -> None:
         try:
             if self.mountPointWasCreated:
                 os.rmdir(self.mountPoint)
@@ -679,8 +697,10 @@ class FuseMount(fuse.Operations):
             pass
 
         try:
-            if self.mountPointFd is not None:
-                os.close(self.mountPointFd)
+            mountPointFd = getattr(self, 'mountPointFd', None)
+            if mountPointFd is not None:
+                os.close(mountPointFd)
+                self.mountPointFd = None
         except Exception as exception:
             if self.printDebug >= 1:
                 print("[Warning] Failed to close mount point folder descriptor because of:", exception)
@@ -692,6 +712,9 @@ class FuseMount(fuse.Operations):
         except Exception as exception:
             if self.printDebug >= 1:
                 print("[Warning] Failed to tear down root mount source because of:", exception)
+
+    def __del__(self) -> None:
+        self._close()
 
     def _addNewHandle(self, handle, flags):
         # Note that fh in fuse_common.h is 64-bit and Python also supports 64-bit (long integers) out of the box.
@@ -1750,7 +1773,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         if hasNonEmptySupport():
             fusekwargs['nonempty'] = True
 
-    fuseOperationsObject = FuseMount(
+    with FuseMount(
         # fmt: off
         pathToMount                  = args.mount_source,
         clearIndexCache              = bool(args.recreate_index),
@@ -1778,21 +1801,21 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         maxCacheEntries              = args.union_mount_cache_max_entries,
         maxSecondsToCache            = args.union_mount_cache_timeout,
         indexMinimumFileCount        = args.index_minimum_file_count,
+        foreground                   = bool(args.foreground),
         # fmt: on
-    )
-
-    try:
-        fuse.FUSE(
-            operations=fuseOperationsObject,
-            mountpoint=args.mount_point,
-            foreground=args.foreground,
-            nothreads=True,  # Cannot access SQLite database connection object from multiple threads
-            **fusekwargs,
-        )
-    except RuntimeError as exception:
-        raise RatarmountError(
-            "FUSE mountpoint could not be created. See previous output for more information."
-        ) from exception
+    ) as fuseOperationsObject:
+        try:
+            fuse.FUSE(
+                operations=fuseOperationsObject,
+                mountpoint=args.mount_point,
+                foreground=args.foreground,
+                nothreads=True,  # Cannot access SQLite database connection object from multiple threads
+                **fusekwargs,
+            )
+        except RuntimeError as exception:
+            raise RatarmountError(
+                "FUSE mountpoint could not be created. See previous output for more information."
+            ) from exception
 
 
 def main():
