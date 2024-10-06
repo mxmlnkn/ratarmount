@@ -86,7 +86,7 @@ jobs:
         # 3.12 was released 2023-10-02 and end-of-life will be 2028-10
         # 3.13 is to be released 2024-10
         # 3.14 is to be released 2025-10
-        python-version: ['3.8', '3.12', '3.13.0-rc.2']
+        python-version: ['3.9', '3.12', '3.13.0-rc.3']
         include:
         - os: ubuntu-latest
           python-version: '3.14.0-alpha.0'
