@@ -25,5 +25,18 @@ jobs:
         TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
       run: |
         python3 -m build
+        # Around commit 08ddc8fb3679faacd6e54eb5c54104995b045dc4, I had some very weird twine check failures
+        # because .tar.gz tarballs were wrongly recognized as ZIP files by CPython's zipfile.is_zipfile.
+        # Therefore, try recompressing the tarballs with different compression levels until it does not randomly
+        # look like a ZIP anymore. It is an ugly hack, but so is zipfile.is_zipfile.
+        tarball=$( find dist -name '*.tar.gz' )
+        if python3 -c 'import sys, zipfile; sys.exit(0 if zipfile.is_zipfile(sys.argv[1]) else 1)' "$tarball"; then
+            gzip -c -d "$tarball" > "$tarball.tar"
+            for (( i=9; i>0; --i )); do
+                cat "$tarball.tar" | gzip -$i > "$tarball"
+                if ! python3 -c 'import sys, zipfile; sys.exit(0 if zipfile.is_zipfile(sys.argv[1]) else 1)' "$tarball"
+                then break; fi
+            done
+        fi
         twine check dist/*
         twine upload --skip-existing -u __token__ dist/*
