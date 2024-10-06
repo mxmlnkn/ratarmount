@@ -25,9 +25,7 @@ jobs:
         USE_CUTTING_EDGE_BACKENDS: 1
       run: bash build-ratarmount-appimage.sh
 
-    # This action also does not work with manylinux2014 (CentOS 7) anymore,
-    # probably because CentOS 7 was EOL on 2024-06-30.
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: ratarmount-x86_64.AppImage
         path: "AppImage/ratarmount*-x86_64.AppImage"
@@ -53,7 +51,7 @@ jobs:
     - name: Fetch tag for tests
       run: git fetch origin refs/tags/v0.15.2:refs/tags/v0.15.2
 
-    - uses: actions/download-artifact@v3
+    - uses: actions/download-artifact@v4
       with:
         name: ratarmount-x86_64.AppImage
 
