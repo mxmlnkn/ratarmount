@@ -5,7 +5,7 @@ init-hook='import sys; sys.path.append("./core")'
 # run arbitrary code.
 extension-pkg-whitelist=indexed_gzip,indexed_bzip2,indexed_zstd,libarchive,libarchive.ffi,lzmaffi,rapidgzip,isal,
                         PySquashfsImage,PySquashfsImage.compressor,zstandard,lz4,deflate,pyminizip,fast_zip_decryption,
-                        asyncssh,sshfs,fsspec
+                        asyncssh,sshfs,fsspec,pygit2
 
 # Specify a score threshold to be exceeded before program exits with error.
 fail-under=10.0

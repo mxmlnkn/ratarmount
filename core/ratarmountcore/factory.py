@@ -5,6 +5,7 @@
 # Disable pylint errors. See https://github.com/fsspec/filesystem_spec/issues/1678
 
 import os
+import stat
 import sys
 import traceback
 import warnings
@@ -16,6 +17,7 @@ from .utils import CompressionError, RatarmountError
 from .MountSource import MountSource
 from .FolderMountSource import FolderMountSource
 from .FSSpecMountSource import FSSpecMountSource
+from .GitMountSource import GitMountSource
 from .RarMountSource import RarMountSource
 from .SingleFileMountSource import SingleFileMountSource
 from .SQLiteIndexedTar import SQLiteIndexedTar
@@ -134,6 +136,44 @@ def openFsspec(url, options, printDebug: int) -> Optional[Union[MountSource, IO[
 
     if protocol == 'file':
         return splitURI[1]
+
+    if protocol == 'git':
+        if not GitMountSource.enabled:
+            raise ValueError(
+                "Detected git:// URL but GitMountSource could not be loaded. Please ensure that pygit2 is installed."
+            )
+
+        remainder = splitURI[1]
+
+        splitRepositoryPath = remainder.split(':', 1)
+        repositoryPath = splitRepositoryPath[0] if len(splitRepositoryPath) > 1 else None
+        remainder = splitRepositoryPath[-1]
+
+        splitReference = remainder.split('@', 1)
+        reference = splitReference[0] if len(splitReference) > 1 else None
+        pathInsideRepository = splitReference[-1]
+
+        mountSource = GitMountSource(repositoryPath, reference=reference)
+        if pathInsideRepository:
+            fileInfo = mountSource.getFileInfo(pathInsideRepository)
+            if not fileInfo:
+                raise ValueError(
+                    f"The path {pathInsideRepository} in the git repository specified via '{url}' does not exist!"
+                )
+
+            if stat.S_ISDIR(fileInfo.mode):
+                mountSource.prefix = pathInsideRepository
+            else:
+                # Add tarFileName argument so that mounting a TAR file via SSH can create a properly named index
+                # file inside ~/.cache/ratarmount.
+                if 'tarFileName' not in options:
+                    options['tarFileName'] = url
+
+                # In the future it might be necessary to extend the lifetime of mountSource by adding it as
+                # a member of the opened file, but not right now.
+                return mountSource.open(fileInfo)
+
+        return mountSource
 
     if not fsspec:
         print("[Warning] An URL was detected but fsspec is not installed. You may want to install it with:")
