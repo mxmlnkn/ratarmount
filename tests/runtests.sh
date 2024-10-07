@@ -1860,7 +1860,8 @@ checkURLProtocolHTTP()
     ruby -run -e httpd --version || returnError "$LINENO" 'Failed to start up ruby HTTP test server!'
     ruby -run -e httpd . --port $port --bind-address=127.0.0.1 1>'httpd-ruby-webrick.log' 2>&1 &
     pid=$!
-    sleep 5
+    sleep 10
+    cat httpd-ruby-webrick.log
     wget 127.0.0.1:$port
 
 
