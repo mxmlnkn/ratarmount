@@ -10,20 +10,6 @@ pytest-xdist
 # msgspec/_core.c:11254:15: error: too few arguments to function ‘_PyLong_AsByteArray’
 pytype; python_version < '3.13'
 
-# Dependencies
-fusepy
-indexed_bzip2
-indexed_gzip
-indexed_zstd
-python-xz
-
-zstandard ~= 0.20.0; python_version == '3.6'
-zstandard ~= 0.21.0; python_version == '3.7'
-# With Python 3.14, I get ImportError: cannot import name 'ByteString' from 'typing' via
-# zstandard/__init__.py:21.
-# https://github.com/indygreg/python-zstandard/issues/238
-zstandard ~= 0.23.0; python_version >= '3.8' and python_version < '3.14'
-
 # Build tools
 build
 twine
