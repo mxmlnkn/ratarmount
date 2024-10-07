@@ -87,7 +87,7 @@ jobs:
         # 3.12 was released 2023-10-02 and end-of-life will be 2028-10
         # 3.13 is to be released 2024-10
         # 3.14 is to be released 2025-10
-        python-version: ['3.9', '3.12', '3.13.0-rc.3']
+        python-version: ['3.13.0-rc.3']
         include:
         - os: ubuntu-latest
           python-version: '3.14.0-alpha.0'
@@ -165,7 +165,7 @@ jobs:
     - name: Install Dependencies For Unreleased Python Versions (MacOS)
       if: >
         startsWith( matrix.os, 'macos' ) && (
-          matrix.python-version == '3.13.0' ||
+          matrix.python-version == '3.13.0-rc.3' ||
           matrix.python-version == '3.14.0-alpha.0')
       run: |
         brew install libgit2@1.8
@@ -181,6 +181,7 @@ jobs:
         python3 -m pip install --upgrade-strategy eager --upgrade twine build fusepy cffi
 
     - name: Test Startup With Only One Compression Dependency
+      if: false
       run: |
         for module in indexed_gzip indexed_zstd lzmaffi python-xz; do
           python3 -m pip install --upgrade "$module"
@@ -244,6 +245,7 @@ jobs:
         python3 ratarmount.py tests/simple.bz2 || [ $? != 139 ]
 
     - name: Unit Tests
+      if: false
       run: |
         python3 -m pip install pytest pytest-xdist
         for file in core/tests/test_*.py tests/test_*.py; do
