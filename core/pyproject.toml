@@ -83,11 +83,7 @@ full = [
     # https://github.com/ronf/asyncssh/issues/690
     "pyopenssl>=23",
     "smbprotocol",
-    # pygit2 1.15 introduced many breaking changes!
-    # https://github.com/libgit2/pygit2/issues/1316
-    # https://github.com/fsspec/filesystem_spec/pull/1703
-    # build error in Python 3.13 because it requires libgit2 1.8.1 and there are no wheels
-    "pygit2<1.15",
+    "pygit2",
     "fsspec",
     "s3fs",
     #"gcsfs",  # untested
@@ -95,6 +91,7 @@ full = [
     #"dropboxdrivefs",  # untested
 ]
 bzip2 = ["rapidgzip >= 0.13.1"]
+git = ["pygit2"]
 gzip = ["indexed_gzip >= 1.6.3, < 2.0"]
 fsspec = [
     # Copy-pasted from fsspec[full] list. Some were excluded because they are too unproportionally large.
@@ -105,11 +102,6 @@ fsspec = [
     # https://github.com/ronf/asyncssh/issues/690
     "pyopenssl>=23",
     "smbprotocol",  # build error in Python 3.13
-    # pygit2 1.15 introduced many breaking changes!
-    # https://github.com/libgit2/pygit2/issues/1316
-    # https://github.com/fsspec/filesystem_spec/pull/1703
-    # build error in Python 3.13 because it requires libgit2 1.8.1 and there are no wheels
-    "pygit2<1.15",
     "fsspec",
     "s3fs",
     #"gcsfs",  # untested

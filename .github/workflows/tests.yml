@@ -143,10 +143,11 @@ jobs:
         #libgit2-dev is too old on Ubuntu 22.04. Leads to error about missing git2/sys/errors.h
         #sudo apt-get -y install libgit2-dev
         sudo apt-get -y install cmake
-        git clone --branch v1.7.2 --depth 1 https://github.com/libgit2/libgit2.git
+        git clone --branch v1.8.1 --depth 1 https://github.com/libgit2/libgit2.git
         ( cd libgit2 && mkdir build && cd build && cmake .. && cmake --build . && sudo cmake --build . -- install )
-        echo "PATH=$PATH:/usr/local/bin" >> "$GITHUB_ENV"
         echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib" >> "$GITHUB_ENV"
+        # Expects exactly libgit2 1.8.x! Therefore install it here instead via the non-pinned ratarmount dependencies.
+        python3 -m pip install pygit2==1.15
 
     - name: Install Dependencies (MacOS)
       if: startsWith( matrix.os, 'macos' )
@@ -167,8 +168,10 @@ jobs:
           matrix.python-version == '3.13.0-rc.3' ||
           matrix.python-version == '3.14.0-alpha.0')
       run: |
-        brew install libgit2@1.7
-        brew link libgit2@1.7 --force
+        brew install libgit2@1.8
+        brew link libgit2@1.8 --force
+        # Expects exactly libgit2 1.8.x! Therefore install it here instead via the non-pinned ratarmount dependencies.
+        python3 -m pip install pygit2==1.15
 
     - name: Install pip Dependencies
       run: |
@@ -273,9 +276,6 @@ jobs:
     - name: Install pip Test Dependencies
       run: |
         python3 -m pip install -r tests/requirements-tests.txt
-        # Explicitly install pygit2 even on Python 3.13+ because we have set up libgit2 manually.
-        python3 -m pip install pygit2
-        python3 -c 'import pygit2'
 
     - name: Regression Tests (FUSE 3)
       if: ${{ !startsWith( matrix.os, 'macos' ) }}
@@ -288,6 +288,7 @@ jobs:
       if: ${{ !startsWith( matrix.os, 'macos' ) }}
       run: |
         bash tests/runtests.sh
+        python3 -c 'import pygit2'
 
     - name: Module tests without fusepy
       run: |
