@@ -213,6 +213,8 @@ function trimAppImage()
            "$APP_PYTHON_LIB/lib-dynload/readline.cpython-311-x86_64-linux-gnu.so"
     # Remove libraries deprecated since 3.11 and to be removed in 3.13:
     # https://docs.python.org/3.13/whatsnew/3.13.html#whatsnew313-pep594
+    # aifc, audioop, chunk, cgi, cgitb, crypt, imghdr, mailcap, msilib, nis, nntplib,
+    # ossaudiodev, pipes, sndhdr, spwd, sunau, telnetlib, uu, xdrlib, lib2to3
     'rm' -rf \
            "$APP_PYTHON_LIB/aifc.py" \
            "$APP_PYTHON_LIB/lib-dynlod/audioop"* \
