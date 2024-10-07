@@ -679,7 +679,7 @@ class FuseMount(fuse.Operations):
             print("Created mount point at:", self.mountPoint)
 
         # Note that this will not detect threads started in shared libraries, only those started via "threading".
-        if not foreground and self.printDebug >= 1 and len(threading.enumerate()) > 1:
+        if not foreground and len(threading.enumerate()) > 1:
             threadNames = [thread.name for thread in threading.enumerate() if thread.name != "MainThread"]
             # Fix FUSE hangs with: https://unix.stackexchange.com/a/713621/111050
             raise ValueError(
