@@ -165,7 +165,7 @@ jobs:
     - name: Install Dependencies For Unreleased Python Versions (MacOS)
       if: >
         startsWith( matrix.os, 'macos' ) && (
-          matrix.python-version == '3.13.0-rc.3' ||
+          matrix.python-version == '3.13.0' ||
           matrix.python-version == '3.14.0-alpha.0')
       run: |
         brew install libgit2@1.8
