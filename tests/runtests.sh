@@ -2270,7 +2270,7 @@ if [[ -z "$CI" ]]; then
         filesToSpellCheck+=( "$file" )
     done < <( git ls-tree -r --name-only HEAD | 'grep' -E '[.](py|md|txt|sh|yml)' )
     # fsspec uses cachable instead of cacheable ...
-    codespell --ignore-words-list fo,Nd,unx,cachable "${filesToSpellCheck[@]}"
+    codespell "${filesToSpellCheck[@]}"
 
     flake8 --config tests/.flake8 "${files[@]}" "${testFiles[@]}" || returnError "$LINENO" 'Flake8 failed!'
 

@@ -35,8 +35,7 @@ jobs:
     - name: Lint With Codespell
       run: |
         python3 -m pip install codespell
-        # fsspec uses cachable instead of cacheable ...
-        codespell --ignore-words-list fo,Nd,unx,cachable $( git ls-tree -r --name-only HEAD | 'grep' -E '[.](py|md|txt|sh|yml)' )
+        codespell $( git ls-tree -r --name-only HEAD | 'grep' -E '[.](py|md|txt|sh|yml)' )
 
     - name: Lint With Flake8
       run: |
