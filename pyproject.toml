@@ -63,3 +63,7 @@ ratarmount = "ratarmount:cli"
 [tool.setuptools]
 py-modules = ["ratarmount"]
 license-files = ["LICENSE"]
+
+[tool.codespell]
+# fsspec uses cachable instead of cacheable ...
+ignore-words-list = "fo,Nd,unx,cachable"
