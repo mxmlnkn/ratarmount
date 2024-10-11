@@ -2115,20 +2115,7 @@ checkURLProtocolS3()
 
     # Wait for port to open
     echo "Waiting for seaweedfs to start up and port $port to open..."
-    python3 -c '
-import socket
-import sys
-import time
-from contextlib import closing
-
-t0 = time.time()
-with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
-    for i in range(10):
-        if sock.connect_ex(("127.0.0.1", int(sys.argv[1]))) == 0:
-            print(f"Weed port opened after {time.time() - t0:.1f} s.")
-            break
-        time.sleep(5)
-' "$port"
+    python3 tests/wait-for-port.py "$port" 50
 
     # Create bucket and upload test file
     python3 -c "
@@ -2188,55 +2175,25 @@ client.upload_file(path, bucket_name, 'single-file.tar')
 
 checkURLProtocolSamba()
 {
-    return 0  # Cannot automate because of the myriad of bugs and issues explained below.
+    # Using impacket/examples/smbserver.py does not work for a multidude of reasons.
+    # Therefore set up a server with tests/install-smbd.sh from outside and check for its existence here.
 
-    local pid user password
-
-    user='pqvfumqbqp'
-    password='ioweb123GUIweb'
-
-    # Unusable because tests should not be run as root.
-    if false; then
-        sudo apt install samba
-        cat <<EOF | sudo tee /etc/samba/smb.conf
-[global]
-usershare allow guests = no
-# Does not work. Somehow hangs indefinitely during systemctl restart smbd nmbd
-#bind interfaces only = yes
-#interfaces = lo
-
-[test-share]
-path = /tmp/smbshare
-browsable = yes
-guest ok = no
-read only = yes
-create mask = 0755
-EOF
-
-        # Unfortunately, we need a user because anonymous/guest login does not seem to work with smbprotocol:
-        # https://github.com/jborean93/smbprotocol/issues/168
-        sudo adduser --no-create-home --disabled-password --disabled-login "$user"
-        sudo smbpasswd -a "$user"  # type password here ioweb123GUIweb
-
-        sudo systemctl restart smbd nmbd
-
-        smbclient --user="$user" --password="$password" --port 445 -c ls //127.0.0.1/test-share
-
-        checkFileInTAR "smb://$user:$password@127.0.0.1:445/test-share/single-file.tar" bar d3b07384d113edec49eaa6238ad5ff00 ||
-            returnError "$LINENO" 'Failed to read from Samba server'
+    local port=445
+    if ! command -v smbclient &>/dev/null || ! python3 tests/wait-for-port.py "$port" 0; then
+        echoerr "Skipping SMB test because no server was found on 127.0.0.1:$port."
+        return 0
     fi
 
-    # Does not work for some obscure reason with signing:
-    #   https://github.com/jborean93/smbprotocol/issues/289
-    # Note that configuring require_signing=False always also would not work as a workaround because of:
-    #   https://github.com/jborean93/smbprotocol/issues/290
-    wget 'https://github.com/fortra/impacket/raw/27e7e7478df5d3d3bb12923055a7d8b614825ff4/examples/smbserver.py'
-    # Need -smb2support because smbprotocol does not support Samba v1!
-    python3 smbserver.py -smb2support -username "$user" -password "$password" -ip 127.0.0.1 -port 8445 \
-        "test-share" "$PWD/tests" 2>&dev/null &
-    pid=$!
+    mkdir -p /tmp/smbshare
+    cp tests/single-file.tar /tmp/smbshare/
+    chmod -R o+r /tmp/smbshare/
 
-    checkFileInTAR "smb://$user:$password@127.0.0.1:8445/test-share/single-file.tar" bar d3b07384d113edec49eaa6238ad5ff00 ||
+    local user='pqvfumqbqp'
+    local password='ioweb123GUIweb'
+
+    smbclient --user="$user" --password="$password" --port "$port" -c ls //127.0.0.1/test-share
+
+    checkFileInTAR "smb://$user:$password@127.0.0.1:$port/test-share/single-file.tar" bar d3b07384d113edec49eaa6238ad5ff00 ||
         returnError "$LINENO" 'Failed to read from Samba server'
 }
 

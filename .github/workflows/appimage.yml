@@ -85,6 +85,7 @@ jobs:
         # Explicitly install pygit2 even on Python 3.13+ because we have set up libgit2 manually.
         python3 -m pip install pygit2
         python3 -c 'import pygit2'
+        sudo bash tests/install-smbd.sh
 
     - name: Regression Tests
       run: |

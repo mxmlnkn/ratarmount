@@ -277,6 +277,11 @@ jobs:
       run: |
         python3 -m pip install -r tests/requirements-tests.txt
 
+    - name: Install Test Dependencies (Linux)
+      if: ${{ !startsWith( matrix.os, 'macos' ) }}
+      run: |
+        sudo bash tests/install-smbd.sh
+
     - name: Regression Tests (FUSE 3)
       if: ${{ !startsWith( matrix.os, 'macos' ) }}
       run: |
