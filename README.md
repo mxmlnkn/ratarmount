@@ -112,9 +112,6 @@ chmod u+x -- "$appImageName"
 sudo cp -- "$appImageName" /usr/local/bin/ratarmount  # Example installation
 ```
 
-<details>
-<summary>Other Installation Methods</summary>
-
 ## Installation via Package Manager
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/ratarmount.svg)](https://repology.org/project/ratarmount/versions)
@@ -182,7 +179,6 @@ If there are troubles with the compression backend dependencies, you can try the
 Ratarmount will work without the compression backends.
 The hard requirements are `fusepy` and for Python versions older than 3.7.0 `dataclasses`.
 
-</details>
 
 # Supported Formats
 
