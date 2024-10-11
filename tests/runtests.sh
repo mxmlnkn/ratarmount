@@ -2,6 +2,8 @@
 
 cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." || { echo 'Failed to cd to ratarmount.py folder!'; exit 1; }
 
+export PYTHONTRACEMALLOC=1
+
 if [[ -z "$RATARMOUNT_CMD" ]]; then
     TEST_EXTERNAL_COMMAND=0
     RATARMOUNT_CMD="python3 -X dev -W ignore::DeprecationWarning -u $( realpath -- ratarmount.py )"
