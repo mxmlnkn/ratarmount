@@ -218,10 +218,13 @@ def _openSSHFSMountSource(url: str) -> Union[MountSource, IO[bytes], str]:
     if not path:
         path = "."
 
-    return fsspec.core.OpenFile(fs, path)
+    if not fs.exists(path):
+        raise RatarmountError(f"Cannot open URL: {url} because the remote path: {path} does not exist!")
+    # Note that the resulting file object has a .fs member for correct lifetime tracking.
+    return fs.open(path) if fs.isfile(path) else FSSpecMountSource(fs, path)
 
 
-def tryOpenURL(url, options, printDebug: int) -> Optional[Union[MountSource, IO[bytes], str]]:
+def tryOpenURL(url, printDebug: int) -> Union[MountSource, IO[bytes], str]:
     splitURI = url.split('://', 1)
     protocol = splitURI[0] if len(splitURI) > 1 else ''
     if not protocol:
@@ -240,69 +243,58 @@ def tryOpenURL(url, options, printDebug: int) -> Optional[Union[MountSource, IO[
         return _openSSHFSMountSource(url)
 
     if not fsspec:
-        print("[Warning] An URL was detected but fsspec is not installed. You may want to install it with:")
-        print("[Warning]     python3 -m pip install ratarmount[fsspec]")
-        return None
+        raise RatarmountError(
+            "An fsspec URL was detected but fsspec is not installed. Install it with: pip install ratarmount[fsspec]"
+        )
 
-    result = None
-    try:
-        if printDebug >= 3:
-            print("[Info] Try to open with fsspec")
+    if printDebug >= 3:
+        print("[Info] Try to open with fsspec")
 
-        # Suppress warning about (default!) encoding not being support for Python<3.9 -.-.
-        if sys.version_info < (3, 9) and protocol == 'ftp':
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                openFile = fsspec.open(url)
-        else:
-            openFile = fsspec.open(url)
-        assert isinstance(openFile, fsspec.core.OpenFile)
+    if protocol == 'ftp' and sys.version_info < (3, 9):
+        # Suppress warning about (default!) encoding not being supported for Python<3.9 -.-.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            fileSystem, path = fsspec.url_to_fs(url)
+    else:
+        fileSystem, path = fsspec.url_to_fs(url)
 
-        if printDebug >= 3:
-            print("[Info] Opened file fsspec:", openFile, "filesystem:", openFile.fs)
+    if printDebug >= 3:
+        print("[Info] Opened filesystem:", fileSystem)
 
-        # Note that http:// URLs are always files. Folders are only regex-parsed HTML files!
-        # By checking with isdir instead of isfile, we give isdir a higher precedence.
-        # Also note that isdir downloads the whole file!
-        # https://github.com/fsspec/filesystem_spec/issues/1707
-        if isinstance(openFile.fs, fsspec.implementations.http.HTTPFileSystem):
-            info = openFile.fs.info(openFile.path)
-            if info.get('mimetype', None) == 'text/html' and openFile.fs.isdir(openFile.path):
-                return FSSpecMountSource(openFile)
-        elif openFile.fs.isdir(openFile.path):
-            return FSSpecMountSource(openFile)
+    # Note that http:// URLs are always files. Folders are only regex-parsed HTML files!
+    # By checking with isdir instead of isfile, we give isdir a higher precedence.
+    # Also note that isdir downloads the whole file!
+    # https://github.com/fsspec/filesystem_spec/issues/1707
+    if isinstance(fileSystem, fsspec.implementations.http.HTTPFileSystem):
+        info = fileSystem.info(path)
+        if info.get('mimetype', None) == 'text/html' and fileSystem.isdir(path):
+            return FSSpecMountSource(fileSystem, path)
+    elif fileSystem.isdir(path):
+        return FSSpecMountSource(fileSystem, path)
 
-        # This open call can fail with FileNotFoundError, IsADirectoryError, and probably others.
-        result = openFile.open()  # pylint: disable=no-member
+    if not fileSystem.exists(path):
+        raise RatarmountError(f"Opening URL {url} failed because path {path} does not exist on remote!")
 
-        # Avoid resource leaks, e.g., when the seek check fails.
-        oldDel = getattr(result, '__del__', None)
+    # This open call can fail with FileNotFoundError, IsADirectoryError, and probably others.
+    result = fileSystem.open(path)  # pylint: disable=no-member
 
-        def newDel():
-            if callable(oldDel):
-                oldDel()
-            result.close()
+    # Avoid resource leaks, e.g., when the seek check fails.
+    oldDel = getattr(result, '__del__', None)
 
-        result.__del__ = newDel
+    def newDel():
+        if callable(oldDel):
+            oldDel()
+        result.close()
 
-        # Check that seeking works. May fail when, e.g., the HTTP server does not support range requests.
-        # Use https://github.com/danvk/RangeHTTPServer for testing purposes because
-        # "python3 -m http.server 9000" does not have range support. Use "python3 -m RangeHTTPServer 9000".
-        result.seek(1)
-        result.read(1)
-        result.seek(0)
+    result.__del__ = newDel
 
-        # Add tarFileName argument so that mounting a TAR file via SSH can create a properly named index
-        # file inside ~/.cache/ratarmount.
-        if 'tarFileName' not in options:
-            options['tarFileName'] = url
-    except Exception as exception:
-        if result and hasattr(result, 'close'):
-            result.close()
-        if printDebug >= 1:
-            print("[Warning] Trying to open with fsspec raised an exception:", exception)
-        if printDebug >= 3:
-            traceback.print_exc()
+    # Check that seeking works. May fail when, e.g., the HTTP server does not support range requests.
+    # Use https://github.com/danvk/RangeHTTPServer for testing purposes because
+    # "python3 -m http.server 9000" does not have range support. Use "python3 -m RangeHTTPServer 9000".
+    result.seek(1)
+    result.read(1)
+    result.seek(0)
+
     return result
 
 
@@ -310,14 +302,11 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
     printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
 
     if isinstance(fileOrPath, str) and '://' in fileOrPath:
-        openedURL = tryOpenURL(fileOrPath, options, printDebug=printDebug)
+        openedURL = tryOpenURL(fileOrPath, printDebug=printDebug)
 
         # If the URL pointed to a folder, return a MountSource, else open the returned file object as an archive.
         if isinstance(openedURL, MountSource):
             return openedURL
-
-        if not (isinstance(openedURL, str) or openedURL is not None):
-            raise RatarmountError("Failed to open URL!")
 
         # Add tarFileName argument so that mounting a TAR file via SSH can create a properly named index
         # file inside ~/.cache/ratarmount.

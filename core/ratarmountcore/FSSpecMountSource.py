@@ -53,26 +53,27 @@ class FSSpecMountSource(MountSource):
     # I guess git is the most obvious candidate because it is the most interesting and most barebone implementation.
 
     # pylint: disable=unused-argument
-    def __init__(self, urlOrOpenFile, **options) -> None:
+    def __init__(self, urlOrFS, prefix: Optional[str] = None, **options) -> None:
         """
-        urlOrOpenFile : Take a URL or an already opened fsspec Filesystem object.
-                        Note that this might take an AbstractFileSystem-derived object in the future.
+        urlOrFS : Take a URL or an already opened fsspec Filesystem object.
+                  Note that this might take an AbstractFileSystem-derived object in the future.
         """
-        # Note that fsspec.implementations.ssh did not use ~/.ssh/config!
-        # That's one of the many reasons why fsspec/sshfs based on asyncssh instead of paramiko is used.
-        assert isinstance(urlOrOpenFile, (str, fsspec.core.OpenFile))
-        self.openFile: fsspec.core.OpenFile = (
-            fsspec.open(urlOrOpenFile) if isinstance(urlOrOpenFile, str) else urlOrOpenFile
-        )
-        self.fileSystem: fsspec.AbstractFileSystem = self.openFile.fs
+        if isinstance(urlOrFS, fsspec.AbstractFileSystem):
+            fs = urlOrFS
+        elif isinstance(urlOrFS, str):
+            fs, path = fsspec.url_to_fs(urlOrFS)
+            if prefix is None:
+                prefix = path
+        else:
+            raise ValueError("First argument must be an URL or inherit from fsspec.AbstractFileSystem!")
+        self.fileSystem: fsspec.AbstractFileSystem = fs
         self.rootFileInfo = createRootFileInfo(userdata=["/"])
 
         # The fsspec filesystems are not uniform! http:// expects the arguments to isdir with prefixed
         # protocol while other filesystem implementations are fine with only the path.
         # https://github.com/ray-project/ray/issues/26423#issuecomment-1179561181
         self._isHTTP = isinstance(self.fileSystem, fsspec.implementations.http.HTTPFileSystem)
-        prefix = self.openFile.path
-        self.prefix = prefix.rstrip("/") if prefix.strip("/") and self.fileSystem.isdir(prefix) else ""
+        self.prefix = prefix.rstrip("/") if prefix and prefix.strip("/") and self.fileSystem.isdir(prefix) else ""
 
     def _getPath(self, path: str) -> str:
         if self._isHTTP:
@@ -253,9 +254,5 @@ class FSSpecMountSource(MountSource):
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
-        if hasattr(self.openFile, 'close'):
-            self.openFile.close()
-
-    def __del__(self):
-        if hasattr(self.openFile, 'close'):
-            self.openFile.close()
+        if hasattr(self.fileSystem, '__exit__'):
+            self.fileSystem.__exit__(exception_type, exception_value, exception_traceback)
