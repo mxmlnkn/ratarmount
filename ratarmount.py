@@ -690,9 +690,9 @@ class FuseMount(fuse.Operations):
     def __enter__(self):
         return self
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, exception_type, exception_value, exception_traceback):
         if hasattr(super(), "__exit__"):
-            super().__exit__(type, value, traceback)
+            super().__exit__(exception_type, exception_value, exception_traceback)
         self._close()
 
     def _close(self) -> None:
