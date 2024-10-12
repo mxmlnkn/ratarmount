@@ -21,6 +21,7 @@ from .compressions import (
     TAR_COMPRESSION_FORMATS,
     zipfile,
 )
+from .compressions import isSquashFS
 from .utils import CompressionError, RatarmountError
 from .MountSource import MountSource
 from .FATMountSource import FATMountSource
@@ -120,6 +121,11 @@ def _openLibarchiveMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> 
 
 def _openPySquashfsImage(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
     try:
+        # Better to check file type here because I am unsure about what the MountSource semantic should be
+        # regarding file object closing when it raises an exception in the constructor.
+        if not isinstance(fileOrPath, str) and not isSquashFS(fileOrPath):
+            return None
+
         if PySquashfsImage is not None:
             return SquashFSMountSource(fileOrPath, **options)
     finally:

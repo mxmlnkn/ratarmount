@@ -408,13 +408,22 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         **options
         # fmt: on
     ) -> None:
-        self.rawFileObject = open(fileOrPath, 'rb') if isinstance(fileOrPath, str) else fileOrPath
-        self.rawFileObject.seek(0)
-        offset = findSquashFSOffset(self.rawFileObject)
+        if isinstance(fileOrPath, str):
+            openedFile = True
+            file: IO[bytes] = open(fileOrPath, 'rb')
+        else:
+            openedFile = False
+            file = fileOrPath
+            file.seek(0)
+
+        offset = findSquashFSOffset(file)
         if offset < 0:
+            if openedFile:
+                file.close()
             raise ValueError("Not a valid SquashFS image!")
 
         # fmt: off
+        self.rawFileObject          = file
         self.image                  = SquashFSImage(self.rawFileObject, offset=offset)
         self.archiveFilePath        = fileOrPath if isinstance(fileOrPath, str) else None
         self.encoding               = encoding
@@ -530,11 +539,27 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         if self.printDebug >= 1:
             print(f"Creating offset dictionary for {self.archiveFilePath} took {t1 - t0:.2f}s")
 
+    def close(self) -> None:
+        if hasattr(self, 'rawFileObject'):
+            self.rawFileObject.close()
+
+        # There is no "closed" method and it can only be closed once, else we get:
+        # PySquashfsImage/__init__.py", line 131, in close
+        #     self._fd.close()
+        #     ^^^^^^^^^^^^^^
+        # AttributeError: 'NoneType' object has no attribute 'close'
+        try:
+            self.image.close()  # pytype: disable=attribute-error
+        except AttributeError:
+            pass
+
     @overrides(SQLiteIndexMountSource)
-    def __exit__(self, exception_type, exception_value, exception_traceback):
+    def __exit__(self, exception_type, exception_value, exception_traceback) -> None:
         super().__exit__(exception_type, exception_value, exception_traceback)
-        self.rawFileObject.close()
-        self.image.close()
+        self.close()
+
+    def __del__(self):
+        self.close()
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
