@@ -250,7 +250,8 @@ checkFileInTAR()
     rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" ||
+        returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     local args=()
@@ -306,7 +307,8 @@ checkFileInTARPrefix()
     rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" ||
+        returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # try with index recreation
@@ -334,7 +336,8 @@ checkLinkInTAR()
     rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" ||
+        returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # try with index recreation
@@ -372,7 +375,7 @@ createLargeTar()
     fi
 
     echoerr "Creating a tar with ${fileNameDataSizeInMB} MiB in file name meta data..."
-    tarFolder="$( mktemp -d )"
+    tarFolder="$( mktemp -d --suffix .test.ratarmount )"
     subFolder='A'
 
     # first create a TAR with files of length 96 characters with max 1024 files per folder to amount to ~1MiB of data
@@ -401,7 +404,7 @@ createLargeTar()
     # Now, instead of spamming the host system with billions of files, make use of the recursive mounting of ratarmount
     # to increase the memory footprint by copy-pasting the TAR with 1MiB metadata n times
 
-    largeTarFolder="$( mktemp -d )" || return 1
+    largeTarFolder="$( mktemp -d --suffix .test.ratarmount )" || return 1
 
     for (( i = 0; i < fileNameDataSizeInMB; ++i )); do
         cp "$tarFile1MiB" "$largeTarFolder/$( printf '%05d' "$i" ).tar"
@@ -448,7 +451,7 @@ testLargeTar()
 
     # clear up mount folder if already in use
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # benchmark creating the index
@@ -498,7 +501,7 @@ checkAutomaticIndexRecreation()
 (
     rm -f ratarmount.{stdout,stderr}.log
 
-    tmpFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    tmpFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     cd -- "$tmpFolder" || returnError "$LINENO" 'Failed to cd into temporary directory'
 
     archive='momo.tar'
@@ -574,7 +577,7 @@ checkUnionMount()
     rm -f ratarmount.{stdout,stderr}.log
 
     testsFolder="$( pwd )/tests"
-    tmpFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    tmpFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     cd -- "$tmpFolder" || returnError "$LINENO" 'Failed to cd into temporary directory'
     keyString='EXTRACTED VERSION'
 
@@ -589,7 +592,7 @@ checkUnionMount()
     )
     done
 
-    mountPoint=$( mktemp -d )
+    mountPoint=$( mktemp -d --suffix .test.ratarmount )
     for tarFile in "${tarFiles[@]}"; do
         # Check whether a simple bind mount works, which is now an officially supported perversion of ratarmount
         runAndCheckRatarmount -c "$tarFile" "$mountPoint"
@@ -672,7 +675,7 @@ checkUnionMountFileVersions()
     rm -f ratarmount.{stdout,stderr}.log
 
     testsFolder="$( pwd )/tests"
-    tmpFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    tmpFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     cd -- "$tmpFolder" || returnError "$LINENO" 'Failed to cd into temporary directory'
 
     tarFiles=( 'updated-file.tar' )
@@ -712,7 +715,7 @@ checkAutoMountPointCreation()
     rm -f ratarmount.{stdout,stderr}.log
 
     testsFolder="$( pwd )/tests"
-    tmpFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    tmpFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     cd -- "$tmpFolder" || returnError "$LINENO" 'Failed to cd into temporary directory'
 
     cp "$testsFolder/single-nested-file.tar" .
@@ -742,7 +745,7 @@ checkTarEncoding()
     rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # try with index recreation
@@ -770,7 +773,7 @@ recompressFile()
 
     local recompressedFiles=()
     local tmpFolder
-    tmpFolder=$( mktemp -d )
+    tmpFolder=$( mktemp -d --suffix .test.ratarmount )
 
     local file=$1
 
@@ -899,8 +902,8 @@ checkIndexPathOption()
     rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder indexFolder indexFile
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
-    indexFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
+    indexFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     indexFile="$indexFolder/ratarmount.index"
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
     TMP_FILES_TO_CLEANUP+=( "$indexFolder" "$indexFile" )
@@ -933,8 +936,8 @@ checkIndexFolderFallback()
     rm -f ratarmount.{stdout,stderr}.log
 
     local args mountFolder indexFolder
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
-    indexFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
+    indexFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # Check that index gets created in the specified folder
@@ -1012,8 +1015,8 @@ checkIndexArgumentChangeDetection()
     rm -f ratarmount.{stdout,stderr}.log
 
     local args mountFolder indexFolder
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
-    indexFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
+    indexFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     indexFile="$indexFolder/ratarmount.index"
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
     TMP_FILES_TO_CLEANUP+=( "$indexFolder" "$indexFile" )
@@ -1055,7 +1058,7 @@ checkSuffixStripping()
     rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # try with index recreation
@@ -1079,8 +1082,8 @@ checkRecursiveFolderMounting()
     rm -f ratarmount.{stdout,stderr}.log
 
     local archiveFolder mountFolder
-    archiveFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    archiveFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     local sourceFile targetFile
@@ -1124,8 +1127,8 @@ checkNestedRecursiveFolderMounting()
     rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder archiveFolder
-    archiveFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    archiveFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     mkdir -- "$archiveFolder/nested-folder"
@@ -1158,7 +1161,7 @@ checkSelfReferencingHardLinks()
     rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     local args=( -P "$parallelization" -c "$archive" "$mountFolder" )
@@ -1274,15 +1277,15 @@ checkWriteOverlayWithNewFiles()
     rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     local overlayFolder;
-    overlayFolder=$( mktemp -d )
+    overlayFolder=$( mktemp -d --suffix .test.ratarmount )
     TMP_FILES_TO_CLEANUP+=( "$overlayFolder" "$overlayFolder/.ratarmount.overlay.sqlite" )
     # Create the overlay folder on some filesystem, e.g., NTFS FUSE, which does not support
     # permission changes for testing the metadata database.
-    #overlayFolder=$( mktemp -d -p "$( pwd )" )
+    #overlayFolder=$( mktemp -d --suffix .test.ratarmount -p "$( pwd )" )
 
     local args=( -P "$parallelization" -c --write-overlay "$overlayFolder" "$archive" "$mountFolder" )
     {
@@ -1376,11 +1379,11 @@ checkWriteOverlayWithArchivedFiles()
     rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     local overlayFolder;
-    overlayFolder=$( mktemp -d )
+    overlayFolder=$( mktemp -d --suffix .test.ratarmount )
     TMP_FILES_TO_CLEANUP+=( "$overlayFolder" "$overlayFolder/.ratarmount.overlay.sqlite" )
 
     local args=( -P "$parallelization" -c --write-overlay "$overlayFolder" "$archive" "$mountFolder" )
@@ -1515,7 +1518,7 @@ checkWriteOverlayWithSymbolicLinks()
     rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # Create test folder structure like this:
@@ -1526,8 +1529,8 @@ checkWriteOverlayWithSymbolicLinks()
     # +- tmp2/
     #    +- bar
     local overlayFolder overlayFolder2;
-    overlayFolder=$( mktemp -d )
-    overlayFolder2=$( mktemp -d )
+    overlayFolder=$( mktemp -d --suffix .test.ratarmount )
+    overlayFolder2=$( mktemp -d --suffix .test.ratarmount )
     ( cd -- "$overlayFolder" && ln -s "$( realpath --relative-to "$overlayFolder" "$overlayFolder2" )" overlay2 )
     echo foo > "${overlayFolder2}/bar"
     ( cd -- "$overlayFolder" && ln -s "$( realpath --relative-to "$overlayFolder" "$overlayFolder2/bar" )" bar )
@@ -1571,7 +1574,7 @@ checkWriteOverlayWithSymbolicLinks()
 checkWriteOverlayCommitDelete()
 {
     local tmpFolder;
-    tmpFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    tmpFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     mkdir "$tmpFolder/overlay"
     TMP_FILES_TO_CLEANUP+=( "$tmpFolder" )
 
@@ -1630,7 +1633,7 @@ checkSymbolicLinkRecursion()
     rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # Create test folder structure like in issue 102 with a mix of relative and absolute links to test both:
@@ -1642,7 +1645,7 @@ checkSymbolicLinkRecursion()
     # +- datastore/
     #    +- 01234567
     local folder;
-    folder=$( mktemp -d )
+    folder=$( mktemp -d --suffix .test.ratarmount )
     TMP_FILES_TO_CLEANUP+=(
         "$folder" "$folder/datastorage" "$folder/downloads" "$folder/collections"
         "$folder/datastorage/01234567" "$folder/downloads/file.gz" "$folder/collections/part1.gz"
@@ -1681,7 +1684,7 @@ checkGnuIncremental()
     rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     # try with index recreation and forcing to read as GNU incremental
@@ -1710,7 +1713,7 @@ checkTruncated()
     rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     local args=( -P "$parallelization" -c "$archive" "$mountFolder" )
@@ -1744,11 +1747,11 @@ checkStatfs()
     rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     local overlayFolder
-    overlayFolder=$( mktemp -d )
+    overlayFolder=$( mktemp -d --suffix .test.ratarmount )
     echo 'foo' > "$overlayFolder/bar"
 
     local args=( -P "$parallelization" -c "$overlayFolder" "$mountFolder" )
@@ -1772,12 +1775,12 @@ checkStatfsWriteOverlay()
     rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     local overlayFolder overlayFolder2
-    overlayFolder=$( mktemp -d )
-    overlayFolder2=$( mktemp -d )
+    overlayFolder=$( mktemp -d --suffix .test.ratarmount )
+    overlayFolder2=$( mktemp -d --suffix .test.ratarmount )
     echo 'foo' > "$overlayFolder2/bar"
 
     local args=( -P "$parallelization" -c --write-overlay "$overlayFolder" "$overlayFolder2" "$mountFolder" )
@@ -1825,7 +1828,7 @@ checkFileInTARForeground()
     rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
-    mountFolder="$( mktemp -d )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     $RATARMOUNT_CMD -c -f -d 3 "$archive" "$mountFolder" >ratarmount.stdout.log 2>ratarmount.stderr.log &
@@ -1844,7 +1847,7 @@ checkFileInTARForeground()
 checkURLProtocolHTTP()
 {
     local pid mountPoint protocol port
-    mountPoint=$( mktemp -d )
+    mountPoint=$( mktemp -d --suffix .test.ratarmount )
     protocol='http'
     port=8000
 
@@ -2018,7 +2021,7 @@ EOF
     echo "Started SSH server with process ID $pid"
     sleep 2
 
-    mountPoint=$( mktemp -d )
+    mountPoint=$( mktemp -d --suffix .test.ratarmount )
 
     checkFileInTARForeground "ssh://127.0.0.1:$port/tests/single-file.tar" 'bar' d3b07384d113edec49eaa6238ad5ff00 ||
         returnError "$LINENO" 'Failed to read from SSH server'
@@ -2101,7 +2104,7 @@ checkURLProtocolGithub()
 checkURLProtocolS3()
 {
     local mountPoint pid weedFolder port
-    mountPoint=$( mktemp -d )
+    mountPoint=$( mktemp -d --suffix .test.ratarmount )
     port=8053
 
     if [[ ! -f weed ]]; then
@@ -2110,7 +2113,7 @@ checkURLProtocolS3()
     fi
     [[ -x weed ]] || chmod u+x weed
 
-    weedFolder=$( mktemp -d )
+    weedFolder=$( mktemp -d --suffix .test.ratarmount )
     TMP_FILES_TO_CLEANUP+=( "$weedFolder" )
     ./weed server -dir="$weedFolder" -s3 -s3.port "$port" -idleTimeout=30 -ip 127.0.0.1 2>weed.log &
     pid=$!
