@@ -143,7 +143,10 @@ zstd = [
 ]
 7z = ["libarchive-c ~= 5.1, < 6.0"]
 # Pin to < 3.12 because of https://github.com/nathanhi/pyfatfs/issues/41
-fat = ['pyfatfs ~= 1.0; python_version < "3.12.0"']
+fat = [
+    'pyfatfs ~= 1.0; python_version < "3.12.0"',
+    'pyfatfs@git+https://github.com/mxmlnkn/pyfatfs.git@v1.2.0 ; python_version >= "3.12.0"',
+]
 
 [tool.setuptools]
 license-files = [
