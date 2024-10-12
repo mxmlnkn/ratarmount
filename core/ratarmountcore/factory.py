@@ -50,8 +50,15 @@ try:
         protocols = ["sftp", "ssh", "scp"]
         cachable = False
 
+        def open(self, *args, **kwargs):
+            # Note that asycnssh SSHFile does/did not implement seekable correctly!
+            # https://github.com/fsspec/sshfs/pull/50
+            result = super().open(*args, **kwargs)
+            result.seekable = lambda: True  # type:ignore
+            return result
+
 except ImportError:
-    SSHFileSystem = None  # type: ignore
+    FixedSSHFileSystem = None  # type: ignore
 
 
 def _openRarMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
@@ -67,6 +74,10 @@ def _openRarMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optiona
 def _openTarMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
     try:
         if isinstance(fileOrPath, str):
+            if 'tarFileName' in options:
+                copiedOptions = options.copy()
+                del copiedOptions['tarFileName']
+                return SQLiteIndexedTar(fileOrPath, **copiedOptions)
             return SQLiteIndexedTar(fileOrPath, **options)
         return SQLiteIndexedTar(fileObject=fileOrPath, **options)
     finally:
@@ -154,52 +165,79 @@ _BACKENDS = {
 }
 
 
-def openFsspec(url, options, printDebug: int) -> Optional[Union[MountSource, IO[bytes], str]]:
+def _openGitMountSource(url: str) -> Union[MountSource, IO[bytes], str]:
+    splitURI = url.split('://', 1)
+    if len(splitURI) <= 1 or splitURI[0] != 'git':
+        raise RatarmountError("Expected URL starting with git://")
+
+    if not GitMountSource.enabled:
+        raise RatarmountError(
+            "Detected git:// URL but GitMountSource could not be loaded. Please ensure that pygit2 is installed."
+        )
+
+    splitRepositoryPath = splitURI[1].split(':', 1)
+    repositoryPath = splitRepositoryPath[0] if len(splitRepositoryPath) > 1 else None
+    remainder = splitRepositoryPath[-1]
+
+    splitReference = remainder.split('@', 1)
+    reference = splitReference[0] if len(splitReference) > 1 else None
+    pathInsideRepository = splitReference[-1]
+
+    mountSource = GitMountSource(repositoryPath, reference=reference)
+    if pathInsideRepository:
+        fileInfo = mountSource.getFileInfo(pathInsideRepository)
+        if not fileInfo:
+            raise RatarmountError(
+                f"The path {pathInsideRepository} in the git repository specified via '{url}' does not exist!"
+            )
+
+        if stat.S_ISDIR(fileInfo.mode):
+            mountSource.prefix = pathInsideRepository
+        else:
+            # In the future it might be necessary to extend the lifetime of mountSource by adding it as
+            # a member of the opened file, but not right now.
+            return mountSource.open(fileInfo)
+
+    return mountSource
+
+
+def _openSSHFSMountSource(url: str) -> Union[MountSource, IO[bytes], str]:
+    if FixedSSHFileSystem is None:
+        raise RatarmountError("Cannot open with sshfs module because it seems to not be installed!")
+
+    # Note that fsspec.implementations.ssh did not use ~/.ssh/config!
+    # That's one of the many reasons why fsspec/sshfs based on asyncssh is used instead of paramiko.
+    fs = FixedSSHFileSystem(**FixedSSHFileSystem._get_kwargs_from_urls(url))  # pytype: disable=attribute-error
+
+    # Remove one leading / in order to add support for relative paths. E.g.:
+    #   ssh://127.0.0.1/relative/path
+    #   ssh://127.0.0.1//home/user/relative/path
+    path = fsspec.utils.infer_storage_options(url)['path']
+    if path.startswith("/"):
+        path = path[1:]
+    if not path:
+        path = "."
+
+    return fsspec.core.OpenFile(fs, path)
+
+
+def tryOpenURL(url, options, printDebug: int) -> Optional[Union[MountSource, IO[bytes], str]]:
     splitURI = url.split('://', 1)
     protocol = splitURI[0] if len(splitURI) > 1 else ''
     if not protocol:
-        return None
+        raise RatarmountError(f"Expected to be called with URL containing :// but got: {url}")
+
+    if printDebug >= 3:
+        print(f"[Info] Try to open URL: {url}")
 
     if protocol == 'file':
         return splitURI[1]
 
     if protocol == 'git':
-        if not GitMountSource.enabled:
-            raise ValueError(
-                "Detected git:// URL but GitMountSource could not be loaded. Please ensure that pygit2 is installed."
-            )
+        return _openGitMountSource(url)
 
-        remainder = splitURI[1]
-
-        splitRepositoryPath = remainder.split(':', 1)
-        repositoryPath = splitRepositoryPath[0] if len(splitRepositoryPath) > 1 else None
-        remainder = splitRepositoryPath[-1]
-
-        splitReference = remainder.split('@', 1)
-        reference = splitReference[0] if len(splitReference) > 1 else None
-        pathInsideRepository = splitReference[-1]
-
-        mountSource = GitMountSource(repositoryPath, reference=reference)
-        if pathInsideRepository:
-            fileInfo = mountSource.getFileInfo(pathInsideRepository)
-            if not fileInfo:
-                raise ValueError(
-                    f"The path {pathInsideRepository} in the git repository specified via '{url}' does not exist!"
-                )
-
-            if stat.S_ISDIR(fileInfo.mode):
-                mountSource.prefix = pathInsideRepository
-            else:
-                # Add tarFileName argument so that mounting a TAR file via SSH can create a properly named index
-                # file inside ~/.cache/ratarmount.
-                if 'tarFileName' not in options:
-                    options['tarFileName'] = url
-
-                # In the future it might be necessary to extend the lifetime of mountSource by adding it as
-                # a member of the opened file, but not right now.
-                return mountSource.open(fileInfo)
-
-        return mountSource
+    if FixedSSHFileSystem is not None and protocol in FixedSSHFileSystem.protocols:
+        return _openSSHFSMountSource(url)
 
     if not fsspec:
         print("[Warning] An URL was detected but fsspec is not installed. You may want to install it with:")
@@ -216,18 +254,6 @@ def openFsspec(url, options, printDebug: int) -> Optional[Union[MountSource, IO[
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 openFile = fsspec.open(url)
-        elif protocol in FixedSSHFileSystem.protocols:
-            fs = FixedSSHFileSystem(**FixedSSHFileSystem._get_kwargs_from_urls(url))  # pytype: disable=attribute-error
-
-            # Remove one leading / in order to add support for relative paths. E.g.:
-            #   ssh://127.0.0.1/relative/path
-            #   ssh://127.0.0.1//home/user/relative/path
-            path = fsspec.utils.infer_storage_options(url)['path']
-            if path.startswith("/"):
-                path = path[1:]
-            if not path:
-                path = "."
-            openFile = fsspec.core.OpenFile(fs, path)
         else:
             openFile = fsspec.open(url)
         assert isinstance(openFile, fsspec.core.OpenFile)
@@ -270,11 +296,6 @@ def openFsspec(url, options, printDebug: int) -> Optional[Union[MountSource, IO[
         # file inside ~/.cache/ratarmount.
         if 'tarFileName' not in options:
             options['tarFileName'] = url
-
-        # Note that asycnssh SSHFile does/did not implement seekable correctly!
-        # https://github.com/fsspec/sshfs/pull/50
-        if 'sshfs.file.SSHFile' in str(type(result)):
-            result.seekable = lambda: True  # type:ignore
     except Exception as exception:
         if result and hasattr(result, 'close'):
             result.close()
@@ -288,14 +309,22 @@ def openFsspec(url, options, printDebug: int) -> Optional[Union[MountSource, IO[
 def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource:
     printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
 
-    if isinstance(fileOrPath, str):
-        result = openFsspec(fileOrPath, options, printDebug=printDebug)
-        if isinstance(result, MountSource):
-            return result
-        if isinstance(result, str) or result is not None:
-            fileOrPath = result
-            if not isinstance(fileOrPath, str) and printDebug >= 3:
-                print("[Info] Opened remote file with fsspec.")
+    if isinstance(fileOrPath, str) and '://' in fileOrPath:
+        openedURL = tryOpenURL(fileOrPath, options, printDebug=printDebug)
+
+        # If the URL pointed to a folder, return a MountSource, else open the returned file object as an archive.
+        if isinstance(openedURL, MountSource):
+            return openedURL
+
+        if not (isinstance(openedURL, str) or openedURL is not None):
+            raise RatarmountError("Failed to open URL!")
+
+        # Add tarFileName argument so that mounting a TAR file via SSH can create a properly named index
+        # file inside ~/.cache/ratarmount.
+        if not isinstance(openedURL, str) and 'tarFileName' not in options:
+            options['tarFileName'] = fileOrPath
+
+        fileOrPath = openedURL
 
     joinedFileName = ''
     if isinstance(fileOrPath, str):
