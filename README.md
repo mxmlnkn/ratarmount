@@ -524,27 +524,55 @@ lbzip2 -cd well-compressed-file.bz2 | createMultiFrameZstd $(( 4*1024*1024 )) > 
 
 # Remote Files
 
-The [fsspec](https://github.com/fsspec/filesystem_spec) API backend adds support for mounting many remote archive or folders:
+The [fsspec](https://github.com/fsspec/filesystem_spec) API backend adds support for mounting many remote archive or folders.
+Please refer to the linked respective backend documentation to see the full configuration options, especially for specifying credentials.
+Some often-used configuration environment variables are copied here for easier viewing.
 
- - `git://[path-to-repo:][ref@]path/to/file`
+| Symbol        | Description               |
+| ------------- | ------------------------- |
+| `[something]` | Optional "something"      |
+| `(one\|two)`  | Either "one" or "two"     |
+
+ - `git://[path-to-repo:][ref@]path/to/file`</br>
    Uses the current path if no repository path is specified.
- - `github://org:repo@[sha]/path-to/file-or-folder`
-   E.g. github://mxmlnkn:ratarmount@v0.15.2/tests/single-file.tar
- - `http[s]://hostname[:port]/path-to/archive.rar`
- - `s3://[endpoint-hostname[:port]]/bucket[/single-file.tar[?versionId=some_version_id]]`
-   Will default to AWS according to the Boto3 library defaults when no endpoint is specified.
+   Backend: [ratarmountcore](https://github.com/mxmlnkn/ratarmount/blob/master/core/ratarmountcore/GitMountSource.py)
+   via [pygit2](https://github.com/libgit2/pygit2)
+ - `github://org:repo@[sha]/path-to/file-or-folder`</br>
+   Example: `github://mxmlnkn:ratarmount@v0.15.2/tests/single-file.tar`</br>
+   Backend: [fsspec](https://github.com/fsspec/filesystem_spec/blob/master/fsspec/implementations/github.py)
+ - `http[s]://hostname[:port]/path-to/archive.rar`</br>
+   Backend: [fsspec](https://github.com/fsspec/filesystem_spec/blob/master/fsspec/implementations/http.py)
+   via [aiohttp](https://github.com/aio-libs/aiohttp)
+ - `(ipfs|ipns)://content-identifier`</br>
+   Example: `ipfs daemon & sleep 2 && ratarmount -f ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG mounted`</br>
+   Backend: [fsspec/ipfsspec](https://github.com/fsspec/ipfsspec)</br>
+   Tries to connect to running local [`ipfs daemon`](https://github.com/ipfs/kubo) instance by default, which needs to be started beforehand.
+   ~~Alternatively, a (public) gateway can be specified with the environment variable `IPFS_GATEWAY`, e.g., `https://127.0.0.1:8080`.~~
+   Specifying a public gateway does not (yet) work because of [this](https://github.com/fsspec/ipfsspec/issues/39) issue.
+ - `s3://[endpoint-hostname[:port]]/bucket[/single-file.tar[?versionId=some_version_id]]`</br>
+   Backend: [fsspec/s3fs](https://github.com/fsspec/s3fs) via [boto3](https://github.com/boto/boto3)</br>
+   The URL will default to AWS according to the Boto3 library defaults when no endpoint is specified.
    Boto3 will check, among others, [these environment variables](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html), for credentials:
-    - `AWS_ACCESS_KEY_ID`
-    - `AWS_SECRET_ACCESS_KEY`
-    - `AWS_SESSION_TOKEN`
-    - `AWS_DEFAULT_REGION`, e.g., `us-west-1`
-   fsspec/s3fs furthermore supports these environment variables:
-    - [`FSSPEC_S3_ENDPOINT_URL`](https://github.com/fsspec/s3fs/pull/704), e.g., `http://127.0.0.1:8053`
- - `[s]ftp://[user[:password]@]hostname[:port]/path-to/archive.rar`
- - `ssh://[user[:password]@]hostname[:port]/path-to/archive.rar`
- - `smb://[workgroup;][user:password@]server[:port]/share/folder/file.tar`
+    - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `AWS_DEFAULT_REGION`
 
-Many others fsspec-based projects may also work when installed.
+   [fsspec/s3fs](https://github.com/fsspec/s3fs) furthermore supports this environment variable:
+    - [`FSSPEC_S3_ENDPOINT_URL`](https://github.com/fsspec/s3fs/pull/704), e.g., `http://127.0.0.1:8053`
+ - `ftp://[user[:password]@]hostname[:port]/path-to/archive.rar`</br>
+   Backend: [fsspec](https://github.com/fsspec/filesystem_spec/blob/master/fsspec/implementations/ftp.py)
+   via [ftplib](https://docs.python.org/3/library/ftplib.html)
+ - `(ssh|sftp)://[user[:password]@]hostname[:port]/path-to/archive.rar`</br>
+   Backend: [fsspec/sshfs](https://github.com/fsspec/sshfs)
+   via [asyncssh](https://github.com/ronf/asyncssh)</br>
+   The usual configuration via [`~/.ssh/config`](https://linux.die.net/man/5/ssh_config) is supported.
+ - `smb://[workgroup;][user:password@]server[:port]/share/folder/file.tar`
+ - `webdav://[user:password@]host[:port][/path]`</br>
+   Backend: [webdav4](https://github.com/skshetry/webdav4) via [httpx](https://github.com/encode/httpx)</br>
+   Environment variables: `WEBDAV_USER`, `WEBDAV_PASSWORD`
+ - `dropbox://path`</br>
+   Backend: [fsspec/dropboxdrivefs](https://github.com/fsspec/dropboxdrivefs) via [dropbox-sdk-python](https://github.com/dropbox/dropbox-sdk-python)</br>
+   Follow [these instructions](https://dropbox.tech/developers/generate-an-access-token-for-your-own-account) to create an [app](https://www.dropbox.com/developers/apps). Check the `files.metadata.read` and `files.content.read` permissions and press "submit" and **after** that create the (long) OAuth 2 token and store it in the environment variable `DROPBOX_TOKEN`. Ignore the (short) app key and secret. This creates a corresponding app folder that can be filled with data.
+
+[Many other](https://filesystem-spec.readthedocs.io/en/latest/api.html#other-known-implementations) fsspec-based projects may also work when installed.
 
 
 # Writable Mounting

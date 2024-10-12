@@ -76,6 +76,7 @@ from ratarmountcore import (
     SubvolumesMountSource,
     FileInfo,
 )
+from ratarmountcore.utils import imeta
 
 
 __version__ = '0.15.2'
@@ -1068,12 +1069,54 @@ class PrintVersionAction(argparse.Action):
             except ImportError:
                 pass
 
+            moduleVersion: Optional[str] = None
             if moduleName in sys.modules:
                 moduleVersion = findModuleVersion(sys.modules[moduleName])
-                if moduleVersion:
-                    print(moduleName, moduleVersion)
+            else:
+                try:
+                    # May raise importlib.metadata.PackageNotFoundError
+                    moduleVersion = imeta.version(moduleName)
+                except Exception:
+                    pass
+            if moduleVersion:
+                print(moduleName, moduleVersion)
 
-        modules = set(module.name for _, info in supportedCompressions.items() for module in info.modules)
+        modules = [module.name for _, info in supportedCompressions.items() for module in info.modules]
+        # Indirect dependencies for PySquashfsImage and other things.
+        modules += ["lz4", "python-lzo", "zstandard", "isal", "fast_zip_decryption", "pygit2"]
+        for moduleName in sorted(list(set(modules))):
+            printModuleVersion(moduleName)
+
+        print()
+        print("Fsspec Backends:")
+        print()
+
+        # fmt: off
+        modules = [
+            "fsspec",
+            "sshfs",
+            "smbprotocol",
+            "dropboxdrivefs",
+            "ipfsspec",
+            "s3fs",
+            "webdav4",
+            # Indirect dependencies. Would be nice to be able to get this programmatically but
+            # this might be too much to ask for.
+            "asyncssh",         # sshfs
+            "requests",
+            "aiohttp",          # httpfs, s3fs, ...
+            "pyopenssl",        # sshfs
+            "cryptography",     # smbprotocol
+            "pyspnego",         # smbprotocol
+            "dropbox",
+            "multiformats",
+            "dag-cbor",         # ipfsspec
+            "pure-protobuf",
+            "aiobotocore",      # s3fs
+            "httpx",            # webdav4
+            "python-dateutil",  # webdav4
+        ]
+        # fmt: on
         for moduleName in sorted(list(modules)):
             printModuleVersion(moduleName)
 
@@ -1111,19 +1154,28 @@ class PrintOSSAttributionAction(argparse.Action):
     def __call__(self, parser, args, values, option_string=None):
         licenses = []
         for name, githubPath in [
-            ("fusepy", "/fusepy/fusepy/master/LICENSE"),
-            ("python-xz", "/Rogdham/python-xz/master/LICENSE.txt"),
-            ("rarfile", "/markokr/rarfile/master/LICENSE"),
-            ("libfuse", "/libfuse/libfuse/master/LGPL2.txt"),
-            ("libsqlite3", "/sqlite/sqlite/master/LICENSE.md"),
-            ("cpython", "/python/cpython/main/LICENSE"),
-            ("libzstd-seek", "/martinellimarco/libzstd-seek/main/LICENSE"),
-            ("zstd", "/facebook/zstd/dev/LICENSE"),
-            ("zlib", "/madler/zlib/master/LICENSE"),
-            ("ratarmountcore", "/mxmlnkn/ratarmount/master/core/LICENSE"),
-            ("indexed_gzip", "/mxmlnkn/indexed_gzip/master/LICENSE"),
-            ("indexed_zstd", "/martinellimarco/indexed_zstd/master/LICENSE"),
-            ("rapidgzip", "/mxmlnkn/rapidgzip/master/LICENSE-MIT"),
+            ("fusepy", "/fusepy/fusepy/master/LICENSE"),  # ISC
+            ("python-xz", "/Rogdham/python-xz/master/LICENSE.txt"),  # MIT
+            ("rarfile", "/markokr/rarfile/master/LICENSE"),  # ISC
+            ("libfuse", "/libfuse/libfuse/master/LGPL2.txt"),  # LGPL 2.1
+            ("libsqlite3", "/sqlite/sqlite/master/LICENSE.md"),  # "The author disclaims copyright to this source code"
+            ("cpython", "/python/cpython/main/LICENSE"),  # PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2
+            ("libzstd-seek", "/martinellimarco/libzstd-seek/main/LICENSE"),  # MIT
+            ("zstd", "/facebook/zstd/dev/LICENSE"),  # BSD-3 with "name of the copyright holder" explicitly filled in
+            ("zlib", "/madler/zlib/master/LICENSE"),  # zlib License
+            ("ratarmountcore", "/mxmlnkn/ratarmount/master/core/LICENSE"),  # MIT
+            ("indexed_gzip", "/pauldmccarthy/indexed_gzip/master/LICENSE"),  # zlib License
+            ("indexed_zstd", "/martinellimarco/indexed_zstd/master/LICENSE"),  # MIT
+            ("rapidgzip", "/mxmlnkn/rapidgzip/master/LICENSE-MIT"),  # MIT or Apache License 2.0
+            ("fast-zip-decryption", "/mxmlnkn/fast-zip-decryption/LICENSE"),  # MIT
+            ("fsspec", "/fsspec/filesystem_spec/LICENSE"),  # BSD-3
+            ("sshfs", "/fsspec/sshfs/LICENSE"),  # Apache License 2.0
+            ("ipfsspec", "/fsspec/ipfsspec/LICENSE"),  # MIT
+            ("smbprotocol", "/jborean93/smbprotocol/LICENSE"),  # MIT
+            ("dropboxdrivefs", "/fsspec/dropboxdrivefs/LICENSE"),  # BSD-3
+            ("s3fs", "/fsspec/s3fs/LICENSE.txt"),  # BSD-3
+            ("webdav4", "/skshetry/webdav4/LICENSE"),  # MIT
+            ("asyncssh", "/ronf/asyncssh/LICENSE"),  # EPL 2.0
         ]:
             licenseUrl = "https://raw.githubusercontent.com" + githubPath
             licenseContents = urllib.request.urlopen(licenseUrl).read().decode()

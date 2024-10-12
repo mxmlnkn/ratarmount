@@ -245,7 +245,6 @@ class TestSQLiteIndexedTarParallelized:
                     assert isinstance(folderContents, dict)
                     for name in folderContents:  # pylint: disable=not-an-iterable
                         path = os.path.join(folder, name)
-                        print(path)
                         fileInfo = indexedTar.getFileInfo(path)
                         if not fileInfo:
                             continue

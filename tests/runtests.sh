@@ -2,7 +2,7 @@
 
 cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." || { echo 'Failed to cd to ratarmount.py folder!'; exit 1; }
 
-export PYTHONTRACEMALLOC=1
+#export PYTHONTRACEMALLOC=1
 
 if [[ -z "$RATARMOUNT_CMD" ]]; then
     TEST_EXTERNAL_COMMAND=0
@@ -16,7 +16,7 @@ export RATARMOUNT_CMD
 echo "RATARMOUNT_CMD: $RATARMOUNT_CMD"
 
 if [[ -z "$PARALLELIZATIONS" ]]; then
-    PARALLELIZATIONS="1 2 0"
+    PARALLELIZATIONS="1 2"
 fi
 
 # MAC does not have mountpoint check!
@@ -2115,7 +2115,7 @@ checkURLProtocolS3()
 
     weedFolder=$( mktemp -d --suffix .test.ratarmount )
     TMP_FILES_TO_CLEANUP+=( "$weedFolder" )
-    ./weed server -dir="$weedFolder" -s3 -s3.port "$port" -idleTimeout=30 -ip 127.0.0.1 2>weed.log &
+    ./weed server -dir="$weedFolder" -s3 -s3.port "$port" -idleTimeout=30 -ip 127.0.0.1 &
     pid=$!
 
     # Wait for port to open
@@ -2198,8 +2198,142 @@ checkURLProtocolSamba()
 
     smbclient --user="$user" --password="$password" --port "$port" -c ls //127.0.0.1/test-share
 
-    checkFileInTAR "smb://$user:$password@127.0.0.1:$port/test-share/single-file.tar" bar d3b07384d113edec49eaa6238ad5ff00 ||
-        returnError "$LINENO" 'Failed to read from Samba server'
+    checkFileInTAR "smb://$user:$password@127.0.0.1:$port/test-share/single-file.tar" \
+        bar d3b07384d113edec49eaa6238ad5ff00 || returnError "$LINENO" 'Failed to read from Samba server'
+    checkFileInTAR "smb://$user:$password@127.0.0.1:$port/test-share/" \
+        single-file.tar 1a28538854d1884e4415cb9bfb7a2ad8 || returnError "$LINENO" 'Failed to read from Samba server'
+    checkFileInTAR "smb://$user:$password@127.0.0.1:$port/test-share" \
+        single-file.tar 1a28538854d1884e4415cb9bfb7a2ad8 || returnError "$LINENO" 'Failed to read from Samba server'
+}
+
+
+checkURLProtocolIPFS()
+{
+    # TODO ipfsspec still fails to import with Python 3.14
+    #      https://github.com/eigenein/protobuf/issues/177
+    python3MinorVersion=$( python3 -c 'import sys; print(sys.version_info.minor)' )
+    if [[ -n "$python3MinorVersion" && "$python3MinorVersion" -ge 14 ]]; then
+        return 0
+    fi
+
+    # Using impacket/examples/smbserver.py does not work for a multidude of reasons.
+    # Therefore set up a server with tests/install-smbd.sh from outside and check for its existence here.
+    local ipfs
+    if command -v ipfs &>/dev/null; then
+        ipfs=ipfs
+    elif [[ -f ipfs ]]; then
+        ipfs=./ipfs
+    else
+        wget -O- 'https://github.com/ipfs/kubo/releases/download/v0.30.0/kubo_v0.30.0_linux-amd64.tar.gz' |
+            tar -zx kubo/ipfs
+        ipfs=kubo/ipfs
+    fi
+
+    local pid=
+    $ipfs init --profile server
+    if ! pgrep ipfs; then
+        $ipfs daemon &
+        pid=$!
+        sleep 5
+    fi
+
+    local folder
+    folder=$( mktemp -d --suffix .test.ratarmount )
+    cp tests/single-file.tar "$folder/"
+    $ipfs add -r "$folder/"
+    # These hashes should be reproducible as long as neither the contents nor the file names change!
+    #added QmcbpsdbKYMpMjXvoFbr9pUWC3Z7ZQVXuEoPFRHaNukAsX tests/single-file.tar
+    #added QmZwm9gKZaayGWqYtMgj6cd4JaNK1Yp2ChYZhXrERGq4Gi tests
+
+    checkFileInTARForeground "ipfs://QmcbpsdbKYMpMjXvoFbr9pUWC3Z7ZQVXuEoPFRHaNukAsX" bar \
+        d3b07384d113edec49eaa6238ad5ff00 || returnError "$LINENO" 'Failed to read from IPFS'
+    checkFileInTARForeground "ipfs://QmZwm9gKZaayGWqYtMgj6cd4JaNK1Yp2ChYZhXrERGq4Gi" single-file.tar \
+        1a28538854d1884e4415cb9bfb7a2ad8 || returnError "$LINENO" 'Failed to read from IPFS'
+
+    if [[ -n "$pid" ]]; then kill "$pid"; fi
+}
+
+
+checkURLProtocolWebDAV()
+{
+    if ! pip show wsgidav &>/dev/null; then
+        echoerr "Skipping WebDAV test because wsigdav package is not installed."
+        return 0
+    fi
+
+    local port=8047
+    # BEWARE OF LOOP MOUNTS when testing locally!
+    # It will time out, when trying to expose PWD via WebDAV while mounting into PWD/mounted.
+    wsgidav --host=127.0.0.1 --port=8047 --root="$PWD" --auth=anonymous &
+    local pid=$!
+    sleep 5
+
+    checkFileInTARForeground "webdav://127.0.0.1:$port/single-file.tar" bar \
+        d3b07384d113edec49eaa6238ad5ff00 || returnError "$LINENO" 'Failed to read from WebDAV server'
+    checkFileInTARForeground "webdav://127.0.0.1:$port" single-file.tar \
+        1a28538854d1884e4415cb9bfb7a2ad8 || returnError "$LINENO" 'Failed to read from WebDAV server'
+
+    kill "$pid"
+
+    local user password
+    user='pqvfumqbqp'
+    password='ioweb123GUIweb'
+
+cat <<EOF > wsgidav-config.yaml
+http_authenticator:
+    domain_controller: null  # Same as wsgidav.dc.simple_dc.SimpleDomainController
+    accept_basic: true  # Pass false to prevent sending clear text passwords
+    accept_digest: true
+    default_to_digest: true
+
+simple_dc:
+    user_mapping:
+        "*":
+            "$user":
+                password: "$password"
+EOF
+
+    wsgidav --host=127.0.0.1 --port=8047 --root="$PWD" --config=wsgidav-config.yaml &
+    pid=$!
+    sleep 5
+
+    checkFileInTARForeground "webdav://$user:$password@127.0.0.1:$port/single-file.tar" bar \
+        d3b07384d113edec49eaa6238ad5ff00 || returnError "$LINENO" 'Failed to read from WebDAV server'
+    checkFileInTARForeground "webdav://$user:$password@127.0.0.1:$port" single-file.tar \
+        1a28538854d1884e4415cb9bfb7a2ad8 || returnError "$LINENO" 'Failed to read from WebDAV server'
+
+    export WEBDAV_USER=$user
+    export WEBDAV_PASSWORD=$password
+    checkFileInTARForeground "webdav://127.0.0.1:$port/single-file.tar" bar \
+        d3b07384d113edec49eaa6238ad5ff00 || returnError "$LINENO" 'Failed to read from WebDAV server'
+    checkFileInTARForeground "webdav://127.0.0.1:$port" single-file.tar \
+        1a28538854d1884e4415cb9bfb7a2ad8 || returnError "$LINENO" 'Failed to read from WebDAV server'
+    unset WEBDAV_USER
+    unset WEBDAV_PASSWORD
+
+    # This server using SSL also works, but do not overload it with regular tests.
+    # ratarmount 'webdav://www.dlp-test.com\WebDAV:WebDAV@www.dlp-test.com/webdav' mounted
+    # checkFileInTARForeground "webdav://www.dlp-test.com\WebDAV:WebDAV@www.dlp-test.com/webdav" \
+    #     mounted/WebDAV_README.txt 87d13914fe24e486be943cb6b1f4e224 ||
+    #     returnError "$LINENO" 'Failed to read from WebDAV server'
+
+    kill "$pid"
+}
+
+
+checkURLProtocolDropbox()
+{
+    if [[ -z "$DROPBOX_TOKEN" ]]; then
+        echo "Skipping Dropbox test because DROPBOX_TOKEN is not configured."
+        return 0
+    fi
+
+    checkFileInTAR "dropbox://tests/single-file.tar" bar d3b07384d113edec49eaa6238ad5ff00 ||
+        returnError "$LINENO" 'Failed to read from Dropbox'
+    checkFileInTAR "dropbox://tests/" single-file.tar 1a28538854d1884e4415cb9bfb7a2ad8 ||
+        returnError "$LINENO" 'Failed to read from Dropbox'
+    checkFileInTAR "dropbox://tests" single-file.tar 1a28538854d1884e4415cb9bfb7a2ad8 ||
+        returnError "$LINENO" 'Failed to read from Dropbox'
 }
 
 
@@ -2214,12 +2348,13 @@ checkRemoteSupport()
     checkURLProtocolFTP || returnError 'Failed ftp:// check'
 
     checkURLProtocolHTTP || returnError 'Failed http:// check'
+    checkURLProtocolIPFS || returnError 'Failed ipfs:// check'
     checkURLProtocolS3 || returnError 'Failed s3:// check'
     checkURLProtocolSSH || returnError 'Failed ssh:// check'
 
+    checkURLProtocolDropbox || returnError 'Failed dropbox:// check'
     checkURLProtocolSamba || returnError 'Failed smb:// check'
-    # TODO Add and test IPFS
-    # TODO look for other fsspec implementations in an automated manner
+    checkURLProtocolWebDAV || returnError 'Failed webdav:// check'
 }
 
 
@@ -2549,6 +2684,9 @@ pytestedTests+=(
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   03.sparse1.bin
 )
 
+# This is slow and it should not make much of a difference for the different parallelizations.
+parallelization=1
+checkRemoteSupport
 
 for parallelization in $PARALLELIZATIONS; do
 
@@ -2559,7 +2697,6 @@ if [[ ! -f tests/2k-recursive-tars.tar ]]; then
     bzip2 -q -d -k tests/2k-recursive-tars.tar.bz2
 fi
 
-checkRemoteSupport
 checkStatfs || returnError "$LINENO" 'Statfs failed!'
 checkStatfsWriteOverlay || returnError "$LINENO" 'Statfs with write overlay failed!'
 checkSymbolicLinkRecursion || returnError "$LINENO" 'Symbolic link recursion failed!'

@@ -4,7 +4,9 @@
 # pylint: disable=no-member,abstract-method
 # Disable pylint errors. See https://github.com/fsspec/filesystem_spec/issues/1678
 
+import http
 import os
+import re
 import stat
 import sys
 import traceback
@@ -59,6 +61,23 @@ try:
 
 except ImportError:
     FixedSSHFileSystem = None  # type: ignore
+
+try:
+    from webdav4.fsspec import WebdavFileSystem
+except ImportError:
+    WebdavFileSystem = None  # type: ignore
+
+try:
+    from dropboxdrivefs import DropboxDriveFileSystem
+
+    class FixedDropboxDriveFileSystem(DropboxDriveFileSystem):
+        def info(self, url, **kwargs):
+            if url == ('/', ''):
+                return {'size': 0, 'name': '/', 'type': 'directory'}
+            return super().info(url, **kwargs)
+
+except ImportError:
+    FixedDropboxDriveFileSystem = None  # type: ignore
 
 
 def _openRarMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
@@ -255,6 +274,62 @@ def tryOpenURL(url, printDebug: int) -> Union[MountSource, IO[bytes], str]:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             fileSystem, path = fsspec.url_to_fs(url)
+    elif protocol == 'webdav':
+        # WebDAV needs special handling because we need to decide between HTTP and HTTPS and because of:
+        # https://github.com/skshetry/webdav4/issues/197
+        if not WebdavFileSystem:
+            raise RatarmountError(f"Install the webdav4 Python package to mount {protocol}://.")
+
+        matchedURI = re.match("(?:([^:/]*):([^@/]*)@)?([^/]*)(.*)", splitURI[1])
+        if not matchedURI:
+            raise RatarmountError(
+                "Failed to match WebDAV URI of the format webdav://[user:password@]host[:port][/path]\n"
+                "If your user name or password contains special characters such as ':/@', then use the environment "
+                "variables WEBDAV_USER and WEBDAV_PASSWORD to specify them."
+            )
+        username, password, baseURL, path = matchedURI.groups()
+        if path is None:
+            path = ""
+        if username is None and 'WEBDAV_USER' in os.environ:
+            username = os.environ.get('WEBDAV_USER')
+        if password is None and 'WEBDAV_PASSWORD' in os.environ:
+            password = os.environ.get('WEBDAV_PASSWORD')
+        auth = None if username is None or password is None else (username, password)
+
+        def checkForHTTPS(url):
+            try:
+                connection = http.client.HTTPSConnection(url, timeout=2)
+                connection.request("HEAD", "/")
+                return bool(connection.getresponse())
+            except Exception as exception:
+                if printDebug >= 3:
+                    print("[Info] Determined WebDAV URL to not use HTTP instead HTTPS because of:", exception)
+                return False
+
+        transportProtocol = "https" if checkForHTTPS(baseURL) else "http"
+        fileSystem = WebdavFileSystem(f"{transportProtocol}://{baseURL}", auth=auth)
+    elif protocol == 'dropbox':
+        # Dropbox needs special handling because there is no way to specify the token and because
+        # there are some obnoxius intricacies regarding ls and stat of the root folder.
+        if FixedDropboxDriveFileSystem is None:
+            raise RatarmountError(f"Install the dropboxdrivefs Python package to mount {protocol}://.")
+
+        dropboxToken = os.environ.get('DROPBOX_TOKEN', None)
+        if not dropboxToken:
+            raise RatarmountError(
+                "Please set the DROPBOX_TOKEN environment variable to mount dropbox:// URLs. "
+                "Please refer to the ratarmount online ReadMe or to the DropBox documentation for creating a token."
+            )
+
+        fileSystem = FixedDropboxDriveFileSystem(token=dropboxToken)
+        path = splitURI[1]
+        # Dropbox requires all paths to start with /, so simply add it
+        # instead of making each user run into this problem.
+        if path and not path.startswith('/'):
+            path = '/' + path
+        # Dropbox also does not like trailing / -.-. God is it super finicky.
+        # dropbox.exceptions.ApiError: ApiError('12345', GetMetadataError('path', LookupError('malformed_path', None)))
+        path = path.rstrip('/')
     else:
         fileSystem, path = fsspec.url_to_fs(url)
 

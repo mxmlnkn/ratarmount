@@ -3,7 +3,7 @@
 user='pqvfumqbqp'
 password='ioweb123GUIweb'
 
-apt install samba
+apt-get install samba
 cat <<EOF | sudo tee /etc/samba/smb.conf
 [global]
 usershare allow guests = no
@@ -21,7 +21,7 @@ EOF
 
 # Unfortunately, we need a user because anonymous/guest login does not seem to work with smbprotocol:
 # https://github.com/jborean93/smbprotocol/issues/168
-adduser --quiet --no-create-home --disabled-password --disabled-login "$user"
+adduser --quiet --no-create-home --disabled-password --disabled-login --gecos "First Last,RoomNumber,WorkPhone,HomePhone" "$user"
 smbpasswd -a "$user" -w "$password"  # type password here ioweb123GUIweb
 
 systemctl restart smbd nmbd

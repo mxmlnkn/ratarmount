@@ -26,3 +26,5 @@ pyminizip
 pyopenssl>=23
 rangehttpserver
 boto3
+wsgidav
+cheroot

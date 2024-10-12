@@ -76,6 +76,7 @@ full = [
     # Pin to < 3.12 because of https://github.com/nathanhi/pyfatfs/issues/41
     'pyfatfs ~= 1.0; python_version < "3.12.0"',
     "fast_zip_decryption",
+    "pygit2",
     # fsspec:
     "requests",
     "aiohttp",
@@ -84,12 +85,13 @@ full = [
     # https://github.com/ronf/asyncssh/issues/690
     "pyopenssl>=23",
     "smbprotocol",
-    "pygit2",
+    "dropboxdrivefs",
     "fsspec",
+    "ipfsspec",
     "s3fs",
+    "webdav4",
     #"gcsfs",  # untested
     #"adlfs",  # untested. build error in Python 3.13
-    #"dropboxdrivefs",  # untested
 ]
 bzip2 = ["rapidgzip >= 0.13.1"]
 git = ["pygit2"]
@@ -102,12 +104,14 @@ fsspec = [
     # Need newer pyopenssl than comes with Ubuntu 22.04.
     # https://github.com/ronf/asyncssh/issues/690
     "pyopenssl>=23",
-    "smbprotocol",  # build error in Python 3.13
+    "smbprotocol",
+    "dropboxdrivefs",
     "fsspec",
+    "ipfsspec",
     "s3fs",
+    "webdav4",
     #"gcsfs",  # untested
     #"adlfs",  # untested. build error in Python 3.13
-    #"dropboxdrivefs",  # untested
     # "dask", "distributed" : ~34 MB, ~10 MB gzip-compressed
     # "pyarrow >= 1" : ~196 MB, ~60 MB gzip-compressed, build error in Python 3.13
     # "ocifs" : ~350 MB
@@ -146,6 +150,17 @@ zstd = [
 fat = [
     'pyfatfs ~= 1.0; python_version < "3.12.0"',
     'pyfatfs@git+https://github.com/mxmlnkn/pyfatfs.git@v1.2.0 ; python_version >= "3.12.0"',
+]
+# All optional dependencies of asyncssh via sshfs. I have not yet needed any of these.
+# Half of these are installed anyway via other dependencies.
+full-ssh = [
+    "sshfs[bcrypt]",
+    "sshfs[fido2]",
+    "sshfs[gssapi]",
+    "sshfs[libnacl]",
+    "sshfs[python-pkcs11]",
+    "sshfs[pyOpenSSL]",
+    #"sshfs[pywin32]",  # Only Windows? asyncssh has no platform specifier though...
 ]
 
 [tool.setuptools]

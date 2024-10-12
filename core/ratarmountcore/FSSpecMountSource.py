@@ -17,6 +17,16 @@ try:
 except ImportError:
     fsspec = None  # type: ignore
 
+try:
+    from webdav4.fsspec import WebdavFileSystem
+except ImportError:
+    WebdavFileSystem = None  # type: ignore
+
+try:
+    from dropboxdrivefs import DropboxDriveFileSystem
+except ImportError:
+    DropboxDriveFileSystem = None  # type: ignore
+
 
 class FSSpecMountSource(MountSource):
     """
@@ -71,12 +81,16 @@ class FSSpecMountSource(MountSource):
 
         # The fsspec filesystems are not uniform! http:// expects the arguments to isdir with prefixed
         # protocol while other filesystem implementations are fine with only the path.
-        # https://github.com/ray-project/ray/issues/26423#issuecomment-1179561181
-        self._isHTTP = isinstance(self.fileSystem, fsspec.implementations.http.HTTPFileSystem)
+        #  - https://github.com/ray-project/ray/issues/26423#issuecomment-1179561181
+        #  - https://github.com/fsspec/filesystem_spec/issues/1713
+        #  - https://github.com/skshetry/webdav4/issues/198
+        self._pathsRequireQuoting = isinstance(self.fileSystem, fsspec.implementations.http.HTTPFileSystem)
+        if WebdavFileSystem:
+            self._pathsRequireQuoting = self._pathsRequireQuoting or isinstance(self.fileSystem, WebdavFileSystem)
         self.prefix = prefix.rstrip("/") if prefix and prefix.strip("/") and self.fileSystem.isdir(prefix) else ""
 
     def _getPath(self, path: str) -> str:
-        if self._isHTTP:
+        if self._pathsRequireQuoting:
             path = urllib.parse.quote(path)
         if self.prefix:
             if not path or path == "/":
@@ -110,9 +124,10 @@ class FSSpecMountSource(MountSource):
         #      They kinda work only like hardlinks.
         # https://github.com/fsspec/filesystem_spec/issues/1679
         # https://github.com/fsspec/filesystem_spec/issues/1680
+        size = entry.get('size', 0)
         return FileInfo(
             # fmt: off
-            size     = entry.get('size', 0),
+            size     = size if size else 0,
             mtime    = FSSpecMountSource._getModificationTime(entry),
             mode     = FSSpecMountSource._getMode(entry),
             linkname = "",
@@ -132,6 +147,14 @@ class FSSpecMountSource(MountSource):
 
     def _listDir(self, path: str, onlyMode: bool) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         path = self._getPath(path)
+
+        if path == '/' and DropboxDriveFileSystem and isinstance(self.fileSystem, DropboxDriveFileSystem):
+            # We need to work around this obnoxious error:
+            # dropbox.exceptions.BadInputError: BadInputError(
+            #   '12345', 'Error in call to API function "files/list_folder":
+            #    request body: path: Specify the root folder as an empty string rather than as "/".')
+            # On the other hand, all paths must start with / or else they will not be found...
+            path = ""
 
         result = self.fileSystem.listdir(path, detail=True)
         if not result:
@@ -181,10 +204,14 @@ class FSSpecMountSource(MountSource):
             )
             for entry in result
         }
-        if self._isHTTP:
+
+        # For HTTPFileSystem, we need to filter out the entries for sorting.
+        # For WebDAV we do not even need to unquote! We get unquoted file names with ls!
+        if isinstance(self.fileSystem, fsspec.implementations.http.HTTPFileSystem):
             return {
                 urllib.parse.unquote(name): info for name, info in result.items() if not name.startswith(('?', '#'))
             }
+
         return result
 
     @overrides(MountSource)
@@ -214,7 +241,7 @@ class FSSpecMountSource(MountSource):
 
     @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
-        if self._isHTTP:
+        if isinstance(self.fileSystem, fsspec.implementations.http.HTTPFileSystem):
             return self._getFileInfoHTTP(path)
 
         path = self._getPath(path)
@@ -236,6 +263,12 @@ class FSSpecMountSource(MountSource):
             #   asyncssh/sftp.py", line 2484, in _process_status
             #     raise exc
             # asyncssh.sftp.SFTPNoSuchFile: No such file
+            #
+            # Dropbox also does not like this:
+            #
+            # dropbox.exceptions.BadInputError: BadInputError('12345',
+            #   'Error in call to API function "files/get_metadata":
+            #   request body: path: The root folder is unsupported.')
             return self.rootFileInfo.clone()
 
         if not self.fileSystem.lexists(path):
