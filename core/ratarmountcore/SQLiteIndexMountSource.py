@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from typing import Dict, Iterable, Optional, Union
+# pylint: disable=abstract-method
+
+from typing import Any, Callable, Dict, Iterable, Optional, Union
 
 from .MountSource import FileInfo, MountSource
 from .SQLiteIndex import SQLiteIndex
@@ -9,11 +11,13 @@ from .utils import overrides
 
 
 class SQLiteIndexMountSource(MountSource):
-    def __init__(self, index: SQLiteIndex, clearIndexCache: bool) -> None:
+    def __init__(
+        self, index: SQLiteIndex, clearIndexCache: bool, checkMetadata: Optional[Callable[[Dict[str, Any]], None]]
+    ) -> None:
         self.index = index
         if clearIndexCache:
             self.index.clearIndexes()
-        self.index.openExisting()
+        self.index.openExisting(checkMetadata=checkMetadata)
 
     def __enter__(self):
         return self

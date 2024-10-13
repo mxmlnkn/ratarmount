@@ -786,13 +786,13 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 indexFolders=indexFolders,
                 archiveFilePath=archiveFilePath,
                 encoding=self.encoding,
-                checkMetadata=self._checkMetadata,
                 printDebug=self.printDebug,
                 indexMinimumFileCount=indexMinimumFileCount,
                 backendName='SQLiteIndexedTar',
                 ignoreCurrentFolder=self.isFileObject and self._fileNameIsURL,
             ),
             clearIndexCache=clearIndexCache,
+            checkMetadata=self._checkMetadata,
         )
 
         if self.index.indexIsLoaded():

@@ -445,12 +445,12 @@ class SquashFSMountSource(SQLiteIndexMountSource):
                 indexFolders=indexFolders,
                 archiveFilePath=self.archiveFilePath,
                 encoding=self.encoding,
-                checkMetadata=self._checkMetadata,
                 printDebug=self.printDebug,
                 indexMinimumFileCount=indexMinimumFileCount,
                 backendName='SquashFSMountSource',
             ),
             clearIndexCache=clearIndexCache,
+            checkMetadata=self._checkMetadata,
         )
 
         isFileObject = not isinstance(fileOrPath, str)

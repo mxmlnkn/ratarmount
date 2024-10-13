@@ -67,12 +67,12 @@ class ZipMountSource(SQLiteIndexMountSource):
                 indexFolders=indexFolders,
                 archiveFilePath=self.archiveFilePath,
                 encoding=self.encoding,
-                checkMetadata=self._checkMetadata,
                 printDebug=self.printDebug,
                 indexMinimumFileCount=indexMinimumFileCount,
                 backendName='ZipMountSource',
             ),
             clearIndexCache=clearIndexCache,
+            checkMetadata=self._checkMetadata,
         )
 
         isFileObject = not isinstance(fileOrPath, str)

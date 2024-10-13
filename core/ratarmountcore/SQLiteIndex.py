@@ -178,7 +178,6 @@ class SQLiteIndex:
         archiveFilePath: Optional[str] = None,
         *,  # force all parameters after to be keyword-only
         encoding: str = tarfile.ENCODING,
-        checkMetadata: Optional[Callable[[Dict[str, Any]], None]] = None,
         printDebug: int = 0,
         preferMemory: bool = False,
         indexMinimumFileCount: int = 0,
@@ -194,10 +193,6 @@ class SQLiteIndex:
             Specify one or multiple paths for storing .index.sqlite files. Paths will be tested for
             suitability in the given order. An empty path will be interpreted as the location in which
             the archive resides in.
-        checkMetadata
-            A verifying callback that is called when opening an existing index. It is given the
-            the dictionary of metadata in the index and should thrown an exception when the index
-            should not be used, e.g., because the version is incompatible.
         preferMemory
             If True, then load existing indexes and write to explicitly given index file paths but
             if no such things are given, then create the new index in memory as if indexFilePath
@@ -225,7 +220,6 @@ class SQLiteIndex:
         )
         # stores which parent folders were last tried to add to database and therefore do exist
         self.parentFolderCache: List[Tuple[str, str]] = []
-        self.checkMetadata = checkMetadata
         self.preferMemory = preferMemory
         self.indexMinimumFileCount = indexMinimumFileCount
         self.backendName = backendName
@@ -281,10 +275,10 @@ class SQLiteIndex:
             if os.path.isfile(indexPath):
                 os.remove(indexPath)
 
-    def openExisting(self):
+    def openExisting(self, checkMetadata: Optional[Callable[[Dict[str, Any]], None]] = None):
         """Tries to find an already existing index."""
         for indexPath in self.possibleIndexFilePaths:
-            if self._tryLoadIndex(indexPath):
+            if self._tryLoadIndex(indexPath, checkMetadata=checkMetadata):
                 self.indexFilePath = indexPath
                 break
 
@@ -954,8 +948,15 @@ class SQLiteIndex:
 
         return True
 
-    def loadIndex(self, indexFilePath: AnyStr) -> None:
-        """Loads the given index SQLite database and checks it for validity raising an exception if it is invalid."""
+    def _loadIndex(self, indexFilePath: AnyStr, checkMetadata: Optional[Callable[[Dict[str, Any]], None]]) -> None:
+        """
+        Loads the given index SQLite database and checks it for validity raising an exception if it is invalid.
+
+        checkMetadata
+            A verifying callback that is called when opening an existing index. It is given the
+            the dictionary of metadata in the index and should thrown an exception when the index
+            should not be used, e.g., because the version is incompatible.
+        """
         if self.indexIsLoaded():
             return
 
@@ -1000,9 +1001,9 @@ class SQLiteIndex:
 
             if 'metadata' in tables:
                 metadata = dict(self.sqlConnection.execute('SELECT * FROM metadata;'))
-                if self.checkMetadata:
+                if checkMetadata:
                     self.checkMetadataBackend(metadata)
-                    self.checkMetadata(metadata)
+                    checkMetadata(metadata)
 
         except Exception as e:
             # indexIsLoaded checks self.sqlConnection, so close it before returning because it was found to be faulty
@@ -1033,8 +1034,10 @@ class SQLiteIndex:
         if self.printDebug >= 1:
             print(f"Successfully loaded offset dictionary from {str(indexFilePath)}")
 
-    def _tryLoadIndex(self, indexFilePath: AnyStr) -> bool:
-        """calls loadIndex if index is not loaded already and provides extensive error handling"""
+    def _tryLoadIndex(
+        self, indexFilePath: AnyStr, checkMetadata: Optional[Callable[[Dict[str, Any]], None]] = None
+    ) -> bool:
+        """Calls loadIndex if index is not loaded already and provides extensive error handling."""
 
         if self.indexIsLoaded():
             return True
@@ -1043,7 +1046,7 @@ class SQLiteIndex:
             return False
 
         try:
-            self.loadIndex(indexFilePath)
+            self._loadIndex(indexFilePath, checkMetadata=checkMetadata)
         except MismatchingIndexError as e:
             raise e
         except Exception as exception:
