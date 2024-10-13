@@ -1207,7 +1207,8 @@ class SQLiteIndex:
             # calculated. For C, there actually is an incremental blob reading interface but not for Python:
             #   https://www.sqlite.org/c3ref/blob_open.html
             #   https://bugs.python.org/issue24905
-            print(f"Loading gzip block offsets took {time.time() - t0:.2f}s")
+            if self.printDebug >= 3:
+                print(f"[Info] Loading gzip block offsets took {time.time() - t0:.2f}s")
 
             return True
 

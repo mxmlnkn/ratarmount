@@ -96,7 +96,8 @@ full = [
 bzip2 = ["rapidgzip >= 0.13.1"]
 git = ["pygit2"]
 gzip = ["indexed_gzip >= 1.6.3, < 2.0"]
-fsspec = [
+fsspec = ["fsspec"]
+fsspec-backends = [
     # Copy-pasted from fsspec[full] list. Some were excluded because they are too unproportionally large.
     "requests",
     "aiohttp",
@@ -162,6 +163,9 @@ full-ssh = [
     "sshfs[pyOpenSSL]",
     #"sshfs[pywin32]",  # Only Windows? asyncssh has no platform specifier though...
 ]
+
+[project.entry-points."fsspec.specs"]
+ratar = "ratarmountcore.SQLiteIndexedTarFsspec.SQLiteIndexedTarFileSystem"
 
 [tool.setuptools]
 license-files = [

@@ -21,7 +21,7 @@ jobs:
     - name: Install pip Dependencies
       run: |
         python3 -m pip install --upgrade pip
-        python3 -m pip install --user fusepy pytest lz4 PySquashfsImage asyncssh
+        python3 -m pip install --user fusepy pytest lz4 PySquashfsImage asyncssh fsspec
 
     - name: Style Check With Black
       run: |
@@ -244,7 +244,7 @@ jobs:
 
     - name: Unit Tests
       run: |
-        python3 -m pip install pytest pytest-xdist
+        python3 -m pip install pytest pytest-xdist pandas
         for file in core/tests/test_*.py tests/test_*.py; do
             case "$file" in
               "tests/test_cli.py")

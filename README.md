@@ -80,6 +80,7 @@ A complete list of supported formats can be found [here](supported-formats).
    7. [Remote Files](#remote-files)
    8. [Writable Mounting](#writable-mounting)
    9. [As a Library](#as-a-library)
+   10. [Fsspec Integration](#fsspec-integration)
 
 
 # Installation
@@ -574,6 +575,9 @@ Some often-used configuration environment variables are copied here for easier v
 
 [Many other](https://filesystem-spec.readthedocs.io/en/latest/api.html#other-known-implementations) fsspec-based projects may also work when installed.
 
+This functionality of ratarmount offers a hopefully more-tested and out-of-the-box experience over the experimental [fsspec.fuse](https://filesystem-spec.readthedocs.io/en/latest/features.html#mount-anything-with-fuse) implementation.
+And, it also works in conjunction with the other features of ratarmount such as union mounting and recursive mounting.
+
 
 # Writable Mounting
 
@@ -642,3 +646,37 @@ Here is an example for applying modifications to a writable mount and then commi
 Ratarmount can also be used as a library.
 Using [ratarmountcore](core/), files inside archives can be accessed directly from Python code without requiring FUSE.
 For a more detailed description, see the [ratarmountcore readme here](core/).
+
+
+## Fsspec integration
+
+To use all fsspec features, either install via `pip install ratarmount[fsspec]` or `pip install ratarmount[fsspec]`.
+It should also suffice to simply `pip install fsspec` if ratarmountcore is already installed.
+The optional [fsspec](https://github.com/fsspec/filesystem_spec) integration is threefold:
+
+ 1. Files can be specified on the command line via URLs pointing to remotes as explained in [this section](#remote-files).
+ 2. A `ratarmountcore.MountSource` wrapping fsspec `AbstractFileSystem` [implementation](https://github.com/mxmlnkn/ratarmount/blob/master/core/ratarmountcore/SQLiteIndexedTarFsspec.py) has been added.
+    A specialized `SQLiteIndexedTarFileSystem` as a more performant and direct replacement for `fsspec.implementations.TarFileSystem` has also been added.
+    ```python3
+    from ratarmountcore.SQLiteIndexedTarFsspec import SQLiteIndexedTarFileSystem as ratarfs
+    fs = ratarfs("tests/single-file.tar")
+    print("Files in root:", fs.ls("/", detail=False))
+    print("Contents of /bar:", fs.cat("/bar"))
+    ```
+ 3. During installation ratarmountcore registers the `ratar://` protocol [with fsspec](https://filesystem-spec.readthedocs.io/en/latest/developer.html#implementing-a-backend) via an [entrypoint](https://setuptools.pypa.io/en/latest/userguide/quickstart.html#entry-points-and-automatic-script-creation) group.
+    This enables usages with `fsspec.open`.
+    The fsspec [URL chaining](https://filesystem-spec.readthedocs.io/en/latest/features.html#url-chaining) feature must be used in order for this to be useful.
+    Example for opening the file `bar`, which is contained inside the file `tests/single-file.tar.gz` with ratarmountcore:
+    ```python3
+    import fsspec
+    with fsspec.open("ratar://bar::file://tests/single-file.tar.gz") as file:
+        print("Contents of file bar:", file.read())
+    ```
+    This also [works with pandas](https://pandas.pydata.org/docs/user_guide/io.html#reading-writing-remote-files):
+    ```python3
+    import fsspec
+    import pandas as pd
+    with fsspec.open("ratar://bar::file://tests/single-file.tar.gz", compression=None) as file:
+        print("Contents of file bar:", file.read())
+    ```
+    The `compression=None` argument is currently necessary because of [this](https://github.com/pandas-dev/pandas/issues/60028) Pandas bug.

@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import stat
-from typing import Optional
+# pylint: disable=abstract-method,unused-argument
 
-from fsspec.spec import AbstractFileSystem
+import stat
+
+import fsspec
 
 from .MountSource import MountSource
+from .SQLiteIndexedTar import SQLiteIndexedTar
+from .utils import overrides
 
 
-class MountSourceFileSystem(AbstractFileSystem):
+class MountSourceFileSystem(fsspec.spec.AbstractFileSystem):
     """A thin adaptor from the MountSource interface to the fsspec AbstractFileSystem interface."""
 
     cachable = False
@@ -24,8 +27,6 @@ class MountSourceFileSystem(AbstractFileSystem):
 
     @staticmethod
     def _fileInfoToDict(name, fileInfo):
-        # obj.name and obj.filemode are None for the root tree!
-        is_dir = isinstance(obj, pygit2.Tree)
         return {
             "type": "directory" if stat.S_ISDIR(fileInfo.mode) else "file",
             "name": name,
@@ -33,7 +34,8 @@ class MountSourceFileSystem(AbstractFileSystem):
             "size": fileInfo.size,
         }
 
-    def ls(self, path, detail=True, ref=None, **kwargs):
+    @overrides(fsspec.spec.AbstractFileSystem)
+    def ls(self, path, detail=True, **kwargs):
         strippedPath = self._stripProtocol(path)
         if detail:
             result = self.mountSource.listDir(strippedPath)
@@ -48,29 +50,80 @@ class MountSourceFileSystem(AbstractFileSystem):
             raise FileNotFoundError(path)
         return list(result.keys()) if isinstance(result, dict) else result
 
-    def info(self, path, ref=None, **kwargs):
+    @overrides(fsspec.spec.AbstractFileSystem)
+    def info(self, path, **kwargs):
         result = self.mountSource.getFileInfo(self._stripProtocol(path))
         if result is None:
             raise FileNotFoundError(path)
-        return self._fileInfoToDict(result)
+        return self._fileInfoToDict(path, result)
 
+    @overrides(fsspec.spec.AbstractFileSystem)
     def _open(
         self,
         path,
         mode="rb",
         block_size=None,
+        autocommit=True,
+        cache_options=None,
         **kwargs,
     ):
         if mode != "rb":
             raise ValueError("Only binary reading is supported!")
-        return self.mountSource(self._stripProtocol(path))
+        fileInfo = self.mountSource.getFileInfo(self._stripProtocol(path))
+        if fileInfo is None:
+            raise FileNotFoundError(path)
+        return self.mountSource.open(fileInfo, buffering=block_size if block_size else -1)
 
 
-class SQLiteIndexedTarFileSystem(AbstractFileSystem):
-    """Browse the files of a (compressed) TAR archive quickly."""
+class SQLiteIndexedTarFileSystem(MountSourceFileSystem):
+    """
+    Browse the files of a (compressed) TAR archive quickly.
+
+    This is a more optimized alternative to fsspec.implementations.TarFileSystem.
+    """
 
     protocol = "ratar"
 
-    def __init__(self, tarFileName: Optional[str] = None, fileObject: Optional[IO[bytes]] = None, **kwargs):
+    def __init__(
+        self,
+        # It must be called "fo" for URL chaining to work!
+        # https://filesystem-spec.readthedocs.io/en/latest/features.html#url-chaining
+        fo=None,
+        *,  # force all parameters after to be keyword-only
+        target_options=None,
+        target_protocol=None,
+        **kwargs,
+    ):
         """Refer to SQLiteIndexedTar for all supported arguments and options."""
-        super().__init__(self, SQLiteIndexedTar(tarFileName, fileObject, **kwargs))
+
+        options = kwargs.copy()
+
+        self._openFile = None
+        if isinstance(fo, str):
+            # Implement URL chaining such as when calling fsspec.open("ratar://bar::file://single-file.tar").
+            if target_protocol:
+                self._openFile = fsspec.open(fo, protocol=target_protocol, **target_options)
+                # Set the TAR file name so that the index can be found/stored accordingly.
+                if target_protocol == 'file':
+                    options['tarFileName'] = fo
+                    if 'indexFilePath' not in options:
+                        options['indexFilePath'] = fo + ".index.sqlite"
+                    if 'writeIndex' not in options:
+                        options['writeIndex'] = True
+                if isinstance(self._openFile, fsspec.core.OpenFiles):
+                    self._openFile = self._openFile[0]
+                fo = self._openFile.open()
+            else:
+                options['tarFileName'] = fo
+                if 'writeIndex' not in options:
+                    options['writeIndex'] = True
+                fo = None
+
+        if fo:
+            options['fileObject'] = fo
+
+        super().__init__(SQLiteIndexedTar(**options))
+
+
+# Only in case the entry point hooks in the pyproject.toml are not working for some reason.
+fsspec.register_implementation("ratar", SQLiteIndexedTarFileSystem, clobber=True)
