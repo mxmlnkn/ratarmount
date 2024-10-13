@@ -319,8 +319,12 @@ class SQLiteIndex:
 
     def close(self):
         if self.sqlConnection:
-            self.sqlConnection.commit()
-            self.sqlConnection.close()
+            try:
+                self.sqlConnection.commit()
+                self.sqlConnection.close()
+            except sqlite3.ProgrammingError:
+                # Ignore "Cannot operate on a closed database."
+                pass
             self.sqlConnection = None
 
     def getConnection(self) -> sqlite3.Connection:
