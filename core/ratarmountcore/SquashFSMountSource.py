@@ -560,6 +560,8 @@ class SquashFSMountSource(SQLiteIndexMountSource):
 
     def __del__(self):
         self.close()
+        if hasattr(super(), '__del__'):
+            super().__del__()
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:

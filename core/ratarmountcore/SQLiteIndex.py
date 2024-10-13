@@ -317,6 +317,8 @@ class SQLiteIndex:
         # This is important in case SQLiteIndex is not used with a context manager
         # and the constructor raises an exception. There is no clean way to close it in that case!
         self.close()
+        if hasattr(super(), '__del__'):
+            super().__del__()
 
     def __exit__(self, exception_type, exception_value, exception_traceback):
         self.close()
