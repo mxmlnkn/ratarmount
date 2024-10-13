@@ -298,3 +298,14 @@ class FixedRawIOBase(io.RawIOBase):
                 break
             chunks.append(result)
         return b"".join(chunks)
+
+
+def getXdgCacheHome():
+    # https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
+    # > $XDG_CACHE_HOME defines the base directory relative to which user-specific non-essential data files should
+    # > be stored. If $XDG_CACHE_HOME is either not set or empty, a default equal to $HOME/.cache should be used.
+    path = os.environ.get('XDG_CACHE_HOME', '')
+    home = os.path.expanduser("~/")
+    if path.startswith(home):
+        path = "~/" + path[len(home) :]
+    return path if path else os.path.join('~', '.cache')
