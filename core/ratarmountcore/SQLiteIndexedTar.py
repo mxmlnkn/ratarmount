@@ -45,6 +45,7 @@ from .utils import (
     InvalidIndexError,
     CompressionError,
     ceilDiv,
+    getXdgCacheHome,
     isOnSlowDrive,
     overrides,
 )
@@ -769,7 +770,12 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             except Exception:
                 pass
 
-        if indexFolders and isinstance(indexFolders, str):
+        if indexFolders is None:
+            indexFolders = ['', os.path.join("~", ".ratarmount")]
+            xdgCacheHome = getXdgCacheHome()
+            if xdgCacheHome and os.path.isdir(os.path.expanduser(xdgCacheHome)):
+                indexFolders.insert(1, os.path.join(xdgCacheHome, 'ratarmount'))
+        elif isinstance(indexFolders, str):
             indexFolders = [indexFolders]
 
         archiveFilePath = self.tarFileName if not self.isFileObject or self._fileNameIsURL else None
