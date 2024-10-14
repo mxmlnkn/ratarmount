@@ -4,16 +4,23 @@
 import json
 import os
 import re
+import shutil
 import sqlite3
 import stat
 import sys
 import tarfile
+import tempfile
 import time
 import traceback
 import urllib.parse
 
 from typing import Any, AnyStr, Callable, Dict, IO, List, Optional, Tuple, Union
 from dataclasses import dataclass
+
+try:
+    import fsspec
+except ImportError:
+    fsspec = None  # type: ignore
 
 try:
     import indexed_gzip
@@ -27,9 +34,22 @@ except ImportError:
 
 from .version import __version__
 from .MountSource import FileInfo, createRootFileInfo
-from .compressions import TAR_COMPRESSION_FORMATS
+from .compressions import (
+    CompressionInfo,
+    LIBARCHIVE_FILTER_FORMATS,
+    TAR_COMPRESSION_FORMATS,
+    detectCompression,
+    findAvailableOpen,
+)
 from .SQLiteBlobFile import SQLiteBlobsFile, WriteSQLiteBlobs
-from .utils import RatarmountError, IndexNotOpenError, InvalidIndexError, findModuleVersion, MismatchingIndexError
+from .utils import (
+    CompressionError,
+    IndexNotOpenError,
+    InvalidIndexError,
+    RatarmountError,
+    MismatchingIndexError,
+    findModuleVersion,
+)
 
 
 def getSqliteTables(connection: sqlite3.Connection):
@@ -214,6 +234,9 @@ class SQLiteIndex:
         self.sqlConnection: Optional[sqlite3.Connection] = None
         # Will hold the actually opened valid path to an index file
         self.indexFilePath: Optional[str] = None
+        # This is true if the index file found was compressed or an URL and had to be downloaded
+        # and/or extracted into a temporary folder.
+        self.indexFilePathDeleteOnClose: bool = False
         self.encoding = encoding
         self.possibleIndexFilePaths = SQLiteIndex.getPossibleIndexFilePaths(
             indexFilePath, indexFolders, archiveFilePath, ignoreCurrentFolder
@@ -224,6 +247,7 @@ class SQLiteIndex:
         self.indexMinimumFileCount = indexMinimumFileCount
         self.backendName = backendName
         self._insertedRowCount = 0
+        self._temporaryIndexFile: Optional[Any] = None
 
         assert self.backendName
 
@@ -251,6 +275,8 @@ class SQLiteIndex:
         ignoreCurrentFolder: bool = False,
     ) -> List[str]:
         if indexFilePath:
+            if '://' in indexFilePath:
+                return [indexFilePath]
             return [] if indexFilePath == ':memory:' else [os.path.abspath(os.path.expanduser(indexFilePath))]
 
         if not archiveFilePath:
@@ -279,7 +305,6 @@ class SQLiteIndex:
         """Tries to find an already existing index."""
         for indexPath in self.possibleIndexFilePaths:
             if self._tryLoadIndex(indexPath, checkMetadata=checkMetadata):
-                self.indexFilePath = indexPath
                 break
 
     def openInMemory(self):
@@ -326,6 +351,8 @@ class SQLiteIndex:
                 # Ignore "Cannot operate on a closed database."
                 pass
             self.sqlConnection = None
+
+        self._setIndexFilePath(None)
 
     def getConnection(self) -> sqlite3.Connection:
         if self.sqlConnection:
@@ -459,6 +486,11 @@ class SQLiteIndex:
 
     @staticmethod
     def _pathIsWritable(path: str, printDebug: int = 0) -> bool:
+        # Writing indexes to remote filesystems currently not supported and we need to take care that URLs
+        # are not interpreted as local file paths, i.e., creating an ftp: folder with a user:password@host subfolder.
+        if '://' in path:
+            return False
+
         try:
             folder = os.path.dirname(path)
             if folder:
@@ -952,7 +984,31 @@ class SQLiteIndex:
 
         return True
 
-    def _loadIndex(self, indexFilePath: AnyStr, checkMetadata: Optional[Callable[[Dict[str, Any]], None]]) -> None:
+    def _setIndexFilePath(self, indexFilePath: Optional[str], deleteOnClose: bool = False):
+        # This is called from __del__, so we need to account for this being called when something
+        # in the constructor raises an exception and not all members of self exist.
+        if (
+            getattr(self, 'indexFilePath', None)
+            and getattr(self, 'indexFilePathDeleteOnClose', False)
+            and self.indexFilePath
+            and os.path.isfile(self.indexFilePath)
+        ):
+            try:
+                os.remove(self.indexFilePath)
+            except Exception as exception:
+                if self.printDebug >= 1:
+                    print(
+                        "[Warning] Failed to remove temporarily downloaded and/or extracted index file at:",
+                        self.indexFilePath,
+                        "because of:",
+                        exception,
+                    )
+
+        if hasattr(self, 'indexFilePath') and hasattr(self, 'indexFilePathDeleteOnClose'):
+            self.indexFilePath = indexFilePath
+            self.indexFilePathDeleteOnClose = deleteOnClose
+
+    def _loadIndex(self, indexFilePath: str, checkMetadata: Optional[Callable[[Dict[str, Any]], None]]) -> None:
         """
         Loads the given index SQLite database and checks it for validity raising an exception if it is invalid.
 
@@ -964,7 +1020,68 @@ class SQLiteIndex:
         if self.indexIsLoaded():
             return
 
-        self.sqlConnection = self._openSqlDb(indexFilePath)
+        # Download and/or extract the file to a temporary file if necessary.
+
+        # Strip file:// prefix to avoid useless copies to the temporary directory.
+        # TODO What about operator chainin?! It would be a valid use case for starting with file://!
+        fileURLPrefix = 'file://'
+        while indexFilePath.startswith(fileURLPrefix):
+            indexFilePath = indexFilePath[len(fileURLPrefix) :]
+
+        temporaryFolder = os.environ.get("RATARMOUNT_INDEX_TMPDIR", None)
+
+        def _undoCompression(file) -> Optional[Tuple[str, CompressionInfo]]:
+            compressionsToTest = TAR_COMPRESSION_FORMATS.copy()
+            compressionsToTest.update(LIBARCHIVE_FILTER_FORMATS)
+            compression = detectCompression(file, printDebug=self.printDebug, compressionsToTest=compressionsToTest)
+            if not compression or compression not in compressionsToTest:
+                return None
+
+            if self.printDebug >= 2:
+                print(f"[Info] Detected {compression}-compressed index.")
+
+            formatOpen = findAvailableOpen(compression)
+            if not formatOpen:
+                moduleNames = [module.name for module in TAR_COMPRESSION_FORMATS[compression].modules]
+                raise CompressionError(
+                    f"Cannot open a {compression} compressed index file {indexFilePath} "
+                    f"without any of these modules: {moduleNames}"
+                )
+
+            return formatOpen(file)
+
+        def _copyToTemp(file):
+            self._temporaryIndexFile = tempfile.NamedTemporaryFile(suffix=".tmp.sqlite.index", dir=temporaryFolder)
+            # TODO add progress bar / output?
+            with open(self._temporaryIndexFile.name, 'wb') as targetFile:
+                shutil.copyfileobj(file, targetFile)
+
+        if '://' in indexFilePath:
+            if fsspec is None:
+                raise RatarmountError(
+                    "Detected an URL for the index path but fsspec could not be imported!\n"
+                    "Try installing it with 'pip install fsspec' or 'pip install ratarmount[full]'."
+                )
+
+            # TODO Maybe manual deletion not even necessary when using tempfile correctly?
+            with fsspec.open(indexFilePath) as file:
+                decompressedFile = _undoCompression(file)
+                with decompressedFile if decompressedFile else file as fileToCopy:
+                    _copyToTemp(fileToCopy)
+        else:
+            with open(indexFilePath, 'rb') as file:
+                decompressedFile = _undoCompression(file)
+                if decompressedFile:
+                    with decompressedFile:
+                        _copyToTemp(decompressedFile)
+                else:
+                    temporaryIndexFilePath = indexFilePath
+
+        temporaryIndexFilePath = self._temporaryIndexFile.name if self._temporaryIndexFile else indexFilePath
+
+        # Done downloading and/or extracting the SQLite index.
+
+        self.sqlConnection = self._openSqlDb(temporaryIndexFilePath)
         tables = getSqliteTables(self.sqlConnection)
         versions = None
         try:
@@ -1036,10 +1153,15 @@ class SQLiteIndex:
                 pass
 
         if self.printDebug >= 1:
-            print(f"Successfully loaded offset dictionary from {str(indexFilePath)}")
+            message = "Successfully loaded offset dictionary from " + str(indexFilePath)
+            if temporaryIndexFilePath != indexFilePath:
+                message += " temporarily downloaded/decompressed into: " + str(temporaryIndexFilePath)
+            print(message)
+
+        self._setIndexFilePath(temporaryIndexFilePath)
 
     def _tryLoadIndex(
-        self, indexFilePath: AnyStr, checkMetadata: Optional[Callable[[Dict[str, Any]], None]] = None
+        self, indexFilePath: str, checkMetadata: Optional[Callable[[Dict[str, Any]], None]] = None
     ) -> bool:
         """Calls loadIndex if index is not loaded already and provides extensive error handling."""
 
