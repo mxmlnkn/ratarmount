@@ -81,6 +81,7 @@ A complete list of supported formats can be found [here](supported-formats).
    8. [Writable Mounting](#writable-mounting)
    9. [As a Library](#as-a-library)
    10. [Fsspec Integration](#fsspec-integration)
+   11. [File Joining](#file-joining)
 
 
 # Installation
@@ -648,7 +649,7 @@ Using [ratarmountcore](core/), files inside archives can be accessed directly fr
 For a more detailed description, see the [ratarmountcore readme here](core/).
 
 
-## Fsspec integration
+## Fsspec Integration
 
 To use all fsspec features, either install via `pip install ratarmount[fsspec]` or `pip install ratarmount[fsspec]`.
 It should also suffice to simply `pip install fsspec` if ratarmountcore is already installed.
@@ -680,3 +681,23 @@ The optional [fsspec](https://github.com/fsspec/filesystem_spec) integration is 
         print("Contents of file bar:", file.read())
     ```
     The `compression=None` argument is currently necessary because of [this](https://github.com/pandas-dev/pandas/issues/60028) Pandas bug.
+
+
+# File Joining
+
+Files with sequentially numbered extensions can be mounted as a joined file.
+If it is an archive, then the joined archive file will be mounted.
+Only one of the files, preferably the first one, should be specified.
+For example:
+
+```bash
+base64 /dev/urandom | head -c $(( 1024 * 1024 )) > 1MiB.dat
+tar -cjf- 1MiB.dat | split -d --bytes=320K - file.tar.gz.
+ls -la
+# 320K  file.tar.gz.00
+# 320K  file.tar.gz.01
+# 138K  file.tar.gz.02
+ratarmount file.tar.gz.00 mounted
+ls -la mounted
+# 1.0M  1MiB.dat
+```
