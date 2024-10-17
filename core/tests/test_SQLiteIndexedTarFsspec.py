@@ -113,8 +113,8 @@ if False:
         # Only global variables trigger the "Detected Python finalization from running rapidgzip thread." bug.
         # I am not sure why. Probably, because it gets garbage-collected later.
         globalOpenFile = fsspec.open("ratar://random-data::file://" + tarPath)
-        with globalOpenFile as file:
-            assert file.read() == contents
+        with globalOpenFile as openedFile:
+            assert openedFile.read() == contents
 
         # This is still some step the user has to do, but it cannot be avoided.
         # It might be helpful if fsspec had some kind of better resource management for filesystems though.
