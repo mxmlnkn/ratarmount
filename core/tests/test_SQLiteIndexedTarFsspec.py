@@ -83,6 +83,7 @@ def test_pandas():
         finally:
             os.chdir(oldPath)
 
+
 if False:
     # I had problems with resource deallocation!
     # For Rapidgzip it becomes important because of the background threads.
@@ -98,10 +99,10 @@ if False:
     #      same error during that close call, i.e., it is already too late at that point. I'm not sure
     #      why it is too late there but not too late during the SQLiteIndexedTar destructor...
     #      Maybe there are also some cyclic dependencies?
-    with tempfile.TemporaryDirectory(suffix=".test.ratarmount") as folderPath:
+    with tempfile.TemporaryDirectory(suffix=".test.ratarmount") as folderPath2:
         contents = os.urandom(96 * 1024 * 1024)
 
-        tarPath = os.path.join(folderPath, "random-data.tar.gz")
+        tarPath = os.path.join(folderPath2, "random-data.tar.gz")
         with tarfile.open(name=tarPath, mode="w:gz") as tarArchive:
             # Must create a sufficiently large .tar.gz so that rapidgzip is actually used.
             # In the future this "has multiple chunks" rapidgzip test is to be removed and
@@ -113,8 +114,8 @@ if False:
         # Only global variables trigger the "Detected Python finalization from running rapidgzip thread." bug.
         # I am not sure why. Probably, because it gets garbage-collected later.
         globalOpenFile = fsspec.open("ratar://random-data::file://" + tarPath)
-        with globalOpenFile as file:
-            assert file.read() == contents
+        with globalOpenFile as openedFile2:
+            assert openedFile2.read() == contents
 
         # This is still some step the user has to do, but it cannot be avoided.
         # It might be helpful if fsspec had some kind of better resource management for filesystems though.
