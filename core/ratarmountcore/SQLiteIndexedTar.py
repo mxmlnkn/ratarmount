@@ -708,8 +708,10 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         self._fileNameIsURL = re.match('[A-Za-z0-9]*://', self.tarFileName) is not None
 
         # If no fileObject given, then self.tarFileName is the path to the archive to open.
+        self._fileObjectsToCloseOnDel: List[IO[bytes]] = []
         if not fileObject:
             fileObject = open(self.tarFileName, 'rb')
+            self._fileObjectsToCloseOnDel.append(fileObject)
         fileObject.seek(0, io.SEEK_END)
         fileSize = fileObject.tell()
         fileObject.seek(0)  # Even if not interested in the file size, seeking to the start might be useful.
@@ -729,10 +731,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             printDebug=self.printDebug,
         )
         if not self.isTar and not self.rawFileObject:
-            fileObjectInfo = str(fileObject)
-            if not self.isFileObject:
-                fileObject.close()
-            raise RatarmountError(f"File object ({fileObjectInfo}) could not be opened as a TAR file!")
+            raise RatarmountError(f"File object ({str(fileObject)}) could not be opened as a TAR file!")
 
         self.blockSize = 512
         if self.rawFileObject:
@@ -858,6 +857,15 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             print("Writing out TAR index to", self.index.indexFilePath, "took 0s",
                   "and is sized", os.stat( self.index.indexFilePath ).st_size, "B")
             # fmt: on
+
+    def __del__(self):
+        if hasattr(self, '_fileObjectsToCloseOnDel'):
+            for fileObject in self._fileObjectsToCloseOnDel:
+                close = getattr(fileObject, 'close', None)
+                if close and callable(close):
+                    close()
+        if hasattr(super(), '__del__'):
+            super().__del__()
 
     def _detectGnuIncremental(self, fileObject: Any) -> bool:
         """Check for GNU incremental backup TARs."""
