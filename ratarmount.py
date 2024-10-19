@@ -591,7 +591,15 @@ class FuseMount(fuse.Operations):
                 hasIndexPath = False
 
                 if 'indexFilePath' in options and isinstance(options['indexFilePath'], str):
-                    indexFilePath = os.path.realpath(options['indexFilePath'])
+                    indexFilePath = options['indexFilePath']
+                    # Strip a single file://, not any more because URL chaining is supported by fsspec.
+                    if options['indexFilePath'].count('://') == 1:
+                        fileURLPrefix = 'file://'
+                        if indexFilePath.startswith(fileURLPrefix):
+                            indexFilePath = indexFilePath[len(fileURLPrefix) :]
+                    if '://' not in indexFilePath:
+                        indexFilePath = os.path.realpath(options['indexFilePath'])
+
                     if pointsIntoMountPoint(indexFilePath):
                         del options['indexFilePath']
                     else:
@@ -1265,7 +1273,13 @@ For further information, see the ReadMe on the project's homepage:
     indexGroup.add_argument(
         '--index-file', type=str,
         help='Specify a path to the .index.sqlite file. Setting this will disable fallback index folders. '
-             'If the given path is ":memory:", then the index will not be written out to disk.')
+             'If the given path is ":memory:", then the index will not be written out to disk. '
+             'If the specified path is a remote URL, such as "https://host.org/file.tar.index.sqlite", or '
+             'a compressed index, such as "file.tar.index.sqlite.gz", then the index file will be downloaded '
+             f'and/or extracted into the default temporary folder ({tempfile.gettempdir()}). This path can be '
+             'changed with the environment variable RATARMOUNT_INDEX_TMPDIR. The temporary folder in general '
+             'can also be changed with these environment variables in decreasing priority: TMPDIR, TEMP, TMP '
+             'as described in the Python tempfile standard library documentation.')
 
     indexFolders = ['', os.path.join( "~", ".ratarmount")]
     xdgCacheHome = getXdgCacheHome()

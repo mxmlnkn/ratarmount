@@ -1828,7 +1828,8 @@ checkFileInTARForeground()
     rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
-    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" ||
+        returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
     $RATARMOUNT_CMD -c -f -d 3 "$archive" "$mountFolder" >ratarmount.stdout.log 2>ratarmount.stderr.log &
@@ -1867,7 +1868,7 @@ checkURLProtocolHTTP()
     pid=$!
     sleep 10
     cat httpd-ruby-webrick.log
-    wget 127.0.0.1:$port
+    wget -O /dev/null 127.0.0.1:$port
 
 
     checkFileInTARForeground "$protocol://127.0.0.1:$port/tests/single-file.tar" 'bar' d3b07384d113edec49eaa6238ad5ff00 ||
@@ -1893,15 +1894,102 @@ checkURLProtocolFTP()
     python3 -m pyftpdlib  --user="$user" --password="$password" --port "$port" --interface 127.0.0.1 &
     pid=$!
     sleep 2s
-    wget "ftp://$user:$password@127.0.0.1:8021/tests/single-file.tar"
+    wget -O /dev/null "ftp://$user:$password@127.0.0.1:$port/tests/single-file.tar"
 
-    checkFileInTAR "ftp://$user:$password@127.0.0.1:8021/tests/single-file.tar" bar d3b07384d113edec49eaa6238ad5ff00 ||
+    checkFileInTAR "ftp://$user:$password@127.0.0.1:$port/tests/single-file.tar" bar d3b07384d113edec49eaa6238ad5ff00 ||
         returnError "$LINENO" 'Failed to read from FTP server'
-    checkFileInTAR "ftp://$user:$password@127.0.0.1:8021/tests/" single-file.tar 1a28538854d1884e4415cb9bfb7a2ad8 ||
+    checkFileInTAR "ftp://$user:$password@127.0.0.1:$port/tests/" single-file.tar 1a28538854d1884e4415cb9bfb7a2ad8 ||
         returnError "$LINENO" 'Failed to read from FTP server'
-    checkFileInTAR "ftp://$user:$password@127.0.0.1:8021/tests" single-file.tar 1a28538854d1884e4415cb9bfb7a2ad8 ||
+    checkFileInTAR "ftp://$user:$password@127.0.0.1:$port/tests" single-file.tar 1a28538854d1884e4415cb9bfb7a2ad8 ||
         returnError "$LINENO" 'Failed to read from FTP server'
 
+    # Check remote and/or compressed indexes.
+
+    local archive='tests/single-file.tar'
+    local fileInTar='bar'
+    local correctChecksum='d3b07384d113edec49eaa6238ad5ff00'
+    local mountFolder
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" ||
+        returnError "$LINENO" 'Failed to create temporary directory'
+
+    runAndCheckRatarmount --recreate-index "$archive" "$mountFolder"
+    [[ -f 'tests/single-file.tar.index.sqlite' ]] || returnError "$LINENO" 'Expected index to have been created!'
+    mv 'tests/single-file.tar.index.sqlite' 'remote.index.sqlite'
+    funmount "$mountFolder"
+
+    # Test remote uncompressed index
+
+    local indexFile="ftp://$user:$password@127.0.0.1:$port/remote.index.sqlite"
+    echo "Checking with remote uncompressed index: $indexFile ..."
+    args=( --index-file "$indexFile" "$archive" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}" &&
+        checkStat "$mountFolder/$fileInTar" &&
+        verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+    funmount "$mountFolder"
+
+    'grep' -q 'Successfully loaded offset dictionary' ratarmount.stdout.log ratarmount.stderr.log ||
+        returnError "$LINENO" "Index was not loaded for '$archive' while executing: $RATARMOUNT_CMD ${args[*]}"
+    [[ ! -f 'tests/single-file.tar.index.sqlite' ]] || returnError "$LINENO" 'Index should not have been recreated!'
+
+    # Test local compressed index
+
+    gzip -f 'remote.index.sqlite'
+    [[ ! -f 'remote.index.sqlite' ]] || returnError "$LINENO" 'Index should not have been deleted after compression!'
+    indexFile='remote.index.sqlite.gz'
+    [[ -f "$indexFile" ]] || returnError "$LINENO" 'Index should not have been compressed!'
+    echo "Checking with local compressed index: $indexFile ..."
+    args=( --index-file "$indexFile" "$archive" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}" &&
+        checkStat "$mountFolder/$fileInTar" &&
+        verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+    funmount "$mountFolder"
+
+    'grep' -q 'Successfully loaded offset dictionary' ratarmount.stdout.log ratarmount.stderr.log ||
+        returnError "$LINENO" "Index was not loaded for '$archive' while executing: $RATARMOUNT_CMD ${args[*]}"
+    [[ ! -f 'tests/single-file.tar.index.sqlite' ]] || returnError "$LINENO" 'Index should not have been recreated!'
+
+    # Test remote compressed index
+
+    indexFile="ftp://$user:$password@127.0.0.1:$port/remote.index.sqlite.gz"
+    echo "Checking with remote compressed index: $indexFile ..."
+    args=( --index-file "$indexFile" "$archive" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}" &&
+        checkStat "$mountFolder/$fileInTar" &&
+        verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+    funmount "$mountFolder"
+
+    'grep' -q 'Successfully loaded offset dictionary' ratarmount.stdout.log ratarmount.stderr.log ||
+        returnError "$LINENO" "Index was not loaded for '$archive' while executing: $RATARMOUNT_CMD ${args[*]}"
+    [[ ! -f 'tests/single-file.tar.index.sqlite' ]] || returnError "$LINENO" 'Index should not have been recreated!'
+
+    # Test with URL chaining remote index
+
+    indexFile=''
+    tar -cf remote.index.tar remote.index.sqlite.gz
+    [[ -f remote.index.tar ]] || returnError "$LINENO" 'Index should not have been archived!'
+    indexFile="file://remote.index.sqlite.gz::tar://::ftp://$user:$password@127.0.0.1:$port/remote.index.tar"
+    echo "Checking with URL-chained remote compressed index: $indexFile ..."
+    args=( --index-file "$indexFile" "$archive" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}" &&
+        checkStat "$mountFolder/$fileInTar" &&
+        verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+    funmount "$mountFolder"
+
+    'grep' -q 'Successfully loaded offset dictionary' ratarmount.stdout.log ratarmount.stderr.log ||
+        returnError "$LINENO" "Index was not loaded for '$archive' while executing: $RATARMOUNT_CMD ${args[*]}"
+    [[ ! -f 'tests/single-file.tar.index.sqlite' ]] || returnError "$LINENO" 'Index should not have been recreated!'
+
+    # Clean up
+
+    rm -f remote.index*
     kill $pid
 }
 

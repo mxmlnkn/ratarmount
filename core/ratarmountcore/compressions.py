@@ -571,7 +571,10 @@ def getGzipInfo(fileobj: IO[bytes]) -> Optional[Tuple[str, int]]:
 
 
 def detectCompression(
-    fileobj: IO[bytes], prioritizedBackends: Optional[List[str]], printDebug: int = 0
+    fileobj: IO[bytes],
+    prioritizedBackends: Optional[List[str]] = None,
+    printDebug: int = 0,
+    compressionsToTest: Dict[str, CompressionInfo] = TAR_COMPRESSION_FORMATS,
 ) -> Optional[str]:
     # isinstance(fileobj, io.IOBase) does not work for everything, e.g., for paramiko.sftp_file.SFTPFile
     # because it does not inherit from io.IOBase. Therefore, do duck-typing and test for required methods.
@@ -594,7 +597,7 @@ def detectCompression(
         return None
 
     oldOffset = fileobj.tell()
-    for compressionId, compression in TAR_COMPRESSION_FORMATS.items():
+    for compressionId, compression in compressionsToTest.items():
         # The header check is a necessary condition not a sufficient condition.
         # Especially for gzip, which only has 2 magic bytes, false positives might happen.
         # Therefore, only use the magic bytes based check if the module could not be found

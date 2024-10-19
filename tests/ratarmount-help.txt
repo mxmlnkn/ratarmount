@@ -49,7 +49,15 @@ Index Options:
   --index-file INDEX_FILE
                         Specify a path to the .index.sqlite file. Setting this will disable
                         fallback index folders. If the given path is ":memory:", then the index
-                        will not be written out to disk. (default: None)
+                        will not be written out to disk. If the specified path is a remote URL,
+                        such as "https://host.org/file.tar.index.sqlite", or a compressed index,
+                        such as "file.tar.index.sqlite.gz", then the index file will be
+                        downloaded and/or extracted into the default temporary folder (/tmp).
+                        This path can be changed with the environment variable
+                        RATARMOUNT_INDEX_TMPDIR. The temporary folder in general can also be
+                        changed with these environment variables in decreasing priority: TMPDIR,
+                        TEMP, TMP as described in the Python tempfile standard library
+                        documentation. (default: None)
   --index-folders INDEX_FOLDERS
                         Specify one or multiple paths for storing .index.sqlite files. Paths
                         will be tested for suitability in the given order. An empty path will be

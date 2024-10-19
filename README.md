@@ -579,6 +579,10 @@ Some often-used configuration environment variables are copied here for easier v
 This functionality of ratarmount offers a hopefully more-tested and out-of-the-box experience over the experimental [fsspec.fuse](https://filesystem-spec.readthedocs.io/en/latest/features.html#mount-anything-with-fuse) implementation.
 And, it also works in conjunction with the other features of ratarmount such as union mounting and recursive mounting.
 
+Index files specified with `--index-file` can also be compressed and/or be an fsspec ([chained](https://filesystem-spec.readthedocs.io/en/latest/features.html#url-chaining)) URL, e.g., `https://host.org/file.tar.index.sqlite.gz`.
+In such a case, the index file will be downloaded and/or extracted into the default temporary folder.
+If the default temporary folder has insufficient disk space, it can be changed by setting the `RATARMOUNT_INDEX_TMPDIR` environment variable.
+
 
 # Writable Mounting
 
