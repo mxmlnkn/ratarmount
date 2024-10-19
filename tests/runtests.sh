@@ -2264,7 +2264,7 @@ checkURLProtocolWebDAV()
     local port=8047
     # BEWARE OF LOOP MOUNTS when testing locally!
     # It will time out, when trying to expose PWD via WebDAV while mounting into PWD/mounted.
-    wsgidav --host=127.0.0.1 --port=8047 --root="$PWD" --auth=anonymous &
+    wsgidav --host=127.0.0.1 --port=$port --root="$PWD/tests" --auth=anonymous &
     local pid=$!
     sleep 5
 
@@ -2293,7 +2293,7 @@ simple_dc:
                 password: "$password"
 EOF
 
-    wsgidav --host=127.0.0.1 --port=8047 --root="$PWD" --config=wsgidav-config.yaml &
+    wsgidav --host=127.0.0.1 --port=$port --root="$PWD/tests" --config=wsgidav-config.yaml &
     pid=$!
     sleep 5
 
