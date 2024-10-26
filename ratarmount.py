@@ -79,7 +79,7 @@ from ratarmountcore import (
 from ratarmountcore.utils import imeta, getXdgCacheHome
 
 
-__version__ = '0.15.2'
+__version__ = '1.0.0'
 
 
 def hasNonEmptySupport() -> bool:

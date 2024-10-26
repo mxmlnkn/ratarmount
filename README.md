@@ -2,7 +2,7 @@
 
 ![Ratarmount Logo](https://raw.githubusercontent.com/mxmlnkn/ratarmount/master/ratarmount.svg "Purple 'ratar' and dark green 'mount'. The `raarmoun` letters pleasingly have the exact same height, and the two bars of the 't's are spread over them. The t-bars are animated to connect in a full horizontal line from time to time.")
 
-# Random Access Tar Mount (Ratarmount)
+# Random Access To Archived Resources (Ratarmount)
 
 [![Python Version](https://img.shields.io/pypi/pyversions/ratarmount)](https://pypi.org/project/ratarmount/)
 [![PyPI version](https://badge.fury.io/py/ratarmount.svg)](https://badge.fury.io/py/ratarmount)

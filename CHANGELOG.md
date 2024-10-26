@@ -1,4 +1,48 @@
 
+# Version 1.0.0 built on 2024-11-01
+
+Semantic versioning of GUIs and CLIs is not easy to define.
+The simplest GUI usage has not changed since the first version and even the index file format has been mostly compatible since version 0.2.0 and there is a lot of code for version checking.
+Based on the [semver](https://semver.org/) FAQ, the 1.0.0. release should probably have been a long time ago.
+Here it is now!
+
+## Features
+
+ - Bundle modified fusepy in order to add libfuse3 support in case only that one is installed.
+   Contributions to the [mfusepy](https://github.com/mxmlnkn/mfusepy) fork would be welcome!
+ - Add message for first time users to show the result mount point.
+ - (ratarmountcore 0.8.0) Add fsspec implementation and register it as ratar://.
+ - (ratarmountcore 0.8.0) Add support for new formats: SquashFS, Git, FAT12, FAT16, FAT32.
+ - (ratarmountcore 0.8.0) Add support for fsspec backends. Archives and even index files can now be specified via URIs:
+   dropbox://, ftp://, git://, github://, http://, https://, ipfs://, ipns://, s3://, ssh://, sftp://, smb://, webdav://.
+ - (ratarmountcore 0.8.0) Add support for remote and compressed index files. Ratarmount will automatically look for
+   index files with .gz and other common extensions and extracts these into `/tmp/` or `RATARMOUNT_INDEX_TMPDIR`
+   before using them.
+
+## Performance
+
+ - Disable Python-side buffering when opening files via FUSE.
+ - Forward underlying archive block sizes to statfs and stat implementations.
+ - (ratarmountcore 0.8.0) Import [compiled zip decrypter](https://github.com/mxmlnkn/fast-zip-decryption/) for 100x speedup for Standard ZIP 2.0 encrypted ZIP files
+ - (ratarmountcore 0.8.0) Speed up `readdir` and therefore simple use cases such as `find` to iterate all files and folders by 3x.
+ - (ratarmountcore 0.8.0) Avoid reading the whole appended TAR parts into memory for the check has-been-appended-to check.
+ - (ratarmountcore 0.8.0) Fix block size being ignored when reading everything via `io.BufferedReader`.
+ - (ratarmountcore 0.8.0) Do not use parallelization with possibly huge prefetches for simple file type checks.
+
+## Fixes
+
+ - `statfs` did not work when using a write overlay and calling it on a file not in the overlay folder.
+ - Union mounting of inputs with the same name, even if in different folders, ignored all but the first.
+ - Suppress teardown warning in case the mount source was not even created yet.
+ - Make mounting work with only a write overlay.
+ - Avoid hangs and errors caused by non-joined threads before forking into the background by checking for running threads.
+ - Set locale to C when calling GNU tar to get more reproducible output on `--commit-overlay`.
+ - (ratarmountcore 0.8.0) Argument to `--gzip-seek-point-spacing` was ignored when using the rapidgzip backend.
+ - (ratarmountcore 0.8.0) Index creation did not work with default arguments with an archive in a read-only location.
+ - (ratarmountcore 0.8.0) Close sqlite3 dummy connection after querying the SQLite version.
+ - (ratarmountcore 0.8.0) Avoid resource leaks in case a `MountSource` constructor throws.
+
+
 # Version 0.15.2 built on 2024-09-01
 
  - Setting either the owner or group for a file with `--write-overlay` would reset the group or user respectively.
