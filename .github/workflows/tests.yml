@@ -86,7 +86,7 @@ jobs:
         # 3.12 was released 2023-10-02 and end-of-life will be 2028-10
         # 3.13 is to be released 2024-10
         # 3.14 is to be released 2025-10
-        python-version: ['3.9', '3.12', '3.13.0']
+        python-version: ['3.9', '3.12', '3.13']
         include:
         - os: ubuntu-latest
           python-version: '3.14.0-alpha.0'
@@ -136,7 +136,7 @@ jobs:
     - name: Install Dependencies For Unreleased Python Versions (Linux)
       if: >
         startsWith( matrix.os, 'ubuntu' ) && (
-          matrix.python-version == '3.13.0' ||
+          matrix.python-version == '3.13' ||
           matrix.python-version == '3.14.0-alpha.0')
       run: |
         #libgit2-dev is too old on Ubuntu 22.04. Leads to error about missing git2/sys/errors.h
@@ -164,7 +164,7 @@ jobs:
     - name: Install Dependencies For Unreleased Python Versions (MacOS)
       if: >
         startsWith( matrix.os, 'macos' ) && (
-          matrix.python-version == '3.13.0' ||
+          matrix.python-version == '3.13' ||
           matrix.python-version == '3.14.0-alpha.0')
       run: |
         brew install libgit2@1.8
