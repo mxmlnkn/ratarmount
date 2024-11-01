@@ -12,8 +12,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ratarmountcore"
-description = "Random Access Read-Only Tar Mount Library"
-authors = [{name = "Maximilian Knespel", email = "mxmlnkn@github.de"}]
+description = "Random Access To Archived Resources Library"
+authors = [{name = "Maximilian Knespel", email = "mxmlnknp@gmail.com"}]
 license = {text = "MIT"}
 classifiers = [
     "License :: OSI Approved :: MIT License",

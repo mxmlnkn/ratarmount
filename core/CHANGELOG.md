@@ -1,4 +1,41 @@
 
+# Version 0.8.0 built on 2024-11-01
+
+## Features
+
+ - Add fsspec implementation and register it as ratar://.
+ - Add support for new formats: SquashFS, Git, FAT12, FAT16, FAT32.
+ - Add support for fsspec backends. Archives and even index files can now be specified via URIs:
+   dropbox://, ftp://, git://, github://, http://, https://, ipfs://, ipns://, s3://, ssh://, sftp://, smb://, webdav://.
+ - Add support for remote and compressed index files. Ratarmount will automatically look for
+   index files with .gz and other common extensions and extracts these into `/tmp/` or `RATARMOUNT_INDEX_TMPDIR`
+   before using them.
+ - `MountSource.open`: Add `buffering` argument to enable/disable buffering or set the buffer size.
+
+## Fixes
+
+ - Argument to `--gzip-seek-point-spacing` was ignored when using the rapidgzip backend.
+ - Index creation did not work with default arguments with an archive in a read-only location.
+ - Close sqlite3 dummy connection after querying the SQLite version.
+ - Avoid resource leaks in case a `MountSource` constructor throws.
+ - `SQLiteIndex`: Do note store checkMetadata callback as a member to avoid dependency cycles.
+ - `SQLiteIndex`: Ignore errors when the connection is already closed.
+ - `SQLiteIndexedTar`: Avoid resource leak when constructor fails.
+
+## Performance
+
+ - Import [compiled zip decrypter](https://github.com/mxmlnkn/fast-zip-decryption/) for 100x speedup for Standard ZIP 2.0 encrypted ZIP files
+ - Speed up `readdir` and therefore simple use cases such as `find` to iterate all files and folders by 3x.
+ - Avoid reading the whole appended TAR parts into memory for the check has-been-appended-to check.
+ - Fix block size being ignored when reading everything via `io.BufferedReader`.
+ - Do not use parallelization with possibly huge prefetches for simple file type checks.
+
+## API
+
+ - Add `getXdgCacheHome` into `ratarmountcore.utils`.
+ - `SQLiteIndexedTar`: Fill indexFolders argument with sane defaults if not specified.
+
+
 # Version 0.7.2 built on 2024-09-01
 
  - Userdata for root file info was wrong in `AutoMountLayer`.
