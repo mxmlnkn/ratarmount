@@ -150,7 +150,8 @@ zstd = [
 # Pin to < 3.12 because of https://github.com/nathanhi/pyfatfs/issues/41
 fat = [
     'pyfatfs ~= 1.0; python_version < "3.12.0"',
-    'pyfatfs@git+https://github.com/mxmlnkn/pyfatfs.git@v1.2.0 ; python_version >= "3.12.0"',
+    # Not allowed by PyPI
+    #'pyfatfs@git+https://github.com/mxmlnkn/pyfatfs.git@v1.2.0 ; python_version >= "3.12.0"',
 ]
 # All optional dependencies of asyncssh via sshfs. I have not yet needed any of these.
 # Half of these are installed anyway via other dependencies.
