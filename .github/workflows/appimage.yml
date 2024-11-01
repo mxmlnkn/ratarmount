@@ -36,11 +36,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-      with:
-        # We need one tag for testing the git mount.
-        # This is BROKEN! God damn it. Is anything working at all...
-        # https://github.com/actions/checkout/issues/1781
-        fetch-tags: true
+      #with:
+      #  # We need one tag for testing the git mount.
+      #  # This is BROKEN! God damn it. Is anything working at all...
+      #  # https://github.com/actions/checkout/issues/1781
+      #  # https://github.com/actions/checkout/issues/1467
+      #  #fetch-tags: true
 
     - name: Fetch tag for tests
       run: git fetch origin refs/tags/v0.15.2:refs/tags/v0.15.2
