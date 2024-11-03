@@ -6,8 +6,8 @@ on:
       - 'v*.*.*'
 
 jobs:
-  deploy:
-
+  Deploy-PyPI:
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
 
     steps:
@@ -19,10 +19,8 @@ jobs:
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install setuptools wheel twine build
-    - name: Build and Publish
-      env:
-        TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
+        pip install setuptools twine build
+    - name: Build Tarball
       run: |
         python3 -m build
         # Around commit 08ddc8fb3679faacd6e54eb5c54104995b045dc4, I had some very weird twine check failures
@@ -39,4 +37,96 @@ jobs:
             done
         fi
         twine check dist/*
+    - name: Publish to PyPI
+      if: startsWith(github.ref, 'refs/tags/v')
+      env:
+        TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
+      run: |
         twine upload --skip-existing -u __token__ dist/*
+
+  Deploy-AUR:
+    # Require the tarball to be uploaded first to PyPI, so that we can download it in this step.
+    needs: Deploy-PyPI
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux
+    steps:
+    - name: Set Up Non-Root User  # Because makepkg is an ass and forbids root from using it
+      run: |
+        groupadd sudo
+        useradd -m -G sudo user
+        # pikaur for some questionable reason needs this even when called with su user ...
+        groupmod -a -U root sudo
+        echo '%sudo   ALL=(ALL:ALL) NOPASSWD: ALL' >> /etc/sudoers
+
+    - name: Install System Dependencies
+      run: |
+        pacman -Syu --noconfirm
+        pacman -Sy --noconfirm base-devel git python python-pip python-setuptools rhash openssh namcap vim less
+
+    - name: Set up SSH for Cloning
+      env:
+        RATARMOUNT_AUR_SSH: ${{ secrets.RATARMOUNT_AUR_SSH }}
+      run: |
+        su user -c 'mkdir -p "$HOME/.ssh/"'
+        su user -c 'echo "$RATARMOUNT_AUR_SSH" > "$HOME/.ssh/aur"'
+        su user -c 'echo -e "Host aur.archlinux.org\n  IdentityFile ~/.ssh/aur\n  User mxmln\n  StrictHostKeyChecking no" > "$HOME/.ssh/config"'
+        su user -c 'chmod 0600 "$HOME/.ssh/config" "$HOME/.ssh/aur"'
+        su user -c 'chmod 0700 "$HOME/.ssh/"'
+
+    - name: Clone Repository
+      env:
+        RATARMOUNT_AUR_SSH: ${{ secrets.RATARMOUNT_AUR_SSH }}
+      run: |
+        chmod a+rwx .
+        chown user .
+        su user -c 'git clone ssh://aur@aur.archlinux.org/ratarmount.git .'
+
+    - name: Update PKGBUILD
+      env:
+        GITHUB_REF: ${{ github.ref }}
+      shell: bash
+      run: |
+        pkgver=${GITHUB_REF#refs/tags/v}
+        curl -L --output "$pkgver.tar.gz" https://github.com/mxmlnkn/ratarmount/archive/$GITHUB_REF.tar.gz
+        b2sum512=$( b2sum ${pkgver}.tar.gz | sed 's| .*||' )
+        # Update PKGBUILD
+        sed -i "s|pkgver=.*|pkgver=$pkgver|" PKGBUILD
+        sed -i "s|b2sums=.*|b2sums=('$b2sum512')|" PKGBUILD
+        su user -c 'namcap PKGBUILD'
+        su user -c 'makepkg --printsrcinfo > .SRCINFO'
+        su user -c 'git add -f PKGBUILD .SRCINFO'
+        su user -c 'git config --local user.email "mxmlnknp@gmail.com"'
+        su user -c 'git config --local user.name "Maximilian Knespel"'
+        su user -c "git commit -m 'Update to $pkgver'"
+        su user -c 'git show | cat'
+
+    - name: Test PKGBUILD
+      if: startsWith(github.ref, 'refs/tags/v')
+      run: |
+        # makepkgs does not work because the PKGBUILD depends on other AUR packages.
+        #su user -c 'makepkg -s --noconfirm'
+        #su user -c 'makepkg --noconfirm --install python-ratarmount-*.tar.zst'
+        # I don't know how or why, but for some reason yay seems to pull the current branch
+        # and thereby removes all newly non-pushed commits!
+        #su user -c 'git clone https://aur.archlinux.org/yay.git && cd yay && makepkg -si --noconfirm'
+        #su user -c 'yay -Bi --noconfirm .'
+        su user -c 'git clone https://aur.archlinux.org/pikaur.git && cd pikaur && makepkg -fsri --noconfirm'
+        su user -c 'pikaur -P --noconfirm'
+        su user -c 'pikaur -Pi --noconfirm ./PKGBUILD'
+        # python3-s3fs won't install because of fsspec version conflict -.-
+        # python-s3fs depends on: 'python-fsspec=2024.6.1'
+        # found in 'PackageSource.REPO': '2024.10.0-1'
+        su user -c 'pikaur --noconfirm --asdeps -Sy python-aiohttp python-requests python-smbprotocol python-webdav4'
+        su user -c 'python3 -c "import sys; import ratarmountcore as rmc; files = rmc.open(sys.argv[1]).listDir(\"\"); print(files); assert files" *.tar.gz'
+        su user -c 'python3 -c "import ratarmountcore as rmc; files = rmc.open(\"https://raw.githubusercontent.com/mxmlnkn/ratarmount/refs/heads/master/tests/single-file.tar\").listDir(\"\"); print(files); assert files"'
+
+    - name: Push PKGBUILD
+      if: startsWith(github.ref, 'refs/tags/v')
+      run: |
+        su user -c 'git push'
+
+    - name: Test installation from AUR
+      run: |
+        su user -c 'git clone https://aur.archlinux.org/yay.git && cd yay && makepkg -si --noconfirm'
+        su user -c 'yay --noconfirm --answerupgrade All -Sy ratarmount'
