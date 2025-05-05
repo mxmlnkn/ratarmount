@@ -63,6 +63,7 @@ except ImportError:
         newfunc.keywords = keywords
         return newfunc
 
+
 log = logging.getLogger("fuse")
 _system = system()
 _machine = machine()
@@ -76,7 +77,8 @@ if _system == 'Windows' or _system.startswith('CYGWIN'):
     # We have to fix up c_long and c_ulong so that it matches the
     # Cygwin (and UNIX) sizes when run on Windows.
     import sys
-    if sys.maxsize > 0xffffffff:
+
+    if sys.maxsize > 0xFFFFFFFF:
         c_win_long = ctypes.c_int64
         c_win_ulong = ctypes.c_uint64
     else:
@@ -84,18 +86,25 @@ if _system == 'Windows' or _system.startswith('CYGWIN'):
         c_win_ulong = ctypes.c_uint32
 
 if _system == 'Windows' or _system.startswith('CYGWIN'):
+
     class c_timespec(ctypes.Structure):
         _fields_ = [('tv_sec', c_win_long), ('tv_nsec', c_win_long)]
+
 elif _system == 'OpenBSD':
     c_time_t = ctypes.c_int64
+
     class c_timespec(ctypes.Structure):
         _fields_ = [('tv_sec', c_time_t), ('tv_nsec', ctypes.c_long)]
+
 else:
+
     class c_timespec(ctypes.Structure):
         _fields_ = [('tv_sec', ctypes.c_long), ('tv_nsec', ctypes.c_long)]
 
+
 class c_utimbuf(ctypes.Structure):
     _fields_ = [('actime', c_timespec), ('modtime', c_timespec)]
+
 
 # Beware that FUSE_LIBRARY_PATH path was unchecked! If it is set to libfuse3.so.3.14.0,
 # then it will mount without error, but when trying to access the mount point, will give:
@@ -116,18 +125,22 @@ if not _libfuse_path:
         # libfuse dependency
         _libiconv = ctypes.CDLL(find_library('iconv'), ctypes.RTLD_GLOBAL)
 
-        _libfuse_path = (find_library('fuse4x') or find_library('osxfuse') or
-                         find_library('fuse') or find_library('fuse-t'))
+        _libfuse_path = (
+            find_library('fuse4x') or find_library('osxfuse') or find_library('fuse') or find_library('fuse-t')
+        )
     elif _system == 'Windows':
         # pytype: disable=module-attr
         try:
             import _winreg as reg  # pytype: disable=import-error
         except ImportError:
             import winreg as reg  # pytype: disable=import-error
+
         def Reg32GetValue(rootkey, keyname, valname):
             key, val = None, None
             try:
-                key = reg.OpenKey(rootkey, keyname, 0, reg.KEY_READ | reg.KEY_WOW64_32KEY)  # pytype: disable=import-error
+                key = reg.OpenKey(
+                    rootkey, keyname, 0, reg.KEY_READ | reg.KEY_WOW64_32KEY
+                )  # pytype: disable=import-error
                 val = str(reg.QueryValueEx(key, valname)[0])
             except WindowsError:  # pylint: disable=undefined-variable  # pytype: disable=name-error
                 pass
@@ -135,9 +148,10 @@ if not _libfuse_path:
                 if key is not None:
                     reg.CloseKey(key)
             return val
+
         _libfuse_path = Reg32GetValue(reg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WinFsp", r"InstallDir")
         if _libfuse_path:
-            _libfuse_path += r"bin\winfsp-%s.dll" % ("x64" if sys.maxsize > 0xffffffff else "x86")
+            _libfuse_path += r"bin\winfsp-%s.dll" % ("x64" if sys.maxsize > 0xFFFFFFFF else "x86")
         # pytype: enable=module-attr
     else:
         _libfuse_path = find_library('fuse')
@@ -160,6 +174,7 @@ def get_fuse_version(libfuse):
         return version // 100, version % 100
     raise AttributeError(f"Version {version} of found library {_libfuse._name} cannot be parsed!")
 
+
 fuse_version_major, fuse_version_minor = get_fuse_version(_libfuse)
 if fuse_version_major == 2 and fuse_version_minor < 6:
     raise AttributeError(
@@ -168,8 +183,7 @@ if fuse_version_major == 2 and fuse_version_minor < 6:
     )
 if fuse_version_major != 2 and not (fuse_version_major == 3 and _system == 'Linux'):
     raise AttributeError(
-        f"Found library {_libfuse_path} has wrong major version: {fuse_version_major}. "
-        "Expected FUSE 2!"
+        f"Found library {_libfuse_path} has wrong major version: {fuse_version_major}. " "Expected FUSE 2!"
     )
 if fuse_version_major == 3 and fuse_version_minor > 16:
     raise AttributeError(
@@ -235,13 +249,22 @@ if _system in ('Darwin', 'Darwin-MacFuse', 'FreeBSD'):
     c_pid_t = ctypes.c_int32
     c_uid_t = ctypes.c_uint32
     setxattr_t = ctypes.CFUNCTYPE(
-        ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p,
-        ctypes.POINTER(ctypes.c_byte), ctypes.c_size_t, ctypes.c_int,
-        ctypes.c_uint32)
-    getxattr_t = ctypes.CFUNCTYPE(
-        ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_char_p,
         ctypes.POINTER(ctypes.c_byte),
-        ctypes.c_size_t, ctypes.c_uint32)
+        ctypes.c_size_t,
+        ctypes.c_int,
+        ctypes.c_uint32,
+    )
+    getxattr_t = ctypes.CFUNCTYPE(
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_char_p,
+        ctypes.POINTER(ctypes.c_byte),
+        ctypes.c_size_t,
+        ctypes.c_uint32,
+    )
     if _system == 'Darwin':
         _c_stat__fields_ = [
             ('st_dev', c_dev_t),
@@ -261,7 +284,8 @@ if _system in ('Darwin', 'Darwin-MacFuse', 'FreeBSD'):
             ('st_flags', ctypes.c_int32),
             ('st_gen', ctypes.c_int32),
             ('st_lspare', ctypes.c_int32),
-            ('st_qspare', ctypes.c_int64)]
+            ('st_qspare', ctypes.c_int64),
+        ]
     else:
         _c_stat__fields_ = [
             ('st_dev', c_dev_t),
@@ -276,26 +300,30 @@ if _system in ('Darwin', 'Darwin-MacFuse', 'FreeBSD'):
             ('st_ctimespec', c_timespec),
             ('st_size', c_off_t),
             ('st_blocks', ctypes.c_int64),
-            ('st_blksize', ctypes.c_int32)]
+            ('st_blksize', ctypes.c_int32),
+        ]
 elif _system == 'Linux':
     ENOTSUP = 95
 
-    # https://man7.org/linux/man-pages/man0/sys_types.h.0p.html
-    c_dev_t = ctypes.c_ulonglong        # sys/types.h
-    c_fsblkcnt_t = ctypes.c_ulonglong   # sys/statvfs.h
-    c_fsfilcnt_t = ctypes.c_ulonglong   # sys/statvfs.h
-    c_gid_t = ctypes.c_uint             # sys/types.h
-    c_mode_t = ctypes.c_uint            # sys/types.h
-    c_off_t = ctypes.c_longlong         # sys/types.h
-    c_pid_t = ctypes.c_int              # sys/types.h
-    c_uid_t = ctypes.c_uint             # sys/types.h
-    setxattr_t = ctypes.CFUNCTYPE(      # sys/xattr.h
-        ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p,
-        ctypes.POINTER(ctypes.c_byte), ctypes.c_size_t, ctypes.c_int)
+    # sys/statvfs.h
+    c_fsblkcnt_t = ctypes.c_ulonglong
+    c_fsfilcnt_t = ctypes.c_ulonglong
 
-    getxattr_t = ctypes.CFUNCTYPE(      # sys/xattr.h
-        ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p,
-        ctypes.POINTER(ctypes.c_byte), ctypes.c_size_t)
+    # https://man7.org/linux/man-pages/man0/sys_types.h.0p.html
+    c_dev_t = ctypes.c_ulonglong
+    c_gid_t = ctypes.c_uint
+    c_mode_t = ctypes.c_uint
+    c_off_t = ctypes.c_longlong
+    c_pid_t = ctypes.c_int
+    c_uid_t = ctypes.c_uint
+
+    # sys/xattr.h
+    setxattr_t = ctypes.CFUNCTYPE(
+        ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p, ctypes.POINTER(ctypes.c_byte), ctypes.c_size_t, ctypes.c_int
+    )
+    getxattr_t = ctypes.CFUNCTYPE(
+        ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p, ctypes.POINTER(ctypes.c_byte), ctypes.c_size_t
+    )
 
     # sys/stat.h
     if _machine == 'x86_64':
@@ -313,7 +341,8 @@ elif _system == 'Linux':
             ('st_blocks', ctypes.c_long),
             ('st_atimespec', c_timespec),
             ('st_mtimespec', c_timespec),
-            ('st_ctimespec', c_timespec)]
+            ('st_ctimespec', c_timespec),
+        ]
     elif _machine == 'mips':
         _c_stat__fields_ = [
             ('st_dev', c_dev_t),
@@ -351,7 +380,8 @@ elif _system == 'Linux':
             ('__pad7_11', ctypes.c_ulong),
             ('__pad7_12', ctypes.c_ulong),
             ('__pad7_13', ctypes.c_ulong),
-            ('__pad7_14', ctypes.c_ulong)]
+            ('__pad7_14', ctypes.c_ulong),
+        ]
     elif _machine == 'ppc':
         _c_stat__fields_ = [
             ('st_dev', c_dev_t),
@@ -367,7 +397,8 @@ elif _system == 'Linux':
             ('st_blocks', ctypes.c_longlong),
             ('st_atimespec', c_timespec),
             ('st_mtimespec', c_timespec),
-            ('st_ctimespec', c_timespec)]
+            ('st_ctimespec', c_timespec),
+        ]
     elif _machine in ('ppc64', 'ppc64le'):
         _c_stat__fields_ = [
             ('st_dev', c_dev_t),
@@ -383,7 +414,8 @@ elif _system == 'Linux':
             ('st_blocks', ctypes.c_long),
             ('st_atimespec', c_timespec),
             ('st_mtimespec', c_timespec),
-            ('st_ctimespec', c_timespec)]
+            ('st_ctimespec', c_timespec),
+        ]
     elif _machine == 'aarch64':
         _c_stat__fields_ = [
             ('st_dev', c_dev_t),
@@ -400,7 +432,8 @@ elif _system == 'Linux':
             ('st_blocks', ctypes.c_long),
             ('st_atimespec', c_timespec),
             ('st_mtimespec', c_timespec),
-            ('st_ctimespec', c_timespec)]
+            ('st_ctimespec', c_timespec),
+        ]
     else:
         # i686, use as fallback for everything else
         _c_stat__fields_ = [
@@ -419,7 +452,8 @@ elif _system == 'Linux':
             ('st_atimespec', c_timespec),
             ('st_mtimespec', c_timespec),
             ('st_ctimespec', c_timespec),
-            ('st_ino', ctypes.c_ulonglong)]
+            ('st_ino', ctypes.c_ulonglong),
+        ]
 elif _system == 'Windows' or _system.startswith('CYGWIN'):
     ENOTSUP = 129 if _system == 'Windows' else 134
     c_dev_t = ctypes.c_uint
@@ -430,10 +464,21 @@ elif _system == 'Windows' or _system.startswith('CYGWIN'):
     c_off_t = ctypes.c_longlong
     c_pid_t = ctypes.c_int
     c_uid_t = ctypes.c_uint
-    setxattr_t = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p,
-        ctypes.POINTER(ctypes.c_byte), ctypes.c_size_t, ctypes.c_int)
-    getxattr_t = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p,
-        ctypes.POINTER(ctypes.c_byte), ctypes.c_size_t)
+    setxattr_t = ctypes.CFUNCTYPE(
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_char_p,
+        ctypes.POINTER(ctypes.c_byte),
+        ctypes.c_size_t,
+        ctypes.c_int,
+    )
+    getxattr_t = ctypes.CFUNCTYPE(
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_char_p,
+        ctypes.POINTER(ctypes.c_byte),
+        ctypes.c_size_t,
+    )
     _c_stat__fields_ = [
         ('st_dev', c_dev_t),
         ('st_ino', ctypes.c_ulonglong),
@@ -448,7 +493,8 @@ elif _system == 'Windows' or _system.startswith('CYGWIN'):
         ('st_ctimespec', c_timespec),
         ('st_blksize', ctypes.c_int),
         ('st_blocks', ctypes.c_longlong),
-        ('st_birthtimespec', c_timespec)]
+        ('st_birthtimespec', c_timespec),
+    ]
 elif _system == 'OpenBSD':
     ENOTSUP = 91
     c_dev_t = ctypes.c_int32
@@ -462,12 +508,20 @@ elif _system == 'OpenBSD':
     c_blkcnt_t = ctypes.c_int64
     c_blksize_t = ctypes.c_int32
     setxattr_t = ctypes.CFUNCTYPE(
-        ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p,
-        ctypes.POINTER(ctypes.c_byte), ctypes.c_size_t, ctypes.c_int)
-    getxattr_t = ctypes.CFUNCTYPE(
-        ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_char_p,
         ctypes.POINTER(ctypes.c_byte),
-        ctypes.c_size_t)
+        ctypes.c_size_t,
+        ctypes.c_int,
+    )
+    getxattr_t = ctypes.CFUNCTYPE(
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_char_p,
+        ctypes.POINTER(ctypes.c_byte),
+        ctypes.c_size_t,
+    )
     c_fsblkcnt_t = ctypes.c_uint64
     c_fsfilcnt_t = ctypes.c_uint64
     _c_stat__fields_ = [
@@ -501,12 +555,21 @@ if _system == 'FreeBSD':
     c_fsblkcnt_t = ctypes.c_uint64
     c_fsfilcnt_t = ctypes.c_uint64
     setxattr_t = ctypes.CFUNCTYPE(
-        ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p,
-        ctypes.POINTER(ctypes.c_byte), ctypes.c_size_t, ctypes.c_int)
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_char_p,
+        ctypes.POINTER(ctypes.c_byte),
+        ctypes.c_size_t,
+        ctypes.c_int,
+    )
 
     getxattr_t = ctypes.CFUNCTYPE(
-        ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p,
-        ctypes.POINTER(ctypes.c_byte), ctypes.c_size_t)
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_char_p,
+        ctypes.POINTER(ctypes.c_byte),
+        ctypes.c_size_t,
+    )
 
     # https://github.com/freebsd/freebsd-src/blob/b1c3a4d75f4ff74218434a11cdd4e56632e13711/sys/sys/statvfs.h#L57-L68
     class c_statvfs(ctypes.Structure):
@@ -519,8 +582,11 @@ if _system == 'FreeBSD':
             ('f_files', c_fsfilcnt_t),
             ('f_bsize', ctypes.c_ulong),
             ('f_flag', ctypes.c_ulong),
-            ('f_frsize', ctypes.c_ulong)]
+            ('f_frsize', ctypes.c_ulong),
+        ]
+
 elif _system == 'Windows' or _system.startswith('CYGWIN'):
+
     class c_statvfs(ctypes.Structure):
         _fields_ = [
             ('f_bsize', c_win_ulong),
@@ -533,7 +599,9 @@ elif _system == 'Windows' or _system.startswith('CYGWIN'):
             ('f_favail', c_fsfilcnt_t),
             ('f_fsid', c_win_ulong),
             ('f_flag', c_win_ulong),
-            ('f_namemax', c_win_ulong)]
+            ('f_namemax', c_win_ulong),
+        ]
+
 else:
     # https://sourceware.org/git?p=glibc.git;a=blob;f=bits/statvfs.h;h=ea89d9004d834c81874de00b5e3f5617d3096ccc;hb=HEAD#l33
     class c_statvfs(ctypes.Structure):
@@ -548,7 +616,8 @@ else:
             ('f_favail', c_fsfilcnt_t),
             ('f_fsid', ctypes.c_ulong),
             ('f_flag', ctypes.c_ulong),
-            ('f_namemax', ctypes.c_ulong)]
+            ('f_namemax', ctypes.c_ulong),
+        ]
 
 
 if _system == 'Linux':
@@ -562,16 +631,18 @@ if _system == 'Linux':
             ('l_pid', c_pid_t),
             ('l_sysid', ctypes.c_long),  # not always present
         ]
+
 elif _system == 'OpenBSD':
     # https://github.com/openbsd/src/blob/a465f6177bcfdb2ffa9f98c7ca0780392688fc0d/sys/sys/fcntl.h#L180
     class c_flock_t(ctypes.Structure):
         _fields_ = [
-            ('l_start', c_off_t),            # starting offset
-            ('l_len', c_off_t),              # len = 0 means until end of file
-            ('l_pid', c_pid_t),              # lock owner
-            ('l_type', ctypes.c_short),    # lock type: read/write, etc.
+            ('l_start', c_off_t),  # starting offset
+            ('l_len', c_off_t),  # len = 0 means until end of file
+            ('l_pid', c_pid_t),  # lock owner
+            ('l_type', ctypes.c_short),  # lock type: read/write, etc.
             ('l_whence', ctypes.c_short),  # type of l_start
         ]
+
 else:
     c_flock_t = ctypes.c_void_p
 
@@ -588,10 +659,10 @@ if fuse_version_major == 2:
         ('flags', ctypes.c_int),
         ('fh_old', ctypes.c_ulong),
         ('writepage', ctypes.c_int),
-        ('direct_io', ctypes.c_uint, 1),      # Introduced in libfuse 2.4
-        ('keep_cache', ctypes.c_uint, 1),     # Introduced in libfuse 2.4
-        ('flush', ctypes.c_uint, 1),          # Introduced in libfuse 2.6
-        ('nonseekable', ctypes.c_uint, 1),    # Introduced in libfuse 2.8
+        ('direct_io', ctypes.c_uint, 1),  # Introduced in libfuse 2.4
+        ('keep_cache', ctypes.c_uint, 1),  # Introduced in libfuse 2.4
+        ('flush', ctypes.c_uint, 1),  # Introduced in libfuse 2.6
+        ('nonseekable', ctypes.c_uint, 1),  # Introduced in libfuse 2.8
         ('flock_release', ctypes.c_uint, 1),  # Introduced in libfuse 2.9
         ('padding', ctypes.c_uint, 27),
         ('fh', ctypes.c_uint64),
@@ -631,6 +702,7 @@ elif fuse_version_major == 3:
         ('poll_events', ctypes.c_uint64),
     ]
 
+
 class fuse_file_info(ctypes.Structure):
     _fields_ = _fuse_file_info_fields_
 
@@ -649,6 +721,7 @@ class fuse_context(ctypes.Structure):
         ('umask', c_mode_t),
     ]
 
+
 _libfuse.fuse_get_context.restype = ctypes.POINTER(fuse_context)
 
 
@@ -656,6 +729,7 @@ _libfuse.fuse_get_context.restype = ctypes.POINTER(fuse_context)
 # FUSE_BUF_FD_SEEK  = (1 << 2),
 # FUSE_BUF_FD_RETRY = (1 << 3),
 fuse_buf_flags = ctypes.c_int
+
 
 class fuse_buf(ctypes.Structure):
     _fields_ = [
@@ -665,6 +739,7 @@ class fuse_buf(ctypes.Structure):
         ('fd', ctypes.c_int),
         ('pos', c_off_t),
     ]
+
 
 class fuse_bufvec(ctypes.Structure):
     _fields_ = [
@@ -676,6 +751,7 @@ class fuse_bufvec(ctypes.Structure):
 
 
 if fuse_version_major == 2:
+
     class fuse_conn_info(ctypes.Structure):  # Added in 2.6 (ABI break of "init" from 2.5->2.6)
         _fields_ = [
             ('proto_major', ctypes.c_uint),
@@ -683,13 +759,15 @@ if fuse_version_major == 2:
             ('async_read', ctypes.c_uint),
             ('max_write', ctypes.c_uint),
             ('max_readahead', ctypes.c_uint),
-            ('capable', ctypes.c_uint),               # Added in 2.8
-            ('want', ctypes.c_uint),                  # Added in 2.8
-            ('max_background', ctypes.c_uint),        # Added in 2.9
+            ('capable', ctypes.c_uint),  # Added in 2.8
+            ('want', ctypes.c_uint),  # Added in 2.8
+            ('max_background', ctypes.c_uint),  # Added in 2.9
             ('congestion_threshold', ctypes.c_uint),  # Added in 2.9
             ('reserved', ctypes.c_uint * 23),
         ]
+
 elif fuse_version_major == 3:
+
     class fuse_conn_info(ctypes.Structure):
         _fields_ = [
             ('proto_major', ctypes.c_uint),
@@ -751,6 +829,7 @@ if fuse_version_major == 3:
         ('debug', ctypes.c_int),
     ]
 
+
 class fuse_config(ctypes.Structure):
     _fields_ = _fuse_config_fields_
 
@@ -780,42 +859,57 @@ _fuse_operations_fields_open_to_removexattr = [
     ('removexattr', CFUNCTYPE(c_int, c_char_p, c_char_p)),
 ]
 _fuse_operations_fields_2_9 = [
-    ('poll', CFUNCTYPE(
-        c_int, c_char_p, POINTER(fuse_file_info), fuse_pollhandle_p, POINTER(c_uint)),
+    (
+        'poll',
+        CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info), fuse_pollhandle_p, POINTER(c_uint)),
     ),
-    ('write_buf', CFUNCTYPE(
-        c_int, c_char_p, POINTER(fuse_bufvec), c_off_t, POINTER(fuse_file_info)),
+    (
+        'write_buf',
+        CFUNCTYPE(c_int, c_char_p, POINTER(fuse_bufvec), c_off_t, POINTER(fuse_file_info)),
     ),
-    ('read_buf', CFUNCTYPE(
-        c_int, c_char_p, POINTER(POINTER(fuse_bufvec)),
-        c_size_t, c_off_t, POINTER(fuse_file_info)),
+    (
+        'read_buf',
+        CFUNCTYPE(c_int, c_char_p, POINTER(POINTER(fuse_bufvec)), c_size_t, c_off_t, POINTER(fuse_file_info)),
     ),
     ('flock', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info), c_int)),
-    ('fallocate', CFUNCTYPE(
-        c_int, c_char_p, c_int, c_off_t, c_off_t, POINTER(fuse_file_info)),
+    (
+        'fallocate',
+        CFUNCTYPE(c_int, c_char_p, c_int, c_off_t, c_off_t, POINTER(fuse_file_info)),
     ),
 ]
 
 if fuse_version_major == 2:
-    _fuse_operations_fields = [
-        ('getattr', CFUNCTYPE(c_int, c_char_p, POINTER(c_stat))),
-        ('readlink', CFUNCTYPE(c_int, c_char_p, POINTER(c_byte), c_size_t)),
-        ('getdir', c_void_p),    # Deprecated, use readdir
-    ] + _fuse_operations_fields_mknod_to_symlink + [
-        ('rename', CFUNCTYPE(c_int, c_char_p, c_char_p)),
-        ('link', CFUNCTYPE(c_int, c_char_p, c_char_p)),
-        ('chmod', CFUNCTYPE(c_int, c_char_p, c_mode_t)),
-        ('chown', CFUNCTYPE(c_int, c_char_p, c_uid_t, c_gid_t)),
-        ('truncate', CFUNCTYPE(c_int, c_char_p, c_off_t)),
-        ('utime', c_void_p),     # Deprecated, use utimens
-    ] + _fuse_operations_fields_open_to_removexattr
+    _fuse_operations_fields = (
+        [
+            ('getattr', CFUNCTYPE(c_int, c_char_p, POINTER(c_stat))),
+            ('readlink', CFUNCTYPE(c_int, c_char_p, POINTER(c_byte), c_size_t)),
+            ('getdir', c_void_p),  # Deprecated, use readdir
+        ]
+        + _fuse_operations_fields_mknod_to_symlink
+        + [
+            ('rename', CFUNCTYPE(c_int, c_char_p, c_char_p)),
+            ('link', CFUNCTYPE(c_int, c_char_p, c_char_p)),
+            ('chmod', CFUNCTYPE(c_int, c_char_p, c_mode_t)),
+            ('chown', CFUNCTYPE(c_int, c_char_p, c_uid_t, c_gid_t)),
+            ('truncate', CFUNCTYPE(c_int, c_char_p, c_off_t)),
+            ('utime', c_void_p),  # Deprecated, use utimens
+        ]
+        + _fuse_operations_fields_open_to_removexattr
+    )
     if fuse_version_minor >= 3:
         _fuse_operations_fields += [
             ('opendir', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
-            ('readdir', CFUNCTYPE(
-                c_int, c_char_p, c_void_p,
-                CFUNCTYPE(c_int, c_void_p, c_char_p, POINTER(c_stat), c_off_t),
-                c_off_t, POINTER(fuse_file_info))),
+            (
+                'readdir',
+                CFUNCTYPE(
+                    c_int,
+                    c_char_p,
+                    c_void_p,
+                    CFUNCTYPE(c_int, c_void_p, c_char_p, POINTER(c_stat), c_off_t),
+                    c_off_t,
+                    POINTER(fuse_file_info),
+                ),
+            ),
             ('releasedir', CFUNCTYPE(c_int, c_char_p, POINTER(fuse_file_info))),
             ('fsyncdir', CFUNCTYPE(c_int, c_char_p, c_int, POINTER(fuse_file_info))),
             ('init', CFUNCTYPE(c_void_p, POINTER(fuse_conn_info))),
@@ -840,10 +934,9 @@ if fuse_version_major == 2:
             ('flag_nopath', c_uint, 1),
             ('flag_utime_omit_ok', c_uint, 1),
             ('flag_reserved', c_uint, 29),
-
-            ('ioctl', CFUNCTYPE(
-                c_int, c_char_p, c_uint, c_void_p,
-                POINTER(fuse_file_info), c_uint, c_void_p),
+            (
+                'ioctl',
+                CFUNCTYPE(c_int, c_char_p, c_uint, c_void_p, POINTER(fuse_file_info), c_uint, c_void_p),
             ),
         ]
     if fuse_version_minor >= 9:
@@ -882,6 +975,7 @@ elif fuse_version_major == 3:
     #    given to fuse_main_real, and then forgotten about in FUSE.__init__.
     # Methods with changed arguments:
     #  - getattr, rename, chmod, chown, truncate, readdir, init, utimens, ioctl
+    # fmt: off
     _fuse_operations_fields = [
         ('getattr', CFUNCTYPE(c_int, c_char_p, POINTER(c_stat), POINTER(fuse_file_info))),         # Added file info
         ('readlink', CFUNCTYPE(c_int, c_char_p, POINTER(c_byte), c_size_t)),                       # Same as v2.9
@@ -909,27 +1003,36 @@ elif fuse_version_major == 3:
             c_int, c_char_p, c_int if fuse_version_minor < 5 else c_uint, c_void_p,
             POINTER(fuse_file_info), c_uint, c_void_p)),
     ] + _fuse_operations_fields_2_9 + [
-        ('copy_file_range', CFUNCTYPE(                                                             # New
+        (
+            'copy_file_range',                                                                     # New
+            CFUNCTYPE(
                 c_ssize_t, c_char_p, POINTER(fuse_file_info), c_off_t, c_char_p,
-                POINTER(fuse_file_info), c_off_t, c_size_t, c_int),
+                POINTER(fuse_file_info), c_off_t, c_size_t, c_int,
             ),
+        ),
         ('lseek', CFUNCTYPE(c_off_t, c_char_p, c_off_t, c_int, POINTER(fuse_file_info))),          # New
     ]
+    # fmt: on
+
 
 class fuse_operations(ctypes.Structure):
     _fields_ = _fuse_operations_fields
 
 
 if _system == "OpenBSD":
+
     def fuse_main_real(argc, argv, fuse_ops_v, sizeof_fuse_ops, ctx_p):
         return _libfuse.fuse_main(argc, argv, fuse_ops_v, ctx_p)
+
 else:
-    fuse_main_real =_libfuse.fuse_main_real
+    fuse_main_real = _libfuse.fuse_main_real
+
 
 def time_of_timespec(ts, use_ns=False):
     if use_ns:
-        return ts.tv_sec * 10 ** 9 + ts.tv_nsec
-    return ts.tv_sec + ts.tv_nsec / 1E9
+        return ts.tv_sec * 10**9 + ts.tv_nsec
+    return ts.tv_sec + ts.tv_nsec / 1e9
+
 
 def set_st_attrs(st, attrs, use_ns=False):
     for key, val in attrs.items():
@@ -939,10 +1042,10 @@ def set_st_attrs(st, attrs, use_ns=False):
                 continue
 
             if use_ns:
-                timespec.tv_sec, timespec.tv_nsec = divmod(int(val), 10 ** 9)
+                timespec.tv_sec, timespec.tv_nsec = divmod(int(val), 10**9)
             else:
                 timespec.tv_sec = int(val)
-                timespec.tv_nsec = int((val - timespec.tv_sec) * 1E9)
+                timespec.tv_nsec = int((val - timespec.tv_sec) * 1e9)
         elif getattr(st, key, None) is not None:
             setattr(st, key, val)
 
@@ -978,7 +1081,7 @@ class FuseOSError(OSError):
         super().__init__(errno, os.strerror(errno))
 
 
-class FUSE():
+class FUSE:
     '''
     This class is the lower level interface and should not be subclassed under
     normal use. Its methods are called by fuse.
@@ -992,9 +1095,7 @@ class FUSE():
         ('nothreads', '-s'),
     )
 
-    def __init__(self, operations, mountpoint, raw_fi=False, encoding='utf-8',
-                 **kwargs):
-
+    def __init__(self, operations, mountpoint, raw_fi=False, encoding='utf-8', **kwargs):
         '''
         Setting raw_fi to True will cause FUSE to pass the fuse_file_info
         class as is to Operations, instead of just the fh field.
@@ -1014,12 +1115,12 @@ class FUSE():
                 'To enable time as nanoseconds set the property "use_ns" to '
                 'True in your operations class or set your fusepy '
                 'requirements to <4.',
-                DeprecationWarning)
+                DeprecationWarning,
+            )
 
         args = ['fuse']
 
-        args.extend(flag for arg, flag in self.OPTIONS
-                    if kwargs.pop(arg, False))
+        args.extend(flag for arg, flag in self.OPTIONS if kwargs.pop(arg, False))
 
         kwargs.setdefault('fsname', operations.__class__.__name__)
         args.append('-o')
@@ -1057,17 +1158,14 @@ class FUSE():
         except ValueError:
             old_handler = SIG_DFL
 
-        err = fuse_main_real(
-            len(args), argv, ctypes.pointer(fuse_ops),
-            ctypes.sizeof(fuse_ops),
-            None)
+        err = fuse_main_real(len(args), argv, ctypes.pointer(fuse_ops), ctypes.sizeof(fuse_ops), None)
 
         try:
             signal(SIGINT, old_handler)
         except ValueError:
             pass
 
-        del self.operations     # Invoke the destructor
+        del self.operations  # Invoke the destructor
         if self.__critical_exception:
             raise self.__critical_exception
         if err:
@@ -1098,27 +1196,37 @@ class FUSE():
                 if isinstance(e.errno, int) and e.errno > 0:
                     log.debug(
                         "FUSE operation %s raised a %s, returning errno %s.",
-                        func.__name__, type(e), e.errno, exc_info=True)
+                        func.__name__,
+                        type(e),
+                        e.errno,
+                        exc_info=True,
+                    )
                     return -e.errno
                 log.error(
-                    "FUSE operation %s raised an OSError with negative "
-                    "errno %s, returning errno.EINVAL.",
-                    func.__name__, e.errno, exc_info=True)
+                    "FUSE operation %s raised an OSError with negative errno %s, returning errno.EINVAL.",
+                    func.__name__,
+                    e.errno,
+                    exc_info=True,
+                )
                 return -errno.EINVAL
 
             except Exception as e:
                 if func.__name__ == "init":
                     raise e
-                log.error("Uncaught exception from FUSE operation %s, "
-                          "returning errno.EINVAL.",
-                          func.__name__, exc_info=True)
+                log.error(
+                    "Uncaught exception from FUSE operation %s, returning errno.EINVAL.",
+                    func.__name__,
+                    exc_info=True,
+                )
                 return -errno.EINVAL
 
         except BaseException as e:
             self.__critical_exception = e
             log.critical(
                 "Uncaught critical exception from FUSE operation %s, aborting.",
-                func.__name__, exc_info=True)
+                func.__name__,
+                exc_info=True,
+            )
             # the raised exception (even SystemExit) will be caught by FUSE
             # potentially causing SIGSEGV, so tell system to stop/interrupt FUSE
             fuse_exit()
@@ -1133,9 +1241,12 @@ class FUSE():
         return path.decode(self.encoding)
 
     if fuse_version_major == 2:
+
         def getattr(self, path, buf):
             return self.fgetattr(path, buf, None)
+
     elif fuse_version_major == 3:
+
         def getattr(self, path, buf, fip):
             return self.fgetattr(path, buf, None)
 
@@ -1144,7 +1255,7 @@ class FUSE():
 
         # copies a string into the given buffer
         # (null terminated and truncated if necessary)
-        data = ctypes.create_string_buffer(ret[:bufsize - 1])
+        data = ctypes.create_string_buffer(ret[: bufsize - 1])
         ctypes.memmove(buf, data, len(data))
         return 0
 
@@ -1171,6 +1282,7 @@ class FUSE():
     if fuse_version_major == 2:
         rename = _rename
     elif fuse_version_major == 3:
+
         def rename(self, old, new, flags):
             self._rename(old, new)
 
@@ -1180,9 +1292,12 @@ class FUSE():
         return self.operations('link', target.decode(self.encoding), source.decode(self.encoding))
 
     if fuse_version_major == 2:
+
         def chmod(self, path, mode):
             return self.operations('chmod', path.decode(self.encoding), mode)
+
     elif fuse_version_major == 3:
+
         def chmod(self, path, mode, fip):
             return self.operations('chmod', path.decode(self.encoding), mode)
 
@@ -1196,16 +1311,22 @@ class FUSE():
         return self.operations('chown', path.decode(self.encoding), uid, gid)
 
     if fuse_version_major == 2:
+
         def chown(self, path, uid, gid):
             return self._chown(path, uid, gid)
+
     elif fuse_version_major == 3:
+
         def chown(self, path, uid, gid, fip):
             return self._chown(path, uid, gid)
 
     if fuse_version_major == 2:
+
         def truncate(self, path, length):
             return self.operations('truncate', path.decode(self.encoding), length)
+
     elif fuse_version_major == 3:
+
         def truncate(self, path, length, fip):
             return self.operations('truncate', path.decode(self.encoding), length)
 
@@ -1256,13 +1377,17 @@ class FUSE():
         return self.operations('fsync', self._decode_optional_path(path), datasync, fh)
 
     def setxattr(self, path, name, value, size, options, *args):
-        return self.operations('setxattr', path.decode(self.encoding),
-                               name.decode(self.encoding),
-                               ctypes.string_at(value, size), options, *args)
+        return self.operations(
+            'setxattr',
+            path.decode(self.encoding),
+            name.decode(self.encoding),
+            ctypes.string_at(value, size),
+            options,
+            *args,
+        )
 
     def getxattr(self, path, name, value, size, *args):
-        ret = self.operations('getxattr', path.decode(self.encoding),
-                                          name.decode(self.encoding), *args)
+        ret = self.operations('getxattr', path.decode(self.encoding), name.decode(self.encoding), *args)
 
         retsize = len(ret)
         # allow size queries
@@ -1300,8 +1425,7 @@ class FUSE():
         return retsize
 
     def removexattr(self, path, name):
-        return self.operations('removexattr', path.decode(self.encoding),
-                                              name.decode(self.encoding))
+        return self.operations('removexattr', path.decode(self.encoding), name.decode(self.encoding))
 
     def opendir(self, path, fip):
         # Ignore raw_fi
@@ -1394,9 +1518,12 @@ class FUSE():
         return 0
 
     if fuse_version_major == 2:
+
         def readdir(self, path, buf, filler, offset, fip):
             return self._readdir(path, buf, filler, offset, fip)
+
     elif fuse_version_major == 3:
+
         def readdir(self, path, buf, filler, offset, fip, flags):
             # TODO if bit 0 (FUSE_READDIR_PLUS) is set in flags, then we might want to gather more metadata
             #      and return it in "filler" with bit 1 (FUSE_FILL_DIR_PLUS) being set.
@@ -1409,20 +1536,23 @@ class FUSE():
 
     def fsyncdir(self, path, datasync, fip):
         # Ignore raw_fi
-        return self.operations('fsyncdir', self._decode_optional_path(path),
-                                           datasync, fip.contents.fh)
+        return self.operations('fsyncdir', self._decode_optional_path(path), datasync, fip.contents.fh)
+
     def _init(self, conn, config):
-        if hasattr(
-            self.operations, "init_with_config"
-        ) and not getattr(self.operations.init_with_config, "libfuse_ignore", False):
+        if hasattr(self.operations, "init_with_config") and not getattr(
+            self.operations.init_with_config, "libfuse_ignore", False
+        ):
             self.operations.init_with_config(conn, config)
         else:
             self.operations("init", "/")
 
     if fuse_version_major == 2:
+
         def init(self, conn):
             self._init(conn, fuse_config())
+
     else:
+
         def init(self, conn, config):
             self._init(conn, config)
 
@@ -1475,6 +1605,7 @@ class FUSE():
     if fuse_version_major == 2:
         utimens = _utimens
     elif fuse_version_major == 3:
+
         def utimens(self, path, buf, fip):
             self._utimens(path, buf)
 
