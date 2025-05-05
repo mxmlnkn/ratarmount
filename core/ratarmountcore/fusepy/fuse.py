@@ -151,7 +151,8 @@ if not _libfuse_path:
 
         _libfuse_path = Reg32GetValue(reg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WinFsp", r"InstallDir")
         if _libfuse_path:
-            _libfuse_path += r"bin\winfsp-%s.dll" % ("x64" if sys.maxsize > 0xFFFFFFFF else "x86")
+            arch = "x64" if sys.maxsize > 0xFFFFFFFF else "x86"
+            _libfuse_path += f"bin\\winfsp-{arch}.dll"
         # pytype: enable=module-attr
     else:
         _libfuse_path = find_library('fuse')
