@@ -6,17 +6,23 @@
 # Use setuptools >= 42 for the license_files option
 # Use setuptools >= 43 because it automatically includes pyproject.toml in source distribution
 # Use setuptools >= 46.5 to use attr: package.__version__
+# Use setuptools >= 61 for pyproject.toml support
+# https://github.com/pypa/setuptools/issues/4903
+# Use setuptools >= 77 for project.license-files support
 # https://setuptools.readthedocs.io/en/latest/history.html#id284
-requires = ["setuptools >= 46.4.0", "wheel"]
+requires = ["setuptools >= 77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "ratarmountcore"
 description = "Random Access To Archived Resources Library"
 authors = [{name = "Maximilian Knespel", email = "mxmlnknp@gmail.com"}]
-license = {text = "MIT"}
+license = "MIT"
+license-files = [
+    "LICENSE",
+    "ratarmountcore/fusepy/LICENSE",
+]
 classifiers = [
-    "License :: OSI Approved :: MIT License",
     "Development Status :: 4 - Beta",
     "Natural Language :: English",
     "Operating System :: MacOS",
@@ -167,12 +173,6 @@ full-ssh = [
 
 [project.entry-points."fsspec.specs"]
 ratar = "ratarmountcore.SQLiteIndexedTarFsspec.SQLiteIndexedTarFileSystem"
-
-[tool.setuptools]
-license-files = [
-    "LICENSE",
-    "ratarmountcore/fusepy/LICENSE",
-]
 
 [tool.setuptools.dynamic]
 version = {attr = "ratarmountcore.version.__version__"}

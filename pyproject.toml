@@ -4,8 +4,10 @@
 # Use setuptools >= 43 because it automatically includes pyproject.toml in source distribution
 # Use setuptools >= 46.5 to use attr: package.__version__
 # Use setuptools >= 61 for pyproject.toml support
+# https://github.com/pypa/setuptools/issues/4903
+# Use setuptools >= 77 for project.license-files support
 # https://setuptools.readthedocs.io/en/latest/history.html#id284
-requires = ["setuptools >= 61", "wheel"]
+requires = ["setuptools >= 77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -13,9 +15,9 @@ name = "ratarmount"
 version = "1.0.0"
 description = "Random Access To Archived Resources"
 authors = [{name = "Maximilian Knespel", email = "mxmlnknp@gmail.com"}]
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE"]
 classifiers = [
-    "License :: OSI Approved :: MIT License",
     "Development Status :: 4 - Beta",
     "Natural Language :: English",
     "Operating System :: MacOS",
@@ -62,7 +64,6 @@ ratarmount = "ratarmount:cli"
 
 [tool.setuptools]
 py-modules = ["ratarmount"]
-license-files = ["LICENSE"]
 
 [tool.codespell]
 # fsspec uses cachable instead of cacheable ...
