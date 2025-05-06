@@ -180,23 +180,24 @@ jobs:
         python3 -m pip install --upgrade setuptools
         python3 -m pip install --upgrade-strategy eager --upgrade twine build fusepy cffi
 
-    - name: Test Startup With Only One Compression Dependency
-      run: |
-        for module in indexed_gzip indexed_zstd lzmaffi python-xz; do
-          python3 -m pip install --upgrade "$module"
-          # Segfaults (139) are not allowed but other exit codes are valid!
-          # indexed_zstd=1.2.0 did segfault here!
-          python3 ratarmount.py README.md || [ $? != 139 ]
-          python3 -m pip uninstall --yes "$module"
-        done
-        python3 -m pip install --upgrade 'git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=rapidgzip&subdirectory=python/rapidgzip'
-
     - name: Test ratarmountcore Installation From Tarball
       working-directory: core
       run: |
         python3 -m build
         twine check dist/*
         python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )"[full]
+
+    - name: Test Startup With Only One Compression Dependency
+      run: |
+        for module in indexed_gzip indexed_zstd lzmaffi python-xz; do
+            # --use-pep517 to fix deprecation warning: https://github.com/pypa/pip/issues/6334
+            python3 -m pip install --use-pep517 --upgrade "$module"
+            # Segfaults (139) are not allowed but other exit codes are valid!
+            # indexed_zstd=1.2.0 did segfault here!
+            python3 ratarmount.py README.md || [ $? != 139 ]
+            python3 -m pip uninstall --yes "$module"
+        done
+        python3 -m pip install --upgrade 'git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=rapidgzip&subdirectory=python/rapidgzip'
 
     - name: Test Installation From Tarball
       run: |
