@@ -21,7 +21,7 @@ jobs:
     - name: Install pip Dependencies
       run: |
         python3 -m pip install --upgrade pip
-        python3 -m pip install --user fusepy pytest lz4 PySquashfsImage asyncssh fsspec
+        python3 -m pip install --user pytest lz4 PySquashfsImage asyncssh fsspec
 
     - name: Style Check With Black
       run: |
@@ -178,7 +178,7 @@ jobs:
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade wheel
         python3 -m pip install --upgrade setuptools
-        python3 -m pip install --upgrade-strategy eager --upgrade twine build fusepy cffi
+        python3 -m pip install --upgrade-strategy eager --upgrade twine build cffi
 
     - name: Test ratarmountcore Installation From Tarball
       working-directory: core
@@ -302,5 +302,5 @@ jobs:
 
     - name: Module tests without fusepy
       run: |
-        python3 -m pip uninstall -y fusepy
+        python3 -m pip uninstall -y fusepy mfusepy
         python3 tests/tests.py
