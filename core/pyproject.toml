@@ -13,16 +13,27 @@
 # Use setuptools <= 82 because the license specification changes backward-incompatible in 2026-02.
 # https://github.com/pypa/setuptools/issues/4903#issuecomment-2923109576
 # <= major must not be used for pinning because it will only match major.0.0 not any higher version!
-requires = ["setuptools >= 61, < 83", "wheel"]
+#
+# Beware that these setuptools requirements are also implicit python requirements!
+# Make those explicit for pip install to choose a fitting version!
+#
+# Python 3.6: setuptools up to 59
+# Python 3.7: setuptools up to 68
+# Python 3.8: setuptools up to 75
+# https://github.com/pypa/setuptools/issues/4903#issuecomment-2741625335
+requires = ["setuptools >= 77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "ratarmountcore"
 description = "Random Access To Archived Resources Library"
 authors = [{name = "Maximilian Knespel", email = "mxmlnknp@gmail.com"}]
-license = {text = "MIT"}
+license = "MIT"
+license-files = [
+    "LICENSE",
+    "ratarmountcore/fusepy/LICENSE",
+]
 classifiers = [
-    "License :: OSI Approved :: MIT License",
     "Development Status :: 4 - Beta",
     "Natural Language :: English",
     "Operating System :: MacOS",
@@ -300,9 +311,6 @@ pdf = ["pypdf[image]"]  # currently version 6, but the major versions change too
 
 [project.entry-points."fsspec.specs"]
 ratar = "ratarmountcore.SQLiteIndexedTarFsspec.SQLiteIndexedTarFileSystem"
-
-[tool.setuptools]
-license-files = ["LICENSE", "ratarmountcore/_external/pyfatfs/LICENSE"]
 
 [tool.setuptools.dynamic]
 version = {attr = "ratarmountcore.version.__version__"}

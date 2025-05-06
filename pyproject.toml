@@ -9,6 +9,14 @@
 # Use setuptools <= 82 because the license specification changes backward-incompatible in 2026-02.
 # https://github.com/pypa/setuptools/issues/4903#issuecomment-2923109576
 # <= major must not be used for pinning because it will only match major.0.0 not any higher version!
+#
+# Beware that these setuptools requirements are also implicit python requirements!
+# Make those explicit for pip install to choose a fitting version!
+#
+# Python 3.6: setuptools up to 59
+# Python 3.7: setuptools up to 68
+# Python 3.8: setuptools up to 75
+# https://github.com/pypa/setuptools/issues/4903#issuecomment-2741625335
 requires = ["setuptools >= 61, < 83", "wheel"]
 build-backend = "setuptools.build_meta"
 
@@ -16,9 +24,9 @@ build-backend = "setuptools.build_meta"
 name = "ratarmount"
 description = "Random Access To Archived Resources"
 authors = [{name = "Maximilian Knespel", email = "mxmlnknp@gmail.com"}]
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE"]
 classifiers = [
-    "License :: OSI Approved :: MIT License",
     "Development Status :: 4 - Beta",
     "Natural Language :: English",
     "Operating System :: MacOS",
@@ -43,7 +51,9 @@ classifiers = [
     "Topic :: Utilities",
 ]
 urls = {Homepage = "https://github.com/mxmlnkn/ratarmount"}
+# Python >= 3.7 because of sqlite3.Connection.backup being used.
 # Require Python 3.9. argparse.BooleanOptionalAction was the straw that broke the camel's back.
+# Python >= 3.9 for setuptools >= 77 to work!
 requires-python = ">= 3.9"
 dependencies = [
     # https://pip.pypa.io/en/stable/reference/requirement-specifiers/
@@ -81,8 +91,7 @@ pdf = ["ratarmountcore[pdf]"]
 ratarmount = "ratarmount.cli:cli"
 
 [tool.setuptools]
-packages = ["ratarmount"]
-license-files = ["LICENSE"]
+py-modules = ["ratarmount"]
 
 [tool.codespell]
 # fsspec uses cachable instead of cacheable ...
