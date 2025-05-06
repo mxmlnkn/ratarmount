@@ -132,6 +132,7 @@ jobs:
         # https://github.com/libarchive/libarchive/blob/ad5a0b542c027883d7069f6844045e6788c7d70c/libarchive/
         #   archive_read_support_filter_lrzip.c#L68
         sudo apt-get -y install libfuse2 fuse3 bzip2 pbzip2 pixz zstd unar lrzip lzop gcc liblzo2-dev ruby-webrick
+        sudo apt-get -y install liblzma-dev*
 
     - name: Install Dependencies For Unreleased Python Versions (Linux)
       if: >
