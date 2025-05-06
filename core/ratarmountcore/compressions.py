@@ -124,7 +124,7 @@ TAR_COMPRESSION_FORMATS: Dict[str, CompressionInfo] = {
             ),
             CompressionModuleInfo('indexed_gzip', lambda x, parallelization=1: indexed_gzip.IndexedGzipFile(fileobj=x)),
         ],
-        lambda x: x.read(2) == b'\x1F\x8B',
+        lambda x: x.read(2) == b'\x1f\x8b',
     ),
     'xz': CompressionInfo(
         ['xz'],
@@ -134,7 +134,7 @@ TAR_COMPRESSION_FORMATS: Dict[str, CompressionInfo] = {
             CompressionModuleInfo('xz', lambda x, parallelization=1: xz.open(x)),
             CompressionModuleInfo('lzmaffi', lambda x, parallelization=1: lzmaffi.open(x)),
         ],
-        lambda x: x.read(6) == b"\xFD7zXZ\x00",
+        lambda x: x.read(6) == b"\xfd7zXZ\x00",
     ),
     'zst': CompressionInfo(
         ['zst', 'zstd'],
@@ -165,7 +165,7 @@ def isRarFile(fileObject) -> bool:
     # > At the moment of writing this documentation RAR assumes the maximum SFX module size to not exceed 1 MB,
     # > but this value can be increased in the future.
     oldPosition = fileObject.tell()
-    if fileObject.read(6) == b'Rar!\x1A\x07':
+    if fileObject.read(6) == b'Rar!\x1a\x07':
         return True
     if 'rarfile' in sys.modules:
         fileObject.seek(oldPosition)
@@ -314,19 +314,19 @@ if 'libarchive' in sys.modules and isinstance(libarchive, types.ModuleType):
             # https://github.com/ckolivas/lrzip/blob/master/doc/magic.header.txt
             (['lrz', 'lrzip'], lambda x: x.read(5) == b'LRZI\x00'),
             # https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md#general-structure-of-lz4-frame-format
-            (['lz4'], lambda x: x.read(4) == b'\x04\x22\x4D\x18'),
+            (['lz4'], lambda x: x.read(4) == b'\x04\x22\x4d\x18'),
             # https://www.ietf.org/archive/id/draft-diaz-lzip-09.txt
             (['lz', 'lzip'], lambda x: x.read(5) == b'LZIP\x01'),
             # https://github.com/jljusten/LZMA-SDK/blob/master/DOC/lzma-specification.txt
             # https://github.com/frizb/FirmwareReverseEngineering/blob/master/IdentifyingCompressionAlgorithms.md#lzma
-            (['lzma'], lambda x: x.read(3) == b'\x5D\x00\x00'),
+            (['lzma'], lambda x: x.read(3) == b'\x5d\x00\x00'),
             (['lzo', 'lzop'], lambda x: x.read(9) == b'\x89\x4c\x5a\x4f\x00\x0d\x0a\x1a\x0a'),
             # https://refspecs.linuxbase.org/LSB_4.1.0/LSB-Core-generic/LSB-Core-generic/pkgformat.html
-            (['rpm'], lambda x: x.read(4) == b'\xED\xAB\xEE\xDB'),
+            (['rpm'], lambda x: x.read(4) == b'\xed\xab\xee\xdb'),
             # https://en.wikipedia.org/wiki/Uuencoding
             (['uu'], lambda x: x.read(6) == b'begin '),
             # https://github.com/file/file/blob/master/magic/Magdir/compress
-            (['Z'], lambda x: x.read(2) == b'\x1F\x9D'),
+            (['Z'], lambda x: x.read(2) == b'\x1f\x9d'),
             # Supported by SQLiteIndexedTar: bzip2, gzip, xz, zstd
         ]
     }
@@ -336,7 +336,7 @@ if 'libarchive' in sys.modules and isinstance(libarchive, types.ModuleType):
         # https://github.com/libarchive/libarchive/blob/6110e9c82d8ba830c3440f36b990483ceaaea52c/libarchive/
         #   archive_read_support_format_cpio.c#L272
         firstBytes = fileObject.read(5)
-        return firstBytes == b'07070' or firstBytes[:2] in [b'\x71\xC7', b'\xC7\x71']
+        return firstBytes == b'07070' or firstBytes[:2] in [b'\x71\xc7', b'\xc7\x71']
 
     def isISO9660(fileObject):
         # https://www.iso.org/obp/ui/#iso:std:iso:9660:ed-1:v1:en
@@ -361,11 +361,11 @@ if 'libarchive' in sys.modules and isinstance(libarchive, types.ModuleType):
         for extensions, headerCheck in [
             # https://github.com/ip7z/7zip/blob/main/DOC/7zFormat.txt
             # https://py7zr.readthedocs.io/en/latest/archive_format.html
-            (['7z', '7zip'], lambda x: x.read(6) == b'7z\xBC\xAF\x27\x1C'),
+            (['7z', '7zip'], lambda x: x.read(6) == b'7z\xbc\xaf\x27\x1c'),
             (['ar'], lambda x: x.read(8) == b'<aiaff>\n'),
             # https://download.microsoft.com/download/4/d/a/4da14f27-b4ef-4170-a6e6-5b1ef85b1baa/[ms-cab].pdf
             (['cab'], lambda x: x.read(4) == b'MSCF'),
-            (['deb'], lambda x: x.read(4) == b'\x21\x3C\x61\x72'),
+            (['deb'], lambda x: x.read(4) == b'\x21\x3c\x61\x72'),
             (['xar'], lambda x: x.read(4) == b'\x78\x61\x72\x21'),
             (['cpio'], isCpio),
             (['iso'], isISO9660),
