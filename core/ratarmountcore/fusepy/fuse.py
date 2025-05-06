@@ -186,11 +186,6 @@ if fuse_version_major != 2 and not (fuse_version_major == 3 and _system == 'Linu
     raise AttributeError(
         f"Found library {_libfuse_path} has wrong major version: {fuse_version_major}. " "Expected FUSE 2!"
     )
-if fuse_version_major == 3 and fuse_version_minor > 16:
-    raise AttributeError(
-        f"Found library {_libfuse_path} is too new ({fuse_version_major}.{fuse_version_minor}) "
-        "and will not be used because FUSE 3 has no track record of ABI compatibility."
-    )
 
 
 # Check FUSE major version changes by cloning https://github.com/libfuse/libfuse.git
@@ -655,6 +650,18 @@ else:
 #    so now there are 33 bits in total, which probably lead to some unwanted
 #    padding in libfuse 3.0.2. This has been made explicit since libfuse 3.7.0:
 #    https://github.com/libfuse/libfuse/commit/1d8e8ca94a3faa635afd1a3bd8d7d26472063a3f
+#  - 3.0.0 -> 3.4.2: no change (flags and padding did add up to 33 bits from the beginning)
+#  - 3.4.2 -> 3.5.0: cache_readdir added correctly
+#  - 3.5.0 -> 3.6.2: no change
+#  - 3.6.2 -> 3.7.0: padding 2 was explicitly added but did exist because of alignment
+#  - 3.7.0 -> 3.10.5: no change
+#  - 3.10.5 -> 3.11.0: noflush added correctly
+#  - 3.11.0 -> 3.13.1: no change
+#  - 3.13.1 -> 3.14.1: parallel_direct_writes was added in the middle.
+#                      Padding was correctly decreased by 1.
+#  - 3.14.1 -> 3.16.2: no change
+_fuse_int32 = ctypes.c_int32 if (fuse_version_major, fuse_version_minor) >= (3, 17) else ctypes.c_int
+_fuse_uint32 = ctypes.c_uint32 if (fuse_version_major, fuse_version_minor) >= (3, 17) else ctypes.c_uint
 if fuse_version_major == 2:
     _fuse_file_info_fields_ = [
         ('flags', ctypes.c_int),
@@ -670,34 +677,52 @@ if fuse_version_major == 2:
         ('lock_owner', ctypes.c_uint64),
     ]
 elif fuse_version_major == 3:
-    _fuse_file_info_fields_ = [('flags', ctypes.c_int)]
+    _fuse_file_info_fields_ = [('flags', _fuse_int32)]
+
+    # Bit flag types were changed from unsigned int to uint32_t in libfuse 3.17,
+    # but as far as I understand this change does not matter because it is only 1 bit.
 
     _fuse_file_info_fields_bitfield = [
-        ('writepage', ctypes.c_uint, 1),
-        ('direct_io', ctypes.c_uint, 1),
-        ('keep_cache', ctypes.c_uint, 1),
+        ('writepage', _fuse_uint32, 1),
+        ('direct_io', _fuse_uint32, 1),
+        ('keep_cache', _fuse_uint32, 1),
     ]
     # Introduced in 3.15.0 and its placement is an API-incompatible change / bug!
     # https://github.com/libfuse/libfuse/issues/1029
-    if fuse_version_minor >= 15:
+    if fuse_version_minor >= 15 and fuse_version_minor < 17:
         _fuse_file_info_fields_bitfield += [
-            ('parallel_direct_writes', ctypes.c_uint, 1),
+            ('parallel_direct_writes', _fuse_uint32, 1),
         ]
     _fuse_file_info_fields_bitfield += [
-        ('flush', ctypes.c_uint, 1),
-        ('nonseekable', ctypes.c_uint, 1),
-        ('flock_release', ctypes.c_uint, 1),
+        ('flush', _fuse_uint32, 1),
+        ('nonseekable', _fuse_uint32, 1),
+        ('flock_release', _fuse_uint32, 1),
     ]
-    # Further ABI-breaks.
     if fuse_version_minor >= 5:
         _fuse_file_info_fields_bitfield += [('cache_readdir', ctypes.c_uint, 1)]
     if fuse_version_minor >= 11:
         _fuse_file_info_fields_bitfield += [('noflush', ctypes.c_uint, 1)]
+    if fuse_version_minor >= 17:
+        _fuse_file_info_fields_bitfield += [
+            ('parallel_direct_writes', _fuse_uint32, 1),
+        ]
+
+    _fuse_file_info_flag_count = sum(x[2] for x in _fuse_file_info_fields_bitfield)
+    assert _fuse_file_info_flag_count < ctypes.sizeof(_fuse_uint32) * 8
 
     _fuse_file_info_fields_ += _fuse_file_info_fields_bitfield
     _fuse_file_info_fields_ += [
-        ('padding', ctypes.c_uint, 32 - sum(x[2] for x in _fuse_file_info_fields_bitfield)),
-        ('padding2', ctypes.c_uint, 32),
+        ('padding', _fuse_uint32, ctypes.sizeof(_fuse_uint32) * 8 - _fuse_file_info_flag_count),
+        ('padding2', _fuse_uint32),
+    ]
+    # https://github.com/libfuse/libfuse/pull/1038#discussion_r1775112524
+    # https://github.com/libfuse/libfuse/pull/1081
+    # This padding did always exist because fh was aligned to an offset modulo 8 B,
+    # but libfuse 3.17 made this explicit and I'm not fully sure how ctypes behaves.
+    if fuse_version_minor >= 17:
+        _fuse_file_info_fields_ += [('padding3', _fuse_uint32)]
+
+    _fuse_file_info_fields_ += [
         ('fh', ctypes.c_uint64),
         ('lock_owner', ctypes.c_uint64),
         ('poll_events', ctypes.c_uint64),
@@ -706,6 +731,10 @@ elif fuse_version_major == 3:
 
 class fuse_file_info(ctypes.Structure):
     _fields_ = _fuse_file_info_fields_
+
+
+if ctypes.sizeof(ctypes.c_int) == 4 and (fuse_version_major, fuse_version_minor) >= (3, 17):
+    assert ctypes.sizeof(fuse_file_info) == 40
 
 
 class fuse_context(ctypes.Structure):
@@ -751,84 +780,111 @@ class fuse_bufvec(ctypes.Structure):
     ]
 
 
+# fuse_conn_info struct as defined and documented in fuse_common.h
+_fuse_conn_info_fields = [
+    ('proto_major', ctypes.c_uint),
+    ('proto_minor', ctypes.c_uint),
+]
 if fuse_version_major == 2:
-
-    class fuse_conn_info(ctypes.Structure):  # Added in 2.6 (ABI break of "init" from 2.5->2.6)
-        _fields_ = [
-            ('proto_major', ctypes.c_uint),
-            ('proto_minor', ctypes.c_uint),
-            ('async_read', ctypes.c_uint),
-            ('max_write', ctypes.c_uint),
-            ('max_readahead', ctypes.c_uint),
-            ('capable', ctypes.c_uint),  # Added in 2.8
-            ('want', ctypes.c_uint),  # Added in 2.8
-            ('max_background', ctypes.c_uint),  # Added in 2.9
-            ('congestion_threshold', ctypes.c_uint),  # Added in 2.9
-            ('reserved', ctypes.c_uint * 23),
-        ]
-
+    _fuse_conn_info_fields += [('async_read', _fuse_uint32)]
+_fuse_conn_info_fields += [('max_write', _fuse_uint32)]
+if fuse_version_major == 3:
+    _fuse_conn_info_fields += [('max_read', _fuse_uint32)]
+_fuse_conn_info_fields += [
+    ('max_readahead', _fuse_uint32),
+    ('capable', _fuse_uint32),  # Added in 2.8
+    ('want', _fuse_uint32),  # Added in 2.8
+    ('max_background', _fuse_uint32),  # Added in 2.9
+    ('congestion_threshold', _fuse_uint32),  # Added in 2.9
+]
+if fuse_version_major == 2:
+    _fuse_conn_info_fields += [('reserved', _fuse_uint32 * 23)]
 elif fuse_version_major == 3:
-
-    class fuse_conn_info(ctypes.Structure):
-        _fields_ = [
-            ('proto_major', ctypes.c_uint),
-            ('proto_minor', ctypes.c_uint),
-            ('max_write', ctypes.c_uint),
-            ('max_read', ctypes.c_uint),
-            ('max_readahead', ctypes.c_uint),
-            ('capable', ctypes.c_uint),
-            ('want', ctypes.c_uint),
-            ('max_background', ctypes.c_uint),
-            ('congestion_threshold', ctypes.c_uint),
-            ('time_gran', ctypes.c_uint),
-            ('reserved', ctypes.c_uint * 22),
+    _fuse_conn_info_fields += [('time_gran', _fuse_uint32)]
+    if fuse_version_minor < 17:
+        _fuse_conn_info_fields += [('reserved', _fuse_uint32 * 22)]
+    else:
+        _fuse_conn_info_fields += [
+            ('max_backing_stack_depth', ctypes.c_uint32),
+            ('no_interrupt', ctypes.c_uint32, 1),
+            ('padding', ctypes.c_uint32, 31),
+            ('capable_ext', ctypes.c_uint64),
+            ('want_ext', ctypes.c_uint64),
+            ('request_timeout', ctypes.c_uint16),
+            ('reserved', ctypes.c_uint16 * 31),
         ]
 
 
-# FUSE 3-only struct for second init argument. If a FUSE 2 method is loaded but 'init_with_config'
-# overridden, then this argument will only be zero-initialized and should be ignored.
+# https://github.com/libfuse/libfuse/pull/1081/commits/24f5b129c4e1b03ebbd05ac0c7673f306facea1ak
+class fuse_conn_info(ctypes.Structure):  # Added in 2.6 (ABI break of "init" from 2.5->2.6)
+    _fields_ = _fuse_conn_info_fields
+
+
+if (fuse_version_major, fuse_version_minor) >= (3, 17):
+    assert ctypes.sizeof(fuse_conn_info) == 128
+
+# FUSE 3-only struct for second init argument defined in fuse.h.
+# If a FUSE 2 method is loaded but 'init_with_config' overridden,
+# then this argument will only be zero-initialized and should be ignored.
+# 3.0.0 -> 3.10.5: no change
+# 3.10.5 -> 3.11.0: no_rofd_flush was added in the middle causing an ABI break
+# 3.11.0 -> 3.13.1: no change
+# 3.13.1 -> 3.14.1: parallel_direct_writes was added in the middle causing an ABI break
+# 3.14.1 -> 3.16.2: no change
+# 3.16.2 -> 3.17.0: Changed all types to uint32_t, added reserved bytes, reverted order to 3.10.
+# https://github.com/libfuse/libfuse/pull/1081
 _fuse_config_fields_ = [
-    ('set_gid', ctypes.c_int),
-    ('gid', ctypes.c_uint),
-    ('set_uid', ctypes.c_int),
-    ('uid', ctypes.c_uint),
-    ('set_mode', ctypes.c_int),
-    ('umask', ctypes.c_uint),
+    ('set_gid', _fuse_int32),
+    ('gid', _fuse_uint32),
+    ('set_uid', _fuse_int32),
+    ('uid', _fuse_uint32),
+    ('set_mode', _fuse_int32),
+    ('umask', _fuse_uint32),
     ('entry_timeout', ctypes.c_double),
     ('negative_timeout', ctypes.c_double),
     ('attr_timeout', ctypes.c_double),
-    ('intr', ctypes.c_int),
-    ('intr_signal', ctypes.c_int),
-    ('remember', ctypes.c_int),
-    ('hard_remove', ctypes.c_int),
-    ('use_ino', ctypes.c_int),
-    ('readdir_ino', ctypes.c_int),
-    ('direct_io', ctypes.c_int),
-    ('kernel_cache', ctypes.c_int),
-    ('auto_cache', ctypes.c_int),
+    ('intr', _fuse_int32),
+    ('intr_signal', _fuse_int32),
+    ('remember', _fuse_int32),
+    ('hard_remove', _fuse_int32),
+    ('use_ino', _fuse_int32),
+    ('readdir_ino', _fuse_int32),
+    ('direct_io', _fuse_int32),
+    ('kernel_cache', _fuse_int32),
+    ('auto_cache', _fuse_int32),
 ]
 if fuse_version_major == 3:
     # Adding this member in the middle of the struct was an ABI-incompatible change!
-    if fuse_version_minor >= 11:
+    if fuse_version_minor >= 11 and fuse_version_minor < 17:
         _fuse_config_fields_ += [('no_rofd_flush', ctypes.c_int)]
 
     _fuse_config_fields_ += [
-        ('ac_attr_timeout_set', ctypes.c_int),
+        ('ac_attr_timeout_set', _fuse_int32),
         ('ac_attr_timeout', ctypes.c_double),
-        ('nullpath_ok', ctypes.c_int),
+        ('nullpath_ok', _fuse_int32),
     ]
 
     # Another ABI break as discussed here: https://lists.debian.org/debian-devel/2024/03/msg00278.html
     # The break was in 3.14.1 NOT in 3.14.0, but I cannot query the bugfix version.
     # I'd hope that all 3.14.0 installations have been replaced by updates to 3.14.1.
-    if fuse_version_minor >= 14:
+    if fuse_version_minor >= 14 and fuse_version_minor < 17:
         _fuse_config_fields_ += [('parallel_direct_writes', ctypes.c_int)]
 
     _fuse_config_fields_ += [
-        ('show_help', ctypes.c_int),
+        ('show_help', _fuse_int32),
         ('modules', ctypes.c_char_p),
-        ('debug', ctypes.c_int),
+        ('debug', _fuse_int32),
     ]
+
+    if fuse_version_minor >= 17:
+        _fuse_config_fields_ += [
+            ('fmask', ctypes.c_uint32),
+            ('dmask', ctypes.c_uint32),
+            ('no_rofd_flush', ctypes.c_int32),
+            ('parallel_direct_writes', ctypes.c_int32),
+            ('flags', ctypes.c_int32),
+            ('reserved', ctypes.c_uint64 * 48),
+        ]
 
 
 class fuse_config(ctypes.Structure):
