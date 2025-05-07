@@ -87,14 +87,22 @@ jobs:
         # 3.13 is to be released 2024-10
         # 3.14 is to be released 2025-10
         python-version: ['3.9', '3.12', '3.13']
+        libfuse-version: ['system']
         include:
         - os: ubuntu-latest
           python-version: '3.14.0-alpha.0'
+          libfuse-version: 'system'
+        - os: ubuntu-latest
+          python-version: '3.13'
+          libfuse-version: '3.17.2'
 
     defaults:
       run:
         # This is especially important for windows because it seems to default to powershell
         shell: bash
+
+    env:
+      LIBFUSE_VERSION: ${{ matrix.libfuse-version }}
 
     steps:
     - uses: actions/checkout@v4
@@ -135,10 +143,7 @@ jobs:
         sudo apt-get -y install liblzma-dev*
 
     - name: Install Dependencies For Unreleased Python Versions (Linux)
-      if: >
-        startsWith( matrix.os, 'ubuntu' ) && (
-          matrix.python-version == '3.13' ||
-          matrix.python-version == '3.14.0-alpha.0')
+      if: startsWith( matrix.os, 'ubuntu' ) && matrix.python-version == '3.14.0-alpha.0'
       run: |
         #libgit2-dev is too old on Ubuntu 22.04. Leads to error about missing git2/sys/errors.h
         #sudo apt-get -y install libgit2-dev
@@ -179,6 +184,24 @@ jobs:
         python3 -m pip install --upgrade wheel
         python3 -m pip install --upgrade setuptools
         python3 -m pip install --upgrade-strategy eager --upgrade twine build cffi
+
+    - name: Install Custom libFUSE
+      if: matrix.libfuse-version != 'system'
+      run: |
+        NAME=fuse-${LIBFUSE_VERSION}
+        wget https://github.com/libfuse/libfuse/releases/download/${NAME}/${NAME}.tar.gz
+        tar -xf "${NAME}.tar.gz"
+        cd -- "${NAME}"
+        mkdir -p build
+        cd build
+        sudo apt-get -y install meson python*-pytest
+        meson ..
+        ninja
+        #sudo python3 -m pytest test/
+        sudo ninja install
+        sudo ln -s /usr/local/bin/fusermount{3,}
+        cd ../..
+        rm -rf -- "${NAME}"
 
     - name: Test ratarmountcore Installation From Tarball
       working-directory: core
@@ -288,17 +311,21 @@ jobs:
       env:
         DROPBOX_TOKEN: ${{ secrets.DROPBOX_TOKEN }}
       run: |
-        export FUSE_LIBRARY_PATH=$( dpkg -L libfuse3-3 | 'grep' -F .so | head -1 )
-        ratarmount --version
+        if [[ $LIBFUSE_VERSION == system ]]; then
+            export FUSE_LIBRARY_PATH=$( dpkg -L libfuse3-3 | 'grep' -F .so | head -1 )
+        else
+            export FUSE_LIBRARY_PATH=/usr/local/lib/x86_64-linux-gnu/libfuse3.so.$LIBFUSE_VERSION
+        fi
+        ratarmount --version | grep -i fuse
         bash tests/runtests.sh
 
     - name: Regression Tests (FUSE 2)
-      if: ${{ !startsWith( matrix.os, 'macos' ) }}
+      if: ${{ !startsWith( matrix.os, 'macos' ) && matrix.libfuse-version == 'system' }}
       env:
         DROPBOX_TOKEN: ${{ secrets.DROPBOX_TOKEN }}
       run: |
+        ratarmount --version | grep -i fuse
         bash tests/runtests.sh
-        python3 -c 'import pygit2'
 
     - name: Module tests without fusepy
       run: |
