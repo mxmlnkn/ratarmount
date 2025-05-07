@@ -1061,9 +1061,12 @@ class PrintVersionAction(argparse.Action):
             fusermountVersion = subprocess.run(
                 ["fusermount", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False
             ).stdout.strip()
-            print("FUSE", re.sub('.* ([0-9][.][0-9.]+).*', r'\1', fusermountVersion.decode()))
+            print("fusermount", re.sub('.* ([0-9][.][0-9.]+).*', r'\1', fusermountVersion.decode()))
         except Exception:
             pass
+
+        if hasattr(fuse, 'fuse_version_major') and hasattr(fuse, 'fuse_version_minor'):
+            print(f"FUSE: {fuse.fuse_version_major}.{fuse.fuse_version_minor}")
 
         print("libsqlite3", sqlite3.sqlite_version)
 
