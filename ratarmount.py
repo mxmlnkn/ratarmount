@@ -1167,18 +1167,21 @@ class PrintOSSAttributionAction(argparse.Action):
             ("indexed_gzip", "/pauldmccarthy/indexed_gzip/master/LICENSE"),  # zlib License
             ("indexed_zstd", "/martinellimarco/indexed_zstd/master/LICENSE"),  # MIT
             ("rapidgzip", "/mxmlnkn/rapidgzip/master/LICENSE-MIT"),  # MIT or Apache License 2.0
-            ("fast-zip-decryption", "/mxmlnkn/fast-zip-decryption/LICENSE"),  # MIT
-            ("fsspec", "/fsspec/filesystem_spec/LICENSE"),  # BSD-3
-            ("sshfs", "/fsspec/sshfs/LICENSE"),  # Apache License 2.0
-            ("ipfsspec", "/fsspec/ipfsspec/LICENSE"),  # MIT
-            ("smbprotocol", "/jborean93/smbprotocol/LICENSE"),  # MIT
-            ("dropboxdrivefs", "/fsspec/dropboxdrivefs/LICENSE"),  # BSD-3
-            ("s3fs", "/fsspec/s3fs/LICENSE.txt"),  # BSD-3
-            ("webdav4", "/skshetry/webdav4/LICENSE"),  # MIT
-            ("asyncssh", "/ronf/asyncssh/LICENSE"),  # EPL 2.0
+            ("fast-zip-decryption", "/mxmlnkn/fast-zip-decryption/refs/heads/master/LICENSE"),  # MIT
+            ("fsspec", "/fsspec/filesystem_spec/refs/heads/master/LICENSE"),  # BSD-3
+            ("sshfs", "/fsspec/sshfs/refs/heads/main/LICENSE"),  # Apache License 2.0
+            ("ipfsspec", "/fsspec/ipfsspec/refs/heads/main/LICENSE"),  # MIT
+            ("smbprotocol", "/jborean93/smbprotocol/refs/heads/master/LICENSE"),  # MIT
+            ("dropboxdrivefs", "/fsspec/dropboxdrivefs/refs/heads/master/LICENSE"),  # BSD-3
+            ("s3fs", "/fsspec/s3fs/refs/heads/main/LICENSE.txt"),  # BSD-3
+            ("webdav4", "/skshetry/webdav4/refs/heads/main/LICENSE"),  # MIT
+            ("asyncssh", "/ronf/asyncssh/refs/heads/develop/LICENSE"),  # EPL 2.0
         ]:
             licenseUrl = "https://raw.githubusercontent.com" + githubPath
-            licenseContents = urllib.request.urlopen(licenseUrl).read().decode()
+            try:
+                licenseContents = urllib.request.urlopen(licenseUrl).read().decode()
+            except urllib.error.HTTPError as error:
+                licenseContents = f"Failed to get license at {licenseUrl} because of: {str(error)}"
             homepage = "https://github.com" + '/'.join(githubPath.split('/', 3)[:3])
             licenses.append((name, homepage, licenseContents))
 
