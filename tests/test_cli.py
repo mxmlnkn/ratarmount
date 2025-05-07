@@ -8,6 +8,7 @@ import contextlib
 import hashlib
 import io
 import os
+import subprocess
 import sys
 import tempfile
 import threading
@@ -104,12 +105,19 @@ class RunRatarmount:
             if os.path.ismount(self.mountPoint):
                 break
             if time.time() - t0 > self.timeout:
+                mount_list = "<Unable to run mount command>"
+                try:
+                    mount_list = subprocess.run("mount", capture_output=True).stdout.decode()
+                except Exception as exception:
+                    mount_list += f"\n{exception}"
                 raise RuntimeError(
                     "Expected mount point but it isn't one!"
                     + "\n===== stderr =====\n"
                     + self.getStderr()
                     + "\n===== stdout =====\n"
                     + self.getStdout()
+                    + "\n===== mount =====\n"
+                    + mount_list
                 )
             time.sleep(0.1)
 

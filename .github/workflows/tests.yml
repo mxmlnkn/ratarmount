@@ -126,6 +126,7 @@ jobs:
         echo "Shell: $SHELL"
         echo "Cores: $( nproc )"
         echo "Mount points:"; mount
+        echo "/etc/fuse.conf:"; cat /etc/fuse.conf || true
 
     - uses: msys2/setup-msys2@v2
       if: startsWith( matrix.os, 'windows' )
@@ -181,6 +182,7 @@ jobs:
     - name: Install pip Dependencies
       run: |
         python3 -m pip install --upgrade pip
+        # Still needed for building lzmaffi without build isolation
         python3 -m pip install --upgrade wheel
         python3 -m pip install --upgrade setuptools
         python3 -m pip install --upgrade-strategy eager --upgrade twine build cffi
