@@ -213,8 +213,12 @@ jobs:
     - name: Test Startup With Only One Compression Dependency
       run: |
         for module in indexed_gzip indexed_zstd lzmaffi python-xz; do
-            # --use-pep517 to fix deprecation warning: https://github.com/pypa/pip/issues/6334
-            python3 -m pip install --use-pep517 --upgrade "$module"
+            if [[ $module == lzmaffi ]]; then
+                # --use-pep517 to fix deprecation warning: https://github.com/pypa/pip/issues/6334
+                python3 -m pip install --use-pep517 --no-build-isolation --upgrade "$module"
+            else
+                python3 -m pip install --upgrade "$module"
+            fi
             # Segfaults (139) are not allowed but other exit codes are valid!
             # indexed_zstd=1.2.0 did segfault here!
             python3 ratarmount.py README.md || [ $? != 139 ]
