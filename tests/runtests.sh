@@ -2312,7 +2312,7 @@ checkURLProtocolIPFS()
     elif [[ -f ipfs ]]; then
         ipfs=./ipfs
     else
-        wget -O- 'https://github.com/ipfs/kubo/releases/download/v0.30.0/kubo_v0.30.0_linux-amd64.tar.gz' |
+        wget -q -O- 'https://github.com/ipfs/kubo/releases/download/v0.30.0/kubo_v0.30.0_linux-amd64.tar.gz' |
             tar -zx kubo/ipfs
         ipfs=kubo/ipfs
     fi
