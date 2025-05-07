@@ -1,4 +1,11 @@
 
+# Version 0.8.1 built on 2025-05-07
+
+## Fixes
+
+ - Add support for libfuse 3.17+.
+
+
 # Version 0.8.0 built on 2024-11-01
 
 ## Features
