@@ -158,7 +158,7 @@ jobs:
         # And the error message is atrocious:
         #   cmdline.extend(args)
         #   TypeError: 'NoneType' object is not iterable
-        brew install macfuse coreutils pixz pbzip2 zstd unar libarchive lrzip lzop lzo
+        brew install -q macfuse coreutils pixz pbzip2 zstd unar libarchive lrzip lzop lzo
         # Add brew installation binary folder to PATH so that command line tools like zstd can be found
         echo PATH="$PATH:/usr/local/bin" >> "$GITHUB_ENV"
 
@@ -168,7 +168,7 @@ jobs:
           matrix.python-version == '3.13' ||
           matrix.python-version == '3.14.0-alpha.0')
       run: |
-        brew install libgit2@1.8
+        brew install -q libgit2@1.8
         brew link libgit2@1.8 --force
         # Expects exactly libgit2 1.8.x! Therefore install it here instead via the non-pinned ratarmount dependencies.
         python3 -m pip install pygit2==1.15
