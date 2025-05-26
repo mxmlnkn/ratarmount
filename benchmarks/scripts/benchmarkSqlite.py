@@ -24,7 +24,7 @@ labels = ['varchar primary key', 'integer primary key', 'varchar,integer primary
 
 def extractValuesFromLog(path):
     result = []
-    with open(path, 'rt') as file:
+    with open(path, 'rt', encoding='utf-8') as file:
         blocks = file.read().split('\n\n')
         for block in blocks:
             if not block:
@@ -71,10 +71,9 @@ def extractValuesFromLog(path):
 def plotSummary(logFiles):
     values = []
     for logFile in logFiles:
-        result = re.match(r'.*/sqlite primary key benchmark ([0-9]+)k files\.log', logFile)
         values += extractValuesFromLog(logFile)
 
-    names = sorted(list(set([x['name'] for x in values])))
+    names = sorted(list({x['name'] for x in values}))
     fig = plt.figure(figsize=(12, 9))
     for ikey, key in enumerate(['tinsert', 'tselectpath', 'tselecthash', 'tselectpathstart']):
         ax = fig.add_subplot(
@@ -91,10 +90,10 @@ def plotSummary(logFiles):
             ax.plot(xvalues[iSorted], yvalues[iSorted], marker='o', label=name)
             allx += [xvalues[iSorted]]
             ally += [yvalues[iSorted]]
-        minx = min([min(x) for x in allx])
-        maxx = max([max(x) for x in allx])
-        miny = min([min(x) for x in ally])
-        maxy = max([max(x) for x in ally])
+        minx = min(min(x) for x in allx)
+        maxx = max(max(x) for x in allx)
+        miny = min(min(x) for x in ally)
+        maxy = max(max(x) for x in ally)
         x = 10 ** np.linspace(np.log10(minx), np.log10(maxx))
         if key in ['tselectpathstart']:
             ax.plot(x, x / x[0] * miny, linestyle='--', color='0.5', label='linear scaling')
@@ -103,7 +102,7 @@ def plotSummary(logFiles):
             y = x**3 / x[-1] ** 3 * maxy
             ax.plot(x[y > miny], y[y > miny], linestyle='-', color='0.5', label='cubic scaling')
         if key in ['tselectpath', 'tselecthash']:
-            ax.plot(x, x / x[0] * max([ys[0] for ys in ally]), linestyle='--', color='0.5', label='linear scaling')
+            ax.plot(x, x / x[0] * max(ys[0] for ys in ally), linestyle='--', color='0.5', label='linear scaling')
 
         if key in ['tselectpath', 'tselecthash']:
             ax.plot(x, np.log(x) / np.log(x[0]) * miny, linestyle='-.', color='0.5', label='logarithmic scaling')
@@ -113,7 +112,7 @@ def plotSummary(logFiles):
             ax.plot(x[y > miny], y[y > miny], linestyle='--', color='0.5', label='linear scaling')
             ax.plot(
                 x,
-                np.log(x) / np.log(x[0]) * max([ys[0] for ys in ally]),
+                np.log(x) / np.log(x[0]) * max(ys[0] for ys in ally),
                 linestyle='-.',
                 color='0.5',
                 label='logarithmic scaling',
@@ -140,7 +139,7 @@ def plotSummary(logFiles):
         ax.plot(xvalues[iSorted], yvalues[iSorted], marker='o', label=name)
         allx += [list(xvalues[iSorted])]
         ally += [list(yvalues[iSorted])]
-    miny = min([min(x) for x in ally])
+    miny = min(min(x) for x in ally)
 
     ax.plot(x, x / x[0] * miny, linestyle='--', color='0.5', label='linear scaling')
     ax.legend(loc='best')
@@ -159,7 +158,7 @@ if len(sys.argv) > 1 and os.path.isdir(sys.argv[1]):
             logFiles += [path]
     plotSummary(logFiles)
     plt.show()
-    exit()
+    sys.exit(0)
 
 logFiles = []
 # for nFiles in [ 3 * 1000, 10 * 1000, 32 * 1000, 100 * 1000,  320 * 1000,
@@ -180,7 +179,7 @@ for nFiles in [1000 * 1000]:
     axsl = plt.subplot(223, xscale='log', yscale='log', title='SELECT PATH LIKE x.%')
     axsh = plt.subplot(224, xscale='log', yscale='log', title='SELECT HASH == y')
 
-    logFile = open(fname + ".log", 'wt')
+    logFile = open(fname + ".log", 'wt', encoding='utf-8')
     logFiles += [logFile]
 
     def log(line):
@@ -239,12 +238,11 @@ for nFiles in [1000 * 1000]:
 
         tTotalInsert = sum(insertTimes) + t1Commit - t0Commit
         log(
-            "Inserting {} file names with {} characters took {:.3f} s when excluding PRNG time".format(
-                nFiles, fileNameLength, tTotalInsert
-            )
+            f"Inserting {nFiles} file names with {fileNameLength} characters took {tTotalInsert:.3f} s "
+            + "when excluding PRNG time"
         )
 
-        with open(f"{fname} {labels[iSchema]} insert.dat", 'wt') as dataFile:
+        with open(f"{fname} {labels[iSchema]} insert.dat", 'wt', encoding='utf-8') as dataFile:
             for t in insertTimes:
                 dataFile.write(str(t) + '\n')
 
@@ -261,12 +259,12 @@ for nFiles in [1000 * 1000]:
                 t1 = time.time()
                 selectTimes += [t1 - t0]
             t1Select = time.time()
-            log("Selecting {} {} took {:.3f} s".format(nFilesSelect, entity, t1Select - t0Select))
+            log(f"Selecting {nFilesSelect} {entity} took {t1Select - t0Select:.3f} s")
 
             tTotalSelectTime = sum(selectTimes)
-            log("Selecting {} {} took {:.3f} s excluding PRNG time".format(nFilesSelect, entity, tTotalSelectTime))
+            log(f"Selecting {nFilesSelect} {entity} took {tTotalSelectTime:.3f} s excluding PRNG time")
 
-            with open(f"{fname} {labels[iSchema]} select {entity}.dat", 'wt') as dataFile:
+            with open(f"{fname} {labels[iSchema]} select {entity}.dat", 'wt', encoding='utf-8') as dataFile:
                 for t in selectTimes:
                     dataFile.write(str(t) + '\n')
 
@@ -291,7 +289,7 @@ for nFiles in [1000 * 1000]:
 
         ########### Cleanup ###########
 
-        # db.execute( 'VACUUM' )  # does not help because we don't delete anything but still adds significant time overhead
+        # db.execute('VACUUM') # does not help because we don't delete anything but still adds significant time overhead
         db.close()
         stats = os.stat(databaseFile)
         log(f"SQL database size in bytes: {stats.st_size}")
