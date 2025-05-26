@@ -286,7 +286,7 @@ class AutoMountLayer(MountSource):
         )
 
     @overrides(MountSource)
-    def listDirModeOnly(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def listDirModeOnly(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
         mountPoint, pathInMountPoint = self._findMounted(path)
         return self._appendMountPoints(
             path, self.mounted[mountPoint].mountSource.listDirModeOnly(pathInMountPoint), onlyMode=True
