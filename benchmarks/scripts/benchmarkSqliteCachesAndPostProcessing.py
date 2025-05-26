@@ -11,49 +11,57 @@ import matplotlib.pyplot as plt
 
 fileNameLength = 256
 
+
 def benchmarkCacheSizes(nFiles):
     rowsPerInsert = 1000
     assert nFiles % rowsPerInsert == 0
     fname = f"sqlite cache size benchmark {nFiles // 1000}k files"
 
-    cacheSizes = [ 2, 4, 16, 32, 64, 128, 256, 512 ]
+    cacheSizes = [2, 4, 16, 32, 64, 128, 256, 512]
     insertionTimes = []
     for cacheSize in cacheSizes:
         databaseFile = tempfile.mkstemp()[1]
-        db = sqlite3.connect( databaseFile ) #'1m-names-test.sqlite3' )
-        db.executescript( f"""
+        db = sqlite3.connect(databaseFile)  #'1m-names-test.sqlite3' )
+        db.executescript(
+            f"""
             PRAGMA LOCKING_MODE = EXCLUSIVE;
             PRAGMA TEMP_STORE = MEMORY;
             PRAGMA JOURNAL_MODE = OFF;
             PRAGMA SYNCHRONOUS = OFF;
             PRAGMA CACHE_SIZE = -{cacheSize * 1000};
-        """ )
+            """
+        )
         # use this schema as it represents the (path,name) primary key currently used in ratarmount
-        db.execute( 'CREATE TABLE "files" ( "path" VARCHAR(65535), "hash" VARCHAR(65535), PRIMARY KEY (path,hash) );' )
+        db.execute('CREATE TABLE "files" ( "path" VARCHAR(65535), "hash" VARCHAR(65535), PRIMARY KEY (path,hash) );')
 
         ########### INSERT benchmark ###########
         t0InsertAll = time.time()
-        for i in range( nFiles // rowsPerInsert ):
-            rows = [ ( os.urandom( fileNameLength // 2 ).hex(), j )
-                     for j in range( i * rowsPerInsert, i * rowsPerInsert + rowsPerInsert ) ]
-            db.executemany( 'INSERT INTO files VALUES (?,?)', rows )
+        for i in range(nFiles // rowsPerInsert):
+            rows = [
+                (os.urandom(fileNameLength // 2).hex(), j)
+                for j in range(i * rowsPerInsert, i * rowsPerInsert + rowsPerInsert)
+            ]
+            db.executemany('INSERT INTO files VALUES (?,?)', rows)
         db.commit()
         t1InsertAll = time.time()
-        print( "Inserting {} file names with {} characters and cache size {} took {:.3f} s".
-               format( nFiles, fileNameLength, cacheSize, t1InsertAll - t0InsertAll ) )
+        print(
+            "Inserting {} file names with {} characters and cache size {} took {:.3f} s".format(
+                nFiles, fileNameLength, cacheSize, t1InsertAll - t0InsertAll
+            )
+        )
 
-        insertionTimes += [ t1InsertAll - t0InsertAll ]
-        os.remove( databaseFile )
+        insertionTimes += [t1InsertAll - t0InsertAll]
+        os.remove(databaseFile)
 
     fig = plt.figure()
-    ax = fig.add_subplot( 111, xlabel = "SQL Cache Size / MB", ylabel = "Table Creation Time / s" )
+    ax = fig.add_subplot(111, xlabel="SQL Cache Size / MB", ylabel="Table Creation Time / s")
 
-    ax.plot( cacheSizes, insertionTimes, 'o' )
+    ax.plot(cacheSizes, insertionTimes, 'o')
 
-    ax.legend( loc = 'best' )
+    ax.legend(loc='best')
     fig.tight_layout()
-    fig.savefig( fname + ".pdf" )
-    fig.savefig( fname + ".png" )
+    fig.savefig(fname + ".pdf")
+    fig.savefig(fname + ".png")
 
 
 def benchmarkCacheSizesSortAfter(nFiles):
@@ -61,62 +69,72 @@ def benchmarkCacheSizesSortAfter(nFiles):
     assert nFiles % rowsPerInsert == 0
     fname = f"sqlite using intermediary table order by cache size benchmark {nFiles // 1000}k files"
 
-    cacheSizes = [ 2, 4, 16, 32, 64, 128, 192, 256, 320, 384, 448, 512 ]
+    cacheSizes = [2, 4, 16, 32, 64, 128, 192, 256, 320, 384, 448, 512]
     insertionTimes = []
     for cacheSize in cacheSizes:
         databaseFile = tempfile.mkstemp()[1]
-        db = sqlite3.connect( databaseFile ) #'1m-names-test.sqlite3' )
-        db.executescript( f"""
+        db = sqlite3.connect(databaseFile)  #'1m-names-test.sqlite3' )
+        db.executescript(
+            f"""
             PRAGMA LOCKING_MODE = EXCLUSIVE;
             PRAGMA TEMP_STORE = MEMORY;
             PRAGMA JOURNAL_MODE = OFF;
             PRAGMA SYNCHRONOUS = OFF;
             PRAGMA CACHE_SIZE = -{cacheSize * 1000};
-        """ )
+            """
+        )
         # use this schema as it represents the (path,name) primary key currently used in ratarmount
-        db.execute( """
+        db.execute(
+            """
             CREATE TABLE "files_tmp" (
                 "id"   INTEGER PRIMARY KEY,
                 "path" VARCHAR(65535),
                 "name" VARCHAR(65535)
             );
-        """ )
+            """
+        )
 
         ########### INSERT benchmark ###########
         t0InsertAll = time.time()
-        for i in range( nFiles // rowsPerInsert ):
-            rows = [ ( j, os.urandom( fileNameLength // 2 ).hex(), j )
-                     for j in range( i * rowsPerInsert, i * rowsPerInsert + rowsPerInsert ) ]
-            db.executemany( 'INSERT INTO files_tmp VALUES (?,?,?)', rows )
+        for i in range(nFiles // rowsPerInsert):
+            rows = [
+                (j, os.urandom(fileNameLength // 2).hex(), j)
+                for j in range(i * rowsPerInsert, i * rowsPerInsert + rowsPerInsert)
+            ]
+            db.executemany('INSERT INTO files_tmp VALUES (?,?,?)', rows)
 
-
-        db.execute( """
+        db.execute(
+            """
             CREATE TABLE "files" (
                 "path" VARCHAR(65535),
                 "name" VARCHAR(65535),
                 PRIMARY KEY (path,name)
             );
-        """ )
-        db.execute( 'INSERT INTO "files" (path,name) SELECT path,name FROM "files_tmp" ORDER BY path,name;' )
-        db.execute( 'DROP TABLE "files_tmp"' )
+            """
+        )
+        db.execute('INSERT INTO "files" (path,name) SELECT path,name FROM "files_tmp" ORDER BY path,name;')
+        db.execute('DROP TABLE "files_tmp"')
 
         db.commit()
         t1InsertAll = time.time()
 
-        print( "Inserting {} file names with {} characters and cache size {} took {:.3f} s".
-               format( nFiles, fileNameLength, cacheSize, t1InsertAll - t0InsertAll ) )
+        print(
+            "Inserting {} file names with {} characters and cache size {} took {:.3f} s".format(
+                nFiles, fileNameLength, cacheSize, t1InsertAll - t0InsertAll
+            )
+        )
 
-        insertionTimes += [ t1InsertAll - t0InsertAll ]
-        os.remove( databaseFile )
+        insertionTimes += [t1InsertAll - t0InsertAll]
+        os.remove(databaseFile)
 
     fig = plt.figure()
-    ax = fig.add_subplot( 111, xlabel = "SQL Cache Size / MB", ylabel = "Table Creation Time / s" )
+    ax = fig.add_subplot(111, xlabel="SQL Cache Size / MB", ylabel="Table Creation Time / s")
 
-    ax.plot( cacheSizes, insertionTimes, 'o' )
+    ax.plot(cacheSizes, insertionTimes, 'o')
 
     fig.tight_layout()
-    fig.savefig( fname + ".pdf" )
-    fig.savefig( fname + ".png" )
+    fig.savefig(fname + ".pdf")
+    fig.savefig(fname + ".png")
 
 
 benchmarkCacheSizes(1_000_000)

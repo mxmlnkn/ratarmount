@@ -35,20 +35,21 @@ ORDER BY "path","name";
 """
 
 
-def createTable( nRows, fileNameLength, modeProbability ):
+def createTable(nRows, fileNameLength, modeProbability):
     db = sqlite3.connect(":memory:")
     db.executescript(schema)
 
-    paths = [ os.urandom( fileNameLength // 2 ).hex() for j in range( nRows ) ]
-    names = [ os.urandom( fileNameLength // 2 ).hex() for j in range( nRows ) ]
-    modes = list( np.random.rand( nRows ) <= modeProbability )
-    db.executemany( 'INSERT INTO files VALUES (?,?,?)', zip( paths,names,modes ) )
+    paths = [os.urandom(fileNameLength // 2).hex() for j in range(nRows)]
+    names = [os.urandom(fileNameLength // 2).hex() for j in range(nRows)]
+    modes = list(np.random.rand(nRows) <= modeProbability)
+    db.executemany('INSERT INTO files VALUES (?,?,?)', zip(paths, names, modes))
 
     db.commit()
     return db
 
-def benchmarkQuery( nRows, fileNameLength, modeProbability, query ):
-    db = createTable( nRows, fileNameLength, modeProbability )
+
+def benchmarkQuery(nRows, fileNameLength, modeProbability, query):
+    db = createTable(nRows, fileNameLength, modeProbability)
 
     t0 = time.time()
     db.execute(query).fetchall()
@@ -56,16 +57,17 @@ def benchmarkQuery( nRows, fileNameLength, modeProbability, query ):
 
     return t1 - t0
 
+
 if __name__ == '__main__':
     for modeProbability in np.arange(6) * 0.2:
         print("Using mode probability:", modeProbability)
         print(" Using Tuples:")
-        for nRows in 10**np.arange(3, 7):
+        for nRows in 10 ** np.arange(3, 7):
             print(" ", nRows, benchmarkQuery(nRows, 128, 0.5, queryUsingTuples))
 
         print()
         print(" Using Concatenation:")
-        for nRows in 10**np.arange(3, 7):
+        for nRows in 10 ** np.arange(3, 7):
             print(" ", nRows, benchmarkQuery(nRows, 128, 0.5, queryUsingConcatenation))
         print()
 

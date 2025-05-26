@@ -295,9 +295,11 @@ def plotRatarmountParallelComparison(fileName, compression):
 
     ax = fig.add_subplot(
         111,
-        title="Speedup for Listing all Files After 'readdir' Improvement"
-        if compression == 'find'
-        else f"Speedup for ratarmount -P 24 for (First) Mounting {suffix}",
+        title=(
+            "Speedup for Listing all Files After 'readdir' Improvement"
+            if compression == 'find'
+            else f"Speedup for ratarmount -P 24 for (First) Mounting {suffix}"
+        ),
         xlabel="Number of Files in Archive",
         ylabel="Speedup",
         xscale='log',
