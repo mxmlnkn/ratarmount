@@ -1102,7 +1102,7 @@ class SQLiteIndex:
                     _copyToTemp(fileToCopy)
         else:
             if not os.path.isfile(indexFilePath):
-                return None
+                return
 
             with open(indexFilePath, 'rb') as file:
                 decompressedFile = _undoCompression(file)
