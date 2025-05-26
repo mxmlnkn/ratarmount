@@ -9,7 +9,7 @@ import platform
 import sys
 import types
 
-from typing import Dict, Generic, Iterable, List, Optional, TypeVar, Union
+from typing import Dict, Generic, Iterable, List, Optional, TypeVar, Union, get_type_hints
 
 import importlib
 
@@ -45,11 +45,28 @@ class CompressionError(RatarmountError):
 
 def overrides(parentClass):
     """Simple decorator that checks that a method with the same name exists in the parent class"""
+    # I tried typing.override (Python 3.12+), but support for it does not seem to be ideal (yet)
+    # and portability also is an issue. https://github.com/google/pytype/issues/1915 Maybe in 3 years.
 
     def overrider(method):
-        if platform.python_implementation() != 'PyPy':
-            assert method.__name__ in dir(parentClass)
-            assert callable(getattr(parentClass, method.__name__))
+        if platform.python_implementation() == 'PyPy':
+            return method
+
+        assert method.__name__ in dir(parentClass)
+        parentMethod = getattr(parentClass, method.__name__)
+        assert callable(parentMethod)
+
+        # Example return of get_type_hints:
+        # {'path': <class 'str'>,
+        #  'return': typing.Union[typing.Iterable[str],
+        #                         typing.Dict[str, ratarmountcore.MountSource.FileInfo], NoneType]}
+        parentTypes = get_type_hints(parentMethod)
+        # If the parent is not typed, e.g., fusepy, then do not show errors for the typed derived class.
+        for argument, argumentType in get_type_hints(method).items():
+            if argument in parentTypes:
+                parentType = parentTypes[argument]
+                assert argumentType == parentType, f"{method.__name__}: {argument}: {argumentType} != {parentType}"
+
         return method
 
     return overrider
