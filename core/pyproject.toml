@@ -18,12 +18,9 @@ name = "ratarmountcore"
 description = "Random Access To Archived Resources Library"
 authors = [{name = "Maximilian Knespel", email = "mxmlnknp@gmail.com"}]
 license = "MIT"
-license-files = [
-    "LICENSE",
-    "ratarmountcore/fusepy/LICENSE",
-]
+license-files = ["LICENSE"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Natural Language :: English",
     "Operating System :: MacOS",
     "Operating System :: Unix",
