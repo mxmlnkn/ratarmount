@@ -13,7 +13,7 @@ import stat
 import tarfile
 
 from timeit import default_timer as timer
-from typing import Any, Callable, Dict, IO, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, IO, List, Optional, Tuple, Union, cast
 
 from .compressions import LIBARCHIVE_FILTER_FORMATS
 from .MountSource import FileInfo, MountSource
@@ -635,17 +635,20 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
         pass
 
     @overrides(MountSource)
-    def open(self, fileInfo: FileInfo, buffering=-1):
+    def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
         assert fileInfo.userdata
         tarFileInfo = fileInfo.userdata[-1]
         assert isinstance(tarFileInfo, SQLiteIndexedTarUserData)
-        return LibarchiveFile(
-            self.fileOrPath,
-            tarFileInfo.offsetheader,
-            fileSize=fileInfo.size,
-            passwords=self.passwords,
-            printDebug=self.printDebug,
-            archiveCache=self._archiveCache,
+        return cast(
+            IO[bytes],
+            LibarchiveFile(
+                self.fileOrPath,
+                tarFileInfo.offsetheader,
+                fileSize=fileInfo.size,
+                passwords=self.passwords,
+                printDebug=self.printDebug,
+                archiveCache=self._archiveCache,
+            ),
         )
 
     def _checkMetadata(self, metadata: Dict[str, Any]) -> None:
