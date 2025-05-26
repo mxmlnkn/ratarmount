@@ -10,6 +10,8 @@ from .utils import overrides
 from .StenciledFile import JoinedFile, LambdaReaderFile
 
 
+# CPython 3.11 added blobopen! https://docs.python.org/3/library/sqlite3.html#sqlite3.Blob
+# Well, will have to wait for some years to fully replace this for compatibility reasons.
 class SQLiteBlobFile(LambdaReaderFile):
     """Provides a memory-efficient file object interface to a single large blob inside an SQLite table"""
 

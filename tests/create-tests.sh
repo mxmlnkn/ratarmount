@@ -396,3 +396,9 @@ mkdir mounted
 sudo mount 'folder-symlink.fat' mounted
 ( cd mounted && sudo unzip ../tests/folder-symlink.zip )
 sudo umount mounted
+
+echo bar > foo
+setfattr --name user.tags --value mytag foo
+#getfattr --dump foo
+bsdtar --numeric-owner --xattrs -cf file-with-attribute.bsd.tar foo
+tar --numeric-owner --xattrs -cf file-with-attribute.gnu.tar foo
