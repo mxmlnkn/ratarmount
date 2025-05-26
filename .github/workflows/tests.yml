@@ -217,6 +217,7 @@ jobs:
         python3 -m build
         twine check dist/*
         python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )"[full]
+        python3 -m pip install mfusepy
 
     - name: Test Startup With Only One Compression Dependency
       run: |
@@ -256,6 +257,7 @@ jobs:
     - name: Test Installation From Source
       run: |
         python3 -m pip install .[full]
+        python3 -m pip install mfusepy
 
     - name: Test Simple Startup
       run: |

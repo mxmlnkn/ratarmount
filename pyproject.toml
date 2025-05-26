@@ -40,6 +40,7 @@ dependencies = [
     # https://packaging.python.org/en/latest/glossary/#term-Requirement-Specifier
     # https://packaging.python.org/en/latest/specifications/dependency-specifiers/#dependency-specifiers
     "ratarmountcore[7z, bzip2, fat, git, gzip, rar, xz, zip, zstd] ~= 0.8.0",
+    "mfusepy ~= 1.0",
 ]
 
 [project.readme]

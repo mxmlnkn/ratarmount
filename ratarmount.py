@@ -26,13 +26,13 @@ from typing import Any, Callable, Dict, Iterable, IO, List, Optional, Tuple, Uni
 
 
 try:
-    from ratarmountcore.fusepy import fuse
+    import mfusepy as fuse  # type: ignore
 except AttributeError as importException:
     traceback.print_exc()
-    print("[Error] Some internal exception occurred while trying to load the bundled fusepy:", importException)
+    print("[Error] Some internal exception occurred while trying to load mfusepy:", importException)
     sys.exit(1)
 except (ImportError, OSError) as importException:
-    print("[Warning] Failed to load bundled fusepy. Will try to load system fusepy. Exception was:", importException)
+    print("[Warning] Failed to load mfusepy. Will try to load system fusepy. Exception was:", importException)
     try:
         import fuse  # type: ignore
     except (ImportError, OSError) as fuseException:
