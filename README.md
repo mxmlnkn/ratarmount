@@ -18,7 +18,7 @@
 </div>
 
 Ratarmount collects all file positions inside a TAR so that it can easily jump to and read from any file without extracting it.
-It, then, **mounts** the **TAR** using [fusepy](https://github.com/fusepy/fusepy) for read access just like [archivemount](https://github.com/cybernoid/archivemount/).
+It, then, **mounts** the **TAR** using [mfusepy](https://github.com/mxmlnkn/mfusepy), a fork of [fusepy](https://github.com/fusepy/fusepy), for read access just like [archivemount](https://github.com/cybernoid/archivemount/).
 In [contrast](https://github.com/libarchive/libarchive#notes-about-the-library-design) to [libarchive](https://github.com/libarchive/libarchive), on which archivemount is based, random access and true seeking is supported.
 And in contrast to [tarindexer](https://github.com/devsnd/tarindexer), which also collects file positions for random access, ratarmount offers easy access via FUSE and support for compressed TARs.
 

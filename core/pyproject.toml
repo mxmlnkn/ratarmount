@@ -192,10 +192,7 @@ full-ssh = [
 ratar = "ratarmountcore.SQLiteIndexedTarFsspec.SQLiteIndexedTarFileSystem"
 
 [tool.setuptools]
-license-files = [
-    "LICENSE",
-    "ratarmountcore/fusepy/LICENSE",
-]
+license-files = ["LICENSE"]
 
 [tool.setuptools.dynamic]
 version = {attr = "ratarmountcore.version.__version__"}
