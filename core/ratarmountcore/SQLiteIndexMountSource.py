@@ -3,7 +3,7 @@
 
 # pylint: disable=abstract-method
 
-from typing import Any, Callable, Dict, Iterable, Optional, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Union
 
 from .MountSource import FileInfo, MountSource
 from .SQLiteIndex import SQLiteIndex
@@ -46,3 +46,11 @@ class SQLiteIndexMountSource(MountSource):
     def fileVersions(self, path: str) -> int:
         fileVersions = self.index.fileVersions(path)
         return len(fileVersions) if isinstance(fileVersions, dict) else 0
+
+    @overrides(MountSource)
+    def listxattr(self, fileInfo: FileInfo) -> List[str]:
+        return self.index.listxattr(fileInfo)
+
+    @overrides(MountSource)
+    def getxattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
+        return self.index.getxattr(fileInfo, key)

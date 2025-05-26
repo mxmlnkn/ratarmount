@@ -946,6 +946,29 @@ class FuseMount(fuse.Operations):
             result[key] = max(result.get(key, 0), FuseMount.MINIMUM_BLOCK_SIZE)
         return result
 
+    @overrides(fuse.Operations)
+    def listxattr(self, path):
+        # Beware, keys not prefixed with "user." will not be listed by getfattr by default.
+        # Use: "getfattr --match=.* mounted/foo" It seems that libfuse and the FUSE kernel module accept
+        # all keys, I tried with "key1", "security.key1", "user.key1".
+        return self.mountSource.listxattr(self._getFileInfo(path))
+
+    @overrides(fuse.Operations)
+    def getxattr(self, path, name, position=0):
+        if position:
+            # Specifically do not raise ENOSYS because libfuse will then disable getxattr calls wholly from now on,
+            # but I think that small values should still work as long as position is 0.
+            print(f"[Warning] Getxattr was called with position != 0 forh path '{path}' and key '{name}'.")
+            print("[Warning] Please report this as an issue to the ratarmount project with details to reproduce this.")
+            raise fuse.FuseOSError(errno.EOPNOTSUPP)
+
+        value = self.mountSource.getxattr(self._getFileInfo(path), name)
+        if value is None:
+            # My system sometimes tries to request security.selinux without the key actually existing.
+            # See https://man7.org/linux/man-pages/man2/getxattr.2.html#ERRORS
+            raise fuse.FuseOSError(errno.ENODATA)
+        return value
+
 
 def checkInputFileType(
     tarFile: str, encoding: str = tarfile.ENCODING, printDebug: int = 0

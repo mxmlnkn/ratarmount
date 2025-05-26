@@ -105,6 +105,7 @@ class SQLiteIndex:
     #     I have also checked for all users of SQLiteIndex: TAR, ZIP, SquashFS, libarchive.
     #     I created the index with the new version and accessed it with an old ratarmount version to test compatibility.
     #     Libarchive (currently) only creates SQLite indexes in memory, ergo has no compatibility issues!
+    #   - Add 'xattrs' table
     __version__ = '0.6.0'
 
     NUMBER_OF_METADATA_TO_VERIFY = 1000  # shouldn't take more than 1 second according to benchmarks
@@ -142,6 +143,30 @@ class SQLiteIndex:
              * the offsetheader column to the primary key. */
             PRIMARY KEY (path,name,offsetheader)
         );"""
+
+    _CREATE_XATTRS_TABLE = """
+        CREATE TABLE IF NOT EXISTS "xattrkeys" ( "name" VARCHAR(65535) PRIMARY KEY );
+
+        CREATE TABLE IF NOT EXISTS "xattrsdata" (
+            "offsetheader" INTEGER,
+            "keyid" INTEGER,
+            "value" VARCHAR(65535),  /* Binary Data (Python Bytes) */
+            PRIMARY KEY (offsetheader,keyid)
+        );
+
+        CREATE VIEW IF NOT EXISTS "xattrs" ( "offsetheader", "key", "value" ) AS
+            SELECT offsetheader, xattrkeys.name, value FROM "xattrsdata"
+            INNER JOIN xattrkeys ON xattrkeys.rowid = xattrsdata.keyid;
+
+        CREATE TRIGGER IF NOT EXISTS "xattrs_insert" INSTEAD OF INSERT ON "xattrs"
+        BEGIN
+            INSERT OR IGNORE INTO xattrkeys(name) VALUES (NEW.key);
+            INSERT OR IGNORE INTO xattrsdata(offsetheader, keyid, value) VALUES(
+                NEW.offsetheader,
+                (SELECT xattrkeys.rowid FROM xattrkeys WHERE name = NEW.key),
+                NEW.value
+            );
+        END;"""
 
     _CREATE_FILESTMP_TABLE = """
         /* "A table created using CREATE TABLE AS has no PRIMARY KEY and no constraints of any kind"
@@ -631,6 +656,7 @@ class SQLiteIndex:
                 f"The index file {indexFilePath} already seems to contain a table. Please specify --recreate-index."
             )
         sqlConnection.executescript(SQLiteIndex._CREATE_FILES_TABLE)
+        sqlConnection.executescript(SQLiteIndex._CREATE_XATTRS_TABLE)
 
         return indexFilePath, sqlConnection
 
@@ -908,6 +934,51 @@ class SQLiteIndex:
             .fetchone()
         )
         return self._rowToFileInfo(row) if row else None
+
+    def setxattrs(self, rows: List[Tuple[int, str, bytes]]):
+        self.getConnection().executemany('INSERT OR REPLACE INTO "xattrs" VALUES (?,?,?)', rows)
+
+    def listxattr(self, fileInfo: FileInfo) -> List[str]:
+        assert fileInfo.userdata
+        userData = fileInfo.userdata[-1]
+        assert isinstance(userData, SQLiteIndexedTarUserData)
+
+        if userData.isgenerated:
+            return []
+
+        try:
+            # Look up by offsetheader seems to be unique enough for all implementations,
+            # but currently only TAR supports attributes anyways.
+            return [
+                row[0]
+                for row in self.getConnection().execute(
+                    "SELECT key FROM xattrs WHERE offsetheader=(?);", (userData.offsetheader,)
+                )
+            ]
+        except sqlite3.OperationalError:
+            # May happen when loading old indexes that do not have the xattrs table.
+            pass
+        return []
+
+    def getxattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
+        assert fileInfo.userdata
+        userData = fileInfo.userdata[-1]
+        assert isinstance(userData, SQLiteIndexedTarUserData)
+
+        if userData.isgenerated:
+            return None
+
+        try:
+            row = (
+                self.getConnection()
+                .execute("SELECT value FROM xattrs WHERE (offsetheader,key)=(?,?);", (userData.offsetheader, key))
+                .fetchone()
+            )
+            return row[0] if row else None
+        except sqlite3.OperationalError:
+            # May happen when loading old indexes that do not have the xattrs table.
+            pass
+        return None
 
     def _tryAddParentFolders(self, path: str, offsetheader: int, offset: int) -> None:
         # Add parent folders if they do not exist.
