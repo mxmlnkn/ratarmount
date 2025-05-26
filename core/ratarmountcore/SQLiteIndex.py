@@ -698,6 +698,7 @@ class SQLiteIndex:
                 )
                 ORDER BY "path","name";
             DROP TABLE "parentfolders";
+            VACUUM;  /* According to benchmarks, this is important to reduce the size after the table drop! */
             PRAGMA optimize;
         """
 
