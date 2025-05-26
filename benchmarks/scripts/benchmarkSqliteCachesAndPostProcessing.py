@@ -45,9 +45,8 @@ def benchmarkCacheSizes(nFiles):
         db.commit()
         t1InsertAll = time.time()
         print(
-            "Inserting {} file names with {} characters and cache size {} took {:.3f} s".format(
-                nFiles, fileNameLength, cacheSize, t1InsertAll - t0InsertAll
-            )
+            f"Inserting {nFiles} file names with {fileNameLength} characters and cache size {cacheSize} "
+            + f"took {t1InsertAll - t0InsertAll:.3f} s"
         )
 
         insertionTimes += [t1InsertAll - t0InsertAll]
@@ -119,9 +118,8 @@ def benchmarkCacheSizesSortAfter(nFiles):
         t1InsertAll = time.time()
 
         print(
-            "Inserting {} file names with {} characters and cache size {} took {:.3f} s".format(
-                nFiles, fileNameLength, cacheSize, t1InsertAll - t0InsertAll
-            )
+            f"Inserting {nFiles} file names with {fileNameLength} characters and cache size {cacheSize} "
+            f"took {t1InsertAll - t0InsertAll:.3f} s"
         )
 
         insertionTimes += [t1InsertAll - t0InsertAll]
