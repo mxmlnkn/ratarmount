@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import base64
 import io
 import math
 import os
@@ -326,3 +327,7 @@ def getXdgCacheHome():
     if path.startswith(home):
         path = "~/" + path[len(home) :]
     return path if path else os.path.join('~', '.cache')
+
+
+def decodeUnpaddedBase64(data: str) -> bytes:
+    return base64.b64decode(data + '=' * ((4 - len(data) % 4) % 4))

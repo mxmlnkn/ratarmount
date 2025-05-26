@@ -234,6 +234,7 @@ runRatarmount()
 
 runAndCheckRatarmount()
 {
+    rm -f ratarmount.stdout.log ratarmount.stderr.log
     runRatarmount "$@"
     ! 'grep' -C 5 -Ei '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
         returnError "$LINENO" "Found warnings while executing: $RATARMOUNT_CMD $*"
@@ -1717,6 +1718,7 @@ checkStatfs()
 
     echoerr "[${FUNCNAME[0]}] Tested successfully statfs to mounted folder."
 
+    cleanup
     'rm' -r -- "$overlayFolder"
 
     return 0
@@ -1744,7 +1746,48 @@ checkStatfsWriteOverlay()
 
     echoerr "[${FUNCNAME[0]}] Tested successfully statfs to mounted folder with write overlay."
 
+    cleanup
     'rm' -r -- "$overlayFolder" "$overlayFolder2"
+
+    return 0
+}
+
+
+checkExtendedAttributes()
+{
+    local mountFolder
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" ||
+        returnError "$LINENO" 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+
+    local folder1 folder2
+    folder1=$( mktemp -d --suffix .test.ratarmount )
+    folder2=$( mktemp -d --suffix .test.ratarmount )
+    TMP_FILES_TO_CLEANUP+=( "$folder1" "$folder2" "$folder1/bar" "$folder2/foo" )
+    echo 'foo' > "$folder1/bar"
+    echo 'bar' > "$folder2/foo"
+    setfattr -n 'user.tags' -v 'bar' "$folder1/bar"
+    setfattr -n 'user.tags' -v 'foo' "$folder2/foo"
+
+    local args=(
+        -P "$parallelization" -c --disable-union-mount
+        "$folder1" "$folder2" tests/file-with-attribute.{bsd,gnu}.tar.bz2 "$mountFolder"
+    )
+    {
+        runAndCheckRatarmount "${args[@]}"
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+
+
+    diff <( getfattr --dump -R -- "$mountFolder" | sed '/^#/d; /^$/d' ) <( sed '/^#/d; /^$/d' <<EOF ) || returnError "$LINENO" 'Mismatching extended attributes'
+user.tags="bar"
+user.tags="foo"
+user.tags="mytag"
+user.tags="mytag"
+EOF
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully extended file attributes."
+
+    cleanup
 
     return 0
 }
@@ -2736,6 +2779,7 @@ if [[ ! -f tests/2k-recursive-tars.tar ]]; then
     bzip2 -q -d -k tests/2k-recursive-tars.tar.bz2
 fi
 
+checkExtendedAttributes || returnError "$LINENO" 'Extended attributes check failed!'
 checkStatfs || returnError "$LINENO" 'Statfs failed!'
 checkStatfsWriteOverlay || returnError "$LINENO" 'Statfs with write overlay failed!'
 checkSymbolicLinkRecursion || returnError "$LINENO" 'Symbolic link recursion failed!'

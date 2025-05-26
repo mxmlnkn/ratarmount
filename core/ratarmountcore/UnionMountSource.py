@@ -210,6 +210,22 @@ class UnionMountSource(MountSource):
             fileInfo.userdata.append(mountSource)
 
     @overrides(MountSource)
+    def listxattr(self, fileInfo: FileInfo) -> List[str]:
+        mountSource = fileInfo.userdata.pop()
+        try:
+            return mountSource.listxattr(fileInfo) if isinstance(mountSource, MountSource) else []
+        finally:
+            fileInfo.userdata.append(mountSource)
+
+    @overrides(MountSource)
+    def getxattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
+        mountSource = fileInfo.userdata.pop()
+        try:
+            return mountSource.getxattr(fileInfo, key) if isinstance(mountSource, MountSource) else None
+        finally:
+            fileInfo.userdata.append(mountSource)
+
+    @overrides(MountSource)
     def getMountSource(self, fileInfo: FileInfo) -> Tuple[str, MountSource, FileInfo]:
         sourceFileInfo = fileInfo.clone()
         mountSource = sourceFileInfo.userdata.pop()
