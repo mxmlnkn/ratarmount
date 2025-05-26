@@ -218,6 +218,7 @@ returnError()
 
 runRatarmount()
 {
+    rm -f ratarmount.stderr.log
     MOUNT_POINTS_TO_CLEANUP+=( "${*: -1}" )
     $RATARMOUNT_CMD "$@" >ratarmount.stdout.log 2>ratarmount.stderr.log.tmp &&
     checkStat "${@: -1}" # mount folder must exist and be stat-able after mounting
@@ -246,8 +247,6 @@ checkFileInTAR()
 
     local startTime
     startTime=$( date +%s )
-
-    rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
     mountFolder="$( mktemp -d --suffix .test.ratarmount )" ||
@@ -304,8 +303,6 @@ checkFileInTARPrefix()
     local fileInTar="$1"; shift
     local correctChecksum="$1"
 
-    rm -f ratarmount.{stdout,stderr}.log
-
     local mountFolder
     mountFolder="$( mktemp -d --suffix .test.ratarmount )" ||
         returnError "$LINENO" 'Failed to create temporary directory'
@@ -332,8 +329,6 @@ checkLinkInTAR()
     local archive="$1"; shift
     local fileInTar="$1"; shift
     local correctLinkTarget="$1"
-
-    rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
     mountFolder="$( mktemp -d --suffix .test.ratarmount )" ||
@@ -499,8 +494,6 @@ print( int( np.max( data[1] ) ), int( np.max( data[2] ) ) )" "$1"
 
 checkAutomaticIndexRecreation()
 (
-    rm -f ratarmount.{stdout,stderr}.log
-
     tmpFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     cd -- "$tmpFolder" || returnError "$LINENO" 'Failed to cd into temporary directory'
 
@@ -574,8 +567,6 @@ checkAutomaticIndexRecreation()
 
 checkUnionMount()
 (
-    rm -f ratarmount.{stdout,stderr}.log
-
     testsFolder="$( pwd )/tests"
     tmpFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     cd -- "$tmpFolder" || returnError "$LINENO" 'Failed to cd into temporary directory'
@@ -672,8 +663,6 @@ checkUnionMount()
 
 checkUnionMountFileVersions()
 (
-    rm -f ratarmount.{stdout,stderr}.log
-
     testsFolder="$( pwd )/tests"
     tmpFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     cd -- "$tmpFolder" || returnError "$LINENO" 'Failed to cd into temporary directory'
@@ -712,8 +701,6 @@ checkUnionMountFileVersions()
 
 checkAutoMountPointCreation()
 (
-    rm -f ratarmount.{stdout,stderr}.log
-
     testsFolder="$( pwd )/tests"
     tmpFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     cd -- "$tmpFolder" || returnError "$LINENO" 'Failed to cd into temporary directory'
@@ -742,8 +729,6 @@ checkTarEncoding()
     local fileInTar="$1"; shift
     local correctChecksum="$1"
 
-    rm -f ratarmount.{stdout,stderr}.log
-
     local mountFolder
     mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
@@ -768,8 +753,6 @@ checkTarEncoding()
 recompressFile()
 {
     # Given a file it returns paths to all variants of (uncompressed, bz2, gzip, xz, zst).
-
-    rm -f ratarmount.{stdout,stderr}.log
 
     local recompressedFiles=()
     local tmpFolder
@@ -899,8 +882,6 @@ checkIndexPathOption()
     local fileInTar="$1"; shift
     local correctChecksum="$1"
 
-    rm -f ratarmount.{stdout,stderr}.log
-
     local mountFolder indexFolder indexFile
     mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     indexFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
@@ -932,8 +913,6 @@ checkIndexFolderFallback()
     local archive="$1"; shift
     local fileInTar="$1"; shift
     local correctChecksum="$1"
-
-    rm -f ratarmount.{stdout,stderr}.log
 
     local args mountFolder indexFolder
     mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
@@ -1012,8 +991,6 @@ checkIndexArgumentChangeDetection()
     local fileInTar="$1"; shift
     local correctChecksum="$1"
 
-    rm -f ratarmount.{stdout,stderr}.log
-
     local args mountFolder indexFolder
     mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     indexFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
@@ -1055,8 +1032,6 @@ checkSuffixStripping()
     local fileInTar="$1"; shift
     local correctChecksum="$1"
 
-    rm -f ratarmount.{stdout,stderr}.log
-
     local mountFolder
     mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
@@ -1078,8 +1053,6 @@ checkSuffixStripping()
 checkRecursiveFolderMounting()
 {
     # Do all test archive checks at once by copying them to temporary folder and recursively mounting that folder
-
-    rm -f ratarmount.{stdout,stderr}.log
 
     local archiveFolder mountFolder
     archiveFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
@@ -1124,8 +1097,6 @@ checkNestedRecursiveFolderMounting()
     local fileInTar="$1"; shift
     local correctChecksum="$1"
 
-    rm -f ratarmount.{stdout,stderr}.log
-
     local mountFolder archiveFolder
     archiveFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
@@ -1157,8 +1128,6 @@ checkSelfReferencingHardLinks()
     # This tests self-referencing hardlinks with no actual file in the tar.
     # The tar should mount and list the files but neither their contents nor stats have to be available.
     local archive=$1
-
-    rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
     mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
@@ -1274,8 +1243,6 @@ checkWriteOverlayWithNewFiles()
 {
     local archive='tests/single-nested-folder.tar'
 
-    rm -f ratarmount.{stdout,stderr}.log
-
     local mountFolder
     mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
@@ -1375,8 +1342,6 @@ checkWriteOverlayWithNewFiles()
 checkWriteOverlayWithArchivedFiles()
 {
     local archive='tests/nested-tar.tar'
-
-    rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
     mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
@@ -1515,8 +1480,6 @@ checkWriteOverlayWithArchivedFiles()
 
 checkWriteOverlayWithSymbolicLinks()
 {
-    rm -f ratarmount.{stdout,stderr}.log
-
     local mountFolder
     mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
@@ -1585,8 +1548,6 @@ checkWriteOverlayCommitDelete()
 
     [[ $( tar -tvlf "$archive" | wc -l ) -eq 2 ]] || returnError "$LINENO" 'Expected two entries in TAR'
 
-    rm -f ratarmount.{stdout,stderr}.log
-
     local mountFolder="$tmpFolder/mounted"
     mkdir "$mountFolder"
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
@@ -1630,8 +1591,6 @@ checkWriteOverlayCommitDelete()
 
 checkSymbolicLinkRecursion()
 {
-    rm -f ratarmount.{stdout,stderr}.log
-
     local mountFolder
     mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
@@ -1681,8 +1640,6 @@ checkGnuIncremental()
     local fileInTar="$1"; shift
     local correctChecksum="$1"
 
-    rm -f ratarmount.{stdout,stderr}.log
-
     local mountFolder
     mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
@@ -1709,8 +1666,6 @@ checkTruncated()
     local archive="$1"; shift
     local fileInTar="$1"; shift
     local correctChecksum="$1"
-
-    rm -f ratarmount.{stdout,stderr}.log
 
     local mountFolder
     mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
@@ -1744,8 +1699,6 @@ getBlockSize()
 
 checkStatfs()
 {
-    rm -f ratarmount.{stdout,stderr}.log
-
     local mountFolder
     mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
@@ -1772,8 +1725,6 @@ checkStatfs()
 
 checkStatfsWriteOverlay()
 {
-    rm -f ratarmount.{stdout,stderr}.log
-
     local mountFolder
     mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
