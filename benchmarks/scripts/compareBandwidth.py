@@ -72,7 +72,7 @@ def loadData(fileName):
                 if '-T 0' in command:
                     tool += ' -T 0'
 
-                if '--decompress' in command or ' -d ' in command or command.startswith( 'cat ' ):
+                if '--decompress' in command or ' -d ' in command or command.startswith('cat '):
                     command = "read"
                 elif '--keep' in command:
                     command = "compress"
@@ -103,13 +103,15 @@ def loadData(fileName):
 
     return labels[3:], data
 
+
 compressionToIndex = {
-    'tar' : 0,
-    'tar.bz2' : 1,
-    'tar.gz' : 2,
-    'tar.xz' : 3,
-    'tar.zst' : 4,
+    'tar': 0,
+    'tar.bz2': 1,
+    'tar.gz': 2,
+    'tar.xz': 3,
+    'tar.zst': 4,
 }
+
 
 def plotBenchmark(labels, data, ax, command, metric, tools, scalingFactor=1, xScalingFactor=1):
     fileSizes = None
@@ -181,9 +183,7 @@ def plotBenchmark(labels, data, ax, command, metric, tools, scalingFactor=1, xSc
                 else:
                     # ymedian? ymin? ymax? ymean?
                     yToPlot = ymax if command == 'mount' else ymedian
-                    lines = ax.plot(
-                        xu, yToPlot, linestyle=lineStyles[j], color=colors[i], marker=marker, zorder=zorder
-                    )
+                    lines = ax.plot(xu, yToPlot, linestyle=lineStyles[j], color=colors[i], marker=marker, zorder=zorder)
                     lines[0].set_linestyle(lineStyles[j])
 
             xs = np.append(xs, x)
@@ -261,15 +261,13 @@ def plotStandardTools(labels, data, ax, command, metric, scalingFactor=1, xScali
             ax.plot(x, y, linestyle=lineStyles[j], color=color, marker=marker, zorder=zorder, label=tool)
         else:
             ymedian = np.array([np.median(y[x == xi]) for xi in xu])
-            #ymean = np.array([np.mean(y[x == xi]) for xi in xu])
-            #ymin = np.array([np.min(y[x == xi]) for xi in xu])
+            # ymean = np.array([np.mean(y[x == xi]) for xi in xu])
+            # ymin = np.array([np.min(y[x == xi]) for xi in xu])
             ymax = np.array([np.max(y[x == xi]) for xi in xu])
 
             # ymedian? ymin? ymax? ymean?
             yToPlot = ymax if command == 'mount' else ymedian
-            lines = ax.plot(
-                xu, yToPlot, linestyle=lineStyles[j], color=color, marker=marker, zorder=zorder, label=tool
-            )
+            lines = ax.plot(xu, yToPlot, linestyle=lineStyles[j], color=color, marker=marker, zorder=zorder, label=tool)
             lines[0].set_linestyle(lineStyles[j])
 
         xs = np.append(xs, x)
@@ -295,8 +293,9 @@ def plotReadingComparison(fileName):
         yscale='log',
     )
 
-    plotBenchmark(labels, data, ax, "read", "peakRssMemory/kiB", tools,
-                  xScalingFactor = 1.0 / 1000, scalingFactor=1.0 / 1024)
+    plotBenchmark(
+        labels, data, ax, "read", "peakRssMemory/kiB", tools, xScalingFactor=1.0 / 1000, scalingFactor=1.0 / 1024
+    )
     ax.grid(axis='y')
 
     ax.legend(loc='best')
@@ -310,7 +309,7 @@ def plotReadingComparison(fileName):
         yscale='log',
     )
 
-    plotBenchmark(labels, data, ax, "read", "duration/s", tools, xScalingFactor = 1.0 / 1000 )
+    plotBenchmark(labels, data, ax, "read", "duration/s", tools, xScalingFactor=1.0 / 1000)
     ax.grid(axis='y')
 
     xmin = axisValueReduction(ax, 'x', np.nanmin, float('+inf'))
@@ -326,12 +325,14 @@ def plotReadingComparison(fileName):
 
     # add quadratic scaling
     x = 10 ** np.linspace(np.log10(xmin), np.log10(xmax) - 4)
-    y = x ** 2
+    y = x**2
     y = y / y[-1] * ymax
     ax.plot(x[y > ymin], y[y > ymin], color='k', linestyle='--', label="quadratic scaling")
-    ax.legend([Line2D([], [], linestyle='-', color='k'),
-               Line2D([], [], linestyle='--', color='k')],
-              ['linear scaling', 'quadratic scaling'], loc='best')
+    ax.legend(
+        [Line2D([], [], linestyle='-', color='k'), Line2D([], [], linestyle='--', color='k')],
+        ['linear scaling', 'quadratic scaling'],
+        loc='best',
+    )
 
     ax = fig.add_subplot(
         223,
@@ -342,8 +343,9 @@ def plotReadingComparison(fileName):
         yscale='log',
     )
 
-    plotBenchmark(labels, data, ax, "bandwidth", "duration/s", tools, xScalingFactor = 1.0 / 1000,
-                  scalingFactor = 1.0 / 1000**2 )
+    plotBenchmark(
+        labels, data, ax, "bandwidth", "duration/s", tools, xScalingFactor=1.0 / 1000, scalingFactor=1.0 / 1000**2
+    )
 
     ax.grid(axis='y')
     axBandwidth = ax
@@ -357,8 +359,9 @@ def plotReadingComparison(fileName):
         yscale='log',
     )
 
-    plotStandardTools(labels, data, ax, "bandwidth", "duration/s", xScalingFactor = 1.0 / 1000,
-                      scalingFactor = 1.0 / 1000**2 )
+    plotStandardTools(
+        labels, data, ax, "bandwidth", "duration/s", xScalingFactor=1.0 / 1000, scalingFactor=1.0 / 1000**2
+    )
     ax.set_ylim(axBandwidth.get_ylim())
     ax.legend(loc='best')
     ax.grid(axis='y')
@@ -389,8 +392,9 @@ def plotBandiwdths(fileName):
         yscale='log',
     )
 
-    plotBenchmark(labels, data, ax, "bandwidth", "duration/s", tools, xScalingFactor = 1.0 / 1000,
-                  scalingFactor = 1.0 / 1000**2 )
+    plotBenchmark(
+        labels, data, ax, "bandwidth", "duration/s", tools, xScalingFactor=1.0 / 1000, scalingFactor=1.0 / 1000**2
+    )
     ax.grid(axis='y')
     ax.legend(loc='best')
 
