@@ -5,7 +5,7 @@ import os
 import stat
 
 
-from typing import Any, Dict, IO, Iterable, Optional, Tuple, Union
+from typing import Any, Dict, IO, Iterable, List, Optional, Tuple, Union
 
 from .MountSource import FileInfo, MountSource
 from .utils import overrides
@@ -232,6 +232,14 @@ class FileVersionLayer(MountSource):
     @overrides(MountSource)
     def getMountSource(self, fileInfo: FileInfo) -> Tuple[str, MountSource, FileInfo]:
         return self.mountSource.getMountSource(fileInfo)
+
+    @overrides(MountSource)
+    def listxattr(self, fileInfo: FileInfo) -> List[str]:
+        return self.mountSource.listxattr(fileInfo)
+
+    @overrides(MountSource)
+    def getxattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
+        return self.mountSource.getxattr(fileInfo, key)
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):

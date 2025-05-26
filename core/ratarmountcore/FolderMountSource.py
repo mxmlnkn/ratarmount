@@ -3,7 +3,7 @@
 
 import os
 import stat
-from typing import Any, Dict, IO, Iterable, Optional, Union
+from typing import Any, Dict, IO, Iterable, List, Optional, Union
 
 from .MountSource import FileInfo, MountSource
 from .utils import overrides
@@ -169,6 +169,14 @@ class FolderMountSource(MountSource):
     @overrides(MountSource)
     def statfs(self) -> Dict[str, Any]:
         return self._statfs.copy()
+
+    @overrides(MountSource)
+    def listxattr(self, fileInfo: FileInfo) -> List[str]:
+        return os.listxattr(self.getFilePath(fileInfo), follow_symlinks=False) if hasattr(os, 'listxattr') else []
+
+    @overrides(MountSource)
+    def getxattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
+        return os.getxattr(self.getFilePath(fileInfo), key, follow_symlinks=False) if hasattr(os, 'getxattr') else None
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):

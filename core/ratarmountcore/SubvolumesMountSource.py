@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from typing import Dict, Iterable, IO, Optional, Tuple, Union
+from typing import Dict, Iterable, IO, List, Optional, Tuple, Union
 
 from .MountSource import FileInfo, MountSource, createRootFileInfo
 from .utils import overrides
@@ -104,6 +104,22 @@ class SubvolumesMountSource(MountSource):
             raise ValueError(f"Found subvolume is None for fileInfo: {fileInfo}")
         try:
             return self.mountSources[subvolume].read(fileInfo, size, offset)
+        finally:
+            fileInfo.userdata.append(subvolume)
+
+    @overrides(MountSource)
+    def listxattr(self, fileInfo: FileInfo) -> List[str]:
+        subvolume = fileInfo.userdata.pop()
+        try:
+            return [] if subvolume is None else self.mountSources[subvolume].listxattr(fileInfo)
+        finally:
+            fileInfo.userdata.append(subvolume)
+
+    @overrides(MountSource)
+    def getxattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
+        subvolume = fileInfo.userdata.pop()
+        try:
+            return None if subvolume is None else self.mountSources[subvolume].getxattr(fileInfo, key)
         finally:
             fileInfo.userdata.append(subvolume)
 

@@ -15,6 +15,7 @@ import tarfile
 import threading
 import time
 import traceback
+import urllib.parse
 
 from timeit import default_timer as timer
 from typing import Any, Callable, cast, Dict, Generator, IO, Iterable, List, Optional, Tuple
@@ -45,6 +46,7 @@ from .utils import (
     InvalidIndexError,
     CompressionError,
     ceilDiv,
+    decodeUnpaddedBase64,
     getXdgCacheHome,
     isOnSlowDrive,
     overrides,
@@ -57,10 +59,12 @@ class _TarFileMetadataReader:
         self,
         parent: 'SQLiteIndexedTar',
         setFileInfos: Callable[[List[Tuple]], None],
+        setxattrs: Callable[[List[Tuple]], None],
         updateProgressBar: Callable[[], None],
     ):
         self._parent = parent
         self._setFileInfos = setFileInfos
+        self._setxattrs = setxattrs
         self._updateProgressBar = updateProgressBar
 
         self._lastUpdateTime = time.time()
@@ -68,6 +72,7 @@ class _TarFileMetadataReader:
         self._futures: List[multiprocessing.pool.AsyncResult] = []
         self._filesToMountRecursively: List[Tuple] = []
         self._fileInfos: List[Tuple] = []
+        self._xattrs: List[Tuple] = []
 
     @staticmethod
     def _getTarPrefix(fileObject: IO[bytes], tarInfo: tarfile.TarInfo, printDebug: int) -> Optional[bytes]:
@@ -183,7 +188,7 @@ class _TarFileMetadataReader:
         transform        : Callable[[str], str],
         printDebug       : int,
         # fmt: on
-    ) -> Tuple[List[Tuple], bool, Optional[bool]]:
+    ) -> Tuple[List[Tuple], List[Tuple], bool, Optional[bool]]:
         """Postprocesses a TarInfo object into one or multiple FileInfo tuples."""
 
         if tarInfo.type == b'D' and not isGnuIncremental:
@@ -196,6 +201,24 @@ class _TarFileMetadataReader:
 
         if isGnuIncremental:
             _TarFileMetadataReader._fixIncrementalBackupNamePrefixes(fileObject, tarInfo, printDebug)
+
+        offsetHeader = streamOffset + tarInfo.offset
+
+        prefix = 'SCHILY.xattr.'
+        xattrs = {
+            key[len(prefix) :]: value.encode('utf-8', errors='surrogateescape')
+            for key, value in tarInfo.pax_headers.items()
+            if key.startswith(prefix)
+        }
+        prefix = 'LIBARCHIVE.xattr.'
+        xattrs.update(
+            {
+                urllib.parse.unquote(key[len(prefix) :]): decodeUnpaddedBase64(value)
+                for key, value in tarInfo.pax_headers.items()
+                if key.startswith(prefix)
+            }
+        )
+        xattrRows = [(offsetHeader, key, value) for key, value in xattrs.items()]
 
         fullPath = pathPrefix + "/" + tarInfo.name
         if tarInfo.isdir():
@@ -228,7 +251,7 @@ class _TarFileMetadataReader:
         fileInfos = [fileInfo]
 
         if mountRecursively and tarInfo.isfile() and tarInfo.name.lower().endswith('.tar'):
-            return fileInfos, True, isGnuIncremental
+            return fileInfos, xattrRows, True, isGnuIncremental
 
         # Add GNU incremental TAR directory metadata files also as directories
         if tarInfo.type == b'D':
@@ -241,7 +264,7 @@ class _TarFileMetadataReader:
             dirFileInfo[6] = tarInfo.mode | stat.S_IFDIR
             fileInfos.append(tuple(dirFileInfo))
 
-        return fileInfos, False, isGnuIncremental
+        return fileInfos, xattrRows, False, isGnuIncremental
 
     @staticmethod
     def _readTarFiles(
@@ -257,7 +280,7 @@ class _TarFileMetadataReader:
         encoding         : str,
         transform        : Callable[[str], str],
         printDebug       : int,
-    ):
+    ) -> Tuple[List[Tuple], List[Tuple], List[Tuple], Optional[bool]]:
         """
         Opens a view of the data range [startOffset, startOffset+size) of the given pathToTar and extracts
         all TAR file metadata and returns it as FileInfo tuples.
@@ -265,6 +288,7 @@ class _TarFileMetadataReader:
 
         filesToMountRecursively: List[Tuple] = []
         fileInfos: List[Tuple] = []
+        xattrs: List[Tuple] = []
 
         with open(pathToTar, 'rb') as rawFileObject:
             fileObject = cast(IO[bytes], StenciledFile([(rawFileObject, startOffset, size)]))
@@ -273,12 +297,12 @@ class _TarFileMetadataReader:
                     fileobj=fileObject, mode='r:', ignore_zeros=ignoreZeros, encoding=encoding
                 )
             except tarfile.ReadError:
-                return fileInfos, filesToMountRecursively, isGnuIncremental
+                return fileInfos, xattrs, filesToMountRecursively, isGnuIncremental
 
             try:
                 for tarInfo in loadedTarFile:
                     loadedTarFile.members = []  # Clear this in order to limit memory usage by tarfile
-                    newFileInfos, mightBeTar, isGnuIncremental = _TarFileMetadataReader._processTarInfo(
+                    newFileInfos, newXAttrs, mightBeTar, isGnuIncremental = _TarFileMetadataReader._processTarInfo(
                         tarInfo,
                         pathPrefix=pathPrefix,
                         streamOffset=streamOffset + startOffset,
@@ -293,6 +317,7 @@ class _TarFileMetadataReader:
                         filesToMountRecursively.extend(newFileInfos)
                     else:
                         fileInfos.extend(newFileInfos)
+                        xattrs.extend(newXAttrs)
             except tarfile.ReadError as e:
                 if 'unexpected end of data' in str(e):
                     print(
@@ -302,7 +327,7 @@ class _TarFileMetadataReader:
                     if printDebug >= 3:
                         traceback.print_exc()
 
-        return fileInfos, filesToMountRecursively, isGnuIncremental
+        return fileInfos, xattrs, filesToMountRecursively, isGnuIncremental
 
     @staticmethod
     def findTarFileOffsets(fileObject: IO[bytes], ignoreZeros: bool) -> Generator[Tuple[int, bytes], None, None]:
@@ -364,12 +389,18 @@ class _TarFileMetadataReader:
             self._lastUpdateTime = time.time()
             self._updateProgressBar()
 
-        newFileInfos, filesToMountRecursively, _ = future.get()
+        newFileInfos, newXAttrs, filesToMountRecursively, _ = future.get()
         self._filesToMountRecursively.extend(filesToMountRecursively)
+
         self._fileInfos.extend(newFileInfos)
         if len(self._fileInfos) > 1000:
             self._setFileInfos(self._fileInfos)
             self._fileInfos = []
+
+        self._xattrs.extend(newXAttrs)
+        if len(self._xattrs) > 1000:
+            self._setxattrs(self._xattrs)
+            self._xattrs = []
 
     def _enqueue(self, future):
         """Enqueues future and if a threshold is reached, waits for and pops the oldest future."""
@@ -443,8 +474,12 @@ class _TarFileMetadataReader:
 
         while self._futures:
             self._processFuture(self._futures.pop(0))
+
         self._setFileInfos(self._fileInfos)
         self._fileInfos = []
+
+        self._setxattrs(self._xattrs)
+        self._xattrs = []
 
         return self._filesToMountRecursively
 
@@ -485,6 +520,7 @@ class _TarFileMetadataReader:
 
         # Iterate over files inside TAR and add them to the database
         fileInfos: List[Tuple] = []
+        xattrs: List[Tuple] = []
         filesToMountRecursively: List[Tuple] = []
 
         # thread_time is twice as fast, which can shave off 10% of time in some tests but it is not as "correct"
@@ -505,15 +541,17 @@ class _TarFileMetadataReader:
                     self._lastUpdateTime = time.time()
                     self._updateProgressBar()
 
-                newFileInfos, mightBeTar, self._parent._isGnuIncremental = _TarFileMetadataReader._processTarInfo(
-                    tarInfo,
-                    fileObject=fileObject,
-                    pathPrefix=pathPrefix,
-                    streamOffset=streamOffset,
-                    isGnuIncremental=self._parent._isGnuIncremental,
-                    mountRecursively=self._parent.mountRecursively,
-                    transform=self._parent.transform,
-                    printDebug=self._parent.printDebug,
+                newFileInfos, newXAttrs, mightBeTar, self._parent._isGnuIncremental = (
+                    _TarFileMetadataReader._processTarInfo(
+                        tarInfo,
+                        fileObject=fileObject,
+                        pathPrefix=pathPrefix,
+                        streamOffset=streamOffset,
+                        isGnuIncremental=self._parent._isGnuIncremental,
+                        mountRecursively=self._parent.mountRecursively,
+                        transform=self._parent.transform,
+                        printDebug=self._parent.printDebug,
+                    )
                 )
 
                 if mightBeTar:
@@ -524,8 +562,14 @@ class _TarFileMetadataReader:
                     self._setFileInfos(fileInfos)
                     fileInfos.clear()
 
+                xattrs.extend(newXAttrs)
+                if len(xattrs) > 1000:
+                    self._setxattrs(xattrs)
+                    xattrs.clear()
+
         finally:
             self._setFileInfos(fileInfos)
+            self._setxattrs(xattrs)
 
         return filesToMountRecursively
 
@@ -986,7 +1030,10 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             progressBar = ProgressBar(self._archiveFileSize)
 
         metadataReader = _TarFileMetadataReader(
-            self, self.index.setFileInfos, lambda: self._updateProgressBar(progressBar, fileObject)
+            self,
+            self.index.setFileInfos,
+            self.index.setxattrs,
+            lambda: self._updateProgressBar(progressBar, fileObject),
         )
         filesToMountRecursively = metadataReader.process(fileObject, pathPrefix, streamOffset)
 
@@ -1467,7 +1514,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 with StenciledFile(fileStencils=[(self.tarFileObject, offsetHeader, headerBlockCount)]) as file:
                     with tarfile.open(fileobj=file, mode='r|', ignore_zeros=True, encoding=self.encoding) as archive:
                         tarInfo = next(iter(archive))
-                        realFileInfos, _, _ = _TarFileMetadataReader._processTarInfo(
+                        realFileInfos, _, _, _ = _TarFileMetadataReader._processTarInfo(
                             tarInfo,
                             file,  # only used for isGnuIncremental == True
                             "",  # pathPrefix
