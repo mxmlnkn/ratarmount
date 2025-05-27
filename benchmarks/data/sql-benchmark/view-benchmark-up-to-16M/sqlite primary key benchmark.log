@@ -1,0 +1,1790 @@
+file name length: 128
+rows per insert: 1000
+number of rows to insert: 3000
+Label: tuple key, , unique rows
+Inserting 3000 file names with 128 characters took 0.008 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 3000 file names with 128 characters took 0.006 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 958464
+
+Label: tuple key, sort after, no vacuum, unique rows
+Inserting 3000 file names with 128 characters took 0.005 s
+Sorting took 0.005 s
+Commit took 0.000 s
+Inserting 3000 file names with 128 characters took 0.008 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 1384448
+
+Label: tuple key, view (primary key), unique rows
+Inserting 3000 file names with 128 characters took 0.015 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 3000 file names with 128 characters took 0.013 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 1089536
+
+Label: tuple key, view (primary key), duplicate rows
+Inserting 3000 file names with 128 characters took 0.009 s
+Sorting took 0.000 s
+Commit took 0.000 s
+Inserting 3000 file names with 128 characters took 0.009 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 126976
+
+Label: tuple key, view (unique constraint), unique rows
+Inserting 3000 file names with 128 characters took 0.015 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 3000 file names with 128 characters took 0.013 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 1105920
+
+Label: tuple key, view (unique constraint), duplicate rows
+Inserting 3000 file names with 128 characters took 0.009 s
+Sorting took 0.000 s
+Commit took 0.000 s
+Inserting 3000 file names with 128 characters took 0.009 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 126976
+
+Label: tuple key, view (unique index), unique rows
+Inserting 3000 file names with 128 characters took 0.014 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 3000 file names with 128 characters took 0.013 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 1101824
+
+Label: tuple key, view (unique index), duplicate rows
+Inserting 3000 file names with 128 characters took 0.009 s
+Sorting took 0.000 s
+Commit took 0.000 s
+Inserting 3000 file names with 128 characters took 0.009 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 126976
+
+Label: tuple key, view, sort and deduplicate after, unique rows
+Inserting 3000 file names with 128 characters took 0.005 s
+Sorting took 0.015 s
+Commit took 0.000 s
+Inserting 3000 file names with 128 characters took 0.018 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 1032192
+
+Label: tuple key, view, sort and deduplicate after, duplicate rows
+Inserting 3000 file names with 128 characters took 0.003 s
+Sorting took 0.010 s
+Commit took 0.000 s
+Inserting 3000 file names with 128 characters took 0.013 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 131072
+
+Label: tuple key, view, sort and deduplicate (batch inner join) after, unique rows
+Inserting 3000 file names with 128 characters took 0.005 s
+Sorting took 0.013 s
+Commit took 0.000 s
+Inserting 3000 file names with 128 characters took 0.015 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 1032192
+
+Label: tuple key, view, sort and deduplicate (batch inner join) after, duplicate rows
+Inserting 3000 file names with 128 characters took 0.003 s
+Sorting took 0.006 s
+Commit took 0.000 s
+Inserting 3000 file names with 128 characters took 0.009 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 122880
+
+Label: tuple key, view, sort and deduplicate (batch insert trigger) after, unique rows
+Inserting 3000 file names with 128 characters took 0.006 s
+Sorting took 0.017 s
+Commit took 0.000 s
+Inserting 3000 file names with 128 characters took 0.020 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 1032192
+
+Label: tuple key, view, sort and deduplicate (batch insert trigger) after, duplicate rows
+Inserting 3000 file names with 128 characters took 0.003 s
+Sorting took 0.009 s
+Commit took 0.000 s
+Inserting 3000 file names with 128 characters took 0.012 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 122880
+
+Label: tuple key, view, sort and deduplicate (full batch insert trigger) after, unique rows
+Inserting 3000 file names with 128 characters took 0.005 s
+Sorting took 0.016 s
+Commit took 0.000 s
+Inserting 3000 file names with 128 characters took 0.019 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 1032192
+
+Label: tuple key, view, sort and deduplicate (full batch insert trigger) after, duplicate rows
+Inserting 3000 file names with 128 characters took 0.003 s
+Sorting took 0.011 s
+Commit took 0.000 s
+Inserting 3000 file names with 128 characters took 0.014 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 131072
+
+file name length: 128
+rows per insert: 1000
+number of rows to insert: 10000
+Label: tuple key, , unique rows
+Inserting 10000 file names with 128 characters took 0.027 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 10000 file names with 128 characters took 0.021 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 3133440
+
+Label: tuple key, sort after, no vacuum, unique rows
+Inserting 10000 file names with 128 characters took 0.017 s
+Sorting took 0.016 s
+Commit took 0.000 s
+Inserting 10000 file names with 128 characters took 0.025 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 4575232
+
+Label: tuple key, view (primary key), unique rows
+Inserting 10000 file names with 128 characters took 0.052 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 10000 file names with 128 characters took 0.046 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 3538944
+
+Label: tuple key, view (primary key), duplicate rows
+Inserting 10000 file names with 128 characters took 0.030 s
+Sorting took 0.000 s
+Commit took 0.000 s
+Inserting 10000 file names with 128 characters took 0.030 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 299008
+
+Label: tuple key, view (unique constraint), unique rows
+Inserting 10000 file names with 128 characters took 0.053 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 10000 file names with 128 characters took 0.047 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 3567616
+
+Label: tuple key, view (unique constraint), duplicate rows
+Inserting 10000 file names with 128 characters took 0.030 s
+Sorting took 0.000 s
+Commit took 0.000 s
+Inserting 10000 file names with 128 characters took 0.030 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 299008
+
+Label: tuple key, view (unique index), unique rows
+Inserting 10000 file names with 128 characters took 0.053 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 10000 file names with 128 characters took 0.047 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 3575808
+
+Label: tuple key, view (unique index), duplicate rows
+Inserting 10000 file names with 128 characters took 0.030 s
+Sorting took 0.000 s
+Commit took 0.000 s
+Inserting 10000 file names with 128 characters took 0.029 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 299008
+
+Label: tuple key, view, sort and deduplicate after, unique rows
+Inserting 10000 file names with 128 characters took 0.016 s
+Sorting took 0.052 s
+Commit took 0.000 s
+Inserting 10000 file names with 128 characters took 0.060 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 3342336
+
+Label: tuple key, view, sort and deduplicate after, duplicate rows
+Inserting 10000 file names with 128 characters took 0.009 s
+Sorting took 0.037 s
+Commit took 0.000 s
+Inserting 10000 file names with 128 characters took 0.046 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 307200
+
+Label: tuple key, view, sort and deduplicate (batch inner join) after, unique rows
+Inserting 10000 file names with 128 characters took 0.016 s
+Sorting took 0.047 s
+Commit took 0.000 s
+Inserting 10000 file names with 128 characters took 0.056 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 3346432
+
+Label: tuple key, view, sort and deduplicate (batch inner join) after, duplicate rows
+Inserting 10000 file names with 128 characters took 0.009 s
+Sorting took 0.020 s
+Commit took 0.000 s
+Inserting 10000 file names with 128 characters took 0.029 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 282624
+
+Label: tuple key, view, sort and deduplicate (batch insert trigger) after, unique rows
+Inserting 10000 file names with 128 characters took 0.016 s
+Sorting took 0.054 s
+Commit took 0.000 s
+Inserting 10000 file names with 128 characters took 0.063 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 3346432
+
+Label: tuple key, view, sort and deduplicate (batch insert trigger) after, duplicate rows
+Inserting 10000 file names with 128 characters took 0.009 s
+Sorting took 0.029 s
+Commit took 0.000 s
+Inserting 10000 file names with 128 characters took 0.038 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 282624
+
+Label: tuple key, view, sort and deduplicate (full batch insert trigger) after, unique rows
+Inserting 10000 file names with 128 characters took 0.016 s
+Sorting took 0.053 s
+Commit took 0.000 s
+Inserting 10000 file names with 128 characters took 0.062 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 3342336
+
+Label: tuple key, view, sort and deduplicate (full batch insert trigger) after, duplicate rows
+Inserting 10000 file names with 128 characters took 0.009 s
+Sorting took 0.038 s
+Commit took 0.000 s
+Inserting 10000 file names with 128 characters took 0.047 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 307200
+
+file name length: 128
+rows per insert: 1000
+number of rows to insert: 32000
+Label: tuple key, , unique rows
+Inserting 32000 file names with 128 characters took 0.131 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 32000 file names with 128 characters took 0.108 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 10059776
+
+Label: tuple key, sort after, no vacuum, unique rows
+Inserting 32000 file names with 128 characters took 0.054 s
+Sorting took 0.050 s
+Commit took 0.000 s
+Inserting 32000 file names with 128 characters took 0.081 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 14614528
+
+Label: tuple key, view (primary key), unique rows
+Inserting 32000 file names with 128 characters took 0.218 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 32000 file names with 128 characters took 0.195 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 11382784
+
+Label: tuple key, view (primary key), duplicate rows
+Inserting 32000 file names with 128 characters took 0.097 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 32000 file names with 128 characters took 0.097 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 868352
+
+Label: tuple key, view (unique constraint), unique rows
+Inserting 32000 file names with 128 characters took 0.216 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 32000 file names with 128 characters took 0.193 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 11407360
+
+Label: tuple key, view (unique constraint), duplicate rows
+Inserting 32000 file names with 128 characters took 0.096 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 32000 file names with 128 characters took 0.095 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 868352
+
+Label: tuple key, view (unique index), unique rows
+Inserting 32000 file names with 128 characters took 0.215 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 32000 file names with 128 characters took 0.192 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 11456512
+
+Label: tuple key, view (unique index), duplicate rows
+Inserting 32000 file names with 128 characters took 0.095 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 32000 file names with 128 characters took 0.094 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 868352
+
+Label: tuple key, view, sort and deduplicate after, unique rows
+Inserting 32000 file names with 128 characters took 0.055 s
+Sorting took 0.208 s
+Commit took 0.000 s
+Inserting 32000 file names with 128 characters took 0.239 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 10711040
+
+Label: tuple key, view, sort and deduplicate after, duplicate rows
+Inserting 32000 file names with 128 characters took 0.033 s
+Sorting took 0.117 s
+Commit took 0.000 s
+Inserting 32000 file names with 128 characters took 0.148 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 888832
+
+Label: tuple key, view, sort and deduplicate (batch inner join) after, unique rows
+Inserting 32000 file names with 128 characters took 0.054 s
+Sorting took 0.182 s
+Commit took 0.000 s
+Inserting 32000 file names with 128 characters took 0.213 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 10711040
+
+Label: tuple key, view, sort and deduplicate (batch inner join) after, duplicate rows
+Inserting 32000 file names with 128 characters took 0.033 s
+Sorting took 0.070 s
+Commit took 0.000 s
+Inserting 32000 file names with 128 characters took 0.102 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 815104
+
+Label: tuple key, view, sort and deduplicate (batch insert trigger) after, unique rows
+Inserting 32000 file names with 128 characters took 0.054 s
+Sorting took 0.198 s
+Commit took 0.000 s
+Inserting 32000 file names with 128 characters took 0.229 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 10711040
+
+Label: tuple key, view, sort and deduplicate (batch insert trigger) after, duplicate rows
+Inserting 32000 file names with 128 characters took 0.033 s
+Sorting took 0.092 s
+Commit took 0.000 s
+Inserting 32000 file names with 128 characters took 0.123 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 815104
+
+Label: tuple key, view, sort and deduplicate (full batch insert trigger) after, unique rows
+Inserting 32000 file names with 128 characters took 0.055 s
+Sorting took 0.202 s
+Commit took 0.000 s
+Inserting 32000 file names with 128 characters took 0.233 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 10711040
+
+Label: tuple key, view, sort and deduplicate (full batch insert trigger) after, duplicate rows
+Inserting 32000 file names with 128 characters took 0.034 s
+Sorting took 0.115 s
+Commit took 0.000 s
+Inserting 32000 file names with 128 characters took 0.147 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 888832
+
+file name length: 128
+rows per insert: 1000
+number of rows to insert: 100000
+Label: tuple key, , unique rows
+Inserting 100000 file names with 128 characters took 0.570 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 100000 file names with 128 characters took 0.499 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 31322112
+
+Label: tuple key, sort after, no vacuum, unique rows
+Inserting 100000 file names with 128 characters took 0.167 s
+Sorting took 0.165 s
+Commit took 0.000 s
+Inserting 100000 file names with 128 characters took 0.262 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 45666304
+
+Label: tuple key, view (primary key), unique rows
+Inserting 100000 file names with 128 characters took 0.870 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 100000 file names with 128 characters took 0.797 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 36216832
+
+Label: tuple key, view (primary key), duplicate rows
+Inserting 100000 file names with 128 characters took 0.319 s
+Sorting took 0.000 s
+Commit took 0.002 s
+Inserting 100000 file names with 128 characters took 0.316 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.011 s
+Selecting 1000 path,hash took 0.011 s excluding PRNG time
+SQL database size in bytes: 2699264
+
+Label: tuple key, view (unique constraint), unique rows
+Inserting 100000 file names with 128 characters took 0.925 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 100000 file names with 128 characters took 0.850 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 36257792
+
+Label: tuple key, view (unique constraint), duplicate rows
+Inserting 100000 file names with 128 characters took 0.316 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 100000 file names with 128 characters took 0.313 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 2699264
+
+Label: tuple key, view (unique index), unique rows
+Inserting 100000 file names with 128 characters took 0.886 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 100000 file names with 128 characters took 0.813 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 36220928
+
+Label: tuple key, view (unique index), duplicate rows
+Inserting 100000 file names with 128 characters took 0.307 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 100000 file names with 128 characters took 0.304 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 2699264
+
+Label: tuple key, view, sort and deduplicate after, unique rows
+Inserting 100000 file names with 128 characters took 0.171 s
+Sorting took 0.844 s
+Commit took 0.000 s
+Inserting 100000 file names with 128 characters took 0.942 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 33918976
+
+Label: tuple key, view, sort and deduplicate after, duplicate rows
+Inserting 100000 file names with 128 characters took 0.103 s
+Sorting took 0.376 s
+Commit took 0.000 s
+Inserting 100000 file names with 128 characters took 0.476 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 3022848
+
+Label: tuple key, view, sort and deduplicate (batch inner join) after, unique rows
+Inserting 100000 file names with 128 characters took 0.169 s
+Sorting took 0.682 s
+Commit took 0.000 s
+Inserting 100000 file names with 128 characters took 0.780 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 33914880
+
+Label: tuple key, view, sort and deduplicate (batch inner join) after, duplicate rows
+Inserting 100000 file names with 128 characters took 0.103 s
+Sorting took 0.221 s
+Commit took 0.000 s
+Inserting 100000 file names with 128 characters took 0.320 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 2527232
+
+Label: tuple key, view, sort and deduplicate (batch insert trigger) after, unique rows
+Inserting 100000 file names with 128 characters took 0.171 s
+Sorting took 0.750 s
+Commit took 0.000 s
+Inserting 100000 file names with 128 characters took 0.849 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 33914880
+
+Label: tuple key, view, sort and deduplicate (batch insert trigger) after, duplicate rows
+Inserting 100000 file names with 128 characters took 0.101 s
+Sorting took 0.286 s
+Commit took 0.000 s
+Inserting 100000 file names with 128 characters took 0.384 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 2527232
+
+Label: tuple key, view, sort and deduplicate (full batch insert trigger) after, unique rows
+Inserting 100000 file names with 128 characters took 0.170 s
+Sorting took 0.820 s
+Commit took 0.000 s
+Inserting 100000 file names with 128 characters took 0.918 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 33918976
+
+Label: tuple key, view, sort and deduplicate (full batch insert trigger) after, duplicate rows
+Inserting 100000 file names with 128 characters took 0.099 s
+Sorting took 0.367 s
+Commit took 0.000 s
+Inserting 100000 file names with 128 characters took 0.462 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 3022848
+
+file name length: 128
+rows per insert: 1000
+number of rows to insert: 320000
+Label: tuple key, , unique rows
+Inserting 320000 file names with 128 characters took 2.299 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 320000 file names with 128 characters took 2.071 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 100175872
+
+Label: tuple key, sort after, no vacuum, unique rows
+Inserting 320000 file names with 128 characters took 0.568 s
+Sorting took 0.617 s
+Commit took 0.000 s
+Inserting 320000 file names with 128 characters took 0.948 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 145948672
+
+Label: tuple key, view (primary key), unique rows
+Inserting 320000 file names with 128 characters took 3.371 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 320000 file names with 128 characters took 3.134 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 116715520
+
+Label: tuple key, view (primary key), duplicate rows
+Inserting 320000 file names with 128 characters took 1.015 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 320000 file names with 128 characters took 1.004 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 9048064
+
+Label: tuple key, view (unique constraint), unique rows
+Inserting 320000 file names with 128 characters took 3.301 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 320000 file names with 128 characters took 3.070 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 117121024
+
+Label: tuple key, view (unique constraint), duplicate rows
+Inserting 320000 file names with 128 characters took 1.030 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 320000 file names with 128 characters took 1.019 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 9052160
+
+Label: tuple key, view (unique index), unique rows
+Inserting 320000 file names with 128 characters took 3.330 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 320000 file names with 128 characters took 3.093 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 116883456
+
+Label: tuple key, view (unique index), duplicate rows
+Inserting 320000 file names with 128 characters took 1.016 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 320000 file names with 128 characters took 1.005 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 9052160
+
+Label: tuple key, view, sort and deduplicate after, unique rows
+Inserting 320000 file names with 128 characters took 0.556 s
+Sorting took 3.224 s
+Commit took 0.000 s
+Inserting 320000 file names with 128 characters took 3.548 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 109453312
+
+Label: tuple key, view, sort and deduplicate after, duplicate rows
+Inserting 320000 file names with 128 characters took 0.326 s
+Sorting took 1.213 s
+Commit took 0.000 s
+Inserting 320000 file names with 128 characters took 1.527 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 9945088
+
+Label: tuple key, view, sort and deduplicate (batch inner join) after, unique rows
+Inserting 320000 file names with 128 characters took 0.529 s
+Sorting took 2.919 s
+Commit took 0.000 s
+Inserting 320000 file names with 128 characters took 3.226 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 109449216
+
+Label: tuple key, view, sort and deduplicate (batch inner join) after, duplicate rows
+Inserting 320000 file names with 128 characters took 0.338 s
+Sorting took 0.764 s
+Commit took 0.000 s
+Inserting 320000 file names with 128 characters took 1.090 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 8441856
+
+Label: tuple key, view, sort and deduplicate (batch insert trigger) after, unique rows
+Inserting 320000 file names with 128 characters took 0.552 s
+Sorting took 3.007 s
+Commit took 0.000 s
+Inserting 320000 file names with 128 characters took 3.329 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 109449216
+
+Label: tuple key, view, sort and deduplicate (batch insert trigger) after, duplicate rows
+Inserting 320000 file names with 128 characters took 0.326 s
+Sorting took 0.981 s
+Commit took 0.000 s
+Inserting 320000 file names with 128 characters took 1.295 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 8445952
+
+Label: tuple key, view, sort and deduplicate (full batch insert trigger) after, unique rows
+Inserting 320000 file names with 128 characters took 0.548 s
+Sorting took 3.179 s
+Commit took 0.000 s
+Inserting 320000 file names with 128 characters took 3.498 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 109453312
+
+Label: tuple key, view, sort and deduplicate (full batch insert trigger) after, duplicate rows
+Inserting 320000 file names with 128 characters took 0.330 s
+Sorting took 1.256 s
+Commit took 0.000 s
+Inserting 320000 file names with 128 characters took 1.574 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 9945088
+
+file name length: 128
+rows per insert: 1000
+number of rows to insert: 1000000
+Label: tuple key, , unique rows
+Inserting 1000000 file names with 128 characters took 8.176 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 1000000 file names with 128 characters took 7.452 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 313028608
+
+Label: tuple key, sort after, no vacuum, unique rows
+Inserting 1000000 file names with 128 characters took 1.699 s
+Sorting took 2.158 s
+Commit took 0.000 s
+Inserting 1000000 file names with 128 characters took 3.148 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 456491008
+
+Label: tuple key, view (primary key), unique rows
+Inserting 1000000 file names with 128 characters took 11.728 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 1000000 file names with 128 characters took 10.971 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 365252608
+
+Label: tuple key, view (primary key), duplicate rows
+Inserting 1000000 file names with 128 characters took 3.240 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 1000000 file names with 128 characters took 3.204 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 28860416
+
+Label: tuple key, view (unique constraint), unique rows
+Inserting 1000000 file names with 128 characters took 11.239 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 1000000 file names with 128 characters took 10.516 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 366526464
+
+Label: tuple key, view (unique constraint), duplicate rows
+Inserting 1000000 file names with 128 characters took 3.233 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 1000000 file names with 128 characters took 3.196 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 28856320
+
+Label: tuple key, view (unique index), unique rows
+Inserting 1000000 file names with 128 characters took 11.169 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 1000000 file names with 128 characters took 10.448 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 366338048
+
+Label: tuple key, view (unique index), duplicate rows
+Inserting 1000000 file names with 128 characters took 3.307 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 1000000 file names with 128 characters took 3.269 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 28860416
+
+Label: tuple key, view, sort and deduplicate after, unique rows
+Inserting 1000000 file names with 128 characters took 1.740 s
+Sorting took 11.092 s
+Commit took 0.000 s
+Inserting 1000000 file names with 128 characters took 12.106 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 342917120
+
+Label: tuple key, view, sort and deduplicate after, duplicate rows
+Inserting 1000000 file names with 128 characters took 1.035 s
+Sorting took 3.989 s
+Commit took 0.000 s
+Inserting 1000000 file names with 128 characters took 4.987 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 31342592
+
+Label: tuple key, view, sort and deduplicate (batch inner join) after, unique rows
+Inserting 1000000 file names with 128 characters took 1.774 s
+Sorting took 10.527 s
+Commit took 0.000 s
+Inserting 1000000 file names with 128 characters took 11.560 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 342921216
+
+Label: tuple key, view, sort and deduplicate (batch inner join) after, duplicate rows
+Inserting 1000000 file names with 128 characters took 1.003 s
+Sorting took 2.423 s
+Commit took 0.000 s
+Inserting 1000000 file names with 128 characters took 3.389 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 26910720
+
+Label: tuple key, view, sort and deduplicate (batch insert trigger) after, unique rows
+Inserting 1000000 file names with 128 characters took 1.743 s
+Sorting took 11.436 s
+Commit took 0.000 s
+Inserting 1000000 file names with 128 characters took 12.450 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 342921216
+
+Label: tuple key, view, sort and deduplicate (batch insert trigger) after, duplicate rows
+Inserting 1000000 file names with 128 characters took 1.044 s
+Sorting took 3.033 s
+Commit took 0.000 s
+Inserting 1000000 file names with 128 characters took 4.039 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 26910720
+
+Label: tuple key, view, sort and deduplicate (full batch insert trigger) after, unique rows
+Inserting 1000000 file names with 128 characters took 1.681 s
+Sorting took 11.009 s
+Commit took 0.000 s
+Inserting 1000000 file names with 128 characters took 11.988 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 342917120
+
+Label: tuple key, view, sort and deduplicate (full batch insert trigger) after, duplicate rows
+Inserting 1000000 file names with 128 characters took 1.050 s
+Sorting took 4.018 s
+Commit took 0.000 s
+Inserting 1000000 file names with 128 characters took 5.030 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 31342592
+
+file name length: 128
+rows per insert: 1000
+number of rows to insert: 2000000
+Label: tuple key, , unique rows
+Inserting 2000000 file names with 128 characters took 17.613 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 2000000 file names with 128 characters took 16.165 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 637882368
+
+Label: tuple key, sort after, no vacuum, unique rows
+Inserting 2000000 file names with 128 characters took 3.446 s
+Sorting took 4.275 s
+Commit took 0.000 s
+Inserting 2000000 file names with 128 characters took 6.280 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 921432064
+
+Label: tuple key, view (primary key), unique rows
+Inserting 2000000 file names with 128 characters took 23.681 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 2000000 file names with 128 characters took 22.248 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 733437952
+
+Label: tuple key, view (primary key), duplicate rows
+Inserting 2000000 file names with 128 characters took 6.515 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 2000000 file names with 128 characters took 6.442 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 57978880
+
+Label: tuple key, view (unique constraint), unique rows
+Inserting 2000000 file names with 128 characters took 23.967 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 2000000 file names with 128 characters took 22.517 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 735436800
+
+Label: tuple key, view (unique constraint), duplicate rows
+Inserting 2000000 file names with 128 characters took 6.643 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 2000000 file names with 128 characters took 6.569 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 57978880
+
+Label: tuple key, view (unique index), unique rows
+Inserting 2000000 file names with 128 characters took 23.649 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 2000000 file names with 128 characters took 22.209 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 735494144
+
+Label: tuple key, view (unique index), duplicate rows
+Inserting 2000000 file names with 128 characters took 6.812 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 2000000 file names with 128 characters took 6.734 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 57970688
+
+Label: tuple key, view, sort and deduplicate after, unique rows
+Inserting 2000000 file names with 128 characters took 3.501 s
+Sorting took 23.681 s
+Commit took 0.000 s
+Inserting 2000000 file names with 128 characters took 25.722 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 688259072
+
+Label: tuple key, view, sort and deduplicate after, duplicate rows
+Inserting 2000000 file names with 128 characters took 2.106 s
+Sorting took 8.226 s
+Commit took 0.000 s
+Inserting 2000000 file names with 128 characters took 10.256 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 62791680
+
+Label: tuple key, view, sort and deduplicate (batch inner join) after, unique rows
+Inserting 2000000 file names with 128 characters took 3.493 s
+Sorting took 22.830 s
+Commit took 0.000 s
+Inserting 2000000 file names with 128 characters took 24.861 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 688271360
+
+Label: tuple key, view, sort and deduplicate (batch inner join) after, duplicate rows
+Inserting 2000000 file names with 128 characters took 2.011 s
+Sorting took 4.883 s
+Commit took 0.000 s
+Inserting 2000000 file names with 128 characters took 6.822 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 54059008
+
+Label: tuple key, view, sort and deduplicate (batch insert trigger) after, unique rows
+Inserting 2000000 file names with 128 characters took 3.456 s
+Sorting took 23.909 s
+Commit took 0.000 s
+Inserting 2000000 file names with 128 characters took 25.923 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 688267264
+
+Label: tuple key, view, sort and deduplicate (batch insert trigger) after, duplicate rows
+Inserting 2000000 file names with 128 characters took 2.097 s
+Sorting took 6.384 s
+Commit took 0.000 s
+Inserting 2000000 file names with 128 characters took 8.406 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 54059008
+
+Label: tuple key, view, sort and deduplicate (full batch insert trigger) after, unique rows
+Inserting 2000000 file names with 128 characters took 3.495 s
+Sorting took 23.905 s
+Commit took 0.000 s
+Inserting 2000000 file names with 128 characters took 25.945 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 688259072
+
+Label: tuple key, view, sort and deduplicate (full batch insert trigger) after, duplicate rows
+Inserting 2000000 file names with 128 characters took 2.048 s
+Sorting took 8.102 s
+Commit took 0.000 s
+Inserting 2000000 file names with 128 characters took 10.076 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 62791680
+
+file name length: 128
+rows per insert: 1000
+number of rows to insert: 4000000
+Label: tuple key, , unique rows
+Inserting 4000000 file names with 128 characters took 37.753 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 4000000 file names with 128 characters took 34.822 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 1287102464
+
+Label: tuple key, sort after, no vacuum, unique rows
+Inserting 4000000 file names with 128 characters took 6.925 s
+Sorting took 9.305 s
+Commit took 0.000 s
+Inserting 4000000 file names with 128 characters took 13.350 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 1864114176
+
+Label: tuple key, view (primary key), unique rows
+Inserting 4000000 file names with 128 characters took 50.367 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 4000000 file names with 128 characters took 47.435 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 1473515520
+
+Label: tuple key, view (primary key), duplicate rows
+Inserting 4000000 file names with 128 characters took 13.387 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 4000000 file names with 128 characters took 13.237 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 118120448
+
+Label: tuple key, view (unique constraint), unique rows
+Inserting 4000000 file names with 128 characters took 50.738 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 4000000 file names with 128 characters took 47.808 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 1477210112
+
+Label: tuple key, view (unique constraint), duplicate rows
+Inserting 4000000 file names with 128 characters took 13.629 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 4000000 file names with 128 characters took 13.476 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 118120448
+
+Label: tuple key, view (unique index), unique rows
+Inserting 4000000 file names with 128 characters took 50.853 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 4000000 file names with 128 characters took 47.900 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 1476857856
+
+Label: tuple key, view (unique index), duplicate rows
+Inserting 4000000 file names with 128 characters took 13.555 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 4000000 file names with 128 characters took 13.403 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 118116352
+
+Label: tuple key, view, sort and deduplicate after, unique rows
+Inserting 4000000 file names with 128 characters took 6.997 s
+Sorting took 50.149 s
+Commit took 0.000 s
+Inserting 4000000 file names with 128 characters took 54.232 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 1382887424
+
+Label: tuple key, view, sort and deduplicate after, duplicate rows
+Inserting 4000000 file names with 128 characters took 4.151 s
+Sorting took 17.026 s
+Commit took 0.000 s
+Inserting 4000000 file names with 128 characters took 21.027 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 127635456
+
+Label: tuple key, view, sort and deduplicate (batch inner join) after, unique rows
+Inserting 4000000 file names with 128 characters took 6.867 s
+Sorting took 49.920 s
+Commit took 0.000 s
+Inserting 4000000 file names with 128 characters took 53.932 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 1382952960
+
+Label: tuple key, view, sort and deduplicate (batch inner join) after, duplicate rows
+Inserting 4000000 file names with 128 characters took 4.132 s
+Sorting took 10.478 s
+Commit took 0.000 s
+Inserting 4000000 file names with 128 characters took 14.462 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 110252032
+
+Label: tuple key, view, sort and deduplicate (batch insert trigger) after, unique rows
+Inserting 4000000 file names with 128 characters took 7.095 s
+Sorting took 53.098 s
+Commit took 0.000 s
+Inserting 4000000 file names with 128 characters took 57.254 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 1382957056
+
+Label: tuple key, view, sort and deduplicate (batch insert trigger) after, duplicate rows
+Inserting 4000000 file names with 128 characters took 4.200 s
+Sorting took 13.351 s
+Commit took 0.000 s
+Inserting 4000000 file names with 128 characters took 17.400 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 110252032
+
+Label: tuple key, view, sort and deduplicate (full batch insert trigger) after, unique rows
+Inserting 4000000 file names with 128 characters took 6.985 s
+Sorting took 49.143 s
+Commit took 0.000 s
+Inserting 4000000 file names with 128 characters took 53.223 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 1382887424
+
+Label: tuple key, view, sort and deduplicate (full batch insert trigger) after, duplicate rows
+Inserting 4000000 file names with 128 characters took 4.167 s
+Sorting took 16.427 s
+Commit took 0.000 s
+Inserting 4000000 file names with 128 characters took 20.444 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 127635456
+
+file name length: 128
+rows per insert: 1000
+number of rows to insert: 8000000
+Label: tuple key, , unique rows
+Inserting 8000000 file names with 128 characters took 78.934 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 8000000 file names with 128 characters took 73.078 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 2584846336
+
+Label: tuple key, sort after, no vacuum, unique rows
+Inserting 8000000 file names with 128 characters took 14.096 s
+Sorting took 19.867 s
+Commit took 0.000 s
+Inserting 8000000 file names with 128 characters took 28.134 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 3752419328
+
+Label: tuple key, view (primary key), unique rows
+Inserting 8000000 file names with 128 characters took 106.104 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 8000000 file names with 128 characters took 100.162 s when excluding PRNG time
+Selecting 1000 paths took 0.005 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.012 s
+Selecting 1000 path,hash took 0.012 s excluding PRNG time
+SQL database size in bytes: 2952962048
+
+Label: tuple key, view (primary key), duplicate rows
+Inserting 8000000 file names with 128 characters took 27.592 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 8000000 file names with 128 characters took 27.282 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 238604288
+
+Label: tuple key, view (unique constraint), unique rows
+Inserting 8000000 file names with 128 characters took 104.940 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 8000000 file names with 128 characters took 99.079 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 2961326080
+
+Label: tuple key, view (unique constraint), duplicate rows
+Inserting 8000000 file names with 128 characters took 27.021 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 8000000 file names with 128 characters took 26.723 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 238620672
+
+Label: tuple key, view (unique index), unique rows
+Inserting 8000000 file names with 128 characters took 106.124 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 8000000 file names with 128 characters took 100.184 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 2961432576
+
+Label: tuple key, view (unique index), duplicate rows
+Inserting 8000000 file names with 128 characters took 27.556 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 8000000 file names with 128 characters took 27.250 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 238612480
+
+Label: tuple key, view, sort and deduplicate after, unique rows
+Inserting 8000000 file names with 128 characters took 13.940 s
+Sorting took 102.718 s
+Commit took 0.000 s
+Inserting 8000000 file names with 128 characters took 110.888 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 2772500480
+
+Label: tuple key, view, sort and deduplicate after, duplicate rows
+Inserting 8000000 file names with 128 characters took 8.450 s
+Sorting took 33.992 s
+Commit took 0.000 s
+Inserting 8000000 file names with 128 characters took 42.138 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 257507328
+
+Label: tuple key, view, sort and deduplicate (batch inner join) after, unique rows
+Inserting 8000000 file names with 128 characters took 14.003 s
+Sorting took 108.769 s
+Commit took 0.000 s
+Inserting 8000000 file names with 128 characters took 116.982 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 2772520960
+
+Label: tuple key, view, sort and deduplicate (batch inner join) after, duplicate rows
+Inserting 8000000 file names with 128 characters took 8.535 s
+Sorting took 21.311 s
+Commit took 0.000 s
+Inserting 8000000 file names with 128 characters took 29.540 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 222838784
+
+Label: tuple key, view, sort and deduplicate (batch insert trigger) after, unique rows
+Inserting 8000000 file names with 128 characters took 13.877 s
+Sorting took 113.940 s
+Commit took 0.000 s
+Inserting 8000000 file names with 128 characters took 122.079 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 2772520960
+
+Label: tuple key, view, sort and deduplicate (batch insert trigger) after, duplicate rows
+Inserting 8000000 file names with 128 characters took 8.385 s
+Sorting took 26.774 s
+Commit took 0.000 s
+Inserting 8000000 file names with 128 characters took 34.859 s when excluding PRNG time
+Selecting 1000 paths took 0.005 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 222838784
+
+Label: tuple key, view, sort and deduplicate (full batch insert trigger) after, unique rows
+Inserting 8000000 file names with 128 characters took 13.728 s
+Sorting took 103.601 s
+Commit took 0.000 s
+Inserting 8000000 file names with 128 characters took 111.651 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.009 s excluding PRNG time
+SQL database size in bytes: 2772500480
+
+Label: tuple key, view, sort and deduplicate (full batch insert trigger) after, duplicate rows
+Inserting 8000000 file names with 128 characters took 8.442 s
+Sorting took 33.630 s
+Commit took 0.000 s
+Inserting 8000000 file names with 128 characters took 41.773 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 257507328
+
+file name length: 128
+rows per insert: 1000
+number of rows to insert: 16000000
+Label: tuple key, , unique rows
+Inserting 16000000 file names with 128 characters took 168.578 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 16000000 file names with 128 characters took 156.764 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 5186732032
+
+Label: tuple key, sort after, no vacuum, unique rows
+Inserting 16000000 file names with 128 characters took 27.639 s
+Sorting took 44.248 s
+Commit took 0.000 s
+Inserting 16000000 file names with 128 characters took 60.473 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 7539859456
+
+Label: tuple key, view (primary key), unique rows
+Inserting 16000000 file names with 128 characters took 221.768 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 16000000 file names with 128 characters took 209.983 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 5979279360
+
+Label: tuple key, view (primary key), duplicate rows
+Inserting 16000000 file names with 128 characters took 54.290 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 16000000 file names with 128 characters took 53.678 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 488419328
+
+Label: tuple key, view (unique constraint), unique rows
+Inserting 16000000 file names with 128 characters took 221.704 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 16000000 file names with 128 characters took 209.936 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 5994131456
+
+Label: tuple key, view (unique constraint), duplicate rows
+Inserting 16000000 file names with 128 characters took 54.380 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 16000000 file names with 128 characters took 53.760 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.009 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 488423424
+
+Label: tuple key, view (unique index), unique rows
+Inserting 16000000 file names with 128 characters took 220.344 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 16000000 file names with 128 characters took 208.626 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 5994672128
+
+Label: tuple key, view (unique index), duplicate rows
+Inserting 16000000 file names with 128 characters took 54.962 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 16000000 file names with 128 characters took 54.340 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 488402944
+
+Label: tuple key, view, sort and deduplicate after, unique rows
+Inserting 16000000 file names with 128 characters took 27.976 s
+Sorting took 213.656 s
+Commit took 0.000 s
+Inserting 16000000 file names with 128 characters took 230.074 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 5609590784
+
+Label: tuple key, view, sort and deduplicate after, duplicate rows
+Inserting 16000000 file names with 128 characters took 16.562 s
+Sorting took 67.538 s
+Commit took 0.000 s
+Inserting 16000000 file names with 128 characters took 83.503 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 555163648
+
+Label: tuple key, view, sort and deduplicate (batch inner join) after, unique rows
+Inserting 16000000 file names with 128 characters took 28.000 s
+Sorting took 231.820 s
+Commit took 0.000 s
+Inserting 16000000 file names with 128 characters took 248.212 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 5609357312
+
+Label: tuple key, view, sort and deduplicate (batch inner join) after, duplicate rows
+Inserting 16000000 file names with 128 characters took 16.600 s
+Sorting took 43.280 s
+Commit took 0.000 s
+Inserting 16000000 file names with 128 characters took 59.285 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 455811072
+
+Label: tuple key, view, sort and deduplicate (batch insert trigger) after, unique rows
+Inserting 16000000 file names with 128 characters took 27.819 s
+Sorting took 239.114 s
+Commit took 0.000 s
+Inserting 16000000 file names with 128 characters took 255.390 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 5609357312
+
+Label: tuple key, view, sort and deduplicate (batch insert trigger) after, duplicate rows
+Inserting 16000000 file names with 128 characters took 16.565 s
+Sorting took 54.316 s
+Commit took 0.000 s
+Inserting 16000000 file names with 128 characters took 70.284 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 455811072
+
+Label: tuple key, view, sort and deduplicate (full batch insert trigger) after, unique rows
+Inserting 16000000 file names with 128 characters took 27.921 s
+Sorting took 212.293 s
+Commit took 0.000 s
+Inserting 16000000 file names with 128 characters took 228.662 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 5609590784
+
+Label: tuple key, view, sort and deduplicate (full batch insert trigger) after, duplicate rows
+Inserting 16000000 file names with 128 characters took 16.693 s
+Sorting took 67.391 s
+Commit took 0.000 s
+Inserting 16000000 file names with 128 characters took 83.484 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 1000 path,hash took 0.008 s
+Selecting 1000 path,hash took 0.008 s excluding PRNG time
+SQL database size in bytes: 555163648
+

@@ -1,0 +1,940 @@
+file name length: 128
+rows per insert: 1000
+number of rows to insert: 3000
+Label: varchar primary key, unique rows
+Inserting 3000 file names with 128 characters took 0.008 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 3000 file names with 128 characters took 0.006 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.002 s
+Selecting 10 paths starting with took 0.002 s excluding PRNG time
+Selecting 10 hashes took 0.001 s
+Selecting 10 hashes took 0.001 s excluding PRNG time
+SQL database size in bytes: 913408
+
+Label: integer primary key, unique rows
+Inserting 3000 file names with 128 characters took 0.005 s
+Sorting took 0.000 s
+Commit took 0.000 s
+Inserting 3000 file names with 128 characters took 0.003 s when excluding PRNG time
+Selecting 10 paths took 0.002 s
+Selecting 10 paths took 0.002 s excluding PRNG time
+Selecting 10 paths starting with took 0.002 s
+Selecting 10 paths starting with took 0.002 s excluding PRNG time
+Selecting 10 hashes took 0.000 s
+Selecting 10 hashes took 0.000 s excluding PRNG time
+SQL database size in bytes: 434176
+
+Label: varchar,integer primary key, unique rows
+Inserting 3000 file names with 128 characters took 0.008 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 3000 file names with 128 characters took 0.006 s when excluding PRNG time
+Selecting 10 paths took 0.000 s
+Selecting 10 paths took 0.000 s excluding PRNG time
+Selecting 10 paths starting with took 0.002 s
+Selecting 10 paths starting with took 0.002 s excluding PRNG time
+Selecting 10 hashes took 0.001 s
+Selecting 10 hashes took 0.001 s excluding PRNG time
+SQL database size in bytes: 929792
+
+Label: varchar,varchar primary key, unique rows
+Inserting 3000 file names with 128 characters took 0.008 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 3000 file names with 128 characters took 0.006 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.002 s
+Selecting 10 paths starting with took 0.002 s excluding PRNG time
+Selecting 10 hashes took 0.002 s
+Selecting 10 hashes took 0.002 s excluding PRNG time
+SQL database size in bytes: 970752
+
+Label: varchar,varchar primary key sort after, no vacuum, unique rows
+Inserting 3000 file names with 128 characters took 0.005 s
+Sorting took 0.004 s
+Commit took 0.000 s
+Inserting 3000 file names with 128 characters took 0.007 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.002 s
+Selecting 10 paths starting with took 0.002 s excluding PRNG time
+Selecting 10 hashes took 0.002 s
+Selecting 10 hashes took 0.002 s excluding PRNG time
+SQL database size in bytes: 1384448
+
+Label: varchar,varchar primary key sort after, no vacuum, no ORDER BY path-hash, unique rows
+Inserting 3000 file names with 128 characters took 0.005 s
+Sorting took 0.004 s
+Commit took 0.000 s
+Inserting 3000 file names with 128 characters took 0.007 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.002 s
+Selecting 10 paths starting with took 0.002 s excluding PRNG time
+Selecting 10 hashes took 0.002 s
+Selecting 10 hashes took 0.002 s excluding PRNG time
+SQL database size in bytes: 1384448
+
+Label: varchar,varchar primary key sort after, unique rows
+Inserting 3000 file names with 128 characters took 0.005 s
+Sorting took 0.006 s
+Commit took 0.000 s
+Inserting 3000 file names with 128 characters took 0.009 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.002 s
+Selecting 10 paths starting with took 0.002 s excluding PRNG time
+Selecting 10 hashes took 0.002 s
+Selecting 10 hashes took 0.002 s excluding PRNG time
+SQL database size in bytes: 892928
+
+file name length: 128
+rows per insert: 1000
+number of rows to insert: 10000
+Label: varchar primary key, unique rows
+Inserting 10000 file names with 128 characters took 0.028 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 10000 file names with 128 characters took 0.021 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.007 s
+Selecting 10 paths starting with took 0.007 s excluding PRNG time
+Selecting 10 hashes took 0.004 s
+Selecting 10 hashes took 0.004 s excluding PRNG time
+SQL database size in bytes: 3035136
+
+Label: integer primary key, unique rows
+Inserting 10000 file names with 128 characters took 0.016 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 10000 file names with 128 characters took 0.010 s when excluding PRNG time
+Selecting 10 paths took 0.006 s
+Selecting 10 paths took 0.006 s excluding PRNG time
+Selecting 10 paths starting with took 0.007 s
+Selecting 10 paths starting with took 0.007 s excluding PRNG time
+Selecting 10 hashes took 0.000 s
+Selecting 10 hashes took 0.000 s excluding PRNG time
+SQL database size in bytes: 1421312
+
+Label: varchar,integer primary key, unique rows
+Inserting 10000 file names with 128 characters took 0.031 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 10000 file names with 128 characters took 0.024 s when excluding PRNG time
+Selecting 10 paths took 0.000 s
+Selecting 10 paths took 0.000 s excluding PRNG time
+Selecting 10 paths starting with took 0.009 s
+Selecting 10 paths starting with took 0.009 s excluding PRNG time
+Selecting 10 hashes took 0.006 s
+Selecting 10 hashes took 0.006 s excluding PRNG time
+SQL database size in bytes: 3084288
+
+Label: varchar,varchar primary key, unique rows
+Inserting 10000 file names with 128 characters took 0.027 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 10000 file names with 128 characters took 0.021 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.007 s
+Selecting 10 paths starting with took 0.007 s excluding PRNG time
+Selecting 10 hashes took 0.007 s
+Selecting 10 hashes took 0.007 s excluding PRNG time
+SQL database size in bytes: 3108864
+
+Label: varchar,varchar primary key sort after, no vacuum, unique rows
+Inserting 10000 file names with 128 characters took 0.016 s
+Sorting took 0.015 s
+Commit took 0.000 s
+Inserting 10000 file names with 128 characters took 0.024 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.007 s
+Selecting 10 paths starting with took 0.007 s excluding PRNG time
+Selecting 10 hashes took 0.008 s
+Selecting 10 hashes took 0.008 s excluding PRNG time
+SQL database size in bytes: 4571136
+
+Label: varchar,varchar primary key sort after, no vacuum, no ORDER BY path-hash, unique rows
+Inserting 10000 file names with 128 characters took 0.016 s
+Sorting took 0.015 s
+Commit took 0.000 s
+Inserting 10000 file names with 128 characters took 0.023 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.007 s
+Selecting 10 paths starting with took 0.007 s excluding PRNG time
+Selecting 10 hashes took 0.007 s
+Selecting 10 hashes took 0.007 s excluding PRNG time
+SQL database size in bytes: 4595712
+
+Label: varchar,varchar primary key sort after, unique rows
+Inserting 10000 file names with 128 characters took 0.016 s
+Sorting took 0.021 s
+Commit took 0.000 s
+Inserting 10000 file names with 128 characters took 0.030 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.007 s
+Selecting 10 paths starting with took 0.007 s excluding PRNG time
+Selecting 10 hashes took 0.008 s
+Selecting 10 hashes took 0.008 s excluding PRNG time
+SQL database size in bytes: 2940928
+
+file name length: 128
+rows per insert: 1000
+number of rows to insert: 32000
+Label: varchar primary key, unique rows
+Inserting 32000 file names with 128 characters took 0.127 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 32000 file names with 128 characters took 0.104 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.034 s
+Selecting 10 paths starting with took 0.034 s excluding PRNG time
+Selecting 10 hashes took 0.025 s
+Selecting 10 hashes took 0.025 s excluding PRNG time
+SQL database size in bytes: 9773056
+
+Label: integer primary key, unique rows
+Inserting 32000 file names with 128 characters took 0.054 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 32000 file names with 128 characters took 0.032 s when excluding PRNG time
+Selecting 10 paths took 0.029 s
+Selecting 10 paths took 0.029 s excluding PRNG time
+Selecting 10 paths starting with took 0.034 s
+Selecting 10 paths starting with took 0.034 s excluding PRNG time
+Selecting 10 hashes took 0.000 s
+Selecting 10 hashes took 0.000 s excluding PRNG time
+SQL database size in bytes: 4542464
+
+Label: varchar,integer primary key, unique rows
+Inserting 32000 file names with 128 characters took 0.122 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 32000 file names with 128 characters took 0.100 s when excluding PRNG time
+Selecting 10 paths took 0.000 s
+Selecting 10 paths took 0.000 s excluding PRNG time
+Selecting 10 paths starting with took 0.032 s
+Selecting 10 paths starting with took 0.032 s excluding PRNG time
+Selecting 10 hashes took 0.024 s
+Selecting 10 hashes took 0.024 s excluding PRNG time
+SQL database size in bytes: 9965568
+
+Label: varchar,varchar primary key, unique rows
+Inserting 32000 file names with 128 characters took 0.126 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 32000 file names with 128 characters took 0.105 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.037 s
+Selecting 10 paths starting with took 0.037 s excluding PRNG time
+Selecting 10 hashes took 0.035 s
+Selecting 10 hashes took 0.035 s excluding PRNG time
+SQL database size in bytes: 10072064
+
+Label: varchar,varchar primary key sort after, no vacuum, unique rows
+Inserting 32000 file names with 128 characters took 0.054 s
+Sorting took 0.050 s
+Commit took 0.000 s
+Inserting 32000 file names with 128 characters took 0.081 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.033 s
+Selecting 10 paths starting with took 0.033 s excluding PRNG time
+Selecting 10 hashes took 0.036 s
+Selecting 10 hashes took 0.036 s excluding PRNG time
+SQL database size in bytes: 14610432
+
+Label: varchar,varchar primary key sort after, no vacuum, no ORDER BY path-hash, unique rows
+Inserting 32000 file names with 128 characters took 0.055 s
+Sorting took 0.089 s
+Commit took 0.000 s
+Inserting 32000 file names with 128 characters took 0.120 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.035 s
+Selecting 10 paths starting with took 0.035 s excluding PRNG time
+Selecting 10 hashes took 0.035 s
+Selecting 10 hashes took 0.035 s excluding PRNG time
+SQL database size in bytes: 14737408
+
+Label: varchar,varchar primary key sort after, unique rows
+Inserting 32000 file names with 128 characters took 0.056 s
+Sorting took 0.068 s
+Commit took 0.000 s
+Inserting 32000 file names with 128 characters took 0.100 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.036 s
+Selecting 10 paths starting with took 0.036 s excluding PRNG time
+Selecting 10 hashes took 0.038 s
+Selecting 10 hashes took 0.038 s excluding PRNG time
+SQL database size in bytes: 9400320
+
+file name length: 128
+rows per insert: 1000
+number of rows to insert: 100000
+Label: varchar primary key, unique rows
+Inserting 100000 file names with 128 characters took 0.606 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 100000 file names with 128 characters took 0.529 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.112 s
+Selecting 10 paths starting with took 0.112 s excluding PRNG time
+Selecting 10 hashes took 0.078 s
+Selecting 10 hashes took 0.078 s excluding PRNG time
+SQL database size in bytes: 30646272
+
+Label: integer primary key, unique rows
+Inserting 100000 file names with 128 characters took 0.169 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 100000 file names with 128 characters took 0.099 s when excluding PRNG time
+Selecting 10 paths took 0.090 s
+Selecting 10 paths took 0.090 s excluding PRNG time
+Selecting 10 paths starting with took 0.101 s
+Selecting 10 paths starting with took 0.101 s excluding PRNG time
+Selecting 10 hashes took 0.000 s
+Selecting 10 hashes took 0.000 s excluding PRNG time
+SQL database size in bytes: 14172160
+
+Label: varchar,integer primary key, unique rows
+Inserting 100000 file names with 128 characters took 0.566 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 100000 file names with 128 characters took 0.495 s when excluding PRNG time
+Selecting 10 paths took 0.000 s
+Selecting 10 paths took 0.000 s excluding PRNG time
+Selecting 10 paths starting with took 0.103 s
+Selecting 10 paths starting with took 0.103 s excluding PRNG time
+Selecting 10 hashes took 0.078 s
+Selecting 10 hashes took 0.078 s excluding PRNG time
+SQL database size in bytes: 31199232
+
+Label: varchar,varchar primary key, unique rows
+Inserting 100000 file names with 128 characters took 0.567 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 100000 file names with 128 characters took 0.497 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.105 s
+Selecting 10 paths starting with took 0.105 s excluding PRNG time
+Selecting 10 hashes took 0.110 s
+Selecting 10 hashes took 0.110 s excluding PRNG time
+SQL database size in bytes: 31264768
+
+Label: varchar,varchar primary key sort after, no vacuum, unique rows
+Inserting 100000 file names with 128 characters took 0.172 s
+Sorting took 0.168 s
+Commit took 0.000 s
+Inserting 100000 file names with 128 characters took 0.267 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.105 s
+Selecting 10 paths starting with took 0.105 s excluding PRNG time
+Selecting 10 hashes took 0.111 s
+Selecting 10 hashes took 0.111 s excluding PRNG time
+SQL database size in bytes: 45670400
+
+Label: varchar,varchar primary key sort after, no vacuum, no ORDER BY path-hash, unique rows
+Inserting 100000 file names with 128 characters took 0.170 s
+Sorting took 0.434 s
+Commit took 0.000 s
+Inserting 100000 file names with 128 characters took 0.532 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.104 s
+Selecting 10 paths starting with took 0.104 s excluding PRNG time
+Selecting 10 hashes took 0.107 s
+Selecting 10 hashes took 0.107 s excluding PRNG time
+SQL database size in bytes: 45965312
+
+Label: varchar,varchar primary key sort after, unique rows
+Inserting 100000 file names with 128 characters took 0.169 s
+Sorting took 0.230 s
+Commit took 0.000 s
+Inserting 100000 file names with 128 characters took 0.328 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.105 s
+Selecting 10 paths starting with took 0.105 s excluding PRNG time
+Selecting 10 hashes took 0.109 s
+Selecting 10 hashes took 0.109 s excluding PRNG time
+SQL database size in bytes: 29335552
+
+file name length: 128
+rows per insert: 1000
+number of rows to insert: 320000
+Label: varchar primary key, unique rows
+Inserting 320000 file names with 128 characters took 2.261 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 320000 file names with 128 characters took 2.030 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.334 s
+Selecting 10 paths starting with took 0.334 s excluding PRNG time
+Selecting 10 hashes took 0.253 s
+Selecting 10 hashes took 0.253 s excluding PRNG time
+SQL database size in bytes: 98238464
+
+Label: integer primary key, unique rows
+Inserting 320000 file names with 128 characters took 0.552 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 320000 file names with 128 characters took 0.325 s when excluding PRNG time
+Selecting 10 paths took 0.292 s
+Selecting 10 paths took 0.292 s excluding PRNG time
+Selecting 10 paths starting with took 0.324 s
+Selecting 10 paths starting with took 0.324 s excluding PRNG time
+Selecting 10 hashes took 0.000 s
+Selecting 10 hashes took 0.000 s excluding PRNG time
+SQL database size in bytes: 45322240
+
+Label: varchar,integer primary key, unique rows
+Inserting 320000 file names with 128 characters took 2.273 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 320000 file names with 128 characters took 2.043 s when excluding PRNG time
+Selecting 10 paths took 0.000 s
+Selecting 10 paths took 0.000 s excluding PRNG time
+Selecting 10 paths starting with took 0.333 s
+Selecting 10 paths starting with took 0.333 s excluding PRNG time
+Selecting 10 hashes took 0.253 s
+Selecting 10 hashes took 0.253 s excluding PRNG time
+SQL database size in bytes: 100032512
+
+Label: varchar,varchar primary key, unique rows
+Inserting 320000 file names with 128 characters took 2.296 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 320000 file names with 128 characters took 2.068 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.004 s excluding PRNG time
+Selecting 10 paths starting with took 0.334 s
+Selecting 10 paths starting with took 0.334 s excluding PRNG time
+Selecting 10 hashes took 0.350 s
+Selecting 10 hashes took 0.350 s excluding PRNG time
+SQL database size in bytes: 100073472
+
+Label: varchar,varchar primary key sort after, no vacuum, unique rows
+Inserting 320000 file names with 128 characters took 0.546 s
+Sorting took 0.609 s
+Commit took 0.000 s
+Inserting 320000 file names with 128 characters took 0.927 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.338 s
+Selecting 10 paths starting with took 0.338 s excluding PRNG time
+Selecting 10 hashes took 0.362 s
+Selecting 10 hashes took 0.362 s excluding PRNG time
+SQL database size in bytes: 145952768
+
+Label: varchar,varchar primary key sort after, no vacuum, no ORDER BY path-hash, unique rows
+Inserting 320000 file names with 128 characters took 0.555 s
+Sorting took 1.893 s
+Commit took 0.000 s
+Inserting 320000 file names with 128 characters took 2.217 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.347 s
+Selecting 10 paths starting with took 0.347 s excluding PRNG time
+Selecting 10 hashes took 0.368 s
+Selecting 10 hashes took 0.368 s excluding PRNG time
+SQL database size in bytes: 147144704
+
+Label: varchar,varchar primary key sort after, unique rows
+Inserting 320000 file names with 128 characters took 0.553 s
+Sorting took 0.817 s
+Commit took 0.000 s
+Inserting 320000 file names with 128 characters took 1.142 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 0.329 s
+Selecting 10 paths starting with took 0.329 s excluding PRNG time
+Selecting 10 hashes took 0.374 s
+Selecting 10 hashes took 0.374 s excluding PRNG time
+SQL database size in bytes: 93822976
+
+file name length: 128
+rows per insert: 1000
+number of rows to insert: 1000000
+Label: varchar primary key, unique rows
+Inserting 1000000 file names with 128 characters took 7.909 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 1000000 file names with 128 characters took 7.201 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 1.081 s
+Selecting 10 paths starting with took 1.081 s excluding PRNG time
+Selecting 10 hashes took 0.808 s
+Selecting 10 hashes took 0.808 s excluding PRNG time
+SQL database size in bytes: 306847744
+
+Label: integer primary key, unique rows
+Inserting 1000000 file names with 128 characters took 1.709 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 1000000 file names with 128 characters took 1.008 s when excluding PRNG time
+Selecting 10 paths took 0.941 s
+Selecting 10 paths took 0.941 s excluding PRNG time
+Selecting 10 paths starting with took 1.079 s
+Selecting 10 paths starting with took 1.079 s excluding PRNG time
+Selecting 10 hashes took 0.000 s
+Selecting 10 hashes took 0.000 s excluding PRNG time
+SQL database size in bytes: 141606912
+
+Label: varchar,integer primary key, unique rows
+Inserting 1000000 file names with 128 characters took 8.321 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 1000000 file names with 128 characters took 7.582 s when excluding PRNG time
+Selecting 10 paths took 0.000 s
+Selecting 10 paths took 0.000 s excluding PRNG time
+Selecting 10 paths starting with took 1.067 s
+Selecting 10 paths starting with took 1.067 s excluding PRNG time
+Selecting 10 hashes took 0.801 s
+Selecting 10 hashes took 0.801 s excluding PRNG time
+SQL database size in bytes: 312737792
+
+Label: varchar,varchar primary key, unique rows
+Inserting 1000000 file names with 128 characters took 8.282 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 1000000 file names with 128 characters took 7.556 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 1.078 s
+Selecting 10 paths starting with took 1.078 s excluding PRNG time
+Selecting 10 hashes took 1.140 s
+Selecting 10 hashes took 1.140 s excluding PRNG time
+SQL database size in bytes: 313004032
+
+Label: varchar,varchar primary key sort after, no vacuum, unique rows
+Inserting 1000000 file names with 128 characters took 1.724 s
+Sorting took 2.119 s
+Commit took 0.000 s
+Inserting 1000000 file names with 128 characters took 3.127 s when excluding PRNG time
+Selecting 1000 paths took 0.004 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 1.082 s
+Selecting 10 paths starting with took 1.082 s excluding PRNG time
+Selecting 10 hashes took 1.176 s
+Selecting 10 hashes took 1.176 s excluding PRNG time
+SQL database size in bytes: 456507392
+
+Label: varchar,varchar primary key sort after, no vacuum, no ORDER BY path-hash, unique rows
+Inserting 1000000 file names with 128 characters took 1.720 s
+Sorting took 6.782 s
+Commit took 0.000 s
+Inserting 1000000 file names with 128 characters took 7.789 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 1.091 s
+Selecting 10 paths starting with took 1.091 s excluding PRNG time
+Selecting 10 hashes took 1.128 s
+Selecting 10 hashes took 1.128 s excluding PRNG time
+SQL database size in bytes: 459530240
+
+Label: varchar,varchar primary key sort after, unique rows
+Inserting 1000000 file names with 128 characters took 1.741 s
+Sorting took 2.668 s
+Commit took 0.000 s
+Inserting 1000000 file names with 128 characters took 3.686 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 1.030 s
+Selecting 10 paths starting with took 1.030 s excluding PRNG time
+Selecting 10 hashes took 1.102 s
+Selecting 10 hashes took 1.102 s excluding PRNG time
+SQL database size in bytes: 293146624
+
+file name length: 128
+rows per insert: 1000
+number of rows to insert: 2000000
+Label: varchar primary key, unique rows
+Inserting 2000000 file names with 128 characters took 17.348 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 2000000 file names with 128 characters took 15.888 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 2.121 s
+Selecting 10 paths starting with took 2.121 s excluding PRNG time
+Selecting 10 hashes took 1.620 s
+Selecting 10 hashes took 1.619 s excluding PRNG time
+SQL database size in bytes: 613355520
+
+Label: integer primary key, unique rows
+Inserting 2000000 file names with 128 characters took 4.451 s
+Sorting took 0.000 s
+Commit took 0.002 s
+Inserting 2000000 file names with 128 characters took 2.715 s when excluding PRNG time
+Selecting 10 paths took 2.061 s
+Selecting 10 paths took 2.061 s excluding PRNG time
+Selecting 10 paths starting with took 2.348 s
+Selecting 10 paths starting with took 2.348 s excluding PRNG time
+Selecting 10 hashes took 0.000 s
+Selecting 10 hashes took 0.000 s excluding PRNG time
+SQL database size in bytes: 283201536
+
+Label: varchar,integer primary key, unique rows
+Inserting 2000000 file names with 128 characters took 18.481 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 2000000 file names with 128 characters took 16.964 s when excluding PRNG time
+Selecting 10 paths took 0.000 s
+Selecting 10 paths took 0.000 s excluding PRNG time
+Selecting 10 paths starting with took 2.105 s
+Selecting 10 paths starting with took 2.105 s excluding PRNG time
+Selecting 10 hashes took 1.590 s
+Selecting 10 hashes took 1.590 s excluding PRNG time
+SQL database size in bytes: 625463296
+
+Label: varchar,varchar primary key, unique rows
+Inserting 2000000 file names with 128 characters took 17.969 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 2000000 file names with 128 characters took 16.506 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 2.134 s
+Selecting 10 paths starting with took 2.134 s excluding PRNG time
+Selecting 10 hashes took 2.281 s
+Selecting 10 hashes took 2.281 s excluding PRNG time
+SQL database size in bytes: 638066688
+
+Label: varchar,varchar primary key sort after, no vacuum, unique rows
+Inserting 2000000 file names with 128 characters took 3.505 s
+Sorting took 4.271 s
+Commit took 0.000 s
+Inserting 2000000 file names with 128 characters took 6.316 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 2.087 s
+Selecting 10 paths starting with took 2.087 s excluding PRNG time
+Selecting 10 hashes took 2.290 s
+Selecting 10 hashes took 2.290 s excluding PRNG time
+SQL database size in bytes: 921432064
+
+Label: varchar,varchar primary key sort after, no vacuum, no ORDER BY path-hash, unique rows
+Inserting 2000000 file names with 128 characters took 3.350 s
+Sorting took 14.620 s
+Commit took 0.000 s
+Inserting 2000000 file names with 128 characters took 16.576 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 2.149 s
+Selecting 10 paths starting with took 2.149 s excluding PRNG time
+Selecting 10 hashes took 2.227 s
+Selecting 10 hashes took 2.227 s excluding PRNG time
+SQL database size in bytes: 931475456
+
+Label: varchar,varchar primary key sort after, unique rows
+Inserting 2000000 file names with 128 characters took 3.444 s
+Sorting took 5.494 s
+Commit took 0.000 s
+Inserting 2000000 file names with 128 characters took 7.509 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 2.102 s
+Selecting 10 paths starting with took 2.102 s excluding PRNG time
+Selecting 10 hashes took 2.255 s
+Selecting 10 hashes took 2.255 s excluding PRNG time
+SQL database size in bytes: 596561920
+
+file name length: 128
+rows per insert: 1000
+number of rows to insert: 4000000
+Label: varchar primary key, unique rows
+Inserting 4000000 file names with 128 characters took 35.907 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 4000000 file names with 128 characters took 33.047 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 4.426 s
+Selecting 10 paths starting with took 4.426 s excluding PRNG time
+Selecting 10 hashes took 3.391 s
+Selecting 10 hashes took 3.391 s excluding PRNG time
+SQL database size in bytes: 1227202560
+
+Label: integer primary key, unique rows
+Inserting 4000000 file names with 128 characters took 7.073 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 4000000 file names with 128 characters took 4.184 s when excluding PRNG time
+Selecting 10 paths took 3.679 s
+Selecting 10 paths took 3.679 s excluding PRNG time
+Selecting 10 paths starting with took 4.163 s
+Selecting 10 paths starting with took 4.163 s excluding PRNG time
+Selecting 10 hashes took 0.000 s
+Selecting 10 hashes took 0.000 s excluding PRNG time
+SQL database size in bytes: 566472704
+
+Label: varchar,integer primary key, unique rows
+Inserting 4000000 file names with 128 characters took 36.990 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 4000000 file names with 128 characters took 34.087 s when excluding PRNG time
+Selecting 10 paths took 0.000 s
+Selecting 10 paths took 0.000 s excluding PRNG time
+Selecting 10 paths starting with took 4.257 s
+Selecting 10 paths starting with took 4.257 s excluding PRNG time
+Selecting 10 hashes took 3.258 s
+Selecting 10 hashes took 3.258 s excluding PRNG time
+SQL database size in bytes: 1250197504
+
+Label: varchar,varchar primary key, unique rows
+Inserting 4000000 file names with 128 characters took 38.064 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 4000000 file names with 128 characters took 35.143 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 4.228 s
+Selecting 10 paths starting with took 4.228 s excluding PRNG time
+Selecting 10 hashes took 4.481 s
+Selecting 10 hashes took 4.481 s excluding PRNG time
+SQL database size in bytes: 1286627328
+
+Label: varchar,varchar primary key sort after, no vacuum, unique rows
+Inserting 4000000 file names with 128 characters took 6.957 s
+Sorting took 9.142 s
+Commit took 0.000 s
+Inserting 4000000 file names with 128 characters took 13.214 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 4.350 s
+Selecting 10 paths starting with took 4.350 s excluding PRNG time
+Selecting 10 hashes took 4.623 s
+Selecting 10 hashes took 4.623 s excluding PRNG time
+SQL database size in bytes: 1864081408
+
+Label: varchar,varchar primary key sort after, no vacuum, no ORDER BY path-hash, unique rows
+Inserting 4000000 file names with 128 characters took 6.989 s
+Sorting took 31.648 s
+Commit took 0.000 s
+Inserting 4000000 file names with 128 characters took 35.740 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 4.208 s
+Selecting 10 paths starting with took 4.208 s excluding PRNG time
+Selecting 10 hashes took 4.445 s
+Selecting 10 hashes took 4.445 s excluding PRNG time
+SQL database size in bytes: 1883799552
+
+Label: varchar,varchar primary key sort after, unique rows
+Inserting 4000000 file names with 128 characters took 7.025 s
+Sorting took 11.786 s
+Commit took 0.000 s
+Inserting 4000000 file names with 128 characters took 15.900 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 4.222 s
+Selecting 10 paths starting with took 4.222 s excluding PRNG time
+Selecting 10 hashes took 4.577 s
+Selecting 10 hashes took 4.577 s excluding PRNG time
+SQL database size in bytes: 1203699712
+
+file name length: 128
+rows per insert: 1000
+number of rows to insert: 8000000
+Label: varchar primary key, unique rows
+Inserting 8000000 file names with 128 characters took 76.925 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 8000000 file names with 128 characters took 71.107 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 8.539 s
+Selecting 10 paths starting with took 8.539 s excluding PRNG time
+Selecting 10 hashes took 6.573 s
+Selecting 10 hashes took 6.573 s excluding PRNG time
+SQL database size in bytes: 2454638592
+
+Label: integer primary key, unique rows
+Inserting 8000000 file names with 128 characters took 14.079 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 8000000 file names with 128 characters took 8.371 s when excluding PRNG time
+Selecting 10 paths took 7.401 s
+Selecting 10 paths took 7.401 s excluding PRNG time
+Selecting 10 paths starting with took 8.133 s
+Selecting 10 paths starting with took 8.133 s excluding PRNG time
+Selecting 10 hashes took 0.000 s
+Selecting 10 hashes took 0.000 s excluding PRNG time
+SQL database size in bytes: 1133027328
+
+Label: varchar,integer primary key, unique rows
+Inserting 8000000 file names with 128 characters took 77.148 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 8000000 file names with 128 characters took 71.319 s when excluding PRNG time
+Selecting 10 paths took 0.000 s
+Selecting 10 paths took 0.000 s excluding PRNG time
+Selecting 10 paths starting with took 8.524 s
+Selecting 10 paths starting with took 8.524 s excluding PRNG time
+Selecting 10 hashes took 6.406 s
+Selecting 10 hashes took 6.406 s excluding PRNG time
+SQL database size in bytes: 2501074944
+
+Label: varchar,varchar primary key, unique rows
+Inserting 8000000 file names with 128 characters took 78.114 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 8000000 file names with 128 characters took 72.322 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 8.792 s
+Selecting 10 paths starting with took 8.792 s excluding PRNG time
+Selecting 10 hashes took 8.716 s
+Selecting 10 hashes took 8.716 s excluding PRNG time
+SQL database size in bytes: 2584739840
+
+Label: varchar,varchar primary key sort after, no vacuum, unique rows
+Inserting 8000000 file names with 128 characters took 13.877 s
+Sorting took 19.200 s
+Commit took 0.000 s
+Inserting 8000000 file names with 128 characters took 27.345 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 8.561 s
+Selecting 10 paths starting with took 8.561 s excluding PRNG time
+Selecting 10 hashes took 9.019 s
+Selecting 10 hashes took 9.019 s excluding PRNG time
+SQL database size in bytes: 3752464384
+
+Label: varchar,varchar primary key sort after, no vacuum, no ORDER BY path-hash, unique rows
+Inserting 8000000 file names with 128 characters took 13.482 s
+Sorting took 65.643 s
+Commit took 0.000 s
+Inserting 8000000 file names with 128 characters took 73.560 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 8.335 s
+Selecting 10 paths starting with took 8.335 s excluding PRNG time
+Selecting 10 hashes took 8.701 s
+Selecting 10 hashes took 8.701 s excluding PRNG time
+SQL database size in bytes: 3789750272
+
+Label: varchar,varchar primary key sort after, unique rows
+Inserting 8000000 file names with 128 characters took 13.580 s
+Sorting took 24.545 s
+Commit took 0.000 s
+Inserting 8000000 file names with 128 characters took 32.503 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 8.381 s
+Selecting 10 paths starting with took 8.381 s excluding PRNG time
+Selecting 10 hashes took 8.992 s
+Selecting 10 hashes took 8.992 s excluding PRNG time
+SQL database size in bytes: 2419032064
+
+file name length: 128
+rows per insert: 1000
+number of rows to insert: 16000000
+Label: varchar primary key, unique rows
+Inserting 16000000 file names with 128 characters took 157.777 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 16000000 file names with 128 characters took 146.216 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 17.026 s
+Selecting 10 paths starting with took 17.026 s excluding PRNG time
+Selecting 10 hashes took 12.998 s
+Selecting 10 hashes took 12.998 s excluding PRNG time
+SQL database size in bytes: 4913295360
+
+Label: integer primary key, unique rows
+Inserting 16000000 file names with 128 characters took 28.344 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 16000000 file names with 128 characters took 16.906 s when excluding PRNG time
+Selecting 10 paths took 14.568 s
+Selecting 10 paths took 14.568 s excluding PRNG time
+Selecting 10 paths starting with took 16.748 s
+Selecting 10 paths starting with took 16.748 s excluding PRNG time
+Selecting 10 hashes took 0.000 s
+Selecting 10 hashes took 0.000 s excluding PRNG time
+SQL database size in bytes: 2266124288
+
+Label: varchar,integer primary key, unique rows
+Inserting 16000000 file names with 128 characters took 160.598 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 16000000 file names with 128 characters took 149.021 s when excluding PRNG time
+Selecting 10 paths took 0.000 s
+Selecting 10 paths took 0.000 s excluding PRNG time
+Selecting 10 paths starting with took 16.543 s
+Selecting 10 paths starting with took 16.543 s excluding PRNG time
+Selecting 10 hashes took 12.873 s
+Selecting 10 hashes took 12.873 s excluding PRNG time
+SQL database size in bytes: 5007765504
+
+Label: varchar,varchar primary key, unique rows
+Inserting 16000000 file names with 128 characters took 163.321 s
+Sorting took 0.000 s
+Commit took 0.001 s
+Inserting 16000000 file names with 128 characters took 151.767 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 17.320 s
+Selecting 10 paths starting with took 17.319 s excluding PRNG time
+Selecting 10 hashes took 18.270 s
+Selecting 10 hashes took 18.270 s excluding PRNG time
+SQL database size in bytes: 5186920448
+
+Label: varchar,varchar primary key sort after, no vacuum, unique rows
+Inserting 16000000 file names with 128 characters took 27.906 s
+Sorting took 42.061 s
+Commit took 0.000 s
+Inserting 16000000 file names with 128 characters took 58.491 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 16.915 s
+Selecting 10 paths starting with took 16.915 s excluding PRNG time
+Selecting 10 hashes took 18.325 s
+Selecting 10 hashes took 18.325 s excluding PRNG time
+SQL database size in bytes: 7539851264
+
+Label: varchar,varchar primary key sort after, no vacuum, no ORDER BY path-hash, unique rows
+Inserting 16000000 file names with 128 characters took 28.009 s
+Sorting took 143.824 s
+Commit took 0.000 s
+Inserting 16000000 file names with 128 characters took 160.313 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 17.296 s
+Selecting 10 paths starting with took 17.296 s excluding PRNG time
+Selecting 10 hashes took 18.182 s
+Selecting 10 hashes took 18.182 s excluding PRNG time
+SQL database size in bytes: 7608340480
+
+Label: varchar,varchar primary key sort after, unique rows
+Inserting 16000000 file names with 128 characters took 28.042 s
+Sorting took 52.974 s
+Commit took 0.000 s
+Inserting 16000000 file names with 128 characters took 69.487 s when excluding PRNG time
+Selecting 1000 paths took 0.003 s
+Selecting 1000 paths took 0.003 s excluding PRNG time
+Selecting 10 paths starting with took 16.818 s
+Selecting 10 paths starting with took 16.818 s excluding PRNG time
+Selecting 10 hashes took 18.046 s
+Selecting 10 hashes took 18.046 s excluding PRNG time
+SQL database size in bytes: 4863709184
+

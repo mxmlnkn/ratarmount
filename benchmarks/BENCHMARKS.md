@@ -9,6 +9,15 @@
 1. [Comparison with Archivemount (December 2019)](#comparison-with-archivemount-december-2019)
 1. [Benchmarks for the Index File Serialization Backends](#benchmarks-for-the-index-file-serialization-backends)
 1. [Comparison of SQLite Table Designs](#comparison-of-sqlite-table-designs)
+   1. [SQL Database Benchmark with 10M Rows on Disk](#sql-database-benchmark-with-10m-rows-on-disk)
+   1. [SQL Database Benchmark with 16M Rows in Memory](#sql-database-benchmark-with-16m-rows-in-memory)
+   1. [Database Sizes Over Row Count](#database-sizes-over-row-count)
+   1. [Database Sizes Over Row Count With String Deduplication](#database-sizes-over-row-count-with-string-deduplication)
+   1. [Scaling with Respect to Row Count on Disk](#scaling-with-respect-to-row-count-on-disk)
+   1. [Influence of SQL Cache Size on Insertion Times](#influence-of-sql-cache-size-on-insertion-times)
+   1. [Doing the One-Time SQL Table Sorting](#doing-the-one-time-sql-table-sorting)
+   1. [Scaling with Respect to Row Count in Memory](#scaling-with-respect-to-row-count-in-memory)
+   1. [Scaling with Respect to Row Count in Memory With Deduplication](#scaling-with-respect-to-row-count-in-memory-with-deduplication)
 
 
 # Comparison with Archivemount and Fuse-archive (December 2021)
@@ -244,31 +253,45 @@ For this reason, all other serialization backends are currently deprecated as th
 
 The benchmarks use 256 characters from a stringified increasing ID for `VARCHAR` keys and the ID itself for `INTEGER` keys.
 
-## Pure SQL database benchmark with 2M rows / files
+## SQL Database Benchmark with 10M Rows on Disk
 
-Shown is the time in seconds over the number of rows.
+![sqlite primary key benchmark 10M files](plots/sqlite%20primary%20key%20benchmark%2010000k%20files%20insert.png)
 
-![sqlite primary key benchmark 2000k files](plots/sqlite%20primary%20key%20benchmark%202000k%20files.png)
+The x-axis shows the number of batches of 1000 already inserted. It goes up to 10k batches, ergo 10M rows.
 
-## Pure SQL database benchmark with 10M rows / files
+For row counts > 2M, the database creation degrades quite a lot because each cache spill seems to trigger a complete resorting of the newly added values in memory into the existing database **on disk**, or something like that. Still, the total time to insert 10M rows is ~7min, so compared to my earlier benchmarks of the ILSVRC dataset, which has 2M images and took 45min to create, the SQL database creation should not be a too significant overhead.
 
-Shown is the time in seconds over the number of rows.
+The later variants for the varchar-varchar tuple as primary key have constant insertion time because they make use of a temporary table that is not sorted.
+The time for sorting that temporary table into the final table is not included here, for that see [Doing the One-Time SQL Table Sorting](doing-the-one-time-sql-table-sorting)!
 
-![sqlite primary key benchmark 10000k files](plots/sqlite%20primary%20key%20benchmark%2010000k%20files%20insert.png)
+## SQL Database Benchmark with 16M Rows in Memory
 
-For row counts > 2M, the database creation degrades quite a lot because each cache spill seems to trigger a complete resorting of the newly added values in memory into the existing database on disk, or something like that. Still, the total time to insert 10M rows is ~7min, so compared to my earlier benchmarks of the ILSVRC dataset, which has 2M images and took 45min to create, the SQL database creation should not be a too significant overhead.
+![sqlite primary key benchmark 16M files](data/sql-benchmark/primary-key-benchmark-up-to-16M-path-size-128B-dev-shm/sqlite%20primary%20key%20benchmark%2016000k%20files%20insert.png)
+
+Presumably, because the database resides in `/dev/shm` (main memory), we do not see the large outliers after the row count is >2M that was visible for the same [benchmark on disk](#sql-database-benchmark-with-10m-rows-on-disk).
+This also affects the perceivable complexity as can be seen in [Scaling with Respect to Row Count in Memory](#scaling-with-respect-to-row-count-in-memory).
+It also shows that insertion becomes constant-time independent of the table size when using the temporary table that does not have a (sorted) index.
+However, that method will incur some overhead in the post-processing stage, which is included in the [Scaling with Respect to Row Count in Memory](#scaling-with-respect-to-row-count-in-memory).
 
 ## Database Sizes Over Row Count
 
-![sqlite primary key benchmark sizes over row count](plots/sqlite%20primary%20key%20benchmark%20sizes%20over%20row%20count.png)
+![sqlite primary key benchmark sizes over row count](data/sql-benchmark/primary-key-benchmark-up-to-16M-path-size-128B-dev-shm/sqlite%20primary%20key%20benchmark%20sizes%20over%20row%20count.png)
 
-As can be seen, the `INTEGER` primary key version results in much smaller database files, roughly half the size of the others.
+The `INTEGER` primary key version results in much smaller database files, roughly half the size of the others.
+Calling `VACUUM` is also shown to be necessary to be called after dropping the temporary files table for speeding up insertion.
 
-## Scaling with Respect to Row Count
+## Database Sizes Over Row Count With String Deduplication
+
+![sqlite primary key benchmark sizes over row count](data/sql-benchmark/view-benchmark-up-to-16M/sqlite%20primary%20key%20benchmark%20sizes%20over%20row%20count.png)
+
+This plot only shows that string deduplication works and reduces the database size approximately by the number of average duplicates. Here, all generated PATH in an INSERT batch (1000 rows) are equal and therefore can be deduplicated.
+It also shows that SQLite does no such deduplication per default.
+
+## Scaling with Respect to Row Count on Disk
 
 ![sqlite primary key benchmark times over row count](plots/sqlite%20primary%20key%20benchmark%20times%20over%20row%20count.png)
 
-I concluded that the varchar primary key version was the only real option for usable lookup times for the mounted FUSE system and all conditions except equality should be avoided because only that one seems to be able to capitalize on the sortedness and actually does a bisection search and scales with O(log n).
+I concluded that the varchar primary key version was the only real option for usable lookup times for the mounted FUSE system and all matching conditions except equality on the first primary column should be avoided because only that one seems to be able to capitalize on the sortedness and actually does a bisection search and scales with O(log n).
 All other statements are ~10k times slower for the case with 2M rows.
 This large gap even made benchmarking kinda awkward.
 
@@ -284,7 +307,7 @@ This large gap even made benchmarking kinda awkward.
 
 This benchmark with 1M files shows that table creation profits quite a lot from high cache sizes.
 The larger the data is, the more it will profit from higher cache sizes.
-Smaller cache sizes force a preemptive writing to disk, which makes subsequents sorts slower because it has to compare with values on disk.
+Smaller cache sizes force preemptive writing to disk, which makes subsequent sorts slower because it has to compare with values on disk.
 
 Currently, no cache size is set anymore because a temporary unsorted table is created, which only gets sorted once after the TAR is processed.
 
@@ -344,5 +367,49 @@ Instead of simply using `INSERT INTO` it is much better to use `INSERT INTO ... 
 
 ![sqlite using intermediary table order by cache size benchmark 1000k files](plots/sqlite%20using%20intermediary%20table%20order%20by%20cache%20size%20benchmark%201000k%20files.png)
 
-this yields pretty "stable" performance "independent" of the cache size, which is similar or even better than using no intermediary table and a relatively large cache of 512MB.
+This yields pretty "stable" performance "independent" of the cache size, which is similar or even better than using no intermediary table and a relatively large cache of 512MB.
 However, the variance seems to be much larger than all other benchmarks, probably caused by the disk accesses.
+
+## Scaling with Respect to Row Count in Memory
+
+![sqlite primary key benchmark times over row count](data/sql-benchmark/primary-key-benchmark-up-to-16M-path-size-128B-dev-shm/sqlite%20primary%20key%20benchmark%20times%20over%20row%20count.png)
+
+Same as [previously](#scaling-with-respect-to-row-count-on-disk), all but the upper left plot, only shows that lookups will be slow if there is no index on the column, or if wildcard matching is used.
+In contrast to the [prior benchmarks](#Scaling%20with%20Respect%20to%20Row%20Count%20on%20Disk), the linearly scaling range for insertion after more than 2M rows is not reached, instead insertion seems to scale roughly logarithmically.
+Differences to the prior benchmark that might cause this:
+ - Database in `/dev/shm` instead of presumably on an encrypted EXT4 SSD.
+ - Uses file name length of 128 instead of 256.
+ - The first half of the file name is filled with `/` to get a worse case for matching and only the second half contains random hex digits.
+ - This benchmark was done in 2025-05 with Python 3.12.3 and libsqlite 3.45.1, the prior one was done 2019-11 with much older versions.
+ - The older benchmark may have run with slightly different settings, e.g., cache size -512000 instead of the default.
+
+Below is the same benchmark on disk with name length 256, i.e., the first two differences undone:
+
+![sqlite primary key benchmark times over row count](data/sql-benchmark/primary-key-benchmark-up-to-16M-path-size-256B-on-disk/sqlite%20primary%20key%20benchmark%20times%20over%20row%20count.png)
+
+It still seems to be rather logarithmic, except for one outlier.
+That probably is because my I/O on all disks has weird seconds-long hangups sometimes, most often when writing.
+I've had this for years, probably some kernel or driver I/O issue.
+
+The separate batch insertion benchmarks below show the outliers as observed for >2 M in the old benchmarks, but they have become much rarer and seemingly rare enough that they do not bog down the scaling law!
+
+![sqlite primary key benchmark times over row count](data/sql-benchmark/primary-key-benchmark-up-to-16M-path-size-256B-on-disk/sqlite%20primary%20key%20benchmark%2016000k%20files%20insert.png)
+
+
+## Scaling with Respect to Row Count in Memory With Deduplication
+
+![sqlite primary key benchmark times over row count](data/sql-benchmark/view-benchmark-up-to-16M/sqlite%20primary%20key%20benchmark%20times%20over%20row%20count.png)
+
+If there is plenty to deduplicate, then insertion will be similarly fast to the table version in ratarmount 1.0.0.
+However, if all strings are unique, then the lookup string-to-ID seems to slow things down to logarithmic complexity.
+This is true for all versions I tried, including those with a post-processing step, for which insertion is constant-time, as shown in the plot below.
+
+There is no difference in the three versions of declaring the string-to-ID tables (`VARCHAR PRIMARY KEY`, `VARCHARY UNIQUE`, `CREATE UNIQUE INDEX`).
+However, all versions with manual post-processing are slower than simply inserting directly and using the INSERT trigger.
+This is likely because the post-processing creates the string-to-ID tables once and then looks up inside them, i.e., all lookups in total will take `O(rows log(rows))` time while looking each value up while inserting them will roughly yield approximately `O(rows(log(rows)-1)`, which is the integral of the logarithm.
+
+For 16M rows and a database size of ~5 GB, the deduplication will incur a slowdown of 2x in the worst case, while improving the database size on average.
+
+Unfortunately, older ratarmount versions won't accept this and will try to recreate the index from scratch because the consistency check was too strict and did check for a `files` table in `getSqliteTables` via `sqlite_master.type`, which will not find the `type="view"`.
+
+![sqlite insertion benchmark 16M files](data/sql-benchmark/view-benchmark-up-to-16M/sqlite%20primary%20key%20benchmark%2016000k%20files%20insert.png)
