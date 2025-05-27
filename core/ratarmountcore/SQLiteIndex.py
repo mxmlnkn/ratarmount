@@ -53,7 +53,7 @@ from .utils import (
 
 
 def getSqliteTables(connection: sqlite3.Connection):
-    return [x[0] for x in connection.execute('SELECT name FROM sqlite_master WHERE type="table"')]
+    return [x[0] for x in connection.execute('SELECT name FROM sqlite_master WHERE type="table" OR type="view"')]
 
 
 def _toVersionTuple(version: str) -> Optional[Tuple[int, int, int]]:
