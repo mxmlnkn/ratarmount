@@ -511,6 +511,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
             0                 ,  # 10 : group ID
             False             ,  # 11 : is TAR (unused?)
             False             ,  # 12 : is sparse
+            False             ,  # 13 : is generated (parent folder)
         )
         # fmt: on
 
