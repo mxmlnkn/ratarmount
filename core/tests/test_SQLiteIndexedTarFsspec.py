@@ -90,7 +90,7 @@ if False:
     # I can only reproduce this bug when run in global namespace.
     # It always works without problems inside a function.
     # TODO I don't know how to fix this. Closing the file object in SQLiteIndexedTar.__del__
-    #      would fix this particular error, but  itwould lead to other errors for recursive mounting
+    #      would fix this particular error, but it would lead to other errors for recursive mounting
     #      and when using fsspec.open chained URLs...
     #      Only calling join_threads also does not work for some reason.
     #      Checking with sys.getrefcount and only closing it if it is the only one left also does not work

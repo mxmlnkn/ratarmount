@@ -107,7 +107,7 @@ class RunRatarmount:
             if time.time() - t0 > self.timeout:
                 mount_list = "<Unable to run mount command>"
                 try:
-                    mount_list = subprocess.run("mount", capture_output=True).stdout.decode()
+                    mount_list = subprocess.run("mount", capture_output=True, check=True).stdout.decode()
                 except Exception as exception:
                     mount_list += f"\n{exception}"
                 raise RuntimeError(
