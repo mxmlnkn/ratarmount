@@ -574,8 +574,11 @@ def detectCompression(
     fileobj: IO[bytes],
     prioritizedBackends: Optional[List[str]] = None,
     printDebug: int = 0,
-    compressionsToTest: Dict[str, CompressionInfo] = TAR_COMPRESSION_FORMATS,
+    compressionsToTest: Optional[Dict[str, CompressionInfo]] = None,
 ) -> Optional[str]:
+    if compressionsToTest is None:
+        compressionsToTest = TAR_COMPRESSION_FORMATS
+
     # isinstance(fileobj, io.IOBase) does not work for everything, e.g., for paramiko.sftp_file.SFTPFile
     # because it does not inherit from io.IOBase. Therefore, do duck-typing and test for required methods.
     expectedMethods = ['seekable', 'seek', 'read', 'tell']
