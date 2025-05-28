@@ -2640,7 +2640,7 @@ fi
 
 # pyfatfs depends on PyFilesystem2, which only works for Python < 3.12 because of the removed pkg_resources.
 # https://github.com/nathanhi/pyfatfs/issues/41
-if [[ -n "$python3MinorVersion" && "$python3MinorVersion" -lt 12 ]]; then
+if python3 -c 'import pyfatfs' &>/dev/null; then
 tests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.fat12.bz2               folder-symlink.fat12/foo/fighter/ufo
 )

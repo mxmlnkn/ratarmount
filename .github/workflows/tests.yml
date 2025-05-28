@@ -306,6 +306,15 @@ jobs:
     - name: Install pip Test Dependencies
       run: |
         python3 -m pip install -r tests/requirements-tests.txt
+        # https://github.com/nathanhi/pyfatfs/issues/41
+        # Stalled PyFilesystem2 now also triggers a Deprecation Warning in Python 3.9, which triggers my tests:
+        # /opt/hostedtoolcache/Python/3.9.22/x64/lib/python3.9/site-packages/fs/__init__.py:4:
+        # UserWarning: pkg_resources is deprecated as an API.
+        # See https://setuptools.pypa.io/en/latest/pkg_resources.html.
+        # The pkg_resources package is slated for removal as early as 2025-11-30.
+        # Refrain from using this package or pin to Setuptools<81.
+        python3 -m pip uninstall --yes pyfatfs
+        python3 -m pip install pyfatfs@git+https://github.com/mxmlnkn/pyfatfs.git@v1.2.0
 
     - name: Install Test Dependencies (Linux)
       if: ${{ !startsWith( matrix.os, 'macos' ) }}
