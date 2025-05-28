@@ -70,6 +70,7 @@ class SQLiteIndexedTarUserData:
     offsetheader : int
     istar        : bool
     issparse     : bool
+    isgenerated  : bool
     # fmt: on
 
 
@@ -96,7 +97,15 @@ class SQLiteIndex:
     #     libarchive, then it will not be readable with the SQLiteIndexedTar backend because it does not
     #     collect data offsets.
     #   - Add 'isGnuIncremental' to 'metadata' table.
-    __version__ = '0.5.0'
+    # Version 0.6.0:
+    #   - Add 'isgenerated' column.
+    #     From what I can gather, the SQLite index is used in such a way that adding columns does not break anything.
+    #     All SELECT statements either explicitly specify columns, or access columns via row[index] or row[columnName],
+    #     e.g., in _rowToFileInfo and SQLiteIndexedTar._checkRowsValidity.
+    #     I have also checked for all users of SQLiteIndex: TAR, ZIP, SquashFS, libarchive.
+    #     I created the index with the new version and accessed it with an old ratarmount version to test compatibility.
+    #     Libarchive (currently) only creates SQLite indexes in memory, ergo has no compatibility issues!
+    __version__ = '0.6.0'
 
     NUMBER_OF_METADATA_TO_VERIFY = 1000  # shouldn't take more than 1 second according to benchmarks
 
@@ -106,9 +115,9 @@ class SQLiteIndex:
     # But, making it too small would result in too many non-backwards compatible indexes being created.
     _MAX_BLOB_SIZE = 256 * 1024 * 1024  # 256 MiB
 
-    # TODO Would be nice for index verification to have columns for recursionlevel (INTEGER) and isgenerated (BOOL)
-    #      that is true for automatically inserted parent folders that do not actually exist in the archive.
-    #      How version compatible would that table change be? Test with old ratarmount versions.
+    # TODO Would be nice for index verification to have columns for recursionlevel (INTEGER).
+    # TODO Would be nice to implement string deduplication for files.path, but this would not be downwards-compatible
+    #      because a view was ignored by my existence-check.
     _CREATE_FILES_TABLE = """
         CREATE TABLE "files" (
             "path"          VARCHAR(65535) NOT NULL,  /* path with leading and without trailing slash */
@@ -124,7 +133,8 @@ class SQLiteIndex:
             "gid"           INTEGER,
             /* True for valid TAR files. Internally used to determine where to mount recursive TAR files. */
             "istar"         BOOL   ,
-            "issparse"      BOOL   ,  /* for sparse files the file size refers to the expanded size! */
+            "issparse"      BOOL   ,  /* For sparse files the file size refers to the expanded size! */
+            "isgenerated"   BOOL   ,  /* True for entries generated for parent folders by ratarmount. */
             /* See SQL benchmarks for decision on the primary key.
              * See also https://www.sqlite.org/optoverview.html
              * (path,name) tuples might appear multiple times in a TAR if it got updated.
@@ -690,8 +700,8 @@ class SQLiteIndex:
             INSERT OR REPLACE INTO "files" SELECT * FROM "filestmp" ORDER BY "path","name",rowid;
             DROP TABLE "filestmp";
             INSERT OR IGNORE INTO "files"
-                /* path name offsetheader offset size mtime mode type linkname uid gid istar issparse */
-                SELECT path,name,offsetheader,offset,0,0,{int(0o555 | stat.S_IFDIR)},{int(tarfile.DIRTYPE)},"",0,0,0,0
+                /* path name offsetheader offset size mtime mode type linkname uid gid istar issparse isgenerated */
+                SELECT path,name,offsetheader,offset,0,0,{int(0o555 | stat.S_IFDIR)},{int(tarfile.DIRTYPE)},"",0,0,0,0,0
                 FROM "parentfolders"
                 WHERE {searchByTuple if libSqliteVersion >= (3, 22, 0) else searchByConcat}
                     FROM "files" WHERE mode & (1 << 14) != 0
@@ -715,6 +725,7 @@ class SQLiteIndex:
             offsetheader = row['offsetheader'] if 'offsetheader' in row.keys() else 0,
             istar        = row['istar'],
             issparse     = row['issparse'] if 'issparse' in row.keys() else False,
+            isgenerated  = row['isgenerated'] if 'isgenerated' in row.keys() else False,
             # fmt: on
         )
 
@@ -780,6 +791,9 @@ class SQLiteIndex:
         # Both were added in index 0.2.0.
         if 'offsetheader' in columns and 'issparse' in columns:
             selected_columns += ['offsetheader', 'issparse']
+        # Added in index 0.6.0.
+        if 'isgenerated' in columns:
+            selected_columns += ['isgenerated']
 
         def rowToFileInfo(cursor, row) -> Tuple[str, FileInfo]:  # pylint: disable=unused-argument
             return row[0], FileInfo(
@@ -795,6 +809,7 @@ class SQLiteIndex:
                     offsetheader = row[9] if len(row) > 9 else 0,
                     istar        = row[8],
                     issparse     = row[10] if len(row) > 10 else False,
+                    isgenerated  = row[11] if len(row) > 11 else False,
                 )],
                 # fmt: on
             )
@@ -847,7 +862,7 @@ class SQLiteIndex:
         """
 
         if path == '/':
-            return {'/': createRootFileInfo(userdata=[SQLiteIndexedTarUserData(0, 0, False, False)])}
+            return {'/': createRootFileInfo(userdata=[SQLiteIndexedTarUserData(0, 0, False, False, True)])}
 
         path, name = self._queryNormpath(path).rsplit('/', 1)
         rows = self.getConnection().execute(
@@ -876,7 +891,7 @@ class SQLiteIndex:
             raise RatarmountError("The specified file version must be an integer!")
 
         if path == '/':
-            return createRootFileInfo(userdata=[SQLiteIndexedTarUserData(0, 0, False, False)])
+            return createRootFileInfo(userdata=[SQLiteIndexedTarUserData(0, 0, False, False, True)])
 
         path, name = self._queryNormpath(path).rsplit('/', 1)
         row = (

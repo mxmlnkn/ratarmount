@@ -208,19 +208,20 @@ class _TarFileMetadataReader:
         #       When looking at the generated index, those values get silently converted to 0?
         # fmt: off
         fileInfo : Tuple = (
-            path                                            ,  # 0
-            name                                            ,  # 1
-            streamOffset + tarInfo.offset                   ,  # 2
-            streamOffset + tarInfo.offset_data              ,  # 3
-            tarInfo.size                                    ,  # 4
-            tarInfo.mtime                                   ,  # 5
-            _TarFileMetadataReader._tarInfoFullMode(tarInfo),  # 6
-            tarInfo.type                                    ,  # 7
-            tarInfo.linkname                                ,  # 8
-            tarInfo.uid                                     ,  # 9
-            tarInfo.gid                                     ,  # 10
-            False                                           ,  # 11 (isTar)
-            tarInfo.issparse()                              ,  # 12
+            path                                            ,  # 0  : path
+            name                                            ,  # 1  : file name
+            offsetHeader                                    ,  # 2  : header offset
+            streamOffset + tarInfo.offset_data              ,  # 3  : data offset
+            tarInfo.size                                    ,  # 4  : file size
+            tarInfo.mtime                                   ,  # 5  : modification time
+            _TarFileMetadataReader._tarInfoFullMode(tarInfo),  # 6  : file mode / permissions
+            tarInfo.type                                    ,  # 7  : TAR file type. Currently unused.
+            tarInfo.linkname                                ,  # 8  : linkname
+            tarInfo.uid                                     ,  # 9  : user ID
+            tarInfo.gid                                     ,  # 10 : group ID
+            False                                           ,  # 11 : is TAR (unused?)
+            tarInfo.issparse()                              ,  # 12 : is sparse
+            False                                           ,  # 13 : is generated (parent folder)
         )
         # fmt: on
 
@@ -1129,19 +1130,20 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
             # fmt: off
             fileInfo = (
-                ""                                    ,  # 0 path
-                fname                                 ,  # 1
-                None                                  ,  # 2 header offset
-                0                                     ,  # 3 data offset
-                fileSize                              ,  # 4
-                tarInfo.st_mtime if tarInfo else mtime,  # 5
-                tarInfo.st_mode if tarInfo else mode  ,  # 6
-                None                                  ,  # 7 TAR file type. Currently unused. Overlaps with mode
-                None                                  ,  # 8 linkname
-                tarInfo.st_uid if tarInfo else 0      ,  # 9
-                tarInfo.st_gid if tarInfo else 0      ,  # 10
-                False              ,  # 11 isTar
-                False              ,  # 12 isSparse, don't care if it is actually sparse or not because it is not in TAR
+                ""                                    ,  # 0  : path
+                fname                                 ,  # 1  : file name
+                None                                  ,  # 2  : header offset
+                0                                     ,  # 3  : data offset
+                fileSize                              ,  # 4  : file size
+                tarInfo.st_mtime if tarInfo else mtime,  # 5  : modification time
+                tarInfo.st_mode if tarInfo else mode  ,  # 6  : file mode / permissions
+                None                                  ,  # 7  : TAR file type. Currently unused. Overlaps with mode
+                None                                  ,  # 8  : linkname
+                tarInfo.st_uid if tarInfo else 0      ,  # 9  : user ID
+                tarInfo.st_gid if tarInfo else 0      ,  # 10 : group ID
+                False                                 ,  # 11 : isTar
+                False,  # 12 isSparse, don't care if it is actually sparse or not because it is not in TAR
+                False                                 ,  # 13 : is generated (parent folder)
             )
             # fmt: on
             self.index.setFileInfo(fileInfo)
