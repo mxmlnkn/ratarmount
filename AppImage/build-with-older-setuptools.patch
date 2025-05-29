@@ -1,0 +1,51 @@
+diff --git a/core/pyproject.toml b/core/pyproject.toml
+index b6f109e6..ee9146b6 100644
+--- a/core/pyproject.toml
++++ b/core/pyproject.toml
+@@ -10,17 +10,17 @@
+ # https://github.com/pypa/setuptools/issues/4903
+ # Use setuptools >= 77 for project.license-files support
+ # https://setuptools.readthedocs.io/en/latest/history.html#id284
+-requires = ["setuptools >= 77", "wheel"]
++requires = ["setuptools >= 46.5", "wheel"]
+ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "ratarmountcore"
+ description = "Random Access To Archived Resources Library"
+ authors = [{name = "Maximilian Knespel", email = "mxmlnknp@gmail.com"}]
+-license = "MIT"
+-license-files = ["LICENSE"]
++license = {text = "MIT"}
+ classifiers = [
+     "Development Status :: 5 - Production/Stable",
++    "License :: OSI Approved :: MIT License",
+     "Natural Language :: English",
+     "Operating System :: MacOS",
+     "Operating System :: Unix",
+diff --git a/pyproject.toml b/pyproject.toml
+index 38b628fd..77737278 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -7,7 +7,7 @@
+ # https://github.com/pypa/setuptools/issues/4903
+ # Use setuptools >= 77 for project.license-files support
+ # https://setuptools.readthedocs.io/en/latest/history.html#id284
+-requires = ["setuptools >= 77", "wheel"]
++requires = ["setuptools >= 46.5", "wheel"]
+ build-backend = "setuptools.build_meta"
+ 
+ [project]
+@@ -15,10 +15,10 @@ name = "ratarmount"
+ version = "1.0.0"
+ description = "Random Access To Archived Resources"
+ authors = [{name = "Maximilian Knespel", email = "mxmlnknp@gmail.com"}]
+-license = "MIT"
+-license-files = ["LICENSE"]
++license = {text = "MIT"}
+ classifiers = [
+     "Development Status :: 5 - Production/Stable",
++    "License :: OSI Approved :: MIT License",
+     "Natural Language :: English",
+     "Operating System :: MacOS",
+     "Operating System :: Unix",

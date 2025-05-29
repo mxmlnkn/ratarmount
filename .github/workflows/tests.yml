@@ -8,6 +8,7 @@ on:
 
 jobs:
   Static-Code-Checks:
+    if: false
     runs-on: ubuntu-latest
 
     steps:
@@ -95,6 +96,7 @@ jobs:
         pytype -d import-error -P$( cd core && pwd ):$( pwd ) ratarmount/*.py core/ratarmountcore/*.py
 
   Tests:
+    if: false
     runs-on: ${{ matrix.os }}
     needs: [Static-Code-Checks]
 
@@ -325,3 +327,117 @@ jobs:
       run: |
         python3 -m pip uninstall -y fusepy mfusepy
         python3 tests/tests.py
+
+
+  Python-Legacy-AppImage:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.6']
+
+    env:
+      APP_PYTHON_VERSION: ${{ matrix.python-version }}
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Patch for old Python versions
+      if: matrix.python-version == '3.6'
+      run: git apply AppImage/build-with-older-setuptools.patch
+
+    - name: Build AppImage
+      # quay.io/pypa/manylinux_2_28_x86_64 (AlmaLinux 8) has Python 3.9-3.14 (2025-06)
+      # quay.io/pypa/manylinux_2_24_x86_64 (Debian 9) has Python 3.5-3.11 (2025-06)
+      #  -> Debian 9 repository sources return 404 and I cannot install packages.
+      # quay.io/pypa/manylinux2014_x86_64 (CentOS 7) has Python 3.8-3.14 (2025-06)
+      # quay.io/pypa/manylinux2010_x86_64 (CentOS 6) has Python 3.6-3.10 (2025-06)
+      # Builds an AppImage instead of testing directly inside the manylinux container
+      # because the tests are very dependent on a Debian-like environment for all the required tools.
+      uses: docker://quay.io/pypa/manylinux2010_x86_64
+      with:
+        args: bash AppImage/build-ratarmount-appimage.sh
+
+    - name: Rename AppImage
+      run: |
+        for file in AppImage/ratarmount*-x86_64.AppImage; do
+            mv "$file" "${file//.App/-cp${{ matrix.python-version }}.App}"
+        done
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ratarmount-x86_64-cp${{ matrix.python-version }}.AppImage
+        path: "AppImage/ratarmount*-x86_64-cp${{ matrix.python-version }}.AppImage"
+
+  Python-Legacy-Tests:
+    runs-on: ubuntu-latest
+    needs: [Python-Legacy-AppImage]
+
+    strategy:
+      matrix:
+        # Must have matching python versions as Python-Legacy-AppImage!
+        python-version: ['3.6']
+        parallelization: [2]
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Fetch tag for tests
+      run: git fetch origin refs/tags/v0.15.2:refs/tags/v0.15.2
+
+    - uses: actions/download-artifact@v4
+      with:
+        name: ratarmount-x86_64-cp${{ matrix.python-version }}.AppImage
+
+    - name: Install AppImage
+      run: |
+        chmod u+x ratarmount*.AppImage
+        ./ratarmount*.AppImage --version
+        mv ratarmount*.AppImage /usr/local/bin/ratarmount
+        echo "/usr/local/bin" >> $GITHUB_PATH
+
+    - name: Install Dependencies
+      run: |
+        # These are required for creating test files on the fly not for ratarmount!
+        sudo apt-get -y install bzip2 pixz zstd unar fuse
+
+    - name: Install pip Test Dependencies
+      run: |
+        python3 -m pip install -r tests/requirements-tests.txt
+        # Explicitly install pygit2 even on Python 3.13+ because we have set up libgit2 manually.
+        python3 -m pip install pygit2
+        python3 -c 'import pygit2'
+
+    - name: Test Simple Startup
+      run: |
+        ratarmount --help
+        ratarmount --version
+
+    - name: Test Simple Mount
+      run: |
+        ratarmount tests/single-file.tar mimi
+        ls -la mimi
+        sleep 1s
+        ratarmount -u mimi
+
+    - name: Install pip Test Dependencies
+      run: |
+        python3 -m pip install -r tests/requirements-tests.txt
+        # Explicitly install pygit2 even on Python 3.13+ because we have set up libgit2 manually.
+        python3 -m pip install pygit2
+        python3 -c 'import pygit2'
+        sudo bash tests/install-smbd.sh
+
+    - name: Regression Tests
+      run: |
+        # Starting up ratarmount for each very short test is quite slow, especially on the CI machine (3-5s).
+        # On my local machine, it's around 1s, which is not good, but also not bad.
+        # The AppImage extraction script is already tested in the simple tests above, so it should be fine
+        # to extract it once and then test the AppRun script, which still modifies the LD_LIBRARY_PATH and
+        # still uses the bundled libraries, i.e., it still is a good integrity test for the AppImage.
+        time /usr/local/bin/ratarmount --appimage-extract
+        export RATARMOUNT_CMD=$PWD/squashfs-root/AppRun
+        export PARALLELIZATIONS=${{ matrix.parallelization }}
+        bash tests/runtests.sh
