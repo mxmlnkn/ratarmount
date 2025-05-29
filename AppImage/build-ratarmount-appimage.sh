@@ -119,18 +119,13 @@ function installAppImageSystemLibraries()
     # linuxdeploy automatically bundles transitive dependencies! I only need to specify libarchive.so manually
     # because it is dynamically loaded by python-libarchive-c, which linuxdeploy does notice automatically.
     local libraries=( $( find /lib64/ -name 'libcrypto.so*' ) )
+    local yumCommand=''
     if commandExists repoquery; then
-        libraries+=( $( repoquery -l fuse-libs | 'grep' 'lib64.*[.]so' ) )
-        libraries+=( $( repoquery -l libarchive | 'grep' 'lib64.*[.]so' ) )
-        libraries+=( $( repoquery -l libarchive-devel | 'grep' 'lib64.*[.]so' ) )
-        libraries+=( $( repoquery -l lzo | 'grep' 'lib64.*[.]so' ) )
-        libraries+=( $( repoquery -l xz-devel | 'grep' 'lib64.*[.]so' ) )
+        yumCommand='repoquery'
     elif commandExists dnf; then
-        libraries+=( $( dnf repoquery -l fuse-libs | 'grep' 'lib64.*[.]so' ) )
-        libraries+=( $( dnf repoquery -l libarchive | 'grep' 'lib64.*[.]so' ) )
-        libraries+=( $( dnf repoquery -l libarchive-devel | 'grep' 'lib64.*[.]so' ) )
-        libraries+=( $( dnf repoquery -l lzo | 'grep' 'lib64.*[.]so' ) )
-        libraries+=( $( dnf repoquery -l xz-devel | 'grep' 'lib64.*[.]so' ) )
+        yumCommand='dnf repoquery'
+    elif commandExists yum; then
+        yumCommand='yum'
     elif commandExists dpkg; then
         libraries+=( $( dpkg -L libfuse2 | 'grep' '/lib.*[.]so' ) )
         libraries+=( $( dpkg -L libarchive13 | 'grep' '/lib.*[.]so' ) )
@@ -139,6 +134,14 @@ function installAppImageSystemLibraries()
         libraries+=( $( dpkg -L liblzma5 | 'grep' '/lib.*[.]so' ) )
     else
         echo -e "\e[31mCannot gather FUSE libs into AppImage without (dnf) repoquery.\e[0m"
+    fi
+
+    if [[ -n "$yumCommand" ]]; then
+        libraries+=( $( $yumCommand -l fuse-libs | 'grep' 'lib64.*[.]so' ) )
+        libraries+=( $( $yumCommand -l libarchive | 'grep' 'lib64.*[.]so' ) )
+        libraries+=( $( $yumCommand -l libarchive-devel | 'grep' 'lib64.*[.]so' ) )
+        libraries+=( $( $yumCommand -l lzo | 'grep' 'lib64.*[.]so' ) )
+        libraries+=( $( $yumCommand -l xz-devel | 'grep' 'lib64.*[.]so' ) )
     fi
 
     # For some reason, the simple libarchive.so file without any version suffix is only installed with the development
@@ -249,6 +252,9 @@ function trimAppImage()
 # Main entry
 
 cd -- "$( dirname -- "$BASH_SOURCE" )"
+# BASH_SOURCE only exists since bash 3.0. This is a fallback.
+# https://stackoverflow.com/questions/35006457/choosing-between-0-and-bash-source
+if [[ -z "$BASH_SOURCE" && -f "$0" ]]; then cd -- "$( dirname -- "$0" )"; fi
 
 # AUDITWHEEL_ARCH is set inside the manylinux container automatically
 if [[ -n $AUDITWHEEL_ARCH ]]; then
