@@ -266,7 +266,9 @@ class SQLiteIndex:
         # a folder of archives or single small archives recursively. If the user goes through the trouble
         # of specifying an index file or folder, then littering should not be a problem as index creations
         # are expected by the user.
-        if self.indexMinimumFileCount > 0 and not indexFilePath:
+        # Guard this feature for Python >= 3.6 because it uses sqlite3.Connection.backup, which was only
+        # introduced in Python 3.7!
+        if self.indexMinimumFileCount > 0 and not indexFilePath and sys.version_info[0:2] >= (3, 7):
             if self.printDebug >= 3:
                 print(
                     f"[Info] Because of the given positive index minimum file count ({self.indexMinimumFileCount}) "
