@@ -71,7 +71,8 @@ class FSSpecMountSource(MountSource):
         if isinstance(urlOrFS, fsspec.AbstractFileSystem):
             fs = urlOrFS
         elif isinstance(urlOrFS, str):
-            fs, path = fsspec.url_to_fs(urlOrFS)
+            url_to_fs = fsspec.url_to_fs if hasattr(fsspec, 'url_to_fs') else fsspec.core.url_to_fs
+            fs, path = url_to_fs(urlOrFS)
             if prefix is None:
                 prefix = path
         else:

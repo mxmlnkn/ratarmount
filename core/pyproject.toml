@@ -50,7 +50,9 @@ Homepage = "https://github.com/mxmlnkn/ratarmount/ratarmountcore"
 
 [project.optional-dependencies]
 full = [
-    "indexed_gzip >= 1.6.3, < 2.0",
+    "indexed_gzip >= 1.6.3, < 2.0; python_version >= '3.8'",
+    # https://github.com/pauldmccarthy/indexed_gzip/issues/167
+    "indexed_gzip >= 1.6.3, != 1.9.4; python_version < '3.8'",
     'indexed_zstd >= 1.3.1, < 2.0; sys_platform=="darwin"',
     'indexed_zstd >= 1.2.2, < 2.0; platform_system!="Windows"',
     "libarchive-c ~= 5.1, < 6.0",
@@ -75,7 +77,8 @@ full = [
     'isal ~= 1.0; python_version < "3.14.0"',
     # Pin to < 3.12 because of https://github.com/nathanhi/pyfatfs/issues/41
     'pyfatfs ~= 1.0; python_version < "3.12.0"',
-    "fast_zip_decryption",
+    'fast_zip_decryption; python_version >= "3.8.0"',
+    'fastzipfile; python_version < "3.8.0"',
     "pygit2",
     # fsspec:
     "requests",
@@ -87,7 +90,14 @@ full = [
     "smbprotocol",
     "dropboxdrivefs",
     "fsspec",
-    "ipfsspec",
+    # With Python 3.7, I get this error:
+    # File "/opt/hostedtoolcache/Python/3.7.17/x64/lib/python3.7/site-packages/ipfsspec/async_ipfs.py", line 173
+    #   if ipfsspec_gateways := os.environ.get("IPFSSPEC_GATEWAYS", ""):
+    #                        ^
+    # for ipfsspec 0.5.0 :(. Well, I can't complain. I messed up proper requires-python myself.
+    # The := operator was introduced in Python 3.8.
+    "ipfsspec < 0.5.0; python_version < '3.8'",
+    "ipfsspec; python_version >= '3.8'",
     "s3fs",
     "webdav4",
     #"gcsfs",  # untested
@@ -95,7 +105,11 @@ full = [
 ]
 bzip2 = ["rapidgzip >= 0.13.1"]
 git = ["pygit2"]
-gzip = ["indexed_gzip >= 1.6.3, < 2.0"]
+gzip = [
+    "indexed_gzip >= 1.6.3, < 2.0; python_version >= '3.8'",
+    # https://github.com/pauldmccarthy/indexed_gzip/issues/167
+    "indexed_gzip >= 1.6.3, != 1.9.4; python_version < '3.8'",
+]
 fsspec = ["fsspec"]
 fsspec-backends = [
     # Copy-pasted from fsspec[full] list. Some were excluded because they are too unproportionally large.
@@ -108,7 +122,14 @@ fsspec-backends = [
     "smbprotocol",
     "dropboxdrivefs",
     "fsspec",
-    "ipfsspec",
+    # With Python 3.7, I get this error:
+    # File "/opt/hostedtoolcache/Python/3.7.17/x64/lib/python3.7/site-packages/ipfsspec/async_ipfs.py", line 173
+    #   if ipfsspec_gateways := os.environ.get("IPFSSPEC_GATEWAYS", ""):
+    #                        ^
+    # for ipfsspec 0.5.0 :(. Well, I can't complain. I messed up proper requires-python myself.
+    # The := operator was introduced in Python 3.8.
+    "ipfsspec < 0.5.0; python_version < '3.8'",
+    "ipfsspec; python_version >= '3.8'",
     "s3fs",
     "webdav4",
     #"gcsfs",  # untested
@@ -141,7 +162,10 @@ squashfs = [
     'isal ~= 1.0; python_version < "3.14.0"',
 ]
 xz = ["python-xz ~= 0.4.0"]
-zip = ["fast_zip_decryption"]
+zip = [
+    'fast_zip_decryption; python_version >= "3.8.0"',
+    'fastzipfile; python_version < "3.8.0"',
+]
 zstd = [
     'indexed_zstd >= 1.3.1, < 2.0; sys_platform=="darwin"',
     'indexed_zstd >= 1.2.2, < 2.0; platform_system!="Windows"',

@@ -22,7 +22,10 @@ try:
     # Importing this patches the zipfile module as a "side" effect!
     import fast_zip_decryption  # pylint: disable=unused-import
 except (ImportError, Exception):
-    pass
+    try:
+        import fastzipfile  # pylint: disable=unused-import
+    except (ImportError, Exception):
+        pass
 
 
 class ZipMountSource(SQLiteIndexMountSource):

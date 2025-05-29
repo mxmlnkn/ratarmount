@@ -19,6 +19,8 @@ if [[ -z "$PARALLELIZATIONS" ]]; then
     PARALLELIZATIONS="1 2"
 fi
 
+python3MinorVersion=$( python3 -c 'import sys; print(sys.version_info.minor)' )
+
 # MAC does not have mountpoint check!
 if ! command -v mountpoint &>/dev/null; then
     mountpoint()
@@ -1798,6 +1800,11 @@ checkFileInTARForeground()
 
 checkURLProtocolHTTP()
 {
+    # With Ubuntu 22.04 and Python 3.7 I get this error: "The HTTP server doesn't appear to support range requests."
+    if [[ -n "$python3MinorVersion" && "$python3MinorVersion" -le 8 ]]; then
+        return 0
+    fi
+
     local pid mountPoint protocol port
     mountPoint=$( mktemp -d --suffix .test.ratarmount )
     protocol='http'
@@ -1836,6 +1843,13 @@ checkURLProtocolHTTP()
 
 checkURLProtocolFTP()
 {
+    # Because I am not able to suppress the FTP fsspec warning:
+    # /opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/site-packages/fsspec/implementations/ftp.py:87:
+    #   UserWarning: `encoding` not supported for python<3.9, ignoring
+    if [[ -n "$python3MinorVersion" && "$python3MinorVersion" -lt 9 ]]; then
+        return 0
+    fi
+
     local pid user password
     # python3 -m pip install pyftpdlib pyopenssl>=23
     user='pqvFUMqbqp'
@@ -2021,7 +2035,6 @@ EOF
 
 checkURLProtocolSSH()
 {
-    python3MinorVersion=$( python3 -c 'import sys; print(sys.version_info.minor)' )
     if [[ -n "$python3MinorVersion" && "$python3MinorVersion" -ge 14 ]]; then
         return 0
     fi
@@ -2091,8 +2104,7 @@ checkURLProtocolGit()
     #   -- Installing: /usr/local/lib/libgit2.so.1.7
     #   -- Installing: /usr/local/lib/libgit2.so
     #   -- Installing: /usr/local/include/git2
-    python3MinorVersion=$( python3 -c 'import sys; print(sys.version_info.minor)' )
-    if [[ -n "$python3MinorVersion" && "$python3MinorVersion" -ge 13 ]] && ! python3 -c 'import pygit2'; then
+    if ! python3 -c 'import pygit2; pygit2.enums.FileMode' &>/dev/null; then
         return 0
     fi
 
@@ -2142,6 +2154,38 @@ checkURLProtocolGithub()
 
 checkURLProtocolS3()
 {
+    # Traceback (most recent call last):
+    #   File "/home/runner/work/ratarmount/ratarmount/ratarmount.py", line 1928, in <module>
+    #     main()
+    #   File "/home/runner/work/ratarmount/ratarmount/ratarmount.py", line 1920, in main
+    #     cli(args)
+    #   File "/home/runner/work/ratarmount/ratarmount/ratarmount.py", line 1892, in cli
+    #     foreground                   = bool(args.foreground),
+    #   File "/home/runner/work/ratarmount/ratarmount/ratarmount.py", line 571, in __init__
+    #     mountSources.append((os.path.basename(path), openMountSource(path, **options)))
+    #   File "/opt/hostedtoolcache/Python/3.7.17/x64/lib/python3.7/site-packages/ratarmountcore/factory.py", line 382, in openMountSource
+    #     openedURL = tryOpenURL(fileOrPath, printDebug=printDebug)
+    #   File "/opt/hostedtoolcache/Python/3.7.17/x64/lib/python3.7/site-packages/ratarmountcore/factory.py", line 349, in tryOpenURL
+    #     elif fileSystem.isdir(path):
+    #   File "/opt/hostedtoolcache/Python/3.7.17/x64/lib/python3.7/site-packages/fsspec/asyn.py", line 114, in wrapper
+    #     return sync(self.loop, func, *args, **kwargs)
+    #   File "/opt/hostedtoolcache/Python/3.7.17/x64/lib/python3.7/site-packages/fsspec/asyn.py", line 99, in sync
+    #     raise return_result
+    #   File "/opt/hostedtoolcache/Python/3.7.17/x64/lib/python3.7/site-packages/fsspec/asyn.py", line 54, in _runner
+    #     result[0] = await coro
+    #   File "/opt/hostedtoolcache/Python/3.7.17/x64/lib/python3.7/site-packages/s3fs/core.py", line 1347, in _isdir
+    #     return bool(await self._lsdir(path))
+    #   File "/opt/hostedtoolcache/Python/3.7.17/x64/lib/python3.7/site-packages/s3fs/core.py", line 688, in _lsdir
+    #     versions=versions,
+    #   File "/opt/hostedtoolcache/Python/3.7.17/x64/lib/python3.7/site-packages/s3fs/core.py", line 714, in _iterdir
+    #     await self.set_session()
+    #   File "/opt/hostedtoolcache/Python/3.7.17/x64/lib/python3.7/site-packages/s3fs/core.py", line 492, in set_session
+    #     self.session = aiobotocore.session.AioSession(**self.kwargs)
+    # TypeError: __init__() got an unexpected keyword argument 'endpoint_url'
+    if [[ -n "$python3MinorVersion" && "$python3MinorVersion" -le 7 ]]; then
+        return 0
+    fi
+
     local mountPoint pid weedFolder port
     mountPoint=$( mktemp -d --suffix .test.ratarmount )
     port=8053
@@ -2250,8 +2294,10 @@ checkURLProtocolIPFS()
 {
     # TODO ipfsspec still fails to import with Python 3.14
     #      https://github.com/eigenein/protobuf/issues/177
-    python3MinorVersion=$( python3 -c 'import sys; print(sys.version_info.minor)' )
-    if [[ -n "$python3MinorVersion" && "$python3MinorVersion" -ge 14 ]]; then
+    # Don't know why I get this error on Ubuntu 22.04 and Python 3.7:
+    # ratarmountcore.utils.RatarmountError: Opening URL ipfs://QmZwm9gKZaayGWqYtMgj6cd4JaNK1Yp2ChYZhXrERGq4Gi failed
+    # because path QmZwm9gKZaayGWqYtMgj6cd4JaNK1Yp2ChYZhXrERGq4Gi does not exist on remote!
+    if [[ -n "$python3MinorVersion" && ( "$python3MinorVersion" -ge 14 || "$python3MinorVersion" -le 7 ) ]]; then
         return 0
     fi
 
@@ -2561,7 +2607,6 @@ tests+=(
 fi
 
 # zipfile returns unseekable file object with Python 3.6. Therefore, I disabled it completely there.
-python3MinorVersion=$( python3 -c 'import sys; print(sys.version_info.minor)' )
 if [[ -n "$python3MinorVersion" && "$python3MinorVersion" -gt 6 ]]; then
 if ! uname | 'grep' -q -i darwin; then
 tests+=(

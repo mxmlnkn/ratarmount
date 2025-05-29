@@ -4,11 +4,13 @@ codespell
 flake8
 mypy
 pylint
-pytest>=8  # pytest 7 did not work with pytest-xdist 3.5.0
+# pytest 7 did not work with pytest-xdist 3.5.0, but pytest 8 is only available for Python >=3.8 :(
+pytest>=8; python_version >= '3.8'
+pytest
 pytest-xdist
 # Depends on msgspec, which has no wheels for Python 3.13 and results in build errors.
 # msgspec/_core.c:11254:15: error: too few arguments to function ‘_PyLong_AsByteArray’
-pytype; python_version < '3.13'
+pytype; python_version >= '3.8' and python_version < '3.13'
 
 # Build tools
 build
@@ -28,3 +30,39 @@ rangehttpserver
 boto3
 wsgidav
 cheroot
+
+# Many of these packages, such as pytype, twine, ... depend on cryptography >= 39, which in a manylinux2010_x86_64
+# container fails to install because of:
+#   Python 3.6: the cp36-abi3 wheel is not downloaded by pip 22 because the oldest one is for manylinux_2_17.
+#   Python 3.7: missing ffi.h when building cffi from source.
+#    -> Run 'apt install libffi-dev' or 'yum install -y libffi-devel'.
+# Even after that it fails to fucking install because of:
+# Collecting cryptography>=39.0 (from asyncssh->-r r.txt (line 24))
+#   Using cached cryptography-45.0.3.tar.gz (744 kB)
+#   Installing build dependencies ... done
+#   Getting requirements to build wheel ... done
+#   Installing backend dependencies ... error
+#   error: subprocess-exited-with-error
+#
+#   × pip subprocess to install backend dependencies did not run successfully.
+#   │ exit code: 1
+#   ╰─> [3 lines of output]
+#       ERROR: Ignored the following versions that require a different python version: 0.1.0
+#       Requires-Python >=3.9; 0.1.1 Requires-Python >=3.9; 0.1.2 Requires-Python >=3.9; 0.1.3
+#       Requires-Python >=3.9; 0.1.4 Requires-Python >=3.9
+#       ERROR: Could not find a version that satisfies the requirement puccinialin (from versions: none)
+#       ERROR: No matching distribution found for puccinialin
+# puccinialin: "Install rust into a temporary directory to support rust-based builds."
+# -> Try to install rust manually:
+# curl --tlsv1.2 -sSf https://sh.rustup.rs | sh
+#   info: downloading installer
+#   warn: Not enforcing strong cipher suites for TLS, this is potentially less secure
+#   warn: Not enforcing TLS v1.2, this is potentially less secure
+#   /tmp/tmp.wpCr2UQPdG/rustup-init: /lib64/libc.so.6: version `GLIBC_2.14' not found
+#     (required by /tmp/tmp.wpCr2UQPdG/rustup-init)
+#   /tmp/tmp.wpCr2UQPdG/rustup-init: /lib64/libc.so.6: version `GLIBC_2.15' not found
+#     (required by /tmp/tmp.wpCr2UQPdG/rustup-init)
+#   /tmp/tmp.wpCr2UQPdG/rustup-init: /lib64/libc.so.6: version `GLIBC_2.17' not found
+#     (required by /tmp/tmp.wpCr2UQPdG/rustup-init)
+#   /tmp/tmp.wpCr2UQPdG/rustup-init: /lib64/libc.so.6: version `GLIBC_2.16' not found
+#     (required by /tmp/tmp.wpCr2UQPdG/rustup-init)

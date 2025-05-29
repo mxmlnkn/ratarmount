@@ -270,10 +270,11 @@ def tryOpenURL(url, printDebug: int) -> Union[MountSource, IO[bytes], str]:
         print("[Info] Try to open with fsspec")
 
     if protocol == 'ftp' and sys.version_info < (3, 9):
+        url_to_fs = fsspec.url_to_fs if hasattr(fsspec, 'url_to_fs') else fsspec.core.url_to_fs
         # Suppress warning about (default!) encoding not being supported for Python<3.9 -.-.
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            fileSystem, path = fsspec.url_to_fs(url)
+            fileSystem, path = url_to_fs(url)
     elif protocol == 'webdav':
         # WebDAV needs special handling because we need to decide between HTTP and HTTPS and because of:
         # https://github.com/skshetry/webdav4/issues/197
@@ -331,7 +332,8 @@ def tryOpenURL(url, printDebug: int) -> Union[MountSource, IO[bytes], str]:
         # dropbox.exceptions.ApiError: ApiError('12345', GetMetadataError('path', LookupError('malformed_path', None)))
         path = path.rstrip('/')
     else:
-        fileSystem, path = fsspec.url_to_fs(url)
+        url_to_fs = fsspec.url_to_fs if hasattr(fsspec, 'url_to_fs') else fsspec.core.url_to_fs
+        fileSystem, path = url_to_fs(url)
 
     if printDebug >= 3:
         print("[Info] Opened filesystem:", fileSystem)
