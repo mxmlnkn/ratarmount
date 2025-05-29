@@ -88,7 +88,6 @@ function installAppImagePythonPackages()
     # https://github.com/nathanhi/pyfatfs/issues/41
     # And we need to apply a patch for that.
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir pyfatfs
-    patch -u "$( find "$APP_DIR" -type f -name FatIO.py )" pyfatfs-issue-41.patch
 }
 
 function installAppImageSystemLibraries()
