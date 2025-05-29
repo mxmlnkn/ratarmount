@@ -21,7 +21,6 @@ classifiers = [
     "Operating System :: MacOS",
     "Operating System :: Unix",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.6",
     "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -35,6 +34,7 @@ classifiers = [
     "Topic :: Utilities",
 ]
 urls = {Homepage = "https://github.com/mxmlnkn/ratarmount"}
+requires-python = ">= 3.7"
 dependencies = [
     # https://pip.pypa.io/en/stable/reference/requirement-specifiers/
     # https://packaging.python.org/en/latest/glossary/#term-Requirement-Specifier

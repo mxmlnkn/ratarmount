@@ -22,7 +22,6 @@ classifiers = [
     "Operating System :: MacOS",
     "Operating System :: Unix",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.6",
     "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -35,8 +34,8 @@ classifiers = [
     "Topic :: System :: Filesystems",
     "Topic :: Utilities",
 ]
+requires-python = ">= 3.7"
 dependencies = [
-    'dataclasses; python_version < "3.7.0"',
     'importlib-metadata; python_version < "3.8.0"',
 ]
 dynamic = ["version"]
