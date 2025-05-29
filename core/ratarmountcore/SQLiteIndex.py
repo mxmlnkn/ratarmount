@@ -972,7 +972,7 @@ class SQLiteIndex:
                 .execute("SELECT value FROM xattrs WHERE (offsetheader,key)=(?,?);", (userData.offsetheader, key))
                 .fetchone()
             )
-            return row[0]
+            return row[0] if row else None
         except sqlite3.OperationalError:
             # May happen when loading old indexes that do not have the xattrs table.
             pass

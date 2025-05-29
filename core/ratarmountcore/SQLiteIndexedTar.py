@@ -206,7 +206,7 @@ class _TarFileMetadataReader:
 
         prefix = 'SCHILY.xattr.'
         xattrs = {
-            urllib.parse.unquote(key[len(prefix) :]): value.encode('utf-8', errors='surrogateescape')
+            key[len(prefix) :]: value.encode('utf-8', errors='surrogateescape')
             for key, value in tarInfo.pax_headers.items()
             if key.startswith(prefix)
         }
