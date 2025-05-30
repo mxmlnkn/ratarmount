@@ -257,7 +257,6 @@ jobs:
     - name: Test Installation From Source
       run: |
         python3 -m pip install .[full]
-        python3 -m pip install mfusepy
 
     - name: Test Simple Startup
       run: |
@@ -281,21 +280,27 @@ jobs:
         # Segfaults (139) are not allowed but other exit codes are valid!
         python3 ratarmount.py tests/simple.bz2 || [ $? != 139 ]
 
+    - name: CLI Tests (Linux)
+      if: ${{ !startsWith( matrix.os, 'macos' ) }}
+      run: |
+        python3 -m pip install pytest
+        # First off, n=auto seems to use the physical cores and ignores virtual ones.
+        # Secondly, these tests scale much better than the others because most time is spent waiting for
+        # the FUSE mount point to appear or disappear, which doesn't seem to be bottlenecked by CPU usage.
+        # There is a new problem in the Github Actions CI:
+        #   fusermount: too many FUSE filesystems mounted; mount_max=N can be set in /etc/fuse.conf
+        # The output of 'mount' shows me only 4 ratarmount mounts!
+        # And now, with 4 mounts, it simply fails without an error message ... WTF is going on.
+        # Remove any multi-threaded execution seems to work, but the error occurred sporadically, so maybe it's that.
+        python3 -X dev -W ignore::DeprecationWarning:fuse -u \
+            -c "import pytest, sys; sys.exit(pytest.console_main())" \
+            --disable-warnings tests/test_cli.py
+
     - name: Unit Tests
       run: |
         python3 -m pip install pytest pytest-xdist pandas
-        for file in core/tests/test_*.py tests/test_*.py; do
+        for file in core/tests/test_*.py; do
             case "$file" in
-              "tests/test_cli.py")
-                  if ! uname | 'grep' -q -i darwin; then
-                      # First off, n=auto seems to use the physical cores and ignores virtual ones.
-                      # Secondly, these tests scale much better than the others because most time is spent waiting for
-                      # the FUSE mount point to appear or disappear, which doesn't seem to be bottlenecked by CPU usage.
-                      python3 -X dev -W ignore::DeprecationWarning:fuse -u \
-                          -c "import pytest, re, sys; sys.exit(pytest.console_main())" \
-                          -n 16 --disable-warnings "$testFile"
-                  fi
-                  ;;
                 "core/tests/test_AutoMountLayer.py"\
                 |"core/tests/test_BlockParallelReaders.py"\
                 |"core/tests/test_LibarchiveMountSource.py"\
