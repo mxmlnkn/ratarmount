@@ -255,8 +255,51 @@ class ParallelXZReader(BlockParallelReader):
     def __init__(self, filename: str, parallelization: Optional[int] = None):
         fileObject = xz.open(filename, 'rb')
 
-        blockBoundaries = fileObject.block_boundaries.copy()
+        # The block boundaries in the decompressed stream are computes as such: [
+        #     stream_pos + block_boundary
+        #     for stream_pos, stream in self._fileobjs.items()
+        #     for block_boundary in stream.block_boundaries
+        # ]
+        # This also gives us hints how to manually compute the compressed block offsets.
+        blockBoundaries: List[int] = fileObject.block_boundaries.copy()
         blockBoundaries.append(len(fileObject))
+
+        # Compute compressed block offsets because python-xz has no way to query that information:
+        # https://github.com/Rogdham/python-xz/blob/89af850a59aaf83920a0eb7c314d9f2ed71979fa/src/xz/stream.py#L43-L46
+        # These offsets are only approximate because of the missing interface and because I do not want to parse
+        # the format myself.
+        self.approximateCompressedBlockBoundaries: List[int] = []
+        if hasattr(fileObject, '_fileobjs'):
+            streamOffset = 0
+            # xz.open returns XZFile defined in xz/file.py as subclass of IOCombiner[XZStream].
+            # fileObject._fileobjs: FloorDict[T] where T=XZStream is part of IOCombiner defined in xz/io.py.
+            # It maps decompressed offsets to XZStream objects.
+            for stream in fileObject._fileobjs.values():
+                # https://tukaani.org/xz/xz-file-format.txt
+                # The stream header and footer are both 12 B. Streams are padded to the next offset divisible by 4.
+                blockOffset = 12
+                for block in stream._fileobjs.values():
+                    self.approximateCompressedBlockBoundaries.append(streamOffset + blockOffset)
+                    # This is very likely not accurate. In tests, the sum of block sizes does not add up
+                    # to the stream size! This is probably because of the index comes after the last block,
+                    # and the padding after the stream footer.
+                    # E.g. in tests: Sum of block sizes: 49654928 stream size: 49655064
+                    # The difference is 136, subtracting the strea header and footer: 112.
+                    # There are 14 blocks per stream and 112 / 14 = 8. This may be a coincidence because:
+                    #  - The index has CRC32 and other extra bytes and might use variable length integers.
+                    #  - Python-xz seems to wrap each XZ block in an XZ stream header and footer to decode
+                    #    it as XZ with liblzma. I'm not sure whether this overhead is returned when calling
+                    #    len on the file object.
+                    blockOffset += len(block.fileobj)
+                streamOffset += len(stream.fileobj)
+            # This is necessary because we also appended the decompressed file size to blockBoundaries above!
+            self.approximateCompressedBlockBoundaries.append(streamOffset)
+            # Clear list if consistency check fails. This is currently only used for the progress indicator anyway.
+            if (
+                len(blockBoundaries) != len(self.approximateCompressedBlockBoundaries)
+                or streamOffset != os.stat(filename).st_size
+            ):
+                self.approximateCompressedBlockBoundaries = []
 
         super().__init__(
             filename, fileObject, blockBoundaries, parallelization, ParallelXZReader._initWorker2, (filename,)
@@ -300,6 +343,12 @@ class ParallelXZReader(BlockParallelReader):
     @overrides(io.BufferedIOBase)
     def read(self, size: int = -1) -> bytes:
         return super()._read(size, ParallelXZReader._decodeBlock)
+
+    def findBlock(self, offset) -> Optional[int]:
+        """
+        Returns the block number corresponding to the specified offset in the decompressed stream.
+        """
+        return self._findBlock(self.blockBoundaries, self._offset)
 
 
 # This one is actually mostly slower than serial decoding. Even the command line tool zstd is often slower with

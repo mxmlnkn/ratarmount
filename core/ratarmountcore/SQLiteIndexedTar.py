@@ -359,7 +359,7 @@ class _TarFileMetadataReader:
         # call stacks and also avoids calling tell() on the file object in each loop iteration.
         # I could observe 10% # shorter runtimes because of this with the test file:
         #     tar-with-1000-folders-with-1000-files-0B-files.tar
-        if time.time() - self._lastUpdateTime >= 2:
+        if time.time() - self._lastUpdateTime >= 1:
             self._lastUpdateTime = time.time()
             self._updateProgressBar()
 
@@ -500,7 +500,7 @@ class _TarFileMetadataReader:
                 # call stacks and also avoids calling tell() on the file object in each loop iteration.
                 # I could observe 10% shorter runtimes because of this with the test file:
                 #     tar-with-1000-folders-with-1000-files-0B-files.tar
-                if time.time() - self._lastUpdateTime >= 2:
+                if time.time() - self._lastUpdateTime >= 1:
                     self._lastUpdateTime = time.time()
                     self._updateProgressBar()
 
@@ -946,7 +946,9 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             elif hasattr(fileobj, 'fileobj') and callable(fileobj.fileobj):
                 progressBar.update(fileobj.fileobj().tell())
             elif isinstance(fileobj, ParallelXZReader):
-                progressBar.update(fileobj.tell())
+                blockNumber = fileobj.findBlock(fileobj.tell())
+                if blockNumber and blockNumber < len(fileobj.approximateCompressedBlockBoundaries):
+                    progressBar.update(fileobj.approximateCompressedBlockBoundaries[blockNumber])
             elif self.rawFileObject and hasattr(self.rawFileObject, 'tell'):
                 progressBar.update(self.rawFileObject.tell())
             else:
