@@ -180,6 +180,7 @@ function trimAppImage()
         "$APP_PYTHON_LIB/site-packages/indexed_gzip/"*.pxd
 
     #"$APP_PYTHON_LIB/email"  # imported by urllib, importlib, site-packages/packaging/metadata.py
+    #"$APP_PYTHON_LIB/html"   # Needed by botocore
     'rm' -rf \
            "$APP_PYTHON_BASE/include" \
            "$APP_DIR/usr/share/tcltk" \
@@ -190,7 +191,6 @@ function trimAppImage()
            "$APP_PYTHON_LIB/smtplib.py" \
            "$APP_PYTHON_LIB/smtpd.py" \
            "$APP_PYTHON_LIB/ensurepip" \
-           #"$APP_PYTHON_LIB/html" \  # Needed by botocore
            "$APP_PYTHON_LIB/idlelib" \
            "$APP_PYTHON_LIB/pickletools.py" \
            "$APP_PYTHON_LIB/pydoc_data" \
