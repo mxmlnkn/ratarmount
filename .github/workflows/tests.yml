@@ -90,7 +90,7 @@ jobs:
         libfuse-version: ['system']
         include:
         - os: ubuntu-latest
-          python-version: '3.14.0-alpha.0'
+          python-version: '3.14.0-beta.2'
           libfuse-version: 'system'
         - os: ubuntu-latest
           python-version: '3.13'
@@ -150,7 +150,7 @@ jobs:
         sudo apt-get -y install liblzma-dev*
 
     - name: Install Dependencies For Unreleased Python Versions (Linux)
-      if: startsWith( matrix.os, 'ubuntu' ) && matrix.python-version == '3.14.0-alpha.0'
+      if: startsWith( matrix.os, 'ubuntu' ) && startsWith( matrix.python-version, '3.14.0-' )
       run: |
         #libgit2-dev is too old on Ubuntu 22.04. Leads to error about missing git2/sys/errors.h
         #sudo apt-get -y install libgit2-dev
@@ -178,7 +178,7 @@ jobs:
       if: >
         startsWith( matrix.os, 'macos' ) && (
           matrix.python-version == '3.13' ||
-          matrix.python-version == '3.14.0-alpha.0')
+          startsWith( matrix.python-version, '3.14' ) )
       run: |
         brew install -q libgit2@1.8
         brew link libgit2@1.8 --force
