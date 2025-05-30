@@ -33,7 +33,8 @@ class FATMountSource(MountSource):
         """
         entry: of type pyfatfs.FATDirectoryEntry.FATDirectoryEntry.
         """
-        mode = 0o555 | (stat.S_IFDIR if entry.is_directory() else stat.S_IFREG)
+        # FAT has no file permissions.
+        mode = 0o777 | (stat.S_IFDIR if entry.is_directory() else stat.S_IFREG)
 
         return FileInfo(
             # fmt: off

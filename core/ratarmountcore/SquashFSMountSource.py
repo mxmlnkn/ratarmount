@@ -479,14 +479,14 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         self.index.storeMetadata(argumentsMetadata, self.archiveFilePath)
 
     def _convertToRow(self, inodeOffset: int, info: "PySquashfsImage.file.File") -> Tuple:  # type: ignore
-        # Note that PySquashfsImage.file.Directory inherits from file.File, i.e., info can also be a directory.
-        mode = 0o555 | (stat.S_IFDIR if info.is_dir else stat.S_IFREG)
-        mtime = info.time
-
+        mode = info.mode
         linkname = ""
         if info.is_symlink:
             linkname = info.readlink()
-            mode = 0o555 | stat.S_IFLNK
+            mode = mode | stat.S_IFLNK
+        else:
+            # Note that PySquashfsImage.file.Directory inherits from file.File, i.e., info can also be a directory.
+            mode = mode | (stat.S_IFDIR if info.is_dir else stat.S_IFREG)
 
         path, name = SQLiteIndex.normpath(self.transform(info.path)).rsplit("/", 1)
 
@@ -503,7 +503,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
             inodeOffset       ,  # 2  : header offset
             dataOffset        ,  # 3  : data offset
             fileSize          ,  # 4  : file size
-            mtime             ,  # 5  : modification time
+            info.time         ,  # 5  : modification time
             mode              ,  # 6  : file mode / permissions
             0                 ,  # 7  : TAR file type. Currently unused. Overlaps with mode
             linkname          ,  # 8  : linkname

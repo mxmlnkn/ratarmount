@@ -67,8 +67,11 @@ class RarMountSource(MountSource):
         raise rarfile.PasswordRequired("Could not find a matching password!")
 
     @staticmethod
+    def _getMode(info: "rarfile.RarInfo") -> int:
+        return info.mode | (stat.S_IFLNK if info.file_redir else (stat.S_IFDIR if info.is_dir() else stat.S_IFREG))
+
+    @staticmethod
     def _convertToFileInfo(normalizedPath: str, info: "rarfile.RarInfo") -> FileInfo:
-        mode = 0o555 | (stat.S_IFDIR if info.is_dir() else stat.S_IFREG)
         if info.date_time:
             dtime = datetime.datetime(*info.date_time)
             dtime = dtime.replace(tzinfo=datetime.timezone.utc)
@@ -76,18 +79,13 @@ class RarMountSource(MountSource):
         else:
             mtime = 0
 
-        # file_redir is (type, flags, target) or None. Only tested for type == RAR5_XREDIR_UNIX_SYMLINK.
-        linkname = ""
-        if info.file_redir:
-            linkname = info.file_redir[2]
-            mode = 0o555 | stat.S_IFLNK
-
         fileInfo = FileInfo(
             # fmt: off
             size     = info.file_size,
             mtime    = mtime,
-            mode     = mode,
-            linkname = linkname,
+            mode     = RarMountSource._getMode(info),
+            # file_redir is (type, flags, target) or None. Only tested for type == RAR5_XREDIR_UNIX_SYMLINK.
+            linkname = info.file_redir[2] if info.file_redir else "",
             uid      = os.getuid(),
             gid      = os.getgid(),
             userdata = [(normalizedPath, info)],
@@ -137,15 +135,9 @@ class RarMountSource(MountSource):
         if path:
             path += '/'
 
-        def _getMode(info: "rarfile.RarInfo") -> int:
-            mode = 0o555 | (stat.S_IFDIR if info.is_dir() else stat.S_IFREG)
-            if info.file_redir:
-                mode = 0o555 | stat.S_IFLNK
-            return mode
-
         # The "filename" member is wrongly named as it returns the full path inside the archive not just the name part.
         return {
-            self._getName(path, normalizedPath): _getMode(info)
+            self._getName(path, normalizedPath): RarMountSource._getMode(info)
             for normalizedPath, info in self.files.items()
             if self._getName(path, normalizedPath)
         }
