@@ -95,6 +95,12 @@ jobs:
         - os: ubuntu-latest
           python-version: '3.13'
           libfuse-version: '3.17.2'
+        - os: ubuntu-22.04
+          python-version: '3.7'
+          libfuse-version: 'system'
+        - os: ubuntu-22.04
+          python-version: '3.8'
+          libfuse-version: 'system'
 
     defaults:
       run:
