@@ -114,12 +114,13 @@ class ArchiveEntry:
                     break
                 size += readSize
 
-        mode = 0o555 | (stat.S_IFDIR if self.isDirectory() else stat.S_IFREG)
+        mode = self.filetype() & 0o777
         linkname = self.linkname()
         if linkname:
-            mode = 0o555 | stat.S_IFLNK
+            mode = mode | stat.S_IFLNK
         else:
             linkname = ""
+            mode = mode | (stat.S_IFDIR if self.isDirectory() else stat.S_IFREG)
 
         if not path:
             path = self.path()

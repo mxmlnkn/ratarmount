@@ -102,7 +102,6 @@ class ZipMountSource(SQLiteIndexMountSource):
         self.index.storeMetadata(argumentsMetadata, self.archiveFilePath)
 
     def _convertToRow(self, info: "zipfile.ZipInfo") -> Tuple:
-        mode = 0o555 | (stat.S_IFDIR if info.is_dir() else stat.S_IFREG)
         mtime = datetime.datetime(*info.date_time, tzinfo=datetime.timezone.utc).timestamp() if info.date_time else 0
 
         # According to section 4.5.7 in the .ZIP file format specification, links are supported:
@@ -117,9 +116,12 @@ class ZipMountSource(SQLiteIndexMountSource):
 
         # file_redir is (type, flags, target) or None. Only tested for type == RAR5_XREDIR_UNIX_SYMLINK.
         linkname = ""
+        mode = (info.external_attr >> 16) & 0o777
         if stat.S_ISLNK(info.external_attr >> 16):
             linkname = self.fileObject.read(info).decode()
-            mode = 0o555 | stat.S_IFLNK
+            mode = mode | stat.S_IFLNK
+        else:
+            mode = mode | (stat.S_IFDIR if info.is_dir() else stat.S_IFREG)
 
         path, name = SQLiteIndex.normpath(self.transform(info.filename)).rsplit("/", 1)
 
