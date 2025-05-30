@@ -1,4 +1,15 @@
 
+# Version 0.8.2 built on 2025-05-30
+
+## Fixes
+
+ - Fix issues with Python 3.6, 3.7, and 3.8. This will be the last version release for Python 3.6
+   because I have no CI to test for it.
+ - Fix broken `SubvolumesMountSource.listDirModeOnly`, used by `ratarmount --disable-union-mount`.
+ - Execute `VACUUM` on index file after deleting the temporary table.
+ - Also accept SQL views as valid tables in case the format will change in a future version.
+
+
 # Version 0.8.1 built on 2025-05-07
 
 ## Fixes
