@@ -161,7 +161,7 @@ class AutoMountLayer(MountSource):
                 mountSource = openMountSource(
                     parentMountSource.open(archiveFileInfo),
                     tarFileName=pathInsideParentMountPoint.rsplit('/', 1)[-1],
-                    **options
+                    **options,
                 )
         except Exception as e:
             print("[Warning] Mounting of '" + path + "' failed because of:", e)
