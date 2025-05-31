@@ -10,7 +10,9 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore import openMountSource, ZipMountSource, SQLiteIndexedTar  # noqa: E402
+from ratarmountcore.factory import openMountSource  # noqa: E402
+from ratarmountcore.ZipMountSource import ZipMountSource  # noqa: E402
+from ratarmountcore.SQLiteIndexedTar import SQLiteIndexedTar  # noqa: E402
 
 
 def findTestFile(relativePathOrName):

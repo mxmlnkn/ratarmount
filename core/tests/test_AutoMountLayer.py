@@ -14,7 +14,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 import pytest  # noqa: E402
 
-from ratarmountcore import AutoMountLayer, openMountSource  # noqa: E402
+from ratarmountcore.factory import openMountSource  # noqa: E402
+from ratarmountcore.AutoMountLayer import AutoMountLayer  # noqa: E402
 
 
 @pytest.mark.parametrize("parallelization", [1, 2, 4])

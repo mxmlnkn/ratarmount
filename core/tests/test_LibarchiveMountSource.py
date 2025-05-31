@@ -18,8 +18,7 @@ from helpers import copyTestFile, findTestFile
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore import LibarchiveMountSource  # noqa: E402
-from ratarmountcore.LibarchiveMountSource import IterableArchive  # noqa: E402
+from ratarmountcore.LibarchiveMountSource import IterableArchive, LibarchiveMountSource  # noqa: E402
 
 
 class TestLibarchiveMountSource:

@@ -16,7 +16,8 @@ if __name__ == '__main__' or __package__ is not None:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../core')))
 
-from ratarmountcore import FileInfo, SQLiteIndexedTar, SQLiteIndexedTarUserData
+from ratarmountcore.MountSource import FileInfo
+from ratarmountcore.SQLiteIndexedTar import SQLiteIndexedTar, SQLiteIndexedTarUserData
 
 
 print("\nTest creating and using an index with .tar.gz files with SQLiteIndexedTar")

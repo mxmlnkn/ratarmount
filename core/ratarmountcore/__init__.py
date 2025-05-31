@@ -26,14 +26,14 @@ The ratarmountcore library offers multiple implementations of the interface:
  - AutoMountLayer: Takes one MountSource, goes over all its files and mounts
                    archives recursively in a similar manner to UnionMountSource.
 
-The factory function 'open' opens one of the archive MountSource implementations
-according to the file type.
+The factory function 'openMountSource' opens one of the archive MountSource
+implementations according to the file type.
 
 Example:
 
-    import ratarmountcore as rmc
+    from ratarmountcore.factory import openMountSource
 
-    archive = rmc.open("foo.tar", recursive=True)
+    archive = openMountSource("foo.tar", recursive=True)
     archive.listDir("/")
     info = archive.getFileInfo("/bar")
 
@@ -43,47 +43,3 @@ Example:
 """
 
 from .version import __version__
-
-from .compressions import (
-    TAR_COMPRESSION_FORMATS,
-    ARCHIVE_FORMATS,
-    findAvailableOpen,
-    supportedCompressions,
-    stripSuffixFromTarFile,
-    checkForSplitFile,
-    compressZstd,
-    getGzipInfo,
-)
-
-from .utils import (
-    RatarmountError,
-    IndexNotOpenError,
-    InvalidIndexError,
-    CompressionError,
-    overrides,
-    distributionContainsFile,
-    getModule,
-    findModuleVersion,
-)
-from .StenciledFile import LambdaReaderFile, RawStenciledFile, StenciledFile, JoinedFile
-from .SQLiteBlobFile import SQLiteBlobFile, SQLiteBlobsFile
-from .BlockParallelReaders import BlockParallelReader, ParallelXZReader, ParallelZstdReader
-
-from .MountSource import FileInfo, MountSource
-
-from .FolderMountSource import FolderMountSource
-from .LibarchiveMountSource import LibarchiveMountSource
-from .RarMountSource import RarMountSource
-from .ZipMountSource import ZipMountSource
-from .SQLiteIndexedTar import SQLiteIndexedTar, SQLiteIndexedTarUserData
-from .SQLiteIndex import SQLiteIndex
-
-from .AutoMountLayer import AutoMountLayer
-from .FileVersionLayer import FileVersionLayer
-from .UnionMountSource import UnionMountSource
-from .SubvolumesMountSource import SubvolumesMountSource
-
-from .factory import openMountSource
-
-
-open = openMountSource  # pylint: disable=redefined-builtin

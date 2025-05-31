@@ -15,7 +15,7 @@ import zipfile
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore import ZipMountSource  # noqa: E402
+from ratarmountcore.ZipMountSource import ZipMountSource  # noqa: E402
 
 try:
     import pyminizip
