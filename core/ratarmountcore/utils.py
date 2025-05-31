@@ -8,9 +8,10 @@ import os
 import pathlib
 import platform
 import sys
+import tarfile
 import types
 
-from typing import Dict, Generic, Iterable, List, Optional, TypeVar, Union, get_type_hints
+from typing import Dict, Generic, Iterable, IO, List, Optional, TypeVar, Union, get_type_hints
 
 import importlib
 
@@ -331,3 +332,30 @@ def getXdgCacheHome():
 
 def decodeUnpaddedBase64(data: str) -> bytes:
     return base64.b64decode(data + '=' * ((4 - len(data) % 4) % 4))
+
+
+def removeDuplicatesStable(iterable: Iterable):
+    seen = set()
+    deduplicated = []
+    for x in iterable:
+        if x not in seen:
+            deduplicated.append(x)
+            seen.add(x)
+    return deduplicated
+
+
+def detectRawTar(fileobj: IO[bytes], encoding: str) -> bool:
+    if not isinstance(fileobj, io.IOBase) or not fileobj.seekable():
+        return False
+
+    oldOffset = fileobj.tell()
+    isTar = False
+    try:
+        # r: will only open uncompressed TAR files!
+        with tarfile.open(fileobj=fileobj, mode='r:', encoding=encoding):
+            isTar = True
+    except (tarfile.ReadError, tarfile.CompressionError):
+        pass
+
+    fileobj.seek(oldOffset)
+    return isTar

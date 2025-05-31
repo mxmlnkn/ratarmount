@@ -13,7 +13,6 @@ import tempfile
 from typing import Dict
 
 if __name__ == '__main__' or __package__ is not None:
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../core')))
 
 from ratarmountcore.MountSource import FileInfo

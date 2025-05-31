@@ -46,6 +46,7 @@ from .utils import (
     InvalidIndexError,
     CompressionError,
     ceilDiv,
+    detectRawTar,
     decodeUnpaddedBase64,
     getXdgCacheHome,
     isOnSlowDrive,
@@ -1563,16 +1564,10 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         if not isinstance(fileobj, io.IOBase) or not fileobj.seekable():
             return False
 
-        oldOffset = fileobj.tell()
-        isTar = False
-        try:
-            with tarfile.open(fileobj=fileobj, mode='r:', encoding=encoding):
-                isTar = True
-        except (tarfile.ReadError, tarfile.CompressionError):
-            if printDebug >= 3:
-                print("[Info] File object", fileobj, "is not a TAR.")
+        isTar = detectRawTar(fileobj, encoding)
+        if not isTar and printDebug >= 3:
+            print("[Info] File object", fileobj, "is not a TAR.")
 
-        fileobj.seek(oldOffset)
         return isTar
 
     @staticmethod
