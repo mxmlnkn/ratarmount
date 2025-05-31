@@ -109,9 +109,9 @@ The factory function `open` opens one of the archive `MountSource` implementatio
 ## Example
 
 ```Python3
-import ratarmountcore as rmc
+from ratarmountcore.factory import openMountSource
 
-archive = rmc.open("foo.tar", recursive=True)
+archive = openMountSource("foo.tar", recursive=True)
 print(archive.listDir("/"))
 info = archive.getFileInfo("/bar")
 

@@ -64,25 +64,20 @@ except ImportError:
     fsspec = None  # type: ignore
 
 
-import ratarmountcore as core
-from ratarmountcore import (
-    AutoMountLayer,
-    MountSource,
-    FileVersionLayer,
-    FolderMountSource,
-    SQLiteIndexedTar,
-    UnionMountSource,
-    findModuleVersion,
+from ratarmountcore.MountSource import FileInfo, MountSource
+from ratarmountcore.compressions import (
+    checkForSplitFile,
     findAvailableOpen,
-    openMountSource,
-    overrides,
     supportedCompressions,
     stripSuffixFromTarFile,
-    RatarmountError,
-    SubvolumesMountSource,
-    FileInfo,
 )
-from ratarmountcore.utils import imeta, getXdgCacheHome
+from ratarmountcore.utils import imeta, findModuleVersion, getXdgCacheHome, overrides, RatarmountError
+from ratarmountcore.FileVersionLayer import FileVersionLayer
+from ratarmountcore.FolderMountSource import FolderMountSource
+from ratarmountcore.SQLiteIndexedTar import SQLiteIndexedTar
+from ratarmountcore.UnionMountSource import UnionMountSource
+from ratarmountcore.SubvolumesMountSource import SubvolumesMountSource
+import ratarmountcore.version
 
 
 __version__ = '1.0.0'
@@ -571,6 +566,12 @@ class FuseMount(fuse.Operations):
         mountSources: List[Tuple[str, MountSource]] = []
         self.mountPointFd: Optional[int] = None
         self.selfBindMount: Optional[FolderMountSource] = None
+
+        # These imports can be particularly expensive when all fsspec backends are installed.
+        # Therefore only import it on-demand to speed up --help and argument completion.
+        from ratarmountcore.factory import openMountSource
+        from ratarmountcore.AutoMountLayer import AutoMountLayer
+
         for path in pathToMount:
             if os.path.realpath(path) != self.mountPoint:
                 # This also will create or load the block offsets for compressed formats
@@ -991,7 +992,7 @@ def checkInputFileType(
         raise argparse.ArgumentTypeError(f"File '{tarFile}' is not a file!")
     tarFile = os.path.realpath(tarFile)
 
-    result = core.checkForSplitFile(tarFile)
+    result = checkForSplitFile(tarFile)
     if result:
         return result[0][0], 'part' + result[1]
 
@@ -1079,7 +1080,7 @@ class _CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescr
 class PrintVersionAction(argparse.Action):
     def __call__(self, parser, args, values, option_string=None):
         print("ratarmount", __version__)
-        print("ratarmountcore", core.__version__)
+        print("ratarmountcore", ratarmountcore.version.__version__)
 
         print()
         print("System Software:")
