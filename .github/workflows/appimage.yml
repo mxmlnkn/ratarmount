@@ -2,7 +2,7 @@ name: AppImage
 
 on:
   push:
-    branches: 'master'
+    branches: '*'
     tags: 'v*'
   workflow_dispatch:
 
