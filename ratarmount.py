@@ -1621,6 +1621,160 @@ For further information, see the ReadMe on the project's homepage:
     return args
 
 
+def commitOverlay(writeOverlay: str, tarFile: str, encoding: str = tarfile.ENCODING, printDebug: int = 0) -> None:
+    if not os.path.isdir(writeOverlay):
+        raise RatarmountError("Need an existing write overlay folder for committing changes.")
+
+    compression = None
+    try:
+        compression = checkInputFileType(tarFile, encoding=encoding, printDebug=printDebug)[1]
+    except Exception as exception:
+        raise RatarmountError("Currently, only modifications to a single TAR may be committed.") from exception
+
+    if compression is not None:
+        raise RatarmountError("Currently, only modifications to an uncompressed TAR may be committed.")
+
+    try:
+        with os.popen('tar --version') as pipe:
+            if not re.search(r'GNU tar', pipe.read()):
+                raise RatarmountError("GNU tar is required")
+    except Exception as exception:
+        raise RatarmountError("Currently, GNU tar must be installed and discoverable as 'tar'.") from exception
+
+    # Delete all files marked for deletion
+    tmpFolder = tempfile.mkdtemp()
+    deletionList = os.path.join(tmpFolder, "deletions.lst")
+    appendList = os.path.join(tmpFolder, "append.lst")
+
+    def addToDeletionFile(deletionListFile, pathRelativeToRoot: str):
+        # Delete with and without leading slash because GNU tar matches exactly while
+        # ratarmount does not discern between these two cases.
+        deletionListFile.write(f"{pathRelativeToRoot}\0")
+        deletionListFile.write(f"/{pathRelativeToRoot}\0")
+        deletionListFile.write(f"./{pathRelativeToRoot}\0")
+
+    databasePath = os.path.join(writeOverlay, WritableFolderMountSource.hiddenDatabaseName)
+    if os.path.exists(databasePath):
+        uriPath = urllib.parse.quote(databasePath)
+        sqlConnection = sqlite3.connect(f"file:{uriPath}?mode=ro", uri=True)
+
+        with open(deletionList, 'at', encoding=encoding) as deletionListFile:
+            for path, name in sqlConnection.execute("SELECT path,name FROM files WHERE deleted == 1;"):
+                addToDeletionFile(deletionListFile, f"{path}/{name}".lstrip('/'))
+
+    # Delete all files to be replaced with other files
+    with open(deletionList, 'at', encoding=encoding) as deletionListFile, open(
+        appendList, 'at', encoding=encoding
+    ) as appendListFile:
+        # For temporary SQLite file suffixes, see https://www.sqlite.org/tempfiles.html
+        suffixes = ['', '-journal', '-shm', '-wal']
+        toBeIgnored = [WritableFolderMountSource.hiddenDatabaseName + suffix for suffix in suffixes]
+
+        writeOverlayWithTrailingSlash = writeOverlay
+        if not writeOverlayWithTrailingSlash.endswith('/'):
+            writeOverlayWithTrailingSlash += '/'
+
+        for dirpath, _, filenames in os.walk(writeOverlay, topdown=False):
+            # dirpath should be a relative path (without leading slash) as seen from the overlay folder
+            if dirpath.startswith(writeOverlayWithTrailingSlash):
+                dirpath = dirpath[len(writeOverlayWithTrailingSlash) :]
+            elif dirpath == writeOverlay:
+                dirpath = ""
+
+            for name in filenames:
+                pathRelativeToRoot = f"{dirpath}/{name}".lstrip('/')
+                if pathRelativeToRoot in toBeIgnored:
+                    continue
+                addToDeletionFile(deletionListFile, pathRelativeToRoot)
+                appendListFile.write(f"{pathRelativeToRoot}\0")
+
+            # Append empty folders
+            if not filenames and dirpath:
+                appendListFile.write(f"{dirpath}\0")
+
+    # TODO Support compressed archives by maybe using tarfile to read from the original and write to a temporary?
+    #      GNU tar does not support --delete on compressed archives unfortunately:
+    #      > This option does not operate on compressed archives.
+    # Suppress file not found errors because the alternative would be to manually check all files
+    # to be updated whether they already exist in the archive or not.
+    print("To commit the overlay folder to the archive, these commands have to be executed:")
+    print()
+
+    if os.stat(deletionList).st_size > 0:
+        print(f"    tar --delete --null --verbatim-files-from --files-from='{deletionList}' \\")
+        print(f"        --file '{tarFile}' 2>&1 |")
+        print("       sed '/^tar: Exiting with failure/d; /^tar.*Not found in archive/d'")
+
+    if os.stat(appendList).st_size > 0:
+        print(
+            f"    tar --append -C '{writeOverlay}' --null --verbatim-files-from --files-from='{appendList}' "
+            f"--file '{tarFile}'"
+        )
+
+    if os.stat(deletionList).st_size == 0 and os.stat(appendList).st_size == 0:
+        print("Nothing to commit.")
+        return
+
+    def runWithoutLocale(*args, check=True, **kwargs):
+        adjustedEnvironment = os.environ.copy()
+        for key in [k for k in adjustedEnvironment.keys() if k.startswith('LC_')]:
+            del adjustedEnvironment[key]
+        adjustedEnvironment['LC_LANG'] = 'C'
+        adjustedEnvironment['LANGUAGE'] = 'C'
+        return subprocess.run(*args, env=adjustedEnvironment, check=check, **kwargs)
+
+    print()
+    print("Committing is an experimental feature!")
+    print('Please confirm by entering "commit". Any other input will cancel.')
+    print("> ", end='')
+    try:
+        if input() == 'commit':
+            if os.stat(deletionList).st_size > 0:
+                tarDelete = runWithoutLocale(
+                    [
+                        "tar",
+                        "--delete",
+                        "--null",
+                        f"--files-from={deletionList}",
+                        "--file",
+                        tarFile,
+                    ],
+                    check=False,
+                    stderr=subprocess.PIPE,
+                )
+
+                unfilteredLines = []
+                for line in tarDelete.stderr.decode().split("\n"):
+                    if 'tar: Exiting with failure' not in line and 'Not found in archive' not in line and line.strip():
+                        unfilteredLines.append(line)
+
+                if unfilteredLines:
+                    for line in unfilteredLines:
+                        print(line)
+                    raise RatarmountError("There were problems when trying to delete files.")
+
+            if os.stat(appendList).st_size > 0:
+                runWithoutLocale(
+                    [
+                        "tar",
+                        "--append",
+                        "-C",
+                        writeOverlay,
+                        "--null",
+                        f"--files-from={appendList}",
+                        "--file",
+                        tarFile,
+                    ],
+                    check=True,
+                )
+
+            print(f"Committed successfully. You can now remove the overlay folder at {writeOverlay}.")
+        else:
+            print("Canceled")
+    finally:
+        shutil.rmtree(tmpFolder)
+
+
 def cli(rawArgs: Optional[List[str]] = None) -> None:
     """Command line interface for ratarmount. Call with args = [ '--help' ] for a description."""
 
@@ -1693,166 +1847,9 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
         return
 
     if args.commit_overlay:
-        if not os.path.isdir(args.write_overlay):
-            raise RatarmountError("Need an existing write overlay folder for committing changes.")
-
         if len(args.mount_source) != 1:
             raise RatarmountError("Currently, only modifications to a single TAR may be committed.")
-
-        tarFile = args.mount_source[0]
-        compression = None
-        try:
-            compression = checkInputFileType(tarFile, encoding=args.encoding, printDebug=args.debug)[1]
-        except Exception as exception:
-            raise RatarmountError("Currently, only modifications to a single TAR may be committed.") from exception
-
-        if compression is not None:
-            raise RatarmountError("Currently, only modifications to an uncompressed TAR may be committed.")
-
-        try:
-            with os.popen('tar --version') as pipe:
-                if not re.search(r'GNU tar', pipe.read()):
-                    raise RatarmountError("GNU tar is required")
-        except Exception as exception:
-            raise RatarmountError("Currently, GNU tar must be installed and discoverable as 'tar'.") from exception
-
-        # Delete all files marked for deletion
-        tmpFolder = tempfile.mkdtemp()
-        deletionList = os.path.join(tmpFolder, "deletions.lst")
-        appendList = os.path.join(tmpFolder, "append.lst")
-
-        def addToDeletionFile(deletionListFile, pathRelativeToRoot: str):
-            # Delete with and without leading slash because GNU tar matches exactly while
-            # ratarmount does not discern between these two cases.
-            deletionListFile.write(f"{pathRelativeToRoot}\0")
-            deletionListFile.write(f"/{pathRelativeToRoot}\0")
-            deletionListFile.write(f"./{pathRelativeToRoot}\0")
-
-        databasePath = os.path.join(args.write_overlay, WritableFolderMountSource.hiddenDatabaseName)
-        if os.path.exists(databasePath):
-            uriPath = urllib.parse.quote(databasePath)
-            sqlConnection = sqlite3.connect(f"file:{uriPath}?mode=ro", uri=True)
-
-            with open(deletionList, 'at', encoding=args.encoding) as deletionListFile:
-                for path, name in sqlConnection.execute("SELECT path,name FROM files WHERE deleted == 1;"):
-                    addToDeletionFile(deletionListFile, f"{path}/{name}".lstrip('/'))
-
-        # Delete all files to be replaced with other files
-        with open(deletionList, 'at', encoding=args.encoding) as deletionListFile, open(
-            appendList, 'at', encoding=args.encoding
-        ) as appendListFile:
-            # For temporary SQLite file suffixes, see https://www.sqlite.org/tempfiles.html
-            suffixes = ['', '-journal', '-shm', '-wal']
-            toBeIgnored = [WritableFolderMountSource.hiddenDatabaseName + suffix for suffix in suffixes]
-
-            writeOverlayWithTrailingSlash = args.write_overlay
-            if not writeOverlayWithTrailingSlash.endswith('/'):
-                writeOverlayWithTrailingSlash += '/'
-
-            for dirpath, _, filenames in os.walk(args.write_overlay, topdown=False):
-                # dirpath should be a relative path (without leading slash) as seen from the overlay folder
-                if dirpath.startswith(writeOverlayWithTrailingSlash):
-                    dirpath = dirpath[len(writeOverlayWithTrailingSlash) :]
-                elif dirpath == args.write_overlay:
-                    dirpath = ""
-
-                for name in filenames:
-                    pathRelativeToRoot = f"{dirpath}/{name}".lstrip('/')
-                    if pathRelativeToRoot in toBeIgnored:
-                        continue
-                    addToDeletionFile(deletionListFile, pathRelativeToRoot)
-                    appendListFile.write(f"{pathRelativeToRoot}\0")
-
-                # Append empty folders
-                if not filenames and dirpath:
-                    appendListFile.write(f"{dirpath}\0")
-
-        # TODO Support compressed archives by maybe using tarfile to read from the original and write to a temporary?
-        #      GNU tar does not support --delete on compressed archives unfortunately:
-        #      > This option does not operate on compressed archives.
-        # Suppress file not found errors because the alternative would be to manually check all files
-        # to be updated whether they already exist in the archive or not.
-        print("To commit the overlay folder to the archive, these commands have to be executed:")
-        print()
-
-        if os.stat(deletionList).st_size > 0:
-            print(f"    tar --delete --null --verbatim-files-from --files-from='{deletionList}' \\")
-            print(f"        --file '{tarFile}' 2>&1 |")
-            print("       sed '/^tar: Exiting with failure/d; /^tar.*Not found in archive/d'")
-
-        if os.stat(appendList).st_size > 0:
-            print(
-                f"    tar --append -C '{args.write_overlay}' --null --verbatim-files-from --files-from='{appendList}' "
-                f"--file '{tarFile}'"
-            )
-
-        if os.stat(deletionList).st_size == 0 and os.stat(appendList).st_size == 0:
-            print("Nothing to commit.")
-            return
-
-        def runWithoutLocale(*args, check=True, **kwargs):
-            adjustedEnvironment = os.environ.copy()
-            for key in [k for k in adjustedEnvironment.keys() if k.startswith('LC_')]:
-                del adjustedEnvironment[key]
-            adjustedEnvironment['LC_LANG'] = 'C'
-            adjustedEnvironment['LANGUAGE'] = 'C'
-            return subprocess.run(*args, env=adjustedEnvironment, check=check, **kwargs)
-
-        print()
-        print("Committing is an experimental feature!")
-        print('Please confirm by entering "commit". Any other input will cancel.')
-        print("> ", end='')
-        try:
-            if input() == 'commit':
-                if os.stat(deletionList).st_size > 0:
-                    tarDelete = runWithoutLocale(
-                        [
-                            "tar",
-                            "--delete",
-                            "--null",
-                            f"--files-from={deletionList}",
-                            "--file",
-                            tarFile,
-                        ],
-                        check=False,
-                        stderr=subprocess.PIPE,
-                    )
-
-                    unfilteredLines = []
-                    for line in tarDelete.stderr.decode().split("\n"):
-                        if (
-                            'tar: Exiting with failure' not in line
-                            and 'Not found in archive' not in line
-                            and line.strip()
-                        ):
-                            unfilteredLines.append(line)
-
-                    if unfilteredLines:
-                        for line in unfilteredLines:
-                            print(line)
-                        raise RatarmountError("There were problems when trying to delete files.")
-
-                if os.stat(appendList).st_size > 0:
-                    runWithoutLocale(
-                        [
-                            "tar",
-                            "--append",
-                            "-C",
-                            args.write_overlay,
-                            "--null",
-                            f"--files-from={appendList}",
-                            "--file",
-                            tarFile,
-                        ],
-                        check=True,
-                    )
-
-                print(f"Committed successfully. You can now remove the overlay folder at {args.write_overlay}.")
-            else:
-                print("Canceled")
-        finally:
-            shutil.rmtree(tmpFolder)
-
+        commitOverlay(args.write_overlay, args.mount_source[0], encoding=args.encoding, printDebug=args.debug)
         return
 
     # Convert the comma separated list of key[=value] options into a dictionary for fusepy
