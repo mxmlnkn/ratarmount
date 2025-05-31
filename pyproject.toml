@@ -12,7 +12,6 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ratarmount"
-version = "1.0.0"
 description = "Random Access To Archived Resources"
 authors = [{name = "Maximilian Knespel", email = "mxmlnknp@gmail.com"}]
 license = {text = "MIT"}
@@ -44,6 +43,7 @@ dependencies = [
     "ratarmountcore[7z, bzip2, fat, git, gzip, rar, xz, zip, zstd] ~= 0.8.0",
     "mfusepy ~= 1.0",
 ]
+dynamic = ["version"]
 
 [project.readme]
 file = "README.md"
@@ -61,12 +61,15 @@ squashfs = ["ratarmountcore[squashfs]"]
 fsspec = ["ratarmountcore[fsspec-backends]"]
 
 [project.scripts]
-ratarmount = "ratarmount:cli"
+ratarmount = "ratarmount.cli:cli"
 
 [tool.setuptools]
-py-modules = ["ratarmount"]
+packages = ["ratarmount"]
 license-files = ["LICENSE"]
 
 [tool.codespell]
 # fsspec uses cachable instead of cacheable ...
 ignore-words-list = "fo,Nd,unx,cachable"
+
+[tool.setuptools.dynamic]
+version = {attr = "ratarmount.version.__version__"}

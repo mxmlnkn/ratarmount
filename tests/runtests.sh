@@ -1,12 +1,16 @@
 #!/bin/bash
 
-cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." || { echo 'Failed to cd to ratarmount.py folder!'; exit 1; }
+cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." || { echo 'Failed to cd to git root!'; exit 1; }
 
 #export PYTHONTRACEMALLOC=1
 
 if [[ -z "$RATARMOUNT_CMD" ]]; then
     TEST_EXTERNAL_COMMAND=0
-    RATARMOUNT_CMD="python3 -X dev -W ignore::DeprecationWarning -u $( realpath -- ratarmount.py )"
+    # I don't see a way to call a non-installed module folder via an absolute path.
+    # Therefore, this will use the non-installed 'ratarmount' module in the current folder if it exists,
+    # and if the test did change directory, e.g., into a temporary folder, then ratarmount must have
+    # been installed for this test to find it!
+    RATARMOUNT_CMD="python3 -X dev -W ignore::DeprecationWarning -u -m ratarmount"
     #RATARMOUNT_CMD=ratarmount
 else
     TEST_EXTERNAL_COMMAND=1

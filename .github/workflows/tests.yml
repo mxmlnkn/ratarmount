@@ -26,7 +26,7 @@ jobs:
     - name: Style Check With Black
       run: |
         python3 -m pip install black
-        black -q --diff --line-length 120 --skip-string-normalization ratarmount.py tests/*.py core/ratarmountcore/*.py > black.diff
+        black -q --diff --line-length 120 --skip-string-normalization ratarmount/*.py tests/*.py core/ratarmountcore/*.py > black.diff
         if [ -s black.diff ]; then
             cat black.diff
             exit 123
@@ -51,7 +51,7 @@ jobs:
     - name: Lint With Pytype
       run: |
         python3 -m pip install pytype
-        pytype -d import-error -P$( cd core && pwd ):$( pwd ) ratarmount.py core/ratarmountcore/*.py
+        pytype -d import-error -P$( cd core && pwd ):$( pwd ) ratarmount/*.py core/ratarmountcore/*.py
 
     - name: Lint With Mypy
       run: |
@@ -219,6 +219,12 @@ jobs:
         python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )"[full]
         python3 -m pip install mfusepy
 
+    - name: Test Startup Without Compression Dependencies
+      if: ${{ !startsWith( matrix.os, 'macos' ) }}
+      run: |
+        # Segfaults (139) are not allowed but other exit codes are valid!
+        python3 -m ratarmount tests/simple.bz2 || [ $? != 139 ]
+
     - name: Test Startup With Only One Compression Dependency
       run: |
         for module in indexed_gzip indexed_zstd lzmaffi python-xz; do
@@ -230,7 +236,7 @@ jobs:
             fi
             # Segfaults (139) are not allowed but other exit codes are valid!
             # indexed_zstd=1.2.0 did segfault here!
-            python3 ratarmount.py README.md || [ $? != 139 ]
+            python3 -m ratarmount README.md || [ $? != 139 ]
             python3 -m pip uninstall --yes "$module"
         done
         python3 -m pip install --upgrade 'git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=rapidgzip&subdirectory=python/rapidgzip'
@@ -273,12 +279,6 @@ jobs:
         sleep 1s
         # MacOS does not have fusermount!
         ratarmount -u mimi
-
-    - name: Test Startup Without Compression Dependencies
-      if: ${{ !startsWith( matrix.os, 'macos' ) }}
-      run: |
-        # Segfaults (139) are not allowed but other exit codes are valid!
-        python3 ratarmount.py tests/simple.bz2 || [ $? != 139 ]
 
     - name: CLI Tests (Linux)
       if: ${{ !startsWith( matrix.os, 'macos' ) }}

@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../core')))
 
 from ratarmountcore.compressions import libarchive  # noqa: E402
-from ratarmount import cli as ratarmountcli  # noqa: E402
+from ratarmount.cli import cli as ratarmountcli  # noqa: E402
 
 
 def findTestFile(relativePathOrName):

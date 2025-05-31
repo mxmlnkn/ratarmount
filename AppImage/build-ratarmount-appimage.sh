@@ -401,7 +401,7 @@ APPIMAGE_EXTRACT_AND_RUN=1 ARCH="$APPIMAGE_ARCH" appimagetool \
 chmod u+x "$APP_BASE.AppImage"
 version=$( ./"$APP_BASE.AppImage" --version | sed -n -E 's|ratarmount ([0-9.]+)|\1|p' &>/dev/null )
 if [[ -z "$version" ]]; then
-    version=$( sed -n -E "s|.*__version__ = '([0-9.]+).*'|\1|p" ../ratarmount.py )
+    version=$( sed -n -E "s|.*__version__ = '([0-9.]+).*'|\1|p" ../ratarmount/version.py )
 fi
 if [[ -n "$version" ]]; then
     'mv' -- "$APP_BASE.AppImage" "ratarmount-$version-$APPIMAGE_ARCH.AppImage"
