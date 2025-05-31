@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# PYTHON_ARGCOMPLETE_OK
 # mypy: disable-error-code="method-assign"
 
 import argparse
@@ -46,6 +47,11 @@ except (ImportError, OSError) as importException:
             print("[Error] Exception for fusepy:", fusepyException)
             sys.exit(1)
 
+
+try:
+    import argcomplete
+except ImportError:
+    pass
 
 try:
     import rarfile
@@ -1492,6 +1498,8 @@ For further information, see the ReadMe on the project's homepage:
              'but without a file extension.')
     # fmt: on
 
+    if 'argcomplete' in sys.modules:
+        argcomplete.autocomplete(parser)
     args = parser.parse_args(rawArgs)
 
     if args.unmount:

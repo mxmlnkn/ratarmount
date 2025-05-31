@@ -64,6 +64,7 @@ A complete list of supported formats can be found [here](supported-formats).
       1. [Arch Linux](#arch-linux)
    3. [System Dependencies for PIP Installation (Rarely Necessary)](#system-dependencies-for-pip-installation-rarely-necessary)
    4. [PIP Package Installation](#pip-package-installation)
+   5. [Argument Completion](#argument-completion)
 2. [Supported Formats](#supported-formats)
    1. [TAR compressions supported for random access](tar-compressions-supported-for-random-access)
    2. [Other supported archive formats](other-supported-archive-formats)
@@ -180,6 +181,31 @@ python3 -m pip install --user --force-reinstall \
 If there are troubles with the compression backend dependencies, you can try the pip `--no-deps` argument.
 Ratarmount will work without the compression backends.
 The hard requirements are `fusepy` and for Python versions older than 3.7.0 `dataclasses`.
+
+## Argument Completion
+
+Ratarmount has support for argument completion in bash and zsh via [argcomplete](https://github.com/kislyuk/argcomplete) if it is installed.
+
+On Debian-like systems, this sets everything up in `/etc/bash_completion.d/global-python-argcomplete` to work out-of-the-box with any Python tool that supports argcomplete:
+
+```bash
+sudo apt install python3-argcomplete
+# Restart your shell.
+ratarmount --<tab><tab>
+```
+
+Manual installation also works:
+
+```bash
+pip install argcomplete
+
+# Either add this to your .bashrc
+eval "$( register-python-argcomplete ratarmount )"
+# Or run this script to install argcomplete globally (into `~/.bash_completion` and `~/.zshenv`):
+activate-global-python-argcomplete  # Requires a restart of your shell to.
+
+ratarmount --<tab><tab>
+```
 
 
 # Supported Formats
