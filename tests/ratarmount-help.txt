@@ -1,24 +1,27 @@
-usage: ratarmount.py [-h] [-c] [-r] [-u] [-P PARALLELIZATION] [-v] [--password PASSWORD]
-                     [--verify-mtime] [--index-file INDEX_FILE] [--index-folders INDEX_FOLDERS]
-                     [--recursion-depth RECURSION_DEPTH] [-l] [-s]
-                     [--transform-recursive-mount-point REGEX_PATTERN REPLACEMENT] [-e ENCODING]
-                     [-i] [--gnu-incremental] [--no-gnu-incremental] [--detect-gnu-incremental]
-                     [-w WRITE_OVERLAY] [--commit-overlay] [-o FUSE] [-f] [-d DEBUG]
-                     [-gs GZIP_SEEK_POINT_SPACING] [-p PREFIX] [--password-file PASSWORD_FILE]
-                     [--use-backend USE_BACKEND] [--oss-attributions] [--disable-union-mount]
-                     [--union-mount-cache-max-depth UNION_MOUNT_CACHE_MAX_DEPTH]
-                     [--union-mount-cache-max-entries UNION_MOUNT_CACHE_MAX_ENTRIES]
-                     [--union-mount-cache-timeout UNION_MOUNT_CACHE_TIMEOUT]
-                     [--index-minimum-file-count INDEX_MINIMUM_FILE_COUNT]
-                     [--transform REGEX_PATTERN REPLACEMENT]
-                     mount_source [mount_source ...] [mount_point]
+usage: ratarmount [-h] [-c] [-r] [-u] [-P PARALLELIZATION] [-v] [--password PASSWORD]
+                  [--verify-mtime] [--index-file INDEX_FILE] [--index-folders INDEX_FOLDERS]
+                  [--recursion-depth RECURSION_DEPTH] [-l] [-s]
+                  [--transform-recursive-mount-point REGEX_PATTERN REPLACEMENT] [-e ENCODING]
+                  [-i] [--gnu-incremental] [--no-gnu-incremental] [--detect-gnu-incremental]
+                  [-w WRITE_OVERLAY] [--commit-overlay] [-o FUSE] [-f] [-d DEBUG]
+                  [-gs GZIP_SEEK_POINT_SPACING] [-p PREFIX] [--password-file PASSWORD_FILE]
+                  [--use-backend USE_BACKEND] [--oss-attributions] [--disable-union-mount]
+                  [--union-mount-cache-max-depth UNION_MOUNT_CACHE_MAX_DEPTH]
+                  [--union-mount-cache-max-entries UNION_MOUNT_CACHE_MAX_ENTRIES]
+                  [--union-mount-cache-timeout UNION_MOUNT_CACHE_TIMEOUT]
+                  [--index-minimum-file-count INDEX_MINIMUM_FILE_COUNT]
+                  [--transform REGEX_PATTERN REPLACEMENT]
+                  mount_source [mount_source ...] [mount_point]
 
 With ratarmount, you can:
-  - Mount a (compressed) TAR file to a folder for read-only access
+  - Mount an archive to a folder for read-only access
   - Mount a compressed file to `<mountpoint>/<filename>`
-  - Bind mount a folder to another folder for read-only access
-  - Union mount a list of TARs, compressed files, and folders to a mount point
+  - Bind-mount a folder to another folder for read-only access
+  - Union mount a list of archives, compressed files, and folders to a mount point
     for read-only access
+  - Mount an archive with a write-overlay mapped to a folder for read-write access
+  - Remotely mount an archive from the internet via https:// for read-only access
+  - And much more
 
 Optional Arguments:
   --password PASSWORD   Specify a single password which shall be used for RAR and ZIP files.
@@ -31,8 +34,8 @@ Optional Arguments:
   -h, --help            Show this help message and exit.
   -r, --recursive       Mount archives inside archives recursively. Same as --recursion-depth
                         -1. (default: False)
-  -u, --unmount         Unmount the given mount point. Equivalent to calling "fusermount -u".
-                        (default: False)
+  -u, --unmount         Unmount the given mount point(s). Equivalent to calling "fusermount -u"
+                        for each mount point. (default: False)
   -v, --version         Print version information and exit.
 
 Positional Options:
@@ -209,9 +212,11 @@ Examples:
 
  - ratarmount archive.tar.gz
  - ratarmount --recursive archive.tar mountpoint
+ - ratarmount --unmount mountpoint mountpoint2
  - ratarmount folder mountpoint
  - ratarmount folder1 folder2 mountpoint
  - ratarmount folder archive.zip folder
+ - ratarmount --recursive folder-with-many-archives mountpoint
  - ratarmount -o modules=subdir,subdir=squashfs-root archive.squashfs mountpoint
  - ratarmount http://server.org:80/archive.rar folder folder
  - ratarmount ssh://hostname:22/relativefolder/ mountpoint

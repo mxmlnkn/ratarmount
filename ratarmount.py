@@ -1153,7 +1153,7 @@ class PrintVersionAction(argparse.Action):
             for library in sorted(list(libraries)):
                 print(library.rsplit('/', maxsplit=1)[-1])
 
-        sys.exit(0)
+        parser.exit()
 
 
 class PrintOSSAttributionAction(argparse.Action):
@@ -1194,20 +1194,76 @@ class PrintOSSAttributionAction(argparse.Action):
         for moduleName, url, licenseContents in sorted(licenses):
             print(f"# {moduleName}\n\n{url}\n\n\n```\n{licenseContents}\n```\n\n")
 
-        sys.exit(0)
+        parser.exit()
+
+
+def unmount(mountPoint: str, printDebug: int = 0) -> None:
+    # Do not test with os.path.ismount or anything other because if the FUSE process was killed without
+    # unmounting, then any file system query might return with errors.
+    # https://github.com/python/cpython/issues/96328#issuecomment-2027458283
+
+    try:
+        subprocess.run(["fusermount", "-u", mountPoint], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if printDebug >= 2:
+            print("[Info] Successfully called fusermount -u.")
+        return
+    except Exception as exception:
+        if printDebug >= 2:
+            print(f"[Warning] fusermount -u {mountPoint} failed with: {exception}")
+        if printDebug >= 3:
+            subprocess.run(["fusermount", "-V", mountPoint], check=False)
+
+    # If called from AppImage, then try to call the user-installed fusermount because FUSE might require
+    # extra permissions depending on the policy and some systems then provide a fusermount binary with
+    # ownership root and the setuid flag set.
+    if os.path.ismount(mountPoint):
+        fusermountPath = shutil.which("fusermount")
+        if fusermountPath is None:
+            fusermountPath = ""
+        for folder in os.environ.get("PATH", "").split(os.pathsep):
+            if not folder:
+                continue
+            binaryPath = os.path.join(folder, "fusermount")
+            if fusermountPath != binaryPath and os.path.isfile(binaryPath) and os.access(binaryPath, os.X_OK):
+                try:
+                    subprocess.run(
+                        [binaryPath, "-u", mountPoint], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                    )
+                    if printDebug >= 2:
+                        print(f"[Info] Successfully called {binaryPath} -u '{mountPoint}'.")
+                    return
+                except Exception as exception:
+                    if printDebug >= 2:
+                        print(f"[Warning] {fusermountPath} -u {mountPoint} failed with: {exception}")
+                    if printDebug >= 3:
+                        subprocess.run([fusermountPath, "-V", mountPoint], check=False)
+
+    if os.path.ismount(mountPoint):
+        try:
+            subprocess.run(["umount", mountPoint], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if printDebug >= 2:
+                print(f"[Info] Successfully called umount -u '{mountPoint}'.")
+            return
+        except Exception as exception:
+            if printDebug >= 2:
+                print(f"[Warning] umount {mountPoint} failed with: {exception}")
 
 
 def _parseArgs(rawArgs: Optional[List[str]] = None):
     parser = argparse.ArgumentParser(
+        prog='ratarmount',
         formatter_class=_CustomFormatter,
         add_help=False,
         description='''\
 With ratarmount, you can:
-  - Mount a (compressed) TAR file to a folder for read-only access
+  - Mount an archive to a folder for read-only access
   - Mount a compressed file to `<mountpoint>/<filename>`
-  - Bind mount a folder to another folder for read-only access
-  - Union mount a list of TARs, compressed files, and folders to a mount point
+  - Bind-mount a folder to another folder for read-only access
+  - Union mount a list of archives, compressed files, and folders to a mount point
     for read-only access
+  - Mount an archive with a write-overlay mapped to a folder for read-write access
+  - Remotely mount an archive from the internet via https:// for read-only access
+  - And much more
 ''',
         # The examples should be kept synchronized with the README.md!
         epilog='''\
@@ -1215,9 +1271,11 @@ Examples:
 
  - ratarmount archive.tar.gz
  - ratarmount --recursive archive.tar mountpoint
+ - ratarmount --unmount mountpoint mountpoint2
  - ratarmount folder mountpoint
  - ratarmount folder1 folder2 mountpoint
  - ratarmount folder archive.zip folder
+ - ratarmount --recursive folder-with-many-archives mountpoint
  - ratarmount -o modules=subdir,subdir=squashfs-root archive.squashfs mountpoint
  - ratarmount http://server.org:80/archive.rar folder folder
  - ratarmount ssh://hostname:22/relativefolder/ mountpoint
@@ -1257,7 +1315,7 @@ For further information, see the ReadMe on the project's homepage:
 
     commonGroup.add_argument(
         '-u', '--unmount', action='store_true',
-        help='Unmount the given mount point. Equivalent to calling "fusermount -u".')
+        help='Unmount the given mount point(s). Equivalent to calling "fusermount -u" for each mount point.')
 
     commonGroup.add_argument(
         '-P', '--parallelization', type=int, default=0,
@@ -1503,13 +1561,14 @@ For further information, see the ReadMe on the project's homepage:
     args = parser.parse_args(rawArgs)
 
     if args.unmount:
-        if not args.mount_source or not args.mount_source[0]:
+        # args.mount_source suffices because it eats all arguments and args.mount_point is always empty by default.
+        args.unmount = [mountPoint for mountPoint in args.mount_source if mountPoint] if args.mount_source else []
+        if not args.unmount:
             raise argparse.ArgumentTypeError("Unmounting requires a path to the mount point!")
 
         # Do not test with os.path.ismount or anything other because if the FUSE process was killed without
         # unmounting, then any file system query might return with errors.
         # https://github.com/python/cpython/issues/96328#issuecomment-2027458283
-        args.unmount = args.mount_source[0]
         return args
 
     args.gzipSeekPointSpacing = int(args.gzip_seek_point_spacing * 1024 * 1024)
@@ -1785,65 +1844,28 @@ def cli(rawArgs: Optional[List[str]] = None) -> None:
     args = _parseArgs(rawArgs)
 
     if args.unmount:
-        try:
-            subprocess.run(
-                ["fusermount", "-u", args.unmount], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-            )
-            if args.debug >= 2:
-                print("[Info] Successfully called fusermount -u.")
-            return
-        except Exception as exception:
-            if args.debug >= 2:
-                print(f"[Warning] fusermount -u {args.unmount} failed with: {exception}")
-            if args.debug >= 3:
-                subprocess.run(["fusermount", "-V", args.unmount], check=False)
-
-        # If called from AppImage, then try to call the user-installed fusermount because FUSE might require
-        # extra permissions depending on the policy and some systems then provide a fusermount binary with
-        # ownership root and the setuid flag set.
-        if os.path.ismount(args.unmount):
-            fusermountPath = shutil.which("fusermount")
-            if fusermountPath is None:
-                fusermountPath = ""
-            for folder in os.environ.get("PATH", "").split(os.pathsep):
-                if not folder:
-                    continue
-                binaryPath = os.path.join(folder, "fusermount")
-                if fusermountPath != binaryPath and os.path.isfile(binaryPath) and os.access(binaryPath, os.X_OK):
-                    try:
-                        subprocess.run(
-                            [binaryPath, "-u", args.unmount], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-                        )
-                        if args.debug >= 2:
-                            print(f"[Info] Successfully called {binaryPath} -u.")
-                        return
-                    except Exception as exception:
-                        if args.debug >= 2:
-                            print(f"[Warning] {fusermountPath} -u {args.unmount} failed with: {exception}")
-                        if args.debug >= 3:
-                            subprocess.run([fusermountPath, "-V", args.unmount], check=False)
-
-        if os.path.ismount(args.unmount):
-            try:
-                subprocess.run(["umount", args.unmount], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                if args.debug >= 2:
-                    print("[Info] Successfully called umount -u.")
-                return
-            except Exception as exception:
-                if args.debug >= 2:
-                    print(f"[Warning] umount {args.unmount} failed with: {exception}")
+        mountPoints = args.unmount
+        for mountPoint in mountPoints:
+            unmount(mountPoint, printDebug=args.debug)
 
         # Unmounting might take some time and I had cases where fusermount returned exit code 1.
         # and still unmounted it successfully. It would be nice to automate this but it seems impossible to do
         # reliably, without any regular expression heuristics. /proc/<pid>/fd/5 links to /dev/fuse. This could
         # be used to reliable detect FUSE-providing processes, but we still wouldn't know which exact mount
         # point they provide.
-        if os.path.ismount(args.unmount):
+        # This check is done outside of 'unmount' in order to only do one time.sleep for all mount points.
+        errorPrinted = False
+        if any(os.path.ismount(mountPoint) for mountPoint in mountPoints):
             time.sleep(1)
-        if os.path.ismount(args.unmount):
-            print("[Error] Failed to unmount the given mount point. Alternatively, the process providing the mount ")
-            print("[Error] point can be looked for and killed, e.g., with this command:")
-            print(f"""[Error]     pkill --full 'ratarmount.*{args.unmount}' -G "$( id -g )" --newest""")
+            for mountPoint in mountPoints:
+                if not os.path.ismount(mountPoint):
+                    continue
+                if not errorPrinted:
+                    print("[Error] Failed to unmount the given mount point. Alternatively, the process providing ")
+                    print("[Error] the mount point can be looked for and killed, e.g., with this command:")
+                    errorPrinted = True
+                print(f"""[Error]     pkill --full 'ratarmount.*{mountPoint}' -G "$( id -g )" --newest""")
+
         return
 
     if args.commit_overlay:
