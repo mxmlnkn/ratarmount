@@ -300,7 +300,7 @@ jobs:
                       # The output of 'mount' shows me only 4 ratarmount mounts...
                       python3 -X dev -W ignore::DeprecationWarning:fuse -u \
                           -c "import pytest, re, sys; sys.exit(pytest.console_main())" \
-                          -n 16 --disable-warnings "$testFile"
+                          -n 4 --disable-warnings "$testFile"
                   fi
                   ;;
                 "core/tests/test_AutoMountLayer.py"\
