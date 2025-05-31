@@ -147,8 +147,7 @@ def printVersions() -> None:
 
 
 def printOSSAttributions() -> None:
-    licenses = []
-    for name, githubPath in [
+    licenses = [
         ("fusepy", "/fusepy/fusepy/master/LICENSE"),  # ISC
         ("python-xz", "/Rogdham/python-xz/master/LICENSE.txt"),  # MIT
         ("rarfile", "/markokr/rarfile/master/LICENSE"),  # ISC
@@ -171,17 +170,15 @@ def printOSSAttributions() -> None:
         ("s3fs", "/fsspec/s3fs/refs/heads/main/LICENSE.txt"),  # BSD-3
         ("webdav4", "/skshetry/webdav4/refs/heads/main/LICENSE"),  # MIT
         ("asyncssh", "/ronf/asyncssh/refs/heads/develop/LICENSE"),  # EPL 2.0
-    ]:
+    ]
+    for name, githubPath in sorted(licenses):
         licenseUrl = "https://raw.githubusercontent.com" + githubPath
         try:
             licenseContents = urllib.request.urlopen(licenseUrl).read().decode()
         except urllib.error.HTTPError as error:
             licenseContents = f"Failed to get license at {licenseUrl} because of: {str(error)}"
         homepage = "https://github.com" + '/'.join(githubPath.split('/', 3)[:3])
-        licenses.append((name, homepage, licenseContents))
-
-    for moduleName, url, licenseContents in sorted(licenses):
-        print(f"# {moduleName}\n\n{url}\n\n\n```\n{licenseContents}\n```\n\n")
+        print(f"# {name}\n\n{homepage}\n\n\n```\n{licenseContents}\n```\n\n")
 
 
 def unmount(mountPoint: str, printDebug: int = 0) -> None:
