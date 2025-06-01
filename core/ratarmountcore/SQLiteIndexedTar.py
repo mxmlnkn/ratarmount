@@ -779,17 +779,15 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         if not self.isTar and not self.rawFileObject:
             raise RatarmountError(f"File object ({str(fileObject)}) could not be opened as a TAR file!")
 
+        # Try to get block size from the real opened file.
         self.blockSize = 512
-        if self.rawFileObject:
-            try:
+        try:
+            if self.rawFileObject:
                 self.blockSize = os.fstat(self.rawFileObject.fileno()).st_blksize
-            except Exception:
-                pass
-        elif self.tarFileObject:
-            try:
+            elif self.tarFileObject:
                 self.blockSize = os.fstat(self.tarFileObject.fileno()).st_blksize
-            except Exception:
-                pass
+        except Exception:
+            pass
 
         if self.compression == 'gz':
             self.blockSize = max(self.blockSize, gzipSeekPointSpacing)
@@ -802,18 +800,18 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
         self.fileObjectLock = threading.Lock()
 
-        if self.compression == 'xz':
-            try:
-                if len(self.tarFileObject.block_boundaries) <= 1 and (fileSize is None or fileSize > 1024 * 1024):
-                    print(f"[Warning] The specified file '{self.tarFileName}'")
-                    print("[Warning] is compressed using xz but only contains one xz block. This makes it ")
-                    print("[Warning] impossible to use true seeking! Please (re)compress your TAR using pixz")
-                    print("[Warning] (see https://github.com/vasi/pixz) in order for ratarmount to do be able ")
-                    print("[Warning] to do fast seeking to requested files.")
-                    print("[Warning] As it is, each file access will decompress the whole TAR from the beginning!")
-                    print()
-            except Exception:
-                pass
+        if (
+            self.compression == 'xz'
+            and len(getattr(self.tarFileObject, 'block_boundaries', (0, 0))) <= 1
+            and self._archiveFileSize > 1024 * 1024
+        ):
+            print(f"[Warning] The specified file '{self.tarFileName}'")
+            print("[Warning] is compressed using xz but only contains one xz block. This makes it ")
+            print("[Warning] impossible to use true seeking! Please (re)compress your TAR using pixz")
+            print("[Warning] (see https://github.com/vasi/pixz) in order for ratarmount to do be able ")
+            print("[Warning] to do fast seeking to requested files.")
+            print("[Warning] As it is, each file access will decompress the whole TAR from the beginning!")
+            print()
 
         if indexFolders is None:
             indexFolders = ['', os.path.join("~", ".ratarmount")]
@@ -1012,7 +1010,8 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
         self.index.ensureIntermediaryTables()
 
-        self._createIndexRecursively(fileObject, streamOffset=streamOffset)
+        progressBar = ProgressBar(self._archiveFileSize)
+        self._createIndexRecursively(fileObject, progressBar, pathPrefix="", streamOffset=streamOffset)
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
         if self.printDebug >= 2:
@@ -1025,11 +1024,8 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             print(f"Creating offset dictionary for {self.tarFileName} took {t1 - t0:.2f}s")
 
     def _createIndexRecursively(
-        self, fileObject: IO[bytes], progressBar: Optional[Any] = None, pathPrefix: str = '', streamOffset: int = 0
+        self, fileObject: IO[bytes], progressBar: ProgressBar, pathPrefix: str, streamOffset: int
     ) -> None:
-        if progressBar is None:
-            progressBar = ProgressBar(self._archiveFileSize)
-
         metadataReader = _TarFileMetadataReader(
             self,
             self.index.setFileInfos,
@@ -1580,7 +1576,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         parallelization: int,
         prioritizedBackends: Optional[List[str]],
         printDebug: int = 0,
-    ) -> Any:
+    ) -> Tuple[Any, Optional[IO[bytes]], Optional[str], bool]:
         """
         Opens a file possibly undoing the compression.
         Returns (tar_file_obj, raw_file_obj, compression, isTar).

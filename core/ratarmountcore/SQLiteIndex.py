@@ -1141,7 +1141,7 @@ class SQLiteIndex:
             should not be used, e.g., because the version is incompatible.
         """
         if self.indexIsLoaded():
-            return
+            return None
 
         # Download and/or extract the file to a temporary file if necessary.
 

@@ -35,6 +35,7 @@ class TestAutoMountLayer:
             assert recursivelyMounted.listDir('/')
             assert recursivelyMounted.listDir('/ufo_12')
             assert recursivelyMounted.listDir('/ufo_00')
+            assert list(recursivelyMounted.listDir('/ufo_00').keys()) == ['ufo']
             assert recursivelyMounted.open(recursivelyMounted.getFileInfo('/ufo_00/ufo')).read() == b'iriya\n'
 
     @staticmethod
@@ -57,6 +58,7 @@ class TestAutoMountLayer:
             assert recursivelyMounted.listDir('/')
             assert recursivelyMounted.listDir('/ufo_12')
             assert recursivelyMounted.listDir('/ufo_00')
+            assert list(recursivelyMounted.listDir('/ufo_00').keys()) == ['ufo']
             assert recursivelyMounted.open(recursivelyMounted.getFileInfo('/ufo_00/ufo')).read() == b'iriya\n'
 
     @staticmethod
