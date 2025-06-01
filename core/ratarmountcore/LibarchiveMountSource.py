@@ -151,6 +151,7 @@ class ArchiveEntry:
             False         ,  # 11 : is TAR (unused?)
             False         ,  # 12 : is sparse
             False         ,  # 13 : is generated (parent folder)
+            0             ,  # 14 : recursion depth
         )
         # fmt: on
 

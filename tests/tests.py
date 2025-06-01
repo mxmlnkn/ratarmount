@@ -99,6 +99,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
                         istar=0,
                         issparse=0,
                         isgenerated=False,
+                        recursiondepth=1,
                     )
                 ],
             )
@@ -119,6 +120,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
                         istar=0,
                         issparse=0,
                         isgenerated=False,
+                        recursiondepth=1,
                     )
                 ],
             ),
@@ -136,6 +138,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
                         istar=0,
                         issparse=0,
                         isgenerated=False,
+                        recursiondepth=1,
                     )
                 ],
             ),
@@ -153,6 +156,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
                         istar=0,
                         issparse=0,
                         isgenerated=False,
+                        recursiondepth=1,
                     )
                 ],
             ),

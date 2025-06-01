@@ -66,11 +66,12 @@ def _toVersionTuple(version: str) -> Optional[Tuple[int, int, int]]:
 @dataclass
 class SQLiteIndexedTarUserData:
     # fmt: off
-    offset       : int
-    offsetheader : int
-    istar        : bool
-    issparse     : bool
-    isgenerated  : bool
+    offset         : int
+    offsetheader   : int
+    istar          : bool
+    issparse       : bool
+    isgenerated    : bool
+    recursiondepth : int
     # fmt: on
 
 
@@ -80,6 +81,38 @@ class SQLiteIndex:
     for all contained files in an index to support fast seeking to a given file.
     """
 
+    # Considerations for a new backwards-incompatible index format, which probably will never happen...:
+    #  - Avoid redundant prefixes by storing ID-ing them. This can be slow though :(
+    #    This would not be downwards-compatible because a view was ignored by my existence check in ratarmount 1.0.0.
+    #  - Maybe put each recursive archive into a separate table? the table name would be some ID that could
+    #    be looked up in a separate 'mountpoints' table, which maps a path to a table ID and maybe a recursion
+    #    depth.
+    #  - Make it possible to undo arbitrarily many outer compressions layers.
+    #    This might be doable in a backwards-compatible manner already.
+    #    Simply add a new table 'compressions' to store indexes for all but the outermost compression.
+    #    Old versions would only be able to undo the outermost compression, while newer versions would be able
+    #    to use this additional information to speed things up.
+    #    It might however be difficult to implement correctly with subfolders and such, i.e., do not simply
+    #    undo the compression layer with compression-backend-open calls but implement a full "SingleFileMountSource"
+    #    hierarchy.
+    #     -> for backward compatibility note that the innermost layer would have to be in the existing 'gzipindex'
+    #        table as the others would be undone by other mount layers in older versions!
+    #     -> But(!), the index would be stored for the outermost file, i.e., it would contain files and offsets,
+    #        which would be loaded by older versions, without fully undoing all compressions!
+    #     -> So, probably not backward compatible after all.
+    #  - Make it possible to store all indexes for recursive ZIPs, Libarchive, RAR, which already support SQLiteIndex
+    #    as backend, in a single database file to speed up loading of recursive archives!
+    #    Would have to be some kind of multiplexing, e.g., with 'files_<ID suffix>' tables.
+    #    I would only have to make the SQLiteIndex default table adjustable.
+    # May be possible in a backwards-compatible (old versions will ignore it) manner:
+    #  - Make it such that recursion depth changes, at least decrementing ones, do not require
+    #    a full rebuild of the index. I think I can get this to work with the current version already.
+    #  - Make it possible to undo inner compression layers, heck maybe even combine all inner compressions
+    #    of the same type (gzip, bzip2, zstandard), create a StenciledFile so that the number of rapidgzip
+    #    background instances gets reduced.
+    #    - Maybe add a simple "(get/set)CompressionIndex" interface and store indexes as blobs for each file
+    #      if possible, ID'd by FileInfo, i.e., by offset/offsetheader and such or maybe even the rowid.
+    #
     # Version 0.1.0:
     #   - Initial version
     # Version 0.2.0:
@@ -92,19 +125,24 @@ class SQLiteIndex:
     # Version 0.4.0:
     #   - Add 'gzipindexes' table, which may contain multiple blobs in contrast to 'gzipindex' table.
     # Version 0.5.0:
-    #   - Add 'backend' name to 'metadata' table. Indexes created by different backends should by default
+    #   - Add 'backendName' to 'metadata' table. Indexes created by different backends should by default
     #     be assumed to be incompatible, especially for chimera files, but also when one was created with
     #     libarchive, then it will not be readable with the SQLiteIndexedTar backend because it does not
     #     collect data offsets.
     #   - Add 'isGnuIncremental' to 'metadata' table.
     # Version 0.6.0:
-    #   - Add 'isgenerated' column.
+    #   - Add 'isgenerated' and 'recursiondepth' columns.
     #     From what I can gather, the SQLite index is used in such a way that adding columns does not break anything.
     #     All SELECT statements either explicitly specify columns, or access columns via row[index] or row[columnName],
     #     e.g., in _rowToFileInfo and SQLiteIndexedTar._checkRowsValidity.
     #     I have also checked for all users of SQLiteIndex: TAR, ZIP, SquashFS, libarchive.
     #     I created the index with the new version and accessed it with an old ratarmount version to test compatibility.
     #     Libarchive (currently) only creates SQLite indexes in memory, ergo has no compatibility issues!
+    #     Unfortunately, the _checkRowsValidity will fail because the loaded vs. generated tuple lengths will differ!
+    #     This is only called when 'backendName' does not exist, i.e., for indexes with version < 0.5.0 and when
+    #     the TAR was detected as having been appended to. So, it's probably negligible. Honestly, who even uses
+    #     an older ratarmount version with a newer index. Probably only if the index was distributed somewhere, i.e.,
+    #     it can be reloaded if it was overwritten, I hope.
     #   - Add 'xattrs' table
     __version__ = '0.6.0'
 
@@ -116,26 +154,24 @@ class SQLiteIndex:
     # But, making it too small would result in too many non-backwards compatible indexes being created.
     _MAX_BLOB_SIZE = 256 * 1024 * 1024  # 256 MiB
 
-    # TODO Would be nice for index verification to have columns for recursionlevel (INTEGER).
-    # TODO Would be nice to implement string deduplication for files.path, but this would not be downwards-compatible
-    #      because a view was ignored by my existence-check.
     _CREATE_FILES_TABLE = """
         CREATE TABLE "files" (
-            "path"          VARCHAR(65535) NOT NULL,  /* path with leading and without trailing slash */
-            "name"          VARCHAR(65535) NOT NULL,
-            "offsetheader"  INTEGER,  /* seek offset from TAR file where the TAR metadata for this file resides */
-            "offset"        INTEGER,  /* seek offset from TAR file where these file's contents resides */
-            "size"          INTEGER,
-            "mtime"         REAL,
-            "mode"          INTEGER,
-            "type"          INTEGER,
-            "linkname"      VARCHAR(65535),
-            "uid"           INTEGER,
-            "gid"           INTEGER,
+            "path"           VARCHAR(65535) NOT NULL,  /* path with leading and without trailing slash */
+            "name"           VARCHAR(65535) NOT NULL,
+            "offsetheader"   INTEGER,  /* seek offset from TAR file where the TAR metadata for this file resides */
+            "offset"         INTEGER,  /* seek offset from TAR file where these file's contents resides */
+            "size"           INTEGER,
+            "mtime"          REAL,
+            "mode"           INTEGER,
+            "type"           INTEGER,
+            "linkname"       VARCHAR(65535),
+            "uid"            INTEGER,
+            "gid"            INTEGER,
             /* True for valid TAR files. Internally used to determine where to mount recursive TAR files. */
-            "istar"         BOOL   ,
-            "issparse"      BOOL   ,  /* For sparse files the file size refers to the expanded size! */
-            "isgenerated"   BOOL   ,  /* True for entries generated for parent folders by ratarmount. */
+            "istar"          BOOL   ,
+            "issparse"       BOOL   ,  /* For sparse files the file size refers to the expanded size! */
+            "isgenerated"    BOOL   ,  /* True for entries generated for parent folders by ratarmount. */
+            "recursiondepth" INTEGER,  /* Normally 0. 1+ if the file is recursively in an archive. */
             /* See SQL benchmarks for decision on the primary key.
              * See also https://www.sqlite.org/optoverview.html
              * (path,name) tuples might appear multiple times in a TAR if it got updated.
@@ -726,8 +762,10 @@ class SQLiteIndex:
             INSERT OR REPLACE INTO "files" SELECT * FROM "filestmp" ORDER BY "path","name",rowid;
             DROP TABLE "filestmp";
             INSERT OR IGNORE INTO "files"
-                /* path name offsetheader offset size mtime mode type linkname uid gid istar issparse isgenerated */
-                SELECT path,name,offsetheader,offset,0,0,{int(0o555 | stat.S_IFDIR)},{int(tarfile.DIRTYPE)},"",0,0,0,0,0
+                /* path name offsetheader offset size mtime mode type */
+                SELECT path,name,offsetheader,offset,0,0,{int(0o555 | stat.S_IFDIR)},{int(tarfile.DIRTYPE)},
+                       /* linkname uid gid istar issparse isgenerated recursiondepth */
+                       "",0,0,0,0,0,0
                 FROM "parentfolders"
                 WHERE {searchByTuple if libSqliteVersion >= (3, 22, 0) else searchByConcat}
                     FROM "files" WHERE mode & (1 << 14) != 0
@@ -747,11 +785,12 @@ class SQLiteIndex:
     def _rowToFileInfo(row: Dict[str, Any]) -> FileInfo:
         userData = SQLiteIndexedTarUserData(
             # fmt: off
-            offset       = row['offset'],
-            offsetheader = row['offsetheader'] if 'offsetheader' in row.keys() else 0,
-            istar        = row['istar'],
-            issparse     = row['issparse'] if 'issparse' in row.keys() else False,
-            isgenerated  = row['isgenerated'] if 'isgenerated' in row.keys() else False,
+            offset         = row['offset'],
+            offsetheader   = row['offsetheader'] if 'offsetheader' in row.keys() else 0,
+            istar          = row['istar'],
+            issparse       = row['issparse'] if 'issparse' in row.keys() else False,
+            isgenerated    = row['isgenerated'] if 'isgenerated' in row.keys() else False,
+            recursiondepth = row['recursiondepth'] if 'recursiondepth' in row.keys() else False,
             # fmt: on
         )
 
@@ -820,6 +859,8 @@ class SQLiteIndex:
         # Added in index 0.6.0.
         if 'isgenerated' in columns:
             selected_columns += ['isgenerated']
+        if 'recursiondepth' in columns:
+            selected_columns += ['recursiondepth']
 
         def rowToFileInfo(cursor, row) -> Tuple[str, FileInfo]:  # pylint: disable=unused-argument
             return row[0], FileInfo(
@@ -831,11 +872,12 @@ class SQLiteIndex:
                 uid      = row[5],
                 gid      = row[6],
                 userdata = [SQLiteIndexedTarUserData(
-                    offset       = row[7],
-                    offsetheader = row[9] if len(row) > 9 else 0,
-                    istar        = row[8],
-                    issparse     = row[10] if len(row) > 10 else False,
-                    isgenerated  = row[11] if len(row) > 11 else False,
+                    offset         = row[7],
+                    offsetheader   = row[9] if len(row) > 9 else 0,
+                    istar          = row[8],
+                    issparse       = row[10] if len(row) > 10 else False,
+                    isgenerated    = row[11] if len(row) > 11 else False,
+                    recursiondepth = row[12] if len(row) > 12 else False,
                 )],
                 # fmt: on
             )
@@ -888,7 +930,7 @@ class SQLiteIndex:
         """
 
         if path == '/':
-            return {'/': createRootFileInfo(userdata=[SQLiteIndexedTarUserData(0, 0, False, False, True)])}
+            return {'/': createRootFileInfo(userdata=[SQLiteIndexedTarUserData(0, 0, False, False, True, 0)])}
 
         path, name = self._queryNormpath(path).rsplit('/', 1)
         rows = self.getConnection().execute(
@@ -917,7 +959,7 @@ class SQLiteIndex:
             raise RatarmountError("The specified file version must be an integer!")
 
         if path == '/':
-            return createRootFileInfo(userdata=[SQLiteIndexedTarUserData(0, 0, False, False, True)])
+            return createRootFileInfo(userdata=[SQLiteIndexedTarUserData(0, 0, False, False, True, 0)])
 
         path, name = self._queryNormpath(path).rsplit('/', 1)
         row = (

@@ -62,11 +62,13 @@ class _TarFileMetadataReader:
         setFileInfos: Callable[[List[Tuple]], None],
         setxattrs: Callable[[List[Tuple]], None],
         updateProgressBar: Callable[[], None],
+        recursionDepth: int,
     ):
         self._parent = parent
         self._setFileInfos = setFileInfos
         self._setxattrs = setxattrs
         self._updateProgressBar = updateProgressBar
+        self._recursionDepth = recursionDepth
 
         self._lastUpdateTime = time.time()
 
@@ -187,6 +189,7 @@ class _TarFileMetadataReader:
         isGnuIncremental : Optional[bool],
         mountRecursively : bool,
         transform        : Callable[[str], str],
+        recursionDepth   : int,
         printDebug       : int,
         # fmt: on
     ) -> Tuple[List[Tuple], List[Tuple], bool, Optional[bool]]:
@@ -246,6 +249,7 @@ class _TarFileMetadataReader:
             False                                           ,  # 11 : is TAR (unused?)
             tarInfo.issparse()                              ,  # 12 : is sparse
             False                                           ,  # 13 : is generated (parent folder)
+            recursionDepth                                  ,  # 14 : recursion depth
         )
         # fmt: on
 
@@ -383,6 +387,7 @@ class _TarFileMetadataReader:
                         isGnuIncremental=self._parent._isGnuIncremental,
                         mountRecursively=self._parent.mountRecursively,
                         transform=self._parent.transform,
+                        recursionDepth=self._recursionDepth,
                         printDebug=self._parent.printDebug,
                     )
                 )
@@ -531,6 +536,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         self.isFileObject                 = fileObject is not None
         self._isGnuIncremental            = isGnuIncremental
         self.hasBeenAppendedTo            = False
+        self._recursionDepth              = -1
         # fmt: on
         self.prioritizedBackends: List[str] = [] if prioritizedBackends is None else prioritizedBackends
 
@@ -579,6 +585,9 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         )
         if not self.isTar and not self.rawFileObject:
             raise RatarmountError(f"File object ({str(fileObject)}) could not be opened as a TAR file!")
+
+        if self.compression:
+            self._recursionDepth += 1
 
         # Try to get block size from the real opened file.
         self.blockSize = 512
@@ -812,7 +821,13 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         self.index.ensureIntermediaryTables()
 
         progressBar = ProgressBar(self._archiveFileSize)
-        self._createIndexRecursively(fileObject, progressBar, pathPrefix="", streamOffset=streamOffset)
+        self._createIndexRecursively(
+            fileObject,
+            progressBar=progressBar,
+            pathPrefix="",
+            streamOffset=streamOffset,
+            recursionDepth=self._recursionDepth + 1,
+        )
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
         if self.printDebug >= 2:
@@ -825,13 +840,14 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             print(f"Creating offset dictionary for {self.tarFileName} took {t1 - t0:.2f}s")
 
     def _createIndexRecursively(
-        self, fileObject: IO[bytes], progressBar: ProgressBar, pathPrefix: str, streamOffset: int
+        self, fileObject: IO[bytes], progressBar: ProgressBar, pathPrefix: str, streamOffset: int, recursionDepth: int
     ) -> None:
         metadataReader = _TarFileMetadataReader(
             self,
             self.index.setFileInfos,
             self.index.setxattrs,
             lambda: self._updateProgressBar(progressBar, fileObject),
+            recursionDepth=recursionDepth,
         )
         filesToMountRecursively = metadataReader.process(fileObject, pathPrefix, streamOffset)
 
@@ -875,7 +891,13 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             try:
                 # Do not use os.path.join here because the leading / might be missing.
                 # This should instead be seen as the reverse operation of the rsplit further above.
-                self._createIndexRecursively(tarFileObject, progressBar, modifiedPath, globalOffset)
+                self._createIndexRecursively(
+                    tarFileObject,
+                    progressBar,
+                    modifiedPath,
+                    streamOffset=globalOffset,
+                    recursionDepth=recursionDepth + 1,
+                )
                 isTar = True
             except tarfile.ReadError:
                 pass
@@ -886,7 +908,9 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 modifiedFileInfo = list(fileInfo)
 
                 # if the TAR file contents could be read, we need to adjust the actual
-                # TAR file's metadata to be a directory instead of a file
+                # TAR file's metadata to be a directory instead of a file.
+                # Avoid overwriting that data, instead add new one such that it can be versioned
+                # or ignored on depending on the recursion depth!
                 mode = modifiedFileInfo[6]
                 mode = (
                     (mode & 0o777)
@@ -910,6 +934,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 modifiedFileInfo[6] = mode
                 modifiedFileInfo[11] = isTar
                 modifiedFileInfo[13] = True  # is generated, i.e., does not have xattr
+                modifiedFileInfo[14] += 1  # recursion depth
 
                 self.index.setFileInfo(tuple(modifiedFileInfo))
 
@@ -991,6 +1016,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 False                                 ,  # 11 : isTar
                 False,  # 12 isSparse, don't care if it is actually sparse or not because it is not in TAR
                 False                                 ,  # 13 : is generated (parent folder)
+                recursionDepth - 1                    ,  # 14 : recursion depth
             )
             # fmt: on
             self.index.setFileInfo(fileInfo)
@@ -1319,11 +1345,16 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                             file,  # only used for isGnuIncremental == True
                             "",  # pathPrefix
                             offsetHeader,  # will be added to all offsets to get the real offset
-                            self._isGnuIncremental,
-                            False,  # mountRecursively
-                            self.transform,
-                            self.printDebug,
+                            isGnuIncremental=self._isGnuIncremental,
+                            mountRecursively=False,
+                            transform=self.transform,
+                            recursionDepth=0,
+                            printDebug=self.printDebug,
                         )
+
+                        if not realFileInfos:
+                            return False
+                        realFileInfo = realFileInfos[0]
 
                         # Bool columns will have been converted to int 0 or 1 when reading from SQLite.
                         # In order to compare with the read result correctly, we need to convert them to bool, too.
@@ -1335,14 +1366,21 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
                         # Do not compare the path because it might have the parent TAR prepended to it for
                         # recursive TARs and this is hard to ignore any other way.
-                        storedFileInfo[0] = realFileInfos[0][0]  # path
-                        storedFileInfo[11] = realFileInfos[0][11]  # isTar
-                        if tuple(storedFileInfo) != realFileInfos[0]:
+                        storedFileInfo[0] = realFileInfo[0]  # path
+                        storedFileInfo[11] = realFileInfo[11]  # isTar
+
+                        commonSize = min(len(storedFileInfo), len(realFileInfo))
+                        # Do not check newly added columns such as isgenerated and recursiondepth.
+                        if commonSize > 13:
+                            storedFileInfo[13] = realFileInfo[13]  # is generated
+                        if commonSize > 14:
+                            storedFileInfo[14] = realFileInfo[14]  # recursion depth
+                        if storedFileInfo[:commonSize] != list(realFileInfo)[:commonSize]:
                             if self.printDebug >= 3:
                                 print("[Info] Stored file info:")
                                 print("[Info]", storedFileInfo)
                                 print("[Info] differs from recomputed one:")
-                                print("[Info]", realFileInfos[0])
+                                print("[Info]", realFileInfo)
                             return False
 
             return True

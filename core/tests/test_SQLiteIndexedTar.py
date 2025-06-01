@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 import pytest  # noqa: E402
 
 from ratarmountcore.utils import RatarmountError  # noqa: E402
-from ratarmountcore.SQLiteIndexedTar import SQLiteIndexedTar  # noqa: E402
+from ratarmountcore.SQLiteIndexedTar import SQLiteIndexedTar, SQLiteIndexedTarUserData  # noqa: E402
 
 
 @pytest.mark.parametrize("parallelization", [1, 2, 4])
@@ -48,6 +48,15 @@ class TestSQLiteIndexedTarParallelized:
         ) as indexedTar:
             assert indexedTar.listDir('/')
             assert indexedTar.getFileInfo('/')
+
+            fileInfo = indexedTar.getFileInfo('/bar')
+            assert fileInfo
+            assert fileInfo.size == 4
+            userdata = fileInfo.userdata[-1]
+            assert isinstance(userdata, SQLiteIndexedTarUserData)
+            assert userdata.recursiondepth == 0
+            assert not userdata.isgenerated
+
             assert not indexedTar.getFileInfo('../')
             assert not indexedTar.getFileInfo('../bar')
 
@@ -105,9 +114,55 @@ class TestSQLiteIndexedTarParallelized:
             assert mountSource.listDir('/ufo_03.tar/ufo_02.tar/ufo_01.tar')
             assert mountSource.listDir('/ufo_03.tar/ufo_02.tar/ufo_01.tar/ufo_00.tar')
 
+            assert mountSource.getFileInfo('/').userdata[-1] == SQLiteIndexedTarUserData(0, 0, False, False, True, 0)
+
+            # Recursion depth:
+            # file.tar -> / 0, /bar 0
+            # nested-file.tar -> / 0, /bar.tar.version/1 0, /bar/ 1, /bar/foo 1
+            # file.tar.gz -> / 0, /bar 1
+            #    TODO: /file.tar 0  would be expected for completeness but it was not there in the past!
+            # nested-file.tar -> / 0, /bar.tar.version/1 0, /bar/ 1, /bar/foo 1
+
+            # The (generated) root has always recursion depth 0 because it will always be shown!
+            assert mountSource.getFileInfo('/').userdata[-1].recursiondepth == 0
+            # The recursion depth is 1 because of the gzip compression. Consider ufo_03.tar being inside
+            # packged-5-times.tar (without the .gz), then the recursion depth would have to be one less, i.e., 0!
+            assert mountSource.getFileInfo('/ufo_03.tar', fileVersion=1).userdata[-1].recursiondepth == 1
+
+            def checkRecursiveMountPoint(path, depth):
+                fileInfo = mountSource.getFileInfo(path)
+                assert stat.S_ISDIR(fileInfo.mode)
+
+                userdata = fileInfo.userdata[-1]
+                assert isinstance(userdata, SQLiteIndexedTarUserData)
+                assert userdata.recursiondepth == depth
+                assert userdata.isgenerated
+                assert userdata.istar
+
+            checkRecursiveMountPoint('/ufo_03.tar', 2)
+            checkRecursiveMountPoint('/ufo_03.tar/ufo_02.tar', 3)
+            checkRecursiveMountPoint('/ufo_03.tar/ufo_02.tar/ufo_01.tar', 4)
+            checkRecursiveMountPoint('/ufo_03.tar/ufo_02.tar/ufo_01.tar/ufo_00.tar', 5)
+
             fileInfo = mountSource.getFileInfo('/ufo_03.tar/ufo_02.tar/ufo_01.tar/ufo_00.tar/ufo')
             assert fileInfo
             assert mountSource.open(fileInfo).read() == b'iriya\n'
+
+    @staticmethod
+    def test_compressed_tar(parallelization):
+        with copyTestFile("packed-5-times.tar.gz") as path, SQLiteIndexedTar(
+            path,
+            clearIndexCache=True,
+            parallelization=parallelization,
+        ) as mountSource:
+            assert mountSource.listDir('/')
+
+            # See test_deep_recursive for recursion depth discussion.
+            assert mountSource.getFileInfo('/').userdata[-1] == SQLiteIndexedTarUserData(0, 0, False, False, True, 0)
+            fileInfo = mountSource.getFileInfo('/ufo_03.tar')
+            assert fileInfo
+            assert stat.S_ISREG(fileInfo.mode)
+            assert fileInfo.userdata[-1].recursiondepth == 1
 
     @staticmethod
     def test_index_creation_and_loading(parallelization):
