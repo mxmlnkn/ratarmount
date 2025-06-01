@@ -101,19 +101,24 @@ class TestSQLiteIndexedTarParallelized:
             assert info.userdata[0].offset == 1248768
 
     @staticmethod
-    def test_deep_recursive(parallelization):
+    @pytest.mark.parametrize("recursive", [False, True])
+    @pytest.mark.parametrize("maxRecursionDepth", [None, 0, 1, 2, 3, 4, 5])
+    def test_deep_recursive(parallelization, recursive, maxRecursionDepth):
         with copyTestFile("packed-5-times.tar.gz") as path, SQLiteIndexedTar(
             path,
             clearIndexCache=True,
-            recursive=True,
+            recursive=recursive,
+            recursionDepth=maxRecursionDepth,
             parallelization=parallelization,
         ) as mountSource:
-            assert mountSource.listDir('/')
-            assert mountSource.listDir('/ufo_03.tar')
-            assert mountSource.listDir('/ufo_03.tar/ufo_02.tar')
-            assert mountSource.listDir('/ufo_03.tar/ufo_02.tar/ufo_01.tar')
-            assert mountSource.listDir('/ufo_03.tar/ufo_02.tar/ufo_01.tar/ufo_00.tar')
+            # packed-5-times.tar.gz -> /ufo_03.tar/ufo_02.tar/ufo_01.tar/ufo_00.tar/ufo
+            maxDepth = 5  # 4 TAR archives + 1 compression layer
+            recursionDepth = (maxDepth if recursive else 0) if maxRecursionDepth is None else maxRecursionDepth
+            # Old default of undoing compression + TAR layer if nothing is specified.
+            if not recursive and maxRecursionDepth is None:
+                recursionDepth = 1
 
+            assert mountSource.listDir('/')
             assert mountSource.getFileInfo('/').userdata[-1] == SQLiteIndexedTarUserData(0, 0, False, False, True, 0)
 
             # Recursion depth:
@@ -125,28 +130,71 @@ class TestSQLiteIndexedTarParallelized:
 
             # The (generated) root has always recursion depth 0 because it will always be shown!
             assert mountSource.getFileInfo('/').userdata[-1].recursiondepth == 0
+
+            # Currently there is no way to get to this file when recursively mounted.
+            # We would have to enable "/.versions/" to get older versions of the root folder or folders in general.
+            if recursionDepth == 0:
+                fileInfo = mountSource.getFileInfo('/packed-5-times.tar')
+                assert fileInfo
+                userdata = fileInfo.userdata[-1]
+                assert userdata.recursiondepth == 0
+                assert stat.S_ISREG(fileInfo.mode)
+                assert fileInfo.size == 51200
+
             # The recursion depth is 1 because of the gzip compression. Consider ufo_03.tar being inside
-            # packged-5-times.tar (without the .gz), then the recursion depth would have to be one less, i.e., 0!
-            assert mountSource.getFileInfo('/ufo_03.tar', fileVersion=1).userdata[-1].recursiondepth == 1
+            # packaged-5-times.tar (without the .gz), then the recursion depth would have to be one less, i.e., 0!
+            fileInfo = mountSource.getFileInfo('/ufo_03.tar')
+            if recursionDepth == 0:
+                assert fileInfo is None
+            elif recursionDepth == 1:
+                assert fileInfo
+                userdata = fileInfo.userdata[-1]
+                assert userdata.recursiondepth == 1  # Not 0 because gzip compression counts as one layer of recursion.
+                assert stat.S_ISREG(fileInfo.mode)
+                assert not stat.S_ISDIR(fileInfo.mode)
+                assert fileInfo.size == 40960
+            else:
+                assert fileInfo
+                userdata = fileInfo.userdata[-1]
+                assert userdata.recursiondepth == 2
+                assert stat.S_ISDIR(fileInfo.mode)
+
+                # Check that the older version is still reachable.
+                fileInfo = mountSource.getFileInfo('/ufo_03.tar', fileVersion=0 if recursionDepth == 0 else 1)
+                assert fileInfo
+                userdata = fileInfo.userdata[-1]
+                assert userdata.recursiondepth == 1  # Not 0 because gzip compression counts as one layer of recursion.
+                assert stat.S_ISREG(fileInfo.mode)
+                assert not stat.S_ISDIR(fileInfo.mode)
+                assert fileInfo.size == 40960
 
             def checkRecursiveMountPoint(path, depth):
                 fileInfo = mountSource.getFileInfo(path)
-                assert stat.S_ISDIR(fileInfo.mode)
+                if depth > recursionDepth:
+                    return
 
+                assert fileInfo
                 userdata = fileInfo.userdata[-1]
                 assert isinstance(userdata, SQLiteIndexedTarUserData)
+                if depth <= recursionDepth:
+                    assert stat.S_ISDIR(fileInfo.mode)
+                    assert mountSource.listDir(path)
+                else:
+                    assert not stat.S_ISDIR(fileInfo.mode)
+
                 assert userdata.recursiondepth == depth
                 assert userdata.isgenerated
                 assert userdata.istar
+
+                if depth == maxDepth:
+                    fileInfo = mountSource.getFileInfo(path + '/ufo')
+                    assert fileInfo
+                    assert mountSource.open(fileInfo).read() == b'iriya\n'
 
             checkRecursiveMountPoint('/ufo_03.tar', 2)
             checkRecursiveMountPoint('/ufo_03.tar/ufo_02.tar', 3)
             checkRecursiveMountPoint('/ufo_03.tar/ufo_02.tar/ufo_01.tar', 4)
             checkRecursiveMountPoint('/ufo_03.tar/ufo_02.tar/ufo_01.tar/ufo_00.tar', 5)
-
-            fileInfo = mountSource.getFileInfo('/ufo_03.tar/ufo_02.tar/ufo_01.tar/ufo_00.tar/ufo')
-            assert fileInfo
-            assert mountSource.open(fileInfo).read() == b'iriya\n'
 
     @staticmethod
     def test_compressed_tar(parallelization):

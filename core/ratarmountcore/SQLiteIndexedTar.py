@@ -47,6 +47,7 @@ from .utils import (
     CompressionError,
     ceilDiv,
     detectRawTar,
+    determineRecursionDepth,
     decodeUnpaddedBase64,
     getXdgCacheHome,
     isOnSlowDrive,
@@ -353,6 +354,9 @@ class _TarFileMetadataReader:
         FileInfo tuples and inserting those into the database in a chunked manner using the given _setFileInfos.
         """
 
+        if self._recursionDepth > self._parent.maxRecursionDepth:
+            return []
+
         loadedTarFile: Any = self._openTar(fileObject)
 
         # Iterate over files inside TAR and add them to the database
@@ -385,7 +389,7 @@ class _TarFileMetadataReader:
                         pathPrefix=pathPrefix,
                         streamOffset=streamOffset,
                         isGnuIncremental=self._parent._isGnuIncremental,
-                        mountRecursively=self._parent.mountRecursively,
+                        mountRecursively=self._recursionDepth < self._parent.maxRecursionDepth,
                         transform=self._parent.transform,
                         recursionDepth=self._recursionDepth,
                         printDebug=self._parent.printDebug,
@@ -464,6 +468,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         transform                    : Optional[Tuple[str, str]] = None,
         prioritizedBackends          : Optional[List[str]]       = None,
         indexMinimumFileCount        : int                       = 0,
+        recursionDepth               : Optional[int]             = None,
         # pylint: disable=unused-argument
         **kwargs
         # fmt: on
@@ -523,7 +528,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         """
 
         # fmt: off
-        self.mountRecursively             = recursive
         self.encoding                     = encoding
         self.stripRecursiveTarExtension   = stripRecursiveTarExtension
         self.transformRecursiveMountPoint = transformRecursiveMountPoint
@@ -539,6 +543,8 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         self._recursionDepth              = -1
         # fmt: on
         self.prioritizedBackends: List[str] = [] if prioritizedBackends is None else prioritizedBackends
+
+        self.maxRecursionDepth = determineRecursionDepth(recursive=recursive, recursionDepth=recursionDepth)
 
         self.transform = (
             (lambda x: re.sub(self.transformPattern[0], self.transformPattern[1], x))
@@ -588,6 +594,13 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
         if self.compression:
             self._recursionDepth += 1
+            # Change the default from 0 to 1 to undo the compression layer and analyze the TAR if nothing is specified.
+            if not recursive and recursionDepth is None:
+                self.maxRecursionDepth = 1
+
+        # Can only be set correctly after the compression has been detected because it determines the default
+        # recursion depth. This is legacy, i.e., only to add the correct value to 'metadata' to be backward compatible.
+        self.mountRecursively = self.maxRecursionDepth > 0
 
         # Try to get block size from the real opened file.
         self.blockSize = 512
