@@ -939,7 +939,8 @@ class SQLiteIndex:
         self.getConnection().executemany('INSERT OR REPLACE INTO "xattrs" VALUES (?,?,?)', rows)
 
     def listxattr(self, fileInfo: FileInfo) -> List[str]:
-        assert fileInfo.userdata
+        if not fileInfo.userdata:
+            return []
         userData = fileInfo.userdata[-1]
         assert isinstance(userData, SQLiteIndexedTarUserData)
 
@@ -961,7 +962,8 @@ class SQLiteIndex:
         return []
 
     def getxattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
-        assert fileInfo.userdata
+        if not fileInfo.userdata:
+            return None
         userData = fileInfo.userdata[-1]
         assert isinstance(userData, SQLiteIndexedTarUserData)
 

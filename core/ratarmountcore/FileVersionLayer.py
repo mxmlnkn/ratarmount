@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import enum
 import os
 import stat
 
@@ -9,6 +10,11 @@ from typing import Any, Dict, IO, Iterable, List, Optional, Tuple, Union
 
 from .MountSource import FileInfo, MountSource
 from .utils import overrides
+
+
+class FileType(enum.Enum):
+    FILE = 0
+    VERSIONS_FOLDER = 1
 
 
 class FileVersionLayer(MountSource):
@@ -149,6 +155,10 @@ class FileVersionLayer(MountSource):
     def _listDirWrapper(self, listDir, path: str):
         files = listDir(path)
         if files is not None:
+            if isinstance(files, dict):
+                for _, fileInfo in files.items():
+                    if isinstance(fileInfo, FileInfo):
+                        fileInfo.userdata.append(FileType.FILE)
             return files
 
         # If no folder was found, check whether the special .versions folder was requested
@@ -162,7 +172,12 @@ class FileVersionLayer(MountSource):
         path, pathIsSpecialVersionsFolder, _ = result
 
         if not pathIsSpecialVersionsFolder:
-            return listDir(path)
+            files = listDir(path)
+            if isinstance(files, dict):
+                for _, fileInfo in files.items():
+                    if isinstance(fileInfo, FileInfo):
+                        fileInfo.userdata.append(FileType.FILE)
+            return files
 
         # Print all available versions of the file at filePath as the contents of the special '.versions' folder
         return [str(version + 1) for version in range(self.mountSource.fileVersions(path))]
@@ -183,6 +198,7 @@ class FileVersionLayer(MountSource):
 
         fileInfo = FileVersionLayer._resolveHardLinks(self.mountSource, path)
         if fileInfo:
+            fileInfo.userdata.append(FileType.FILE)
             return fileInfo
 
         # If no file was found, check if a special .versions folder to an existing file/folder was queried.
@@ -197,7 +213,7 @@ class FileVersionLayer(MountSource):
             parentFileInfo = self.mountSource.getFileInfo(path)
             assert parentFileInfo
 
-            fileInfo = FileInfo(
+            return FileInfo(
                 # fmt: off
                 size     = 0,
                 mtime    = parentFileInfo.mtime,
@@ -205,41 +221,69 @@ class FileVersionLayer(MountSource):
                 linkname = "",
                 uid      = parentFileInfo.uid,
                 gid      = parentFileInfo.gid,
-                # I think this does not matter because currently userdata is only used in read calls,
-                # which should only be given non-directory files and this is a directory
-                userdata = [],
+                userdata = [FileType.VERSIONS_FOLDER],
                 # fmt: on
             )
 
-            return fileInfo
-
         # 3.) At this point the request is for an actually older version of a file or folder
-        return self.mountSource.getFileInfo(path, fileVersion=fileVersion)
+        fileInfo = self.mountSource.getFileInfo(path, fileVersion=fileVersion)
+        if fileInfo:
+            fileInfo.userdata.append(FileType.FILE)
+        return fileInfo
 
     @overrides(MountSource)
     def fileVersions(self, path: str) -> int:
-        # TODO return 1 for special .versions folders and files contained in there?
         return self.mountSource.fileVersions(path)
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
-        return self.mountSource.open(fileInfo, buffering=buffering)
+        fileType = fileInfo.userdata.pop()
+        try:
+            if fileType == FileType.FILE:
+                return self.mountSource.open(fileInfo, buffering=buffering)
+            raise FileNotFoundError(f"[FileVersionLayer.open] file info: {fileInfo}")
+        finally:
+            fileInfo.userdata.append(fileType)
 
     @overrides(MountSource)
     def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
-        return self.mountSource.read(fileInfo, size, offset)
+        fileType = fileInfo.userdata.pop()
+        try:
+            if fileType == FileType.FILE:
+                return self.mountSource.read(fileInfo, size, offset)
+            raise FileNotFoundError(f"[FileVersionLayer.read] file info: {fileInfo}")
+        finally:
+            fileInfo.userdata.append(fileType)
 
     @overrides(MountSource)
     def getMountSource(self, fileInfo: FileInfo) -> Tuple[str, MountSource, FileInfo]:
-        return self.mountSource.getMountSource(fileInfo)
+        fileType = fileInfo.userdata.pop()
+        try:
+            if fileType == FileType.VERSIONS_FOLDER:
+                return '/', self, fileInfo
+            return self.mountSource.getMountSource(fileInfo)
+        finally:
+            fileInfo.userdata.append(fileType)
 
     @overrides(MountSource)
     def listxattr(self, fileInfo: FileInfo) -> List[str]:
-        return self.mountSource.listxattr(fileInfo)
+        fileType = fileInfo.userdata.pop()
+        try:
+            if fileType == FileType.VERSIONS_FOLDER:
+                return []
+            return self.mountSource.listxattr(fileInfo)
+        finally:
+            fileInfo.userdata.append(fileType)
 
     @overrides(MountSource)
     def getxattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
-        return self.mountSource.getxattr(fileInfo, key)
+        fileType = fileInfo.userdata.pop()
+        try:
+            if fileType == FileType.VERSIONS_FOLDER:
+                return None
+            return self.mountSource.getxattr(fileInfo, key)
+        finally:
+            fileInfo.userdata.append(fileType)
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
