@@ -12,18 +12,21 @@ import sys
 import traceback
 import warnings
 
-from typing import IO, Optional, Union
+from typing import IO, List, Optional, Union
 
 from .compressions import (
     checkForSplitFile,
+    isSquashFS,
     libarchive,
-    PySquashfsImage,
     pyfatfs,
     rarfile,
-    TAR_COMPRESSION_FORMATS,
+    supportedCompressions,
     zipfile,
+    PySquashfsImage,
+    LIBARCHIVE_ARCHIVE_FORMATS,
+    LIBARCHIVE_FILTER_FORMATS,
+    TAR_COMPRESSION_FORMATS,
 )
-from .compressions import isSquashFS
 from .utils import CompressionError, RatarmountError
 from .MountSource import MountSource
 from .FATMountSource import FATMountSource
@@ -174,14 +177,39 @@ def _openFATImage(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[Moun
     return None
 
 
+def _getTarExtensions() -> List[str]:
+    result = ['tar']
+    result += ['tar.' + suffix for compression in TAR_COMPRESSION_FORMATS.values() for suffix in compression.suffixes]
+    result += [suffix for compression in TAR_COMPRESSION_FORMATS.values() for suffix in compression.doubleSuffixes]
+    return result
+
+
+def getFormatExtensions(formatName: str) -> List[str]:
+    return supportedCompressions[formatName].suffixes if formatName in supportedCompressions else []
+
+
+# Map of backends to their respective open-function and also some extension
+# for which that particular backend will be tested first. Should all be lowercase
 _BACKENDS = {
-    "rarfile": _openRarMountSource,
-    "tarfile": _openTarMountSource,
-    "zipfile": _openZipMountSource,
-    "pysquashfsimage": _openPySquashfsImage,
-    "libarchive": _openLibarchiveMountSource,
-    "pyfatfs": _openFATImage,
+    "rarfile": (_openRarMountSource, getFormatExtensions('rar')),
+    "tarfile": (_openTarMountSource, _getTarExtensions()),
+    "zipfile": (_openZipMountSource, getFormatExtensions('zip')),
+    "pysquashfsimage": (_openPySquashfsImage, getFormatExtensions('squashfs')),
+    "libarchive": (
+        _openLibarchiveMountSource,
+        [
+            s
+            for formats in [LIBARCHIVE_FILTER_FORMATS, LIBARCHIVE_ARCHIVE_FORMATS]
+            for info in formats.values()
+            for s in info.suffixes
+        ],
+    ),
+    "pyfatfs": (_openFATImage, getFormatExtensions('fat')),
 }
+
+
+def matchesExtension(fileName: str, extensions: List[str]) -> bool:
+    return any(fileName.lower().endswith('.' + extension.lower()) for extension in extensions)
 
 
 def _openGitMountSource(url: str) -> Union[MountSource, IO[bytes], str]:
@@ -392,6 +420,7 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
 
         fileOrPath = openedURL
 
+    autoPrioritizedBackends: List[str] = []
     joinedFileName = ''
     if isinstance(fileOrPath, str):
         if not os.path.exists(fileOrPath):
@@ -411,12 +440,16 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
             fileOrPath = JoinedFileFromFactory(
                 [(lambda file=file: open(file, 'rb')) for file in filesToJoin]  # type: ignore
             )
+        else:
+            autoPrioritizedBackends = [
+                backend for backend, value in _BACKENDS.items() if matchesExtension(fileOrPath, value[1])
+            ]
 
     prioritizedBackends = options.get("prioritizedBackends", [])
     triedBackends = set()
     tarCompressionBackends = [module.name for _, info in TAR_COMPRESSION_FORMATS.items() for module in info.modules]
 
-    for name in prioritizedBackends + list(_BACKENDS.keys()):
+    for name in prioritizedBackends + autoPrioritizedBackends + list(_BACKENDS.keys()):
         if name in tarCompressionBackends:
             name = "tarfile"
         if name in triedBackends:
@@ -430,7 +463,8 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
         try:
             if printDebug >= 3:
                 print(f"[Info] Try to open with {name}")
-            result = _BACKENDS[name](fileOrPath, **options)
+            backendOpen, _ = _BACKENDS[name]
+            result = backendOpen(fileOrPath, **options)
             if result:
                 if printDebug >= 2:
                     print(f"[Info] Opened archive with {name} backend.")
