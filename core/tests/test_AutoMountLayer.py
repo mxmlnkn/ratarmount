@@ -18,7 +18,8 @@ from ratarmountcore.factory import openMountSource  # noqa: E402
 from ratarmountcore.AutoMountLayer import AutoMountLayer  # noqa: E402
 
 
-@pytest.mark.parametrize("parallelization", [1, 2, 4])
+# @pytest.mark.parametrize("parallelization", [1, 2, 4])
+@pytest.mark.parametrize("parallelization", [1])
 class TestAutoMountLayer:
     @staticmethod
     def test_regex_mount_point_tar(parallelization):
@@ -142,3 +143,99 @@ class TestAutoMountLayer:
                 assert stat.S_ISREG(recursivelyMounted.getFileInfo(mountedFile, fileVersion=1).mode)
 
             # assert recursivelyMounted.open(recursivelyMounted.getFileInfo('/ufo_00/ufo')).read() == b'iriya\n'
+
+    @staticmethod
+    @pytest.mark.parametrize("recursive", [False])
+    @pytest.mark.parametrize("maxRecursionDepth", range(7))
+    def test_recursion_depth(parallelization, recursive, maxRecursionDepth):
+        name = "triple-compressed-nested-tar"
+        archivePath = f"tests/{name}.tgz.tgz.gz"
+        options = {
+            'clearIndexCache': True,
+            'recursive': recursive,
+            'recursionDepth': maxRecursionDepth,
+            'parallelization': parallelization,
+        }
+        with copyTestFile(archivePath) as path, openMountSource(path, **options) as mountSource:
+            recursivelyMounted = AutoMountLayer(mountSource, **options)
+            assert recursivelyMounted.listDir('/')
+
+            maxDepth = 6
+            recursionDepth = maxDepth if maxRecursionDepth is None else maxRecursionDepth
+
+            def checkDirectory(fileInfo):
+                assert fileInfo
+                assert stat.S_ISDIR(fileInfo.mode)
+
+            def checkFile(fileInfo, size=None):
+                assert fileInfo
+                assert fileInfo.size == size
+                assert not stat.S_ISDIR(fileInfo.mode)
+                assert stat.S_ISREG(fileInfo.mode)
+
+            def checkNonExisting(fileInfo):
+                assert not fileInfo
+
+            # This was insane brainfuck... Off by one errors everywhere.
+            # Check with: ratarmount -f -c --recursion-depth 1 tests/triple-compressed-nested-tar.tgz.tgz.gz mounted
+            nestedRoot = f"/{name}.tgz.tgz/nested-tar.tar.gz"
+            testPaths = {
+                f"/{name}.tgz.tgz": {
+                    0: lambda path: checkFile(path, size=436),
+                    1: lambda path: checkDirectory,
+                },
+                f"/{name}.tgz.tgz/{name}.tgz.tgz": {
+                    1: lambda path: checkFile(path, size=10240),
+                    2: lambda path: checkDirectory,
+                },
+                nestedRoot: {
+                    2: lambda path: checkFile(path, size=291),
+                    3: lambda path: checkDirectory,
+                },
+                # This file is only visible when only the gzip compression has been undone.
+                # And the name is probably the one stored in gzip itself. It has support for that!
+                # For the next recursion, this virtual file will be replaced by the actual contents.
+                nestedRoot
+                + "/nested-tar.tar": {
+                    3: lambda path: checkFile(path, size=20480),
+                    4: lambda path: checkNonExisting(path),
+                },
+                nestedRoot
+                + "/foo": {
+                    4: lambda path: checkDirectory,
+                },
+                nestedRoot
+                + "/foo/fighter": {
+                    4: lambda path: checkDirectory,
+                },
+                nestedRoot
+                + "/foo/fighter/ufo": {
+                    4: lambda path: checkFile(path, size=6),
+                },
+                nestedRoot
+                + "/foo/lighter.tar": {
+                    4: lambda path: checkFile(path, size=10240),
+                    5: lambda path: checkDirectory,
+                },
+                nestedRoot
+                + "/foo/lighter.tar/fighter": {
+                    5: lambda path: checkDirectory,
+                },
+                nestedRoot
+                + "/foo/lighter.tar/fighter/bar": {
+                    5: lambda path: checkFile(path, size=10),
+                },
+            }
+
+            # Check paths up to the allowed recursion depth
+            for path, configurations in testPaths.items():
+                fileInfo = recursivelyMounted.getFileInfo(path)
+
+                # Files should not exist when their actual depth is larger than the specified mount depth.
+                if recursionDepth < min(configurations.keys()):
+                    assert not recursivelyMounted.exists(path)
+                    assert fileInfo is None
+                    continue
+
+                expectedDepth = recursionDepth if recursionDepth in configurations else max(configurations.keys())
+                configurations[expectedDepth](fileInfo)

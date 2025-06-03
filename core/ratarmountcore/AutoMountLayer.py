@@ -14,7 +14,7 @@ from .factory import openMountSource
 from .FolderMountSource import FolderMountSource
 from .MountSource import FileInfo, MountSource, mergeStatfs
 from .SQLiteIndexedTar import SQLiteIndexedTar, SQLiteIndexedTarUserData
-from .utils import determineRecursionDepth, overrides
+from .utils import determineRecursionDepth, overrides, RatarmountError
 
 
 class AutoMountLayer(MountSource):
@@ -29,8 +29,13 @@ class AutoMountLayer(MountSource):
     class MountInfo:
         mountSource: MountSource
         rootFileInfo: FileInfo
+        recursionDepth: int
 
     def __init__(self, mountSource: MountSource, **options) -> None:
+        if isinstance(mountSource, AutoMountLayer):
+            # Stacking can make sense and should work when they have non-overlapping(!) recursion depths.
+            raise RatarmountError("AutoMountLayer must not be stacked directly onto each other.")
+
         self.options = options
         self.maxRecursionDepth: int = determineRecursionDepth(**options)
         self.lazyMounting: bool = self.options.get('lazyMounting', False)
@@ -45,17 +50,21 @@ class AutoMountLayer(MountSource):
         # Disable false positive introduced when updating pylint from 2.6 to 2.12.
         # It now thinks that the assignment is to AutoMountLayer instead of self.mounted.
         # pylint: disable=used-before-assignment
-        self.mounted: Dict[str, AutoMountLayer.MountInfo] = {'/': AutoMountLayer.MountInfo(mountSource, rootFileInfo)}
+        self.mounted: Dict[str, AutoMountLayer.MountInfo] = {
+            '/': AutoMountLayer.MountInfo(mountSource, rootFileInfo, 0)
+        }
 
         if self.lazyMounting:
             return
 
         # Go over all files and mount archives and even archives in those archives
         foldersToWalk = ['/']
-        recursionDepth = 0
-        while foldersToWalk and recursionDepth < self.maxRecursionDepth:
+        while foldersToWalk:
             newFoldersToWalk = []
             for folder in foldersToWalk:
+                if self.getRecursionDepth(folder) > self.maxRecursionDepth:
+                    continue
+
                 fileNames = self.listDir(folder)
                 if not fileNames:
                     continue
@@ -69,16 +78,7 @@ class AutoMountLayer(MountSource):
                         if mountPoint:
                             newFoldersToWalk.append(mountPoint)
 
-            recursionDepth += 1
             foldersToWalk = newFoldersToWalk
-
-    def _getRecursionDepth(self, path: str) -> int:
-        parts = path.split('/')
-        mountLayers = 0
-        for depth in range(len(parts)):
-            if '/'.join(parts[:depth]) in self.mounted:
-                mountLayers += 1
-        return mountLayers
 
     def _simplyFindMounted(self, path: str) -> Tuple[str, str]:
         """See _findMounted. This is split off to avoid convoluted recursions during lazy mounting."""
@@ -96,6 +96,24 @@ class AutoMountLayer(MountSource):
         assert '/' in self.mounted
         return '/', path
 
+    def getRecursionDepth(self, path: str) -> int:
+        mountPoint, pathInMountPoint = self._simplyFindMounted(path)
+        mountInfo = self.mounted[mountPoint]
+        fileInfo = mountInfo.mountSource.getFileInfo(pathInMountPoint)
+
+        # +1 because, by definition each mount source adds one recursion.
+        # There can be no passthrough MountSource here because they are only created on archives..
+        return mountInfo.recursionDepth + (
+            sum(
+                userdata.recursiondepth
+                for userdata in fileInfo.userdata
+                if isinstance(userdata, SQLiteIndexedTarUserData)
+            )
+            + 1
+            if fileInfo
+            else 0
+        )
+
     def _tryToMountFile(self, path: str) -> Optional[str]:
         """
         Returns the mount point path if it has been successfully mounted.
@@ -108,7 +126,7 @@ class AutoMountLayer(MountSource):
         if strippedFilePath == path:
             return None
 
-        recursionDepth = self._getRecursionDepth(path)
+        recursionDepth = self.getRecursionDepth(path)
         if recursionDepth > self.maxRecursionDepth:
             return None
 
@@ -124,7 +142,8 @@ class AutoMountLayer(MountSource):
 
         # Use _simplyFindMounted instead of _findMounted or self.open to avoid recursions caused by lazy mounting!
         parentMountPoint, pathInsideParentMountPoint = self._simplyFindMounted(path)
-        parentMountSource = self.mounted[parentMountPoint].mountSource
+        parentMountInfo = self.mounted[parentMountPoint]
+        parentMountSource = parentMountInfo.mountSource
 
         archiveFileInfo = parentMountSource.getFileInfo(pathInsideParentMountPoint)
         if archiveFileInfo is None:
@@ -143,9 +162,11 @@ class AutoMountLayer(MountSource):
                 if isinstance(indexedTarData, SQLiteIndexedTarUserData) and indexedTarData.istar:
                     return None
 
+        recursionDepth = self.getRecursionDepth(path)
+
         try:
             options = self.options.copy()
-            options['recursive'] = recursionDepth + 1 < self.maxRecursionDepth
+            options['recursionDepth'] = max(0, self.maxRecursionDepth - recursionDepth)
 
             _, deepestMountSource, deepestFileInfo = parentMountSource.getMountSource(archiveFileInfo)
             if isinstance(deepestMountSource, FolderMountSource):
@@ -172,7 +193,7 @@ class AutoMountLayer(MountSource):
         rootFileInfo.mode = (rootFileInfo.mode & 0o777) | stat.S_IFDIR
         rootFileInfo.linkname = ""
         rootFileInfo.userdata = [mountPoint]
-        mountInfo = AutoMountLayer.MountInfo(mountSource, rootFileInfo)
+        mountInfo = AutoMountLayer.MountInfo(mountSource, rootFileInfo, recursionDepth)
 
         # TODO What if the mount point already exists, e.g., because stripRecursiveTarExtension is true and there
         #      are multiple archives with the same name but different extensions?
@@ -197,7 +218,7 @@ class AutoMountLayer(MountSource):
             for part in path.lstrip('/').split('/'):
                 subPath = os.path.join(subPath, part)
 
-                if self._getRecursionDepth(subPath) > self.maxRecursionDepth:
+                if self.getRecursionDepth(subPath) > self.maxRecursionDepth:
                     break
 
                 if subPath not in self.mounted:
