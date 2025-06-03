@@ -691,3 +691,16 @@ mkdir -p pkgroot/usr/share/doc/testpkg
 touch pkgroot/usr/share/doc/testpkg/empty
 chmod 755 pkgroot/DEBIAN/control
 dpkg-deb --build pkgroot testpkg_0.0.1_all.deb
+
+# archive-with-versions-folder.tar
+mkdir archive-with-version-folder
+(
+    cd archive-with-version-folder &&
+    echo bar > foo &&
+    mkdir foo.versions &&
+    echo bar2 > foo.versions/foo2 &&
+    echo fole > file &&
+    echo fole2 > file.versions &&
+    echo 'root file' > .versions
+)
+tar --numeric-owner --xattrs -cf archive-with-version-folder{.tar,}
