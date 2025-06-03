@@ -148,19 +148,21 @@ def printVersions() -> None:
 
 def printOSSAttributions() -> None:
     licenses = [
-        ("fusepy", "/fusepy/fusepy/master/LICENSE"),  # ISC
-        ("python-xz", "/Rogdham/python-xz/master/LICENSE.txt"),  # MIT
-        ("rarfile", "/markokr/rarfile/master/LICENSE"),  # ISC
-        ("libfuse", "/libfuse/libfuse/master/LGPL2.txt"),  # LGPL 2.1
+        ("fusepy", "/fusepy/fusepy/refs/heads/master/LICENSE"),  # ISC
+        ("mfusepy", "/mxmlnkn/mfusepy/refs/heads/master/LICENSE"),  # ISC
+        ("python-xz", "/Rogdham/python-xz/refs/heads/master/LICENSE.txt"),  # MIT
+        ("rarfile", "/markokr/rarfile/refs/heads/master/LICENSE"),  # ISC
+        ("libfuse", "/libfuse/libfuse/refs/heads/master/LGPL2.txt"),  # LGPL 2.1
         ("libsqlite3", "/sqlite/sqlite/master/LICENSE.md"),  # "The author disclaims copyright to this source code"
         ("cpython", "/python/cpython/main/LICENSE"),  # PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2
         ("libzstd-seek", "/martinellimarco/libzstd-seek/main/LICENSE"),  # MIT
         ("zstd", "/facebook/zstd/dev/LICENSE"),  # BSD-3 with "name of the copyright holder" explicitly filled in
-        ("zlib", "/madler/zlib/master/LICENSE"),  # zlib License
-        ("ratarmountcore", "/mxmlnkn/ratarmount/master/core/LICENSE"),  # MIT
-        ("indexed_gzip", "/pauldmccarthy/indexed_gzip/master/LICENSE"),  # zlib License
-        ("indexed_zstd", "/martinellimarco/indexed_zstd/master/LICENSE"),  # MIT
-        ("rapidgzip", "/mxmlnkn/rapidgzip/master/LICENSE-MIT"),  # MIT or Apache License 2.0
+        ("zlib", "/madler/zlib/refs/heads/master/LICENSE"),  # zlib License
+        ("ratarmountcore", "/mxmlnkn/ratarmount/refs/heads/master/core/LICENSE"),  # MIT
+        ("indexed_gzip", "/pauldmccarthy/indexed_gzip/refs/heads/main/LICENSE"),  # zlib License
+        ("indexed_zstd", "/martinellimarco/indexed_zstd/refs/heads/master/LICENSE"),  # MIT
+        ("rapidgzip", "/mxmlnkn/rapidgzip/refs/heads/master/LICENSE-MIT"),  # MIT or Apache License 2.0
+        ("fastzipfile", "/kamilmahmood/fastzipfile/refs/heads/master/LICENSE"),  # MIT
         ("fast-zip-decryption", "/mxmlnkn/fast-zip-decryption/refs/heads/master/LICENSE"),  # MIT
         ("fsspec", "/fsspec/filesystem_spec/refs/heads/master/LICENSE"),  # BSD-3
         ("sshfs", "/fsspec/sshfs/refs/heads/main/LICENSE"),  # Apache License 2.0

@@ -2509,9 +2509,13 @@ if [[ -z "$CI" ]]; then
             'grep' -v -F '__init__.py' |
             'grep' -v 'benchmarks/' |
             'grep' -v -F 'setup.py' |
-            'grep' -v 'test.*.py' |
-            'grep' -v 'fuse.py'
+            'grep' -v 'test.*.py'
     )
+
+    allPythonFiles=()
+    while read -r file; do
+        allPythonFiles+=( "$file" )
+    done < <( git ls-tree -r --name-only HEAD | 'grep' '[.]py$' )
 
     testFiles=()
     while read -r file; do
@@ -2521,20 +2525,22 @@ if [[ -z "$CI" ]]; then
     echo "Checking files:"
     printf '    %s\n' "${files[@]}" "${testFiles[@]}"
 
-    pylint --rcfile tests/.pylintrc "${files[@]}" "${testFiles[@]}" | tee pylint.log
+    # Parallelism with -j 3 does not improve much anymore and anything larger even worsens the runtime!
+    pylint -j 2 --rcfile tests/.pylintrc ratarmount core/ratarmountcore "${testFiles[@]}" | tee pylint.log
     if 'grep' -E -q ': E[0-9]{4}: ' pylint.log; then
         echoerr 'There were warnings during the pylint run!'
         exit 1
     fi
     rm pylint.log
 
+    # No parallelism yet: https://github.com/python/mypy/issues/933
     mypy --config-file tests/.mypy.ini "${files[@]}" || returnError "$LINENO" 'Mypy failed!'
     mypy --config-file tests/.mypy.ini "${testFiles[@]}" || returnError "$LINENO" 'Mypy failed!'
 
     pytype -d import-error -P"$( cd core && pwd ):$( pwd )" "${files[@]}" \
         || returnError "$LINENO" 'Pytype failed!'
 
-    black -q --line-length 120 --skip-string-normalization "${files[@]}" "${testFiles[@]}"
+    black -q --line-length 120 --skip-string-normalization "${allPythonFiles[@]}"
 
     filesToSpellCheck=()
     while read -r file; do
@@ -2932,7 +2938,7 @@ checkRecursiveFolderMounting --lazy
 cleanup
 
 rm -f tests/*.index.*
-rmdir tests/*/
+for folder in tests/*/; do safeRmdir "$folder"; done
 
 done  # for parallelization
 

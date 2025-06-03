@@ -37,7 +37,7 @@ def benchmarkReading(fileObject):
         file.close()
 
     t1 = time.time()
-    print(f"Reading {size} B took: {t1-t0:.3f}s")
+    print(f"Reading {size} B took: {t1 - t0:.3f}s")
 
 
 def compareReading(file, pfile):
@@ -63,7 +63,7 @@ def compareReading(file, pfile):
             print(f"{t1 - t0:.2f}s {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024} MiB RSS")
 
     t1 = time.time()
-    print(f"Reading {size} B took: {t1-t0:.3f}s")
+    print(f"Reading {size} B took: {t1 - t0:.3f}s")
 
 
 def testZstdSeeking(filename):
@@ -75,13 +75,14 @@ def testZstdSeeking(filename):
         file.seek(offset)
         file.read(1)
         t1 = time.time()
-        print(f"Seeking to {offset} took {t1-t0:.3f}s")
+        print(f"Seeking to {offset} took {t1 - t0:.3f}s")
 
 
 def readBlock(filename, offset, size):
     with indexed_zstd.IndexedZstdFile(filename) as file:
         file.seek(offset)
         return file.read(size)
+
 
 def simpleParallelZstdReading(filename):
     parallelization = os.cpu_count()
@@ -96,12 +97,12 @@ def simpleParallelZstdReading(filename):
             while len(futures) >= parallelization:
                 futures.pop(0).result()
         t1 = time.time()
-        print(f"Reading in parallel with a thread pool took {t1-t0:.3f}s")
+        print(f"Reading in parallel with a thread pool took {t1 - t0:.3f}s")
 
 
 if __name__ == '__main__':
     for module in ('zstandard', 'indexed_zstd', 'ratarmountcore'):
-        if hasattr( sys.modules[module], '__version__' ):
+        if hasattr(sys.modules[module], '__version__'):
             print(module, "version:", getattr(sys.modules[module], '__version__'))
     print()
 
@@ -120,8 +121,8 @@ if __name__ == '__main__':
     print()
 
     if os.path.isfile(filename + '.zst'):
-        #simpleParallelZstdReading(filename + '.zst')
-        #testZstdSeeking(filename + '.zst')
+        # simpleParallelZstdReading(filename + '.zst')
+        # testZstdSeeking(filename + '.zst')
 
         compareReading(zstandard.open(filename + '.zst', 'rb'), ParallelZstdReader(filename + '.zst', os.cpu_count()))
         benchmarkReading(zstandard.open(filename + '.zst', 'rb'))

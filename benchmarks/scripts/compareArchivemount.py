@@ -309,7 +309,7 @@ def plotRatarmountParallelComparison(fileName, compression):
     df = pd.read_csv(fileName, comment='#', sep=';', names=readLabelsFromFirstComment(fileName))
 
     if df.empty:
-        print(f"[Warning] Did not data for ratarmount tools.")
+        print("[Warning] Did not data for ratarmount tools.")
         return False
 
     if compression == 'find':

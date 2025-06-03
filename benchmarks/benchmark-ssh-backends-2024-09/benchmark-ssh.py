@@ -139,11 +139,16 @@ def test_uncertain_value_to_str():
         assert ss == test[3]
 
 
-def load_config(username = ()):
+def load_config(username=()):
     default_config = os.path.expanduser(os.path.join('~', '.ssh', 'config'))
     config = asyncssh.config.SSHClientConfig.load(
-        None, [default_config] if os.access(default_config, os.R_OK) else [],
-        False, getpass.getuser(), username, hostname, port
+        None,
+        [default_config] if os.access(default_config, os.R_OK) else [],
+        False,
+        getpass.getuser(),
+        username,
+        hostname,
+        port,
     )
     if config.get('Compression') is None:
         config._options['Compression'] = False
@@ -191,7 +196,7 @@ class BenchmarkFullRead:
         ax.set_yticklabels(bar_labels)
 
         for position, value, stddev in zip(bar_positions, bar_values, bar_errors):
-            #if value < 500:
+            # if value < 500:
             x, sx = uncertain_value_to_str(value, stddev)
             plt.text(value + stddev + 10, position, f"({x} ± {sx}) MB/s", ha='left', va='center')
 
@@ -308,7 +313,9 @@ class BenchmarkFullRead:
 
     @classmethod
     def plot(cls, data_file_path, **kwargs):
-        cls.plot_bar_comparison(data_file_path if data_file_path else cls.DATA_FILE_NAME, xlabel="Read Bandwidth / (MB/s)")
+        cls.plot_bar_comparison(
+            data_file_path if data_file_path else cls.DATA_FILE_NAME, xlabel="Read Bandwidth / (MB/s)"
+        )
 
 
 class BenchmarkFullWrite(BenchmarkFullRead):
@@ -349,15 +356,15 @@ class BenchmarkFullWrite(BenchmarkFullRead):
 
             for i in range(repetitions):
                 rclone_command = ['rclone', 'copy', src_path, f'localssh:{target_folder}']
-                #lftpget_command = ['lftpget', f"sftp://{hostname}:{port}{src_path}"]
+                # lftpget_command = ['lftpget', f"sftp://{hostname}:{port}{src_path}"]
                 scp_command = ['scp', '-q', '-P', str(port), src_path, f'scp://{hostname}/{target_folder}']
-                #sftp_command = ['sftp', '-q', '-P', str(port), src_path, f'{hostname}:{target_folder}']
+                # sftp_command = ['sftp', '-q', '-P', str(port), src_path, f'{hostname}:{target_folder}']
                 rsync_command = ['rsync', '-e', f'ssh -p {port}', src_path, f'{hostname}:{target_folder}']
 
                 upload("rclone to memory", rclone_command, memory_folder, csv_file)
-                #upload("lftpget to memory", lftpget_command, memory_folder, csv_file)
+                # upload("lftpget to memory", lftpget_command, memory_folder, csv_file)
                 upload("scp to memory", scp_command, memory_folder, csv_file)
-                #upload("sftp to memory", sftp_command, memory_folder, csv_file)
+                # upload("sftp to memory", sftp_command, memory_folder, csv_file)
                 upload("rsync to memory", rsync_command, memory_folder, csv_file)
 
                 subprocess.run(['sshfs', '-p', str(port), f"{hostname}:{source_folder}", 'mounted-sshfs'], check=True)
@@ -403,7 +410,9 @@ class BenchmarkFullWrite(BenchmarkFullRead):
 
     @classmethod
     def plot(cls, data_file_path, **kwargs):
-        cls.plot_bar_comparison(data_file_path if data_file_path else cls.DATA_FILE_NAME, xlabel="Write Bandwidth / (MB/s)")
+        cls.plot_bar_comparison(
+            data_file_path if data_file_path else cls.DATA_FILE_NAME, xlabel="Write Bandwidth / (MB/s)"
+        )
 
 
 class BenchmarkSshfsMaxRequests:
@@ -511,8 +520,8 @@ class BenchmarkAsyncsshMaxRequests(BenchmarkSshfsMaxRequests):
     @staticmethod
     def download(path, **kwargs):
         ##logging.basicConfig(stream=sys.stdout.buffer, level=logging.DEBUG)
-        #logging.basicConfig(filename="asyncssh.log", level=logging.DEBUG)
-        #asyncssh.set_debug_level(2)
+        # logging.basicConfig(filename="asyncssh.log", level=logging.DEBUG)
+        # asyncssh.set_debug_level(2)
 
         ssh_options = load_config()
 
@@ -580,13 +589,13 @@ class BenchmarkSshfsOverread:
                 for open_file_name in ['sshfs', 'fsspec']:
                     file = fs[open_file_name].open(src_path)
 
-                    t0=time.time()
+                    t0 = time.time()
                     size = 0
                     for i in range(chunk_count):
                         read_size = len(file.read(chunk_size))
-                        #print(f"Read {read_size} out of {chunk_size} for chunk {i}.")
+                        # print(f"Read {read_size} out of {chunk_size} for chunk {i}.")
                         size += read_size
-                    t1=time.time()
+                    t1 = time.time()
 
                     if size != file_size:
                         print(f"Read {size} B but expected {file_size} B!")
@@ -601,7 +610,6 @@ class BenchmarkSshfsOverread:
                         f"Read {size / 1e6:.2f} MB in {chunk_size_in_KiB} KiB chunks with {open_file_name} "
                         f"in {t1-t0:.2f} s -> {size/(t1-t0)/1e6:.2f} MB/s"
                     )
-
 
     @classmethod
     def plot(cls, data_file_path, **kwargs):
@@ -639,7 +647,7 @@ test_file = "silesia.tar.gz"
 src_path = source_folder + test_file
 
 plot_dpi = 300
-figsize = (6,4)
+figsize = (6, 4)
 
 benchmarks = [
     BenchmarkFullRead,
@@ -659,15 +667,11 @@ def _parse_args(raw_args: Optional[List[str]] = None):
     )
     parser.add_argument('--show', action='store_true', help="Display the generated plot before quitting.")
     parser.add_argument('-f', '--file', type=str, help="Output file for benchmark, input file for plot.")
-    parser.add_argument(
-        '--test-file', type=str, default=test_file, help="File name to download or upload via SFTP."
-    )
+    parser.add_argument('--test-file', type=str, default=test_file, help="File name to download or upload via SFTP.")
     parser.add_argument(
         '-r', '--repetitions', type=int, default=15, help="How often to repeat benchmarks for statistics."
     )
-    parser.add_argument(
-        '-P', '--port', type=int, default=port, help="The port for the SSH server."
-    )
+    parser.add_argument('-P', '--port', type=int, default=port, help="The port for the SSH server.")
 
     parser.add_argument('action', choices=["benchmark", "plot"])
     parser.add_argument('name', choices=[x.__name__ for x in benchmarks])

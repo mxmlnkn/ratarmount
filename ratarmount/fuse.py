@@ -6,6 +6,7 @@
 import sys
 import traceback
 
+
 try:
     import mfusepy as fuse  # type: ignore
 except AttributeError as importException:
@@ -25,4 +26,5 @@ except (ImportError, OSError) as importException:
             print("[Error]  - yum install fuse fuse-libs")
             print("[Error] Exception for fuse:", fuseException)
             print("[Error] Exception for fusepy:", fusepyException)
-            sys.exit(1)
+            fuse = None
+            raise fusepyException

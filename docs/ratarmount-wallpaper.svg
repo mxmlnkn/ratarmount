@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+<svg width="2560" height="1440" version="1.1" viewBox="0 0 677 381" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><defs><linearGradient id="linearGradient1" x1="190" x2="320" gradientUnits="userSpaceOnUse" xlink:href="#linearGradientStops"/><linearGradient id="linearGradientStops"><stop id="stop-ratar" stop-color="#a0c" offset="0"/><stop id="stop-mount" stop-color="#090" offset="1"/></linearGradient><filter id="glow"><feGaussianBlur result="blur1" stdDeviation="1"/><feGaussianBlur result="blur2" stdDeviation="2"/><feGaussianBlur result="blur3" stdDeviation="4"/><feColorMatrix in="SourceGraphic" result="luminescence" type="saturate" values="2"/><feMerge><feMergeNode in="blur1"/><feMergeNode in="blur2"/><feMergeNode in="blur3"/><feMergeNode in="SourceGraphic"/><feMergeNode in="luminescence"/></feMerge></filter></defs><rect width="677" height="381" stroke-linecap="square" stroke-opacity=".313" stroke-width="13.2"/><g id="ratarmount" class="gloweffect" transform="matrix(.773 0 0 .833 103 264)" fill="none" stroke-linecap="round" stroke-width="6.33"><g id="ratar" stroke="#a0c"><g id="r" transform="translate(30)"><path d="m0 50c-11 0-20 9-20 20v30" stroke-width="6.33"/></g><g id="a" transform="translate(50)"><circle id="a-ring" cx="25" cy="75" r="25"/><path id="a-tail" d="m50 75v25"/></g><g id="left-t" transform="translate(125)"><path d="m0 10v90" stroke-width="6.33"/></g><g id="mirrored-a" transform="translate(150)"><circle id="mirrored-a-ring" cx="25" cy="75" r="25"/><path id="mirrored-a-tail" d="m0 75v25"/></g><g id="mirrored-r" transform="translate(220)"><path d="m0 50c11 0 20 9 20 20v30" stroke-width="6.33"/></g></g><g id="mount" transform="translate(255)" stroke="#090"><g id="m"><path d="m50 100v-30c0-11-9-20-20-20s-20 9-20 20v30m80 0v-30c0-11-9-20-20-20s-20 9-20 20" stroke-width="6.33"/></g><g id="o" transform="translate(110)"><circle cx="25" cy="75" r="25" stroke-width="6.33"/></g><g id="u" transform="translate(205)"><path d="m25 50v25c0 13.8-11 25-25 25-13.8 0-25-11-25-25v-25" stroke-width="6.33"/></g><g id="n" transform="translate(250)"><path d="m0 100v-25c0-13.8 11-25 25-25 13.8 0 25 11 25 25v25" stroke-width="6.33"/></g><path id="right-t" d="m325 10v90"/></g><g id="animated-t-bar"><path id="right-t-bar" d="m560 30h40" stroke="url(#linearGradient1)" stroke-width="6.33"><animate attributeName="d" calcMode="spline" dur="20s" keyTimes="0.0; 0.7; 0.75; 0.95; 1.0" repeatCount="indefinite" values="M 240,30 H 595;                             M 240,30 H 595;                             M 565,30 H 595;                             M 565,30 H 595;                             M 240,30 H 595"/></path></g><path id="roof" d="m10 30h590" stroke="url(#linearGradient1)">
+    <!--
+            Multiply length with cosine to simulate an animation as if the line was rotating with constant speed:
+            python3 -c 'import numpy as np; \
+                cs = 0.5 + 0.5 * np.cos( np.linspace( 0, 1, 24, endpoint = True ) * 2 * np.pi ); \
+                cs = np.concatenate( (np.ones( 48 ), cs) ); \
+                print( ";\n".join( f"M {105 - c * 90},30 H {145 + c * 450}" for c in cs ) )'
+
+            <animate attributeName="d" values="... output from Python script ..." dur="8s" repeatCount="indefinite"/>
+            --><animate attributeName="d" calcMode="spline" dur="20s" keyTimes="0.0; 0.7; 0.75; 0.95; 1.0" repeatCount="indefinite" values="M 15,30 H 240;                         M 15,30 H 240;                         M 105,30 H 145;                         M 105,30 H 145;                         M 15,30 H 240"/></path></g><g id="ratarmount-icon-face" class="gloweffect" transform="matrix(.816 0 0 .824 216 41)" fill="none" stroke-linecap="round" stroke-width="6.46"><rect id="background" width="300" height="220" rx="19.5" ry="19.3" fill="#000" stroke="#a0c"/><g id="face-features" transform="translate(25,30)" stroke="#090"><g transform="translate(30)"><path d="m0 50c-11 0-20 9-20 20v30" stroke-width="6.46"/></g><g transform="translate(50)"><circle cx="25" cy="75" r="25"/><path d="m50 75v25"/></g><g transform="translate(125)"><path d="m0 10v90" stroke-width="6.46"/></g><g transform="translate(150)"><circle cx="25" cy="75" r="25"/><path d="m0 75v25"/></g><g transform="translate(220)"><path d="m0 50c11 0 20 9 20 20v30" stroke-width="6.46"/></g><g transform="translate(125,50)"><path d="m25 50v25c0 13.8-11 25-25 25-13.8 0-25-11-25-25v-25" stroke-width="6.46"/></g><path d="m10 30h230"/></g></g><style>
+:root {
+    --color-ratar: #aa00cc;
+    --color-mount: #009900;
+}
+
+#ratar { stroke: var(--color-ratar); }
+#stop-ratar { stop-color: var(--color-ratar); }
+#mount { stroke: var(--color-mount); }
+#stop-mount { stop-color: var(--color-mount); }
+
+/* On hover does not work for this SVG when inlined into the rendered Github Readme.md. */
+.gloweffect:hover { filter: url(#glow); }
+/* .gloweffect { filter: url(#glow); } */
+    </style></svg>

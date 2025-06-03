@@ -3,7 +3,6 @@
 benchmarks/data/**/*.png
 knowledge
 worktrees
-indexed*/
 miscellaneous/
 *mimi*
 *momo*
@@ -13,11 +12,9 @@ issue*
 notes
 
 # Related other git repositories
-/fusepy/
-/ratarmount++/
-/nix/
-/staged-recipes/
-/aur/
+/repos
+/archives
+/scripts
 
 # AppImage tooling and temporary files
 *.AppImage
@@ -29,6 +26,8 @@ linuxdeploy
 # Normally, do not commit archives. Exceptions are tests. These can be added with git add -f
 *.bz2
 *.lz4
+*.bgzip
+*.bgz
 *.gz
 *.xz
 *.zst

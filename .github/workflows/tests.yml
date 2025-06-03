@@ -16,17 +16,21 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
+        # Pytype does not support Python 3.13 as of 2025-06.
+        python-version: '3.12'
 
     - name: Install pip Dependencies
       run: |
+        sudo apt-get -y install liblzo2-dev
         python3 -m pip install --upgrade pip
-        python3 -m pip install --user pytest lz4 PySquashfsImage asyncssh fsspec
+        python3 -m pip install --user pytest lz4 PySquashfsImage asyncssh fsspec pygit2
+        ( cd core && python3 -m pip install --user .[full] )
+        python3 -m pip install --user .
 
     - name: Style Check With Black
       run: |
         python3 -m pip install black
-        black -q --diff --line-length 120 --skip-string-normalization ratarmount/*.py tests/*.py core/ratarmountcore/*.py > black.diff
+        black -q --diff --line-length 120 --skip-string-normalization $( git ls-tree -r --name-only HEAD | 'grep' '[.]py$' ) > black.diff
         if [ -s black.diff ]; then
             cat black.diff
             exit 123
@@ -45,7 +49,7 @@ jobs:
     - name: Lint With Pylint
       run: |
         python3 -m pip install pylint
-        pylint --rcfile tests/.pylintrc *.py tests/*.py core/ratarmountcore/*.py | tee pylint.log
+        pylint -j 2 --rcfile tests/.pylintrc ratarmount core/ratarmountcore tests/*.py core/tests/*.py | tee pylint.log
         ! 'egrep' ': E[0-9]{4}: ' pylint.log
 
     - name: Lint With Pytype
@@ -84,7 +88,7 @@ jobs:
         # 3.10 was released 2021-10-04 and end-of-life will be 2026-10-04
         # 3.11 was released 2022-10-24 and end-of-life will be 2027-10
         # 3.12 was released 2023-10-02 and end-of-life will be 2028-10
-        # 3.13 is to be released 2024-10
+        # 3.13 was released 2024-10-07 and end-of-life will be 2029-10
         # 3.14 is to be released 2025-10
         python-version: ['3.9', '3.12', '3.13']
         libfuse-version: ['system']

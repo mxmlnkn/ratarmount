@@ -10,6 +10,7 @@ import time
 import guppy
 import xz
 
+
 def benchmark_python_xz():
     print("== Benchmark xz file decompression ==")
 
@@ -22,7 +23,7 @@ def benchmark_python_xz():
         t1 = time.time()
 
         while True:
-            readSize = len(file.read(32*1024*1024))
+            readSize = len(file.read(32 * 1024 * 1024))
             if readSize == 0:
                 break
             size += readSize
@@ -32,9 +33,9 @@ def benchmark_python_xz():
                 print(f"{t1 - t0:.2f}s {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024} MiB RSS")
                 gc.collect()
                 # Note that this heap call would add a reference count to the file object...
-                #if result is None:
+                # if result is None:
                 #    result = h.heap()
-                #else:
+                # else:
                 #    print((h.heap() - result))
 
         print(f"After finishing loop: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024} MiB RSS")
@@ -54,7 +55,8 @@ def benchmark_python_xz():
     print(f"After garbage collection: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024} MiB RSS")
     if result is not None:
         print((h.heap() - result))
-    print(f"Reading {size} B took: {t1-t0}s")
+    print(f"Reading {size} B took: {t1 - t0}s")
+
 
 def benchmark_reading():
     print("== Benchmark simple file reading ==")
@@ -65,7 +67,7 @@ def benchmark_reading():
         t1 = time.time()
 
         while True:
-            readSize = len(file.read(32*1024*1024))
+            readSize = len(file.read(32 * 1024 * 1024))
             if readSize == 0:
                 break
             size += readSize
@@ -79,7 +81,8 @@ def benchmark_reading():
     print(f"After closing file: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024} MiB RSS")
     gc.collect()
     print(f"After garbage collection: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024} MiB RSS")
-    print(f"Reading {size} B took: {t1-t0}s")
+    print(f"Reading {size} B took: {t1 - t0}s")
+
 
 def benchmark_lzma_compress():
     print("== Benchmark LZMA compression ==")
@@ -90,7 +93,7 @@ def benchmark_lzma_compress():
         t1 = time.time()
 
         while True:
-            data = file.read(32*1024*1024)
+            data = file.read(32 * 1024 * 1024)
             compressed = lzma.compress(data)
             readSize = len(data)
             if readSize == 0:
@@ -106,7 +109,8 @@ def benchmark_lzma_compress():
     print(f"After closing file: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024} MiB RSS")
     gc.collect()
     print(f"After garbage collection: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024} MiB RSS")
-    print(f"Reading {size} B took: {t1-t0}s")
+    print(f"Reading {size} B took: {t1 - t0}s")
+
 
 def benchmark_lzma_decompress():
     print("== Benchmark LZMA compression + decompression ==")
@@ -117,7 +121,7 @@ def benchmark_lzma_decompress():
         t1 = time.time()
 
         while True:
-            data = file.read(32*1024*1024)
+            data = file.read(32 * 1024 * 1024)
             compressed = lzma.compress(data)
             data = lzma.decompress(compressed)
             readSize = len(data)
@@ -134,7 +138,8 @@ def benchmark_lzma_decompress():
     print(f"After closing file: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024} MiB RSS")
     gc.collect()
     print(f"After garbage collection: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024} MiB RSS")
-    print(f"Reading {size} B took: {t1-t0}s")
+    print(f"Reading {size} B took: {t1 - t0}s")
+
 
 def benchmark_lzma_decompressor():
     print("== Benchmark LZMADecompressor ==")
@@ -145,7 +150,7 @@ def benchmark_lzma_decompressor():
         t1 = time.time()
 
         while True:
-            data = file.read(32*1024*1024)
+            data = file.read(32 * 1024 * 1024)
             compressed = lzma.compress(data)
             decompressor = lzma.LZMADecompressor(format=lzma.FORMAT_XZ)
             data = decompressor.decompress(compressed)
@@ -163,14 +168,15 @@ def benchmark_lzma_decompressor():
     print(f"After closing file: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024} MiB RSS")
     gc.collect()
     print(f"After garbage collection: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024} MiB RSS")
-    print(f"Reading {size} B took: {t1-t0}s")
+    print(f"Reading {size} B took: {t1 - t0}s")
+
 
 if __name__ == '__main__':
     print("xz version:", xz.__version__)
-    #benchmark_reading()
-    #benchmark_lzma_compress()
-    #benchmark_lzma_decompress()
-    #benchmark_lzma_decompressor()
+    # benchmark_reading()
+    # benchmark_lzma_compress()
+    # benchmark_lzma_decompress()
+    # benchmark_lzma_decompressor()
     benchmark_python_xz()
 
 """

@@ -17,7 +17,7 @@ if __name__ == '__main__':
 
             entries += 1
             block += 1
-            size = int(tarBlock[124:124+12].strip(b"\0"), 8)
+            size = int(tarBlock[124 : 124 + 12].strip(b"\0"), 8)
             block += -(size // -512)  # ceiling division
             tarFile.seek(block * 512)
 

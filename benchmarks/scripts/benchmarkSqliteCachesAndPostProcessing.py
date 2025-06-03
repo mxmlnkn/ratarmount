@@ -21,7 +21,7 @@ def benchmarkCacheSizes(nFiles):
     insertionTimes = []
     for cacheSize in cacheSizes:
         databaseFile = tempfile.mkstemp()[1]
-        db = sqlite3.connect(databaseFile)  #'1m-names-test.sqlite3' )
+        db = sqlite3.connect(databaseFile)  # '1m-names-test.sqlite3' )
         db.executescript(
             f"""
             PRAGMA LOCKING_MODE = EXCLUSIVE;
@@ -72,7 +72,7 @@ def benchmarkCacheSizesSortAfter(nFiles):
     insertionTimes = []
     for cacheSize in cacheSizes:
         databaseFile = tempfile.mkstemp()[1]
-        db = sqlite3.connect(databaseFile)  #'1m-names-test.sqlite3' )
+        db = sqlite3.connect(databaseFile)  # '1m-names-test.sqlite3' )
         db.executescript(
             f"""
             PRAGMA LOCKING_MODE = EXCLUSIVE;

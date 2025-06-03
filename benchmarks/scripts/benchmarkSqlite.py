@@ -61,7 +61,18 @@ else:
     comparePostProcessing = False
     compareSchemaWithViews = True
     nFilesToBenchmark = [3_000, 10_000, 32_000, 100_000, 320_000, 1_000_000, 2_000_000, 4_000_000]
-    nFilesToBenchmark = [3_000, 10_000, 32_000, 100_000, 320_000, 1_000_000, 2_000_000, 4_000_000, 8_000_000, 16_000_000]
+    nFilesToBenchmark = [
+        3_000,
+        10_000,
+        32_000,
+        100_000,
+        320_000,
+        1_000_000,
+        2_000_000,
+        4_000_000,
+        8_000_000,
+        16_000_000,
+    ]
 
 
 schemas = {}
@@ -186,7 +197,8 @@ if compareSchemaWithViews:
         END;
         '''
     schemaFilesViewWithTemporary = (
-        wordToIdPrimaryKey + schemaFilesView
+        wordToIdPrimaryKey
+        + schemaFilesView
         + '''
         /* "A table created using CREATE TABLE AS has no PRIMARY KEY and no constraints of any kind"
          * Therefore, it will not be sorted and insertion will be faster! */
@@ -399,9 +411,8 @@ def plotSummary(logFiles: List[str]):
         if label in labelToColor:
             ax.plot(x, y, **kwargs, color=labelToColor[label])
         elif 'color' not in kwargs:
-            line, = ax.plot(x, y, **kwargs)
+            (line,) = ax.plot(x, y, **kwargs)
             labelToColor[label] = line.get_color()
-
 
     for ikey, key in enumerate(keys):
         slowOperation = key == 'tselectpathstart' or ('select' in key and any('varchar' not in name for name in names))
@@ -464,8 +475,10 @@ def plotSummary(logFiles: List[str]):
     labelMatches = [re.match('(.*), (unique|duplicate) rows$', name) for name in names]
     hasDifferentData = len({match.group(1) for match in labelMatches if match}) > 1
     if hasDifferentData:
-        lines += [Line2D([0], [0], color='0.5', linestyle='-', marker='o'),
-                  Line2D([0], [0], color='0.5', linestyle='--', marker='+')]
+        lines += [
+            Line2D([0], [0], color='0.5', linestyle='-', marker='o'),
+            Line2D([0], [0], color='0.5', linestyle='--', marker='+'),
+        ]
         labels += ['unique data', 'duplicate PATH per batch']
 
     # outside is a matplotlib 3.7+ feature! https://stackoverflow.com/a/75453792/2191065
@@ -504,6 +517,7 @@ def getSchemasToBenchmark() -> List[Tuple[str, str, bool]]:
             schemasToBenchmark.append((label + ', duplicate rows', schema, True))
     return schemasToBenchmark
 
+
 def plotOperationMeasurements(labelAndPath: List[Tuple[str, str]], targetFileName: str):
     if not labelAndPath:
         return
@@ -522,7 +536,7 @@ def plotOperationMeasurements(labelAndPath: List[Tuple[str, str]], targetFileNam
         if label in labelToColor:
             ax.plot(x, y, **kwargs, color=labelToColor[label])
         elif 'color' not in kwargs:
-            line, = ax.plot(x, y, **kwargs)
+            (line,) = ax.plot(x, y, **kwargs)
             labelToColor[label] = line.get_color()
 
     fig, ax = plt.subplots(1, 1, figsize=(6, 7), layout='constrained')
@@ -544,15 +558,14 @@ def plotOperationMeasurements(labelAndPath: List[Tuple[str, str]], targetFileNam
     lines = [Line2D([0], [0], color=color) for _, color in labelToColor.items()]
     labels = list(labelToColor.keys())
     if hasDifferentData:
-        lines += [Line2D([0], [0], color='0.5', marker='.'),
-                  Line2D([0], [0], color='0.5', marker='+')]
+        lines += [Line2D([0], [0], color='0.5', marker='.'), Line2D([0], [0], color='0.5', marker='+')]
         labels += ['unique data', 'duplicate PATH per batch']
 
     minx = min(min(line.get_xdata()) for line in ax.lines)
     maxx = max(max(line.get_xdata()) for line in ax.lines)
     maxy10 = max(line.get_ydata()[10] for line in ax.lines)
     x = 10 ** np.linspace(np.log10(minx), np.log10(maxx))
-    line, = ax.plot(x, np.log(x) / np.log(x[10]) * maxy10, linestyle='-.', color='0.5')
+    (line,) = ax.plot(x, np.log(x) / np.log(x[10]) * maxy10, linestyle='-.', color='0.5')
     lines.append(line)
     labels.append('logarithmic scaling')
 
@@ -581,7 +594,10 @@ if len(sys.argv) > 1 and os.path.isdir(sys.argv[1]):
             singleOperationMeasurements[nFiles][label] = path
 
     for nFiles, measurements in singleOperationMeasurements.items():
-        plotOperationMeasurements([(label, measurements[label]) for label, schema, _ in getSchemasToBenchmark() if label in measurements], os.path.join(folder, f"sqlite primary key benchmark {nFiles}k files insert"))
+        plotOperationMeasurements(
+            [(label, measurements[label]) for label, schema, _ in getSchemasToBenchmark() if label in measurements],
+            os.path.join(folder, f"sqlite primary key benchmark {nFiles}k files insert"),
+        )
 
     plotSummary(logFiles)
     plt.show()
@@ -699,9 +715,7 @@ def benchmarkSchemas(nFiles: int, log, plotAllMeasurements: bool) -> None:
         def benchmarkSelect(entity, sqlCommand, makeRow):
             nFilesSelect = (
                 10
-                if 'LIKE' in sqlCommand
-                or entity == 'hashes'
-                or (entity == 'paths' and 'integer primary' in label)
+                if 'LIKE' in sqlCommand or entity == 'hashes' or (entity == 'paths' and 'integer primary' in label)
                 else 1000
             )
             t0Select = time.time()
