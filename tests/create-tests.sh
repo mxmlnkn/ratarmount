@@ -531,3 +531,16 @@ npx @electron/asar pack non-existing empty.asar
 mkdir foodir
 mv foo foodir
 npx @electron/asar pack foodir nested-tar.asar
+
+# archive-with-versions-folder.tar
+mkdir archive-with-version-folder
+(
+    cd archive-with-version-folder &&
+    echo bar > foo &&
+    mkdir foo.versions &&
+    echo bar2 > foo.versions/foo2 &&
+    echo fole > file &&
+    echo fole2 > file.versions &&
+    echo 'root file' > .versions
+)
+tar --numeric-owner --xattrs -cf archive-with-version-folder{.tar,}
