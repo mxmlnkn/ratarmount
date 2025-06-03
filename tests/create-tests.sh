@@ -498,3 +498,17 @@ EOF
 #   'CREATE TABLE sqlar(\n  name TEXT PRIMARY KEY,\n  mode INT,\n  mtime INT,\n  sz INT,\n  data BLOB\n)'),
 #   ('index', 'sqlite_autoindex_sqlar_1', 'sqlar', 3, None)]
 # [('foo',), ('foo/fighter',), ('foo/fighter/ufo',), ('foo/lighter.tar',)]
+
+
+# archive-with-versions-folder.tar
+mkdir archive-with-version-folder
+(
+    cd archive-with-version-folder &&
+    echo bar > foo &&
+    mkdir foo.versions &&
+    echo bar2 > foo.versions/foo2 &&
+    echo fole > file &&
+    echo fole2 > file.versions &&
+    echo 'root file' > .versions
+)
+tar --numeric-owner --xattrs -cf archive-with-version-folder{.tar,}
