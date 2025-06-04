@@ -16,7 +16,13 @@ import zipfile
 from typing import List, Optional
 
 from ratarmountcore.compressions import supportedCompressions, stripSuffixFromTarFile
-from ratarmountcore.utils import imeta, findModuleVersion, removeDuplicatesStable, RatarmountError
+from ratarmountcore.utils import (
+    determineRecursionDepth,
+    imeta,
+    findModuleVersion,
+    removeDuplicatesStable,
+    RatarmountError,
+)
 import ratarmountcore.version
 
 try:
@@ -267,12 +273,9 @@ def processParsedArguments(args) -> int:
 
     args.gzipSeekPointSpacing = int(args.gzip_seek_point_spacing * 1024 * 1024)
 
-    if args.recursive and args.recursion_depth is None:
-        args.recursion_depth = -1
-    if args.recursion_depth is None:
-        args.recursion_depth = 0
-
-    if (args.strip_recursive_tar_extension or args.transform_recursive_mount_point) and not args.recursion_depth:
+    if (args.strip_recursive_tar_extension or args.transform_recursive_mount_point) and determineRecursionDepth(
+        recursive=args.recursive, recursion_depth=args.recursion_depth
+    ) <= 0:
         print("[Warning] The options --strip-recursive-tar-extension and --transform-recursive-mount-point")
         print("[Warning] only have an effect when used with recursive mounting.")
 
@@ -404,7 +407,7 @@ def createFuseMount(args) -> None:
         pathToMount                  = args.mount_source,
         clearIndexCache              = bool(args.recreate_index),
         recursive                    = bool(args.recursive),
-        recursionDepth               = int(args.recursion_depth),
+        recursionDepth               = args.recursion_depth,
         gzipSeekPointSpacing         = int(args.gzipSeekPointSpacing),
         mountPoint                   = args.mount_point,
         encoding                     = args.encoding,

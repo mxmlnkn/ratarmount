@@ -7,7 +7,7 @@ import threading
 import traceback
 from typing import Any, Dict, IO, List, Optional, Tuple, Union
 
-from ratarmountcore.utils import overrides
+from ratarmountcore.utils import determineRecursionDepth, overrides
 from ratarmountcore.FileVersionLayer import FileVersionLayer
 from ratarmountcore.FolderMountSource import FolderMountSource
 from ratarmountcore.MountSource import FileInfo, MountSource
@@ -69,7 +69,10 @@ class FuseMount(fuse.Operations):
             raise ValueError("No paths to mount left over after filtering!")
 
         options['writeIndex'] = True
-        if 'recursive' not in options and options.get('recursionDepth', 0) != 0:
+
+        # Explicitly enable recursion if it was specified implictily via recursionDepth.
+        recursionDepth = options.get('recursionDepth', None)
+        if 'recursive' not in options and determineRecursionDepth(**options) > 0:
             options['recursive'] = True
 
         # Add write overlay as folder mount source to read from with highest priority.
@@ -161,7 +164,8 @@ class FuseMount(fuse.Operations):
             return SubvolumesMountSource(submountSources, printDebug=self.printDebug)
 
         self.mountSource: MountSource = mountSources[0][1] if len(mountSources) == 1 else createMultiMount()
-        if options.get('recursionDepth', 0):
+
+        if determineRecursionDepth(**options) > 0:
             self.mountSource = AutoMountLayer(self.mountSource, **options)
 
         # No threads should be created and still be open before FUSE forks.

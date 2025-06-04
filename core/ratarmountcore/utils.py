@@ -359,3 +359,13 @@ def detectRawTar(fileobj: IO[bytes], encoding: str) -> bool:
 
     fileobj.seek(oldOffset)
     return isTar
+
+
+def determineRecursionDepth(recursive: bool = False, recursionDepth: Optional[int] = None, **_) -> int:
+    """
+    'recursionDepth' has higher precedence than 'recursive' if specified.
+    Can be called directly i.e. f(a,b) or with kwargs f(**options) for which unknown keys will be ignored.
+    Returns a real recursion depth. -1 or any negative has no special meaning, but it should effectively
+    result in no recursion.
+    """
+    return (sys.maxsize if recursive else 0) if recursionDepth is None else recursionDepth
