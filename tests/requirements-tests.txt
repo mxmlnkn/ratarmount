@@ -31,6 +31,9 @@ boto3
 wsgidav
 cheroot
 
+# Optional dependencies
+sqlcipher3-wheels
+
 # Many of these packages, such as pytype, twine, ... depend on cryptography >= 39, which in a manylinux2010_x86_64
 # container fails to install because of:
 #   Python 3.6: the cp36-abi3 wheel is not downloaded by pip 22 because the oldest one is for manylinux_2_17.

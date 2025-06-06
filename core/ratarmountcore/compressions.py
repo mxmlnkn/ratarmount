@@ -5,6 +5,7 @@ import collections
 import concurrent.futures
 import io
 import os
+import sqlite3
 import struct
 import sys
 import traceback
@@ -187,6 +188,12 @@ ARCHIVE_FORMATS: Dict[str, CompressionInfo] = {
         [],
         [CompressionModuleInfo('zipfile', lambda x: zipfile.ZipFile(x))],
         lambda x: x.read(2) == b'PK',
+    ),
+    'sqlar': CompressionInfo(
+        ['sqlar'],
+        [],
+        [CompressionModuleInfo('sqlite3', lambda x: sqlite3.connect(x))],
+        lambda x: x.read(16) == b'SQLite format 3\x00',
     ),
 }
 

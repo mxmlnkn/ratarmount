@@ -402,3 +402,99 @@ setfattr --name user.tags --value mytag foo
 #getfattr --dump foo
 bsdtar --numeric-owner --xattrs -cf file-with-attribute.bsd.tar foo
 tar --numeric-owner --xattrs -cf file-with-attribute.gnu.tar foo
+
+# sqlar
+name='sqlar-src-4824e73896'
+wget "https://www.sqlite.org/sqlar/tarball/4824e73896/${name}.tar.gz"
+tar -xf "${name}.tar.gz"
+(
+    cd -- "$name" && sed -i 's|-Werror||g' Makefile && make &&
+    tar -xf ../nested-tar.tar &&
+    ./sqlar ../nested-tar-compressed.sqlar foo/ &&
+    ./sqlar -n ../nested-tar.sqlar foo/
+)
+
+python3 -m pip install sqlcipher3-binary
+# This unfortunately does not work :(
+#cp nested-tar{,-encrypted}.sqlar
+#python3 -c '
+#from sqlcipher3 import dbapi2 as sqlcipher3;
+#c = sqlcipher3.connect("encrypted-nested-tar.sqlar");
+#c.execute("PRAGMA rekey=\"foo\";");'
+#
+# > sqlcipher3.dbapi2.OperationalError: An error occurred with PRAGMA key or rekey. PRAGMA key requires a key of one
+# > or more characters. PRAGMA rekey can only be run on an existing encrypted database. Use sqlcipher_export() and
+# > ATTACH to convert encrypted/plaintext databases.
+# Note that this seems to be an error from the C library because sqlcipher_export only exists there.
+sqlite3 nested-tar.sqlar .schema
+python3 -c '
+from sqlcipher3 import dbapi2 as sqlcipher3
+c1 = sqlcipher3.connect("nested-tar.sqlar")
+
+c2 = sqlcipher3.connect("encrypted-nested-tar.sqlar")
+c2.execute("PRAGMA key=\"foo\";")
+c2.executescript("""DROP TABLE IF EXISTS sqlar;
+CREATE TABLE sqlar(
+  name TEXT PRIMARY KEY,
+  mode INT,
+  mtime INT,
+  sz INT,
+  data BLOB
+);
+""")
+rows = c1.execute("SELECT * FROM sqlar;").fetchall()
+c2.executemany("INSERT INTO sqlar VALUES (?,?,?,?,?);", rows)
+c2.commit()
+c2.close()
+'
+sqlite3 encrypted-nested-tar.sqlar 'SELECT * FROM sqlite_master'
+# Error: in prepare, file is not a database (26)
+python3 -c 'import sqlite3; print(sqlite3.connect("encrypted-nested-tar.sqlar").execute("SELECT * FROM sqlite_master").fetchall())'
+# Traceback (most recent call last):
+#   File "<string>", line 1, in <module>
+# sqlite3.DatabaseError: file is not a database
+python3 -c 'from sqlcipher3 import dbapi2 as sqlcipher3;
+print(sqlcipher3.connect("encrypted-nested-tar.sqlar").execute("SELECT * FROM sqlite_master").fetchall())'
+# Traceback (most recent call last):
+#   File "<string>", line 2, in <module>
+# sqlcipher3.dbapi2.DatabaseError: file is not a database
+python3 -c '
+from sqlcipher3 import dbapi2 as sqlcipher3;
+c = sqlcipher3.connect("encrypted-nested-tar.sqlar")
+c.execute("PRAGMA key=\"foo\"")
+print(c.execute("SELECT * FROM sqlite_master").fetchall())
+print(c.execute("SELECT name FROM sqlar").fetchall())'
+# [('table', 'sqlar', 'sqlar', 2, 'CREATE TABLE sqlar(\n  name TEXT PRIMARY KEY,\n  mode INT,\n  mtime INT,\n  sz INT,\n  data BLOB\n)'), ('index', 'sqlite_autoindex_sqlar_1', 'sqlar', 3, None)]
+
+python3 <<EOF
+import urllib.parse
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.backends import default_backend
+import sqlcipher3.dbapi2 as sqlcipher3
+
+fname = "encrypted-nested-tar.sqlar"
+password = b"foo"
+
+key = PBKDF2HMAC(
+    algorithm=hashes.SHA512(),
+    # 256-bit key for 256-bit AES in CBC mode
+    length=32,
+    # The salt is stored in the first 16 bytes.
+    salt=open(fname, 'rb').read(16),
+    # This is the current default. Older versions may have used fewer iterations.
+    # It can also be specified with 'PRAGMA kdf_iter'.
+    iterations=256_000,
+    backend=default_backend(),
+).derive(password)
+
+c = sqlcipher3.connect(f"file:{urllib.parse.quote(fname)}?mode=ro", uri=True)
+c.execute(f"PRAGMA key = \"x'{key.hex()}'\";")
+print(c.execute("SELECT * FROM sqlite_master;").fetchall())
+
+print(c.execute("SELECT name FROM sqlar").fetchall())
+EOF
+# [('table', 'sqlar', 'sqlar', 2,
+#   'CREATE TABLE sqlar(\n  name TEXT PRIMARY KEY,\n  mode INT,\n  mtime INT,\n  sz INT,\n  data BLOB\n)'),
+#   ('index', 'sqlite_autoindex_sqlar_1', 'sqlar', 3, None)]
+# [('foo',), ('foo/fighter',), ('foo/fighter/ufo',), ('foo/lighter.tar',)]

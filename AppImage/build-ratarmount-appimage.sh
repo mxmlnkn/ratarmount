@@ -66,7 +66,7 @@ function installAppImagePythonPackages()
         'git+https://github.com/mxmlnkn/pyfatfs.git@master#egginfo=pyfatfs'
 
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ../core
-    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ..[full]
+    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ..[full,sqlar]
 
     # These lines are only to document the individual package sizes. They are all installed with [full] above.
     # ratarmount-0.10.0-manylinux2014_x86_64.AppImage (the first one!) was 13.6 MB

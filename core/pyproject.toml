@@ -144,6 +144,10 @@ fsspec-backends = [
 rar = ["rarfile ~= 4.1"]
 # For now, only optional (and installed in the AppImage) because it is unstable and depends on many other packages
 # that do not even have up-to-date wheels, i.e., will fail to install if, e.g., gcc and liblzo2-dev are not installed.
+sqlar = [
+    "cryptography",
+    "sqlcipher3-wheels",
+]
 squashfs = [
     "PySquashfsImage == 0.9.0",
     "lz4 ~= 4.0.0",
