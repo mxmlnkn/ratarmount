@@ -35,6 +35,7 @@ from .GitMountSource import GitMountSource
 from .RarMountSource import RarMountSource
 from .SingleFileMountSource import SingleFileMountSource
 from .SQLiteIndexedTar import SQLiteIndexedTar
+from .SQLARMountSource import SQLARMountSource
 from .SquashFSMountSource import SquashFSMountSource
 from .StenciledFile import JoinedFileFromFactory
 from .ZipMountSource import ZipMountSource
@@ -141,6 +142,10 @@ def _openFATImage(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[Moun
     return FATMountSource(fileOrPath, **options)
 
 
+def _openSqlar(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
+    return SQLARMountSource(fileOrPath, **options)
+
+
 def _getTarExtensions() -> List[str]:
     result = ['tar']
     result += ['tar.' + suffix for compression in TAR_COMPRESSION_FORMATS.values() for suffix in compression.suffixes]
@@ -169,6 +174,7 @@ _BACKENDS = {
         ],
     ),
     "pyfatfs": (_openFATImage, getFormatExtensions('fat')),
+    "sqlar": (_openSqlar, getFormatExtensions('sqlar')),
 }
 
 

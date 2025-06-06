@@ -59,6 +59,8 @@ zip = ["ratarmountcore[zip]"]
 zstd = ["ratarmountcore[zstd]"]
 squashfs = ["ratarmountcore[squashfs]"]
 fsspec = ["ratarmountcore[fsspec-backends]"]
+# Not included in 'full' for now because only encrypted SQLAR require dependencies and those are not well-maintained.
+sqlar = ["ratarmountcore[sqlar]"]
 
 [project.scripts]
 ratarmount = "ratarmount.cli:cli"

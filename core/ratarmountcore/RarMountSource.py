@@ -17,12 +17,7 @@ except ImportError:
 
 
 class RarMountSource(MountSource):
-    # Basically copy paste of ZipMountSource because the interfaces are very similar
-    # I'm honestly not sure how it works that well as it does. It does have some problems
-    # when trying to mount .tar.bz2 or .tar.xz inside rar files recursively but it works
-    # reasonably well for .tar.gz and .zip considering that seeking seems to be broken:
-    # https://github.com/markokr/rarfile/issues/73
-
+    # Basically copy paste of ZipMountSource because the interfaces are very similar.
     def __init__(self, fileOrPath: Union[str, IO[bytes]], **options) -> None:
         self.fileObject = rarfile.RarFile(fileOrPath, 'r')
         RarMountSource._findPassword(self.fileObject, options.get("passwords", []))

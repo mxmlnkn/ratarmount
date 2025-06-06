@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import base64
+import collections
 import io
 import math
 import os
@@ -369,3 +370,66 @@ def determineRecursionDepth(recursive: bool = False, recursionDepth: Optional[in
     result in no recursion.
     """
     return (sys.maxsize if recursive else 0) if recursionDepth is None else recursionDepth
+
+
+def computeEntropy(data: bytes) -> float:
+    if not data:
+        return 0.0
+
+    # https://en.wikipedia.org/wiki/Cross-entropy
+    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.entropy.html
+    # > The cross entropy can be calculated as the sum of the entropy and relative entropy.
+    # The entropy we compute is basically the number of bits required to encode the message optimally,
+    # e.g., with Huffman Coding or, better, with asymmetric numeral systems.
+    # I.e., for random data we except the result to be close to 8, e.g. cut off > 7.5, which would correspond
+    # to a compression ratio of 0.9375.
+    # Note that we would need at least 256 values, or else 256 - N values will be 0 and will therefore
+    # reduce entropy! More generically, t should be a multiple of 256 to get more accurate entropy estimations!
+    # Tests with SQLAR encrypted data:
+    #   N = 10   -> 3.32
+    #   N = 100  -> 6.38
+    #   N = 384  -> 7.49
+    #   N = 1000 -> 7.81
+    #
+    #   N = 256  -> 7.24
+    #   N = 512  -> 7.61
+    #   N = 1024 -> 7.81
+    #   N = 2048 -> 7.916
+    #   N = 4096 -> 7.950
+    #   N = 8192 -> 7.977
+    # Note that the information entropy is completely ordering-independent!
+    # I.e., a sequence like \x00\x01\x02...\xFF will have entropy like random data even though it clearly is not!
+    # The first idea coming to mind to encode position, would to take the difference between neighboring bytes.
+    # This would still result in the same value range but we could test for sequences, and all linearly related
+    # sequences such as \x00\x02\x04..\xFC\xFE.
+    # It would even find repeated words because any repeated word would also repeat the same differences between
+    # consecutive letters.
+    # I really have trouble constructing data that this method wouldn't catch. I guess quadratic sequences like
+    # \x01\x02\x04\x08\... could work with overflow but at that point we would go into the direction of pseudorandom
+    # generators like (quadratic) linear congruential generators.
+    probabilities = [byteFrequency / len(data) for byteFrequency in collections.Counter(data).values()]
+    return -sum(p * math.log2(p) for p in probabilities)
+
+
+def isRandom(data: bytes) -> bool:
+    if len(data) <= 1:
+        return False
+
+    # See benchmarks/scripts/testEntropy to heuristically find a lower bound for entropy of random-distributed data.
+    # The longer data is the closer it will get to 8 bits entropy. The difference goes to 0 proportional to 1/length.
+    # Larger m make randomness detection more lenient. m=16 follows approximately the median when repeating with
+    # different random data, so m should at least be >16.
+    # We could do any number of tests for randomness: https://en.wikipedia.org/wiki/Statistical_randomness
+    # Some of them might even fail for encrypted data if the encryption is assumedly not strong enough or adds magic
+    # bytes at periodic locations.
+    # Does not work very well for small number of bytes! Should at least give 1024. A multiple of 256 is preferable.
+    m = 40
+
+    def convergenceRate(n: int):
+        return 8 * (1 + m) / (n + m)
+
+    def isInThreshold(dataToTest: bytes):
+        return 8 - computeEntropy(dataToTest) < convergenceRate(len(dataToTest))
+
+    diffData = bytes((data[i + 1] - data[i] + 256) % 256 for i in range(len(data) - 1))
+    return isInThreshold(data) and isInThreshold(diffData)
