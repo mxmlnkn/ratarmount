@@ -18,7 +18,6 @@ from .compressions import (
     checkForSplitFile,
     isSquashFS,
     libarchive,
-    pyfatfs,
     rarfile,
     supportedCompressions,
     zipfile,
@@ -84,41 +83,23 @@ except ImportError:
 
 
 def _openRarMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
-    try:
-        if rarfile is not None and rarfile.is_rarfile_sfx(fileOrPath):
-            return RarMountSource(fileOrPath, **options)
-    finally:
-        if hasattr(fileOrPath, 'seek'):
-            fileOrPath.seek(0)  # type: ignore
-    return None
+    return RarMountSource(fileOrPath, **options) if rarfile is not None and rarfile.is_rarfile_sfx(fileOrPath) else None
 
 
 def _openTarMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
-    try:
-        if isinstance(fileOrPath, str):
-            if 'tarFileName' in options:
-                copiedOptions = options.copy()
-                del copiedOptions['tarFileName']
-                return SQLiteIndexedTar(fileOrPath, **copiedOptions)
-            return SQLiteIndexedTar(fileOrPath, **options)
-        return SQLiteIndexedTar(fileObject=fileOrPath, **options)
-    finally:
-        if hasattr(fileOrPath, 'seek'):
-            fileOrPath.seek(0)  # type: ignore
+    if isinstance(fileOrPath, str):
+        if 'tarFileName' in options:
+            copiedOptions = options.copy()
+            del copiedOptions['tarFileName']
+            return SQLiteIndexedTar(fileOrPath, **copiedOptions)
+        return SQLiteIndexedTar(fileOrPath, **options)
+    return SQLiteIndexedTar(fileObject=fileOrPath, **options)
 
 
 def _openZipMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
-    try:
-        if zipfile is not None:
-            # is_zipfile might yields some false positives, but those should then raise exceptions, which
-            # are caught, so it should be fine. See: https://bugs.python.org/issue42096
-            if zipfile.is_zipfile(fileOrPath):
-                mountSource = ZipMountSource(fileOrPath, **options)
-                return mountSource
-    finally:
-        if hasattr(fileOrPath, 'seek'):
-            fileOrPath.seek(0)  # type: ignore
-    return None
+    # is_zipfile might yields some false positives, but those should then raise exceptions, which
+    # are caught, so it should be fine. See: https://bugs.python.org/issue42096
+    return ZipMountSource(fileOrPath, **options) if zipfile is not None and zipfile.is_zipfile(fileOrPath) else None
 
 
 def _openLibarchiveMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
@@ -128,53 +109,36 @@ def _openLibarchiveMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> 
     printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
 
     try:
-        try:
-            if printDebug >= 2:
-                print("[Info] Trying to open archive with libarchive backend.")
-            return LibarchiveMountSource(fileOrPath, **options)
-        except Exception as exception:
-            if printDebug >= 2:
-                print("[Info] Checking for libarchive file raised an exception:", exception)
-            if printDebug >= 3:
-                traceback.print_exc()
-        finally:
-            try:
-                if hasattr(fileOrPath, 'seek'):
-                    fileOrPath.seek(0)  # type: ignore
-            except Exception as exception:
-                if printDebug >= 1:
-                    print("[Info] seek(0) raised an exception:", exception)
-                if printDebug >= 2:
-                    traceback.print_exc()
+        if printDebug >= 2:
+            print("[Info] Trying to open archive with libarchive backend.")
+        return LibarchiveMountSource(fileOrPath, **options)
+    except Exception as exception:
+        if printDebug >= 2:
+            print("[Info] Checking for libarchive file raised an exception:", exception)
+        if printDebug >= 3:
+            traceback.print_exc()
     finally:
-        if hasattr(fileOrPath, 'seek'):
-            fileOrPath.seek(0)  # type: ignore
+        try:
+            if hasattr(fileOrPath, 'seek'):
+                fileOrPath.seek(0)  # type: ignore
+        except Exception as exception:
+            if printDebug >= 1:
+                print("[Info] seek(0) raised an exception:", exception)
+            if printDebug >= 2:
+                traceback.print_exc()
     return None
 
 
 def _openPySquashfsImage(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
-    try:
-        # Better to check file type here because I am unsure about what the MountSource semantic should be
-        # regarding file object closing when it raises an exception in the constructor.
-        if not isinstance(fileOrPath, str) and not isSquashFS(fileOrPath):
-            return None
-
-        if PySquashfsImage is not None:
-            return SquashFSMountSource(fileOrPath, **options)
-    finally:
-        if hasattr(fileOrPath, 'seek'):
-            fileOrPath.seek(0)  # type: ignore
+    # Better to check file type here because I am unsure about what the MountSource semantic should be
+    # regarding file object closing when it raises an exception in the constructor.
+    if PySquashfsImage is not None and (isinstance(fileOrPath, str) or isSquashFS(fileOrPath)):
+        return SquashFSMountSource(fileOrPath, **options)
     return None
 
 
 def _openFATImage(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
-    try:
-        if pyfatfs is not None:
-            return FATMountSource(fileOrPath, **options)
-    finally:
-        if hasattr(fileOrPath, 'seek'):
-            fileOrPath.seek(0)  # type: ignore
-    return None
+    return FATMountSource(fileOrPath, **options)
 
 
 def _getTarExtensions() -> List[str]:
@@ -474,6 +438,15 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
                 print(f"[Info] Trying to open with {name} raised an exception:", exception)
             if printDebug >= 3:
                 traceback.print_exc()
+
+            try:
+                if hasattr(fileOrPath, 'seek'):
+                    fileOrPath.seek(0)  # type: ignore
+            except Exception as seekException:
+                if printDebug >= 1:
+                    print("[Info] seek(0) raised an exception:", seekException)
+                if printDebug >= 2:
+                    traceback.print_exc()
 
     if joinedFileName and not isinstance(fileOrPath, str):
         return SingleFileMountSource(joinedFileName, fileOrPath)

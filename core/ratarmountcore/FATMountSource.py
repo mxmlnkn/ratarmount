@@ -20,6 +20,9 @@ except ImportError:
 
 class FATMountSource(MountSource):
     def __init__(self, fileOrPath: Union[str, IO[bytes]], **options) -> None:
+        if PyFat is None:
+            raise ImportError("Failed to find pyfatfs. Try: pip install pyfatfs")
+
         self.fileSystem = PyFat()
         if isinstance(fileOrPath, str):
             # TODO Probably good idea for performance on Lustre to open the file unbuffered.
