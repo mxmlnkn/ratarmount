@@ -2725,6 +2725,11 @@ pytestedTests+=(
 fi
 
 pytestedTests+=(
+    2709a3348eb2c52302a7606ecf5860bc tests/nested-tar.sqlar                       foo/fighter/ufo
+    2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar.sqlar                       foo/lighter.tar/fighter/bar
+    2709a3348eb2c52302a7606ecf5860bc tests/nested-tar-compressed.sqlar            foo/fighter/ufo
+    2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar-compressed.sqlar            foo/lighter.tar/fighter/bar
+
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.gzip.squashfs           foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lz4.squashfs            foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lzma.squashfs           foo/fighter/ufo

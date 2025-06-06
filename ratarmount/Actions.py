@@ -178,6 +178,9 @@ def printOSSAttributions() -> None:
         ("s3fs", "/fsspec/s3fs/refs/heads/main/LICENSE.txt"),  # BSD-3
         ("webdav4", "/skshetry/webdav4/refs/heads/main/LICENSE"),  # MIT
         ("asyncssh", "/ronf/asyncssh/refs/heads/develop/LICENSE"),  # EPL 2.0
+        ("sqlcipher3", "/coleifer/sqlcipher3/refs/heads/master/LICENSE"),  # zlib License
+        # BSD-3 with "name of the copyright holder" explicitly filled in
+        ("sqlcipher", "/sqlcipher/sqlcipher/refs/heads/master/LICENSE.txt"),
     ]
     for name, githubPath in sorted(licenses):
         licenseUrl = "https://raw.githubusercontent.com" + githubPath

@@ -23,7 +23,7 @@ jobs:
       run: |
         sudo apt-get -y install liblzo2-dev
         python3 -m pip install --upgrade pip
-        python3 -m pip install --user pytest lz4 PySquashfsImage asyncssh fsspec pygit2
+        python3 -m pip install --user pytest lz4 PySquashfsImage asyncssh fsspec pygit2 sqlcipher3-wheels
         ( cd core && python3 -m pip install --user .[full] )
         python3 -m pip install --user .
 
@@ -266,7 +266,7 @@ jobs:
 
     - name: Test Installation From Source
       run: |
-        python3 -m pip install .[full]
+        python3 -m pip install .[full,fsspec,sqlar]
 
     - name: Test Simple Startup
       run: |

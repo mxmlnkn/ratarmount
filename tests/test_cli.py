@@ -22,6 +22,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../c
 from ratarmountcore.compressions import libarchive  # noqa: E402
 from ratarmount.cli import cli as ratarmountcli  # noqa: E402
 
+try:
+    import sqlcipher3
+except ImportError:
+    sqlcipher3 = None  # type:ignore
+
 
 def findTestFile(relativePathOrName):
     for i in range(3):
@@ -137,7 +142,7 @@ class RunRatarmount:
 
 # 7z encryption is not supported by libarchive and therefore also not by ratarmount.
 # https://github.com/libarchive/libarchive/issues/579#issuecomment-118440525
-@pytest.mark.parametrize("compression", ["rar", "zip"])
+@pytest.mark.parametrize("compression", ["rar", "zip"] + ([] if sqlcipher3 is None else ["sqlar"]))
 def test_password(tmpdir, compression):
     # The file object returned by ZipFile.open is not seekable in Python 3.6 for some reason.
     if compression == "zip" and sys.version_info[0] == 3 and sys.version_info[1] <= 6:
@@ -324,6 +329,17 @@ LIBARCHIVE_ARCHIVES_TO_TEST = [
 
 if libarchive:
     ARCHIVES_TO_TEST += LIBARCHIVE_ARCHIVES_TO_TEST
+
+
+SQLAR_TO_TEST = [
+    ("2709a3348eb2c52302a7606ecf5860bc", "nested-tar.sqlar", "foo/fighter/ufo"),
+    ("2b87e29fca6ee7f1df6c1a76cb58e101", "nested-tar.sqlar", "foo/lighter.tar/fighter/bar"),
+    ("2709a3348eb2c52302a7606ecf5860bc", "nested-tar-compressed.sqlar", "foo/fighter/ufo"),
+    ("2b87e29fca6ee7f1df6c1a76cb58e101", "nested-tar-compressed.sqlar", "foo/lighter.tar/fighter/bar"),
+]
+
+if sqlcipher3:
+    ARCHIVES_TO_TEST += SQLAR_TO_TEST
 
 
 @pytest.mark.parametrize("parallelization", [1, 2, 0])

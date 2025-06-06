@@ -15,6 +15,7 @@ from ratarmountcore.utils import (  # noqa: E402
     isLatinAlpha,
     isLatinDigit,
     isLatinHexAlpha,
+    isRandom,
     ALPHA,
     DIGITS,
     HEX,
@@ -224,3 +225,22 @@ def test_formatNumber():
     assert formatNumber(16 * 16 + 3, HEX, 3) == '103'
 
     assert formatNumber(357641610, DIGITS) == '357641610'
+
+
+def test_isRandom():
+    data = os.urandom(1 << 20)
+    for size in [1024, 1280, 2048, 3333, 4096, len(data) // 100, len(data) // 10, len(data) // 2, len(data)]:
+        assert isRandom(data[:size])
+
+    data = bytes(i for i in range(256))
+    assert not isRandom(data)
+    assert not isRandom(data * 4)
+    assert not isRandom(data * 100)
+    # Too few bytes to determine randomness! Also no repeated letter! I guess the random test would have to check
+    # specifically for some bit distributions because these are mostly ASCII characters, i.e., the 7-th bit is not
+    # set. Or maybe some clustering analysis because the bytes are clustered in a very close range of bytes.
+    # But oh well. Simply require >= 256 input bytes.
+    # assert isRandom(b'SQLite format 3\x00')
+    # assert isRandom(b'abcde')
+    # assert isRandom(b'abcdefghijklmnopqrstuvxyz')
+    # assert isRandom(b'aaaaa')

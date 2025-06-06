@@ -7,12 +7,17 @@ import tarfile
 from typing import Optional, Tuple
 
 from ratarmountcore.compressions import checkForSplitFile, findAvailableOpen, supportedCompressions
-from ratarmountcore.utils import detectRawTar
+from ratarmountcore.utils import detectRawTar, isRandom
 
 try:
     import fsspec
 except ImportError:
     fsspec = None  # type: ignore
+
+try:
+    import sqlcipher3
+except ImportError:
+    sqlcipher3 = None  # type: ignore
 
 
 def checkInputFileType(
@@ -82,6 +87,14 @@ def checkInputFileType(
         if compression not in supportedCompressions:
             if detectRawTar(fileobj, encoding):
                 return tarFile, compression
+
+            if (
+                compression is None
+                and sqlcipher3 is not None
+                and tarFile.lower().endswith(".sqlar")
+                and isRandom(fileobj.read(4096))
+            ):
+                return tarFile, 'sqlar'
 
             if printDebug >= 2:
                 print(f"Archive '{tarFile}' (compression: {compression}) cannot be opened!")
