@@ -179,7 +179,7 @@ class IterableArchive:
         self,
         file: Union[str, IO[bytes]],
         encoding='utf-8',
-        passwords: Optional[List[str]] = None,
+        passwords: Optional[List[Union[str, bytes]]] = None,
         bufferSize=1024 * 1024,
         printDebug: int = 0,
     ):
@@ -241,7 +241,7 @@ class IterableArchive:
         if not allowArchives and not self.filterNames():
             raise ArchiveError("When not looking for archives, there must be at least one filter!")
 
-    def _setPasswords(self, passwords: List[str]):
+    def _setPasswords(self, passwords: List[Union[str, bytes]]):
         try:
             for password in passwords:
                 laffi.read_add_passphrase(self._archive, password.encode() if isinstance(password, str) else password)
