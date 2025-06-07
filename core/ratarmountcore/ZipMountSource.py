@@ -162,11 +162,7 @@ class ZipMountSource(SQLiteIndexMountSource):
         t0 = timer()
 
         self.index.ensureIntermediaryTables()
-
-        fileInfos = []
-        for info in self.fileObject.infolist():
-            fileInfos.append(self._convertToRow(info))
-        self.index.setFileInfos(fileInfos)
+        self.index.setFileInfos([self._convertToRow(info) for info in self.fileObject.infolist()])
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
         if self.printDebug >= 2:

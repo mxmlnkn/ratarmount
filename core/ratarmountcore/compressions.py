@@ -155,7 +155,7 @@ TAR_COMPRESSION_FORMATS: Dict[str, CompressionInfo] = {
 }
 
 
-def isRarFile(fileObject) -> bool:
+def isRarFile(fileObject: IO[bytes]) -> bool:
     # @see https://www.rarlab.com/technote.htm#rarsign
     # > RAR 5.0 signature consists of 8 bytes: 0x52 0x61 0x72 0x21 0x1A 0x07 0x01 0x00.
     # > You need to search for this signature in supposed archive from beginning and up to maximum SFX module size.
