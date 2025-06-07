@@ -98,7 +98,7 @@ def printVersions() -> None:
         if moduleVersion:
             print(moduleName, moduleVersion)
 
-    modules = [module.name for _, info in supportedCompressions.items() for module in info.modules]
+    modules = [module.name for info in supportedCompressions.values() for module in info.modules]
     # Indirect dependencies for PySquashfsImage and other things.
     modules += ["lz4", "python-lzo", "zstandard", "isal", "fast_zip_decryption", "pygit2"]
     for moduleName in sorted(list(set(modules))):

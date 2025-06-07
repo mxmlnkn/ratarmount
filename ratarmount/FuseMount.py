@@ -71,7 +71,6 @@ class FuseMount(fuse.Operations):
         options['writeIndex'] = True
 
         # Explicitly enable recursion if it was specified implictily via recursionDepth.
-        recursionDepth = options.get('recursionDepth', None)
         if 'recursive' not in options and determineRecursionDepth(**options) > 0:
             options['recursive'] = True
 
