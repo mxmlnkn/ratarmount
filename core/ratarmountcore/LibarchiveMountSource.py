@@ -591,6 +591,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
 
         self.index.ensureIntermediaryTables()
 
+        triedToOpen = False
         fileInfos = []
         with IterableArchive(self.fileOrPath, passwords=self.passwords, printDebug=self.printDebug) as archive:
             while True:
@@ -610,6 +611,19 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                     entryPath = fname
 
                 fileInfos.append(entry.convertToRow(entry.entryIndex, self.transform, path=entryPath))
+                # Contains file info SQLite row tuples! 4 -> size, 6 -> mode
+                if not triedToOpen and not stat.S_ISDIR(fileInfos[-1][6]) and fileInfos[-1][4] > 0:
+                    bufferSize = 1
+                    buffer = ctypes.create_string_buffer(bufferSize)
+                    try:
+                        archive.readData(buffer, 1)
+                    except ArchiveError as exception:
+                        if self.passwords:
+                            raise exception
+                        if 'encrypt' in str(exception).lower() and self.printDebug >= 1:
+                            print("[Warning] The file contents are encrypted but not the file hierarchy!")
+                            print("[Warning] Specify a password with --password to also view file contents!")
+                    triedToOpen = True
             if len(fileInfos) > 1000:
                 self.index.setFileInfos(fileInfos)
                 fileInfos = []
