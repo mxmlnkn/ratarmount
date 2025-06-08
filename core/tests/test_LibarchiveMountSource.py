@@ -7,6 +7,7 @@
 
 import io
 import os
+import stat
 import sys
 import tarfile
 import tempfile
@@ -27,12 +28,18 @@ class TestLibarchiveMountSource:
     def test_simple_usage(compression):
         with copyTestFile('folder-symlink.' + compression) as path, LibarchiveMountSource(path) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
-                assert mountSource.getFileInfo(folder)
+                fileInfo = mountSource.getFileInfo(folder)
+                assert fileInfo
+                assert stat.S_ISDIR(fileInfo.mode)
+
                 assert mountSource.fileVersions(folder) == 1
                 assert mountSource.listDir(folder)
 
             for filePath in ['/foo/fighter/ufo']:
-                assert mountSource.getFileInfo(filePath)
+                fileInfo = mountSource.getFileInfo(filePath)
+                assert fileInfo
+                assert not stat.S_ISDIR(fileInfo.mode)
+
                 assert mountSource.fileVersions(filePath) == 1
                 assert not mountSource.listDir(filePath)
                 with mountSource.open(mountSource.getFileInfo(filePath)) as file:
@@ -48,6 +55,28 @@ class TestLibarchiveMountSource:
                 assert fileInfo.linkname == 'fighter'
 
     @staticmethod
+    @pytest.mark.parametrize('compression', ['7z', 'rar', 'zip'])
+    def test_transform(compression):
+        with copyTestFile('folder-symlink.' + compression) as path, LibarchiveMountSource(
+            path, transform=("(.)/(.)", r"\1_\2")
+        ) as mountSource:
+            for folder in ['/', '/foo', '/foo_fighter']:
+                fileInfo = mountSource.getFileInfo(folder)
+                assert fileInfo
+                assert stat.S_ISDIR(fileInfo.mode)
+                assert mountSource.fileVersions(folder) == 1
+
+            for filePath in ['/foo_fighter_ufo']:
+                fileInfo = mountSource.getFileInfo(filePath)
+                assert fileInfo
+                assert not stat.S_ISDIR(fileInfo.mode)
+
+                assert mountSource.fileVersions(filePath) == 1
+                assert not mountSource.listDir(filePath)
+                with mountSource.open(mountSource.getFileInfo(filePath)) as file:
+                    assert file.read() == b'iriya\n'
+
+    @staticmethod
     # 7z : libarchive.exception.ArchiveError: The file content is encrypted, but currently not supported
     #      (errno=-1, retcode=-30, archive_p=94443813387248)
     # RAR: libarchive.exception.ArchiveError: Unsupported block header size (was 4, max is 2)
@@ -61,12 +90,18 @@ class TestLibarchiveMountSource:
             path, passwords=['foo']
         ) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
-                assert mountSource.getFileInfo(folder)
+                fileInfo = mountSource.getFileInfo(folder)
+                assert fileInfo
+                assert stat.S_ISDIR(fileInfo.mode)
+
                 assert mountSource.fileVersions(folder) == 1
                 assert mountSource.listDir(folder)
 
             for filePath in ['/foo/fighter/ufo']:
-                assert mountSource.getFileInfo(filePath)
+                fileInfo = mountSource.getFileInfo(filePath)
+                assert fileInfo
+                assert not stat.S_ISDIR(fileInfo.mode)
+
                 assert mountSource.fileVersions(filePath) == 1
                 assert not mountSource.listDir(filePath)
                 with mountSource.open(mountSource.getFileInfo(filePath)) as file:
@@ -79,12 +114,18 @@ class TestLibarchiveMountSource:
             path, passwords=['foo']
         ) as mountSource:
             for folder in ['/']:
-                assert mountSource.getFileInfo(folder)
+                fileInfo = mountSource.getFileInfo(folder)
+                assert fileInfo
+                assert stat.S_ISDIR(fileInfo.mode)
+
                 assert mountSource.fileVersions(folder) == 1
                 assert mountSource.listDir(folder)
 
             for filePath in ['/simple']:
-                assert mountSource.getFileInfo(filePath)
+                fileInfo = mountSource.getFileInfo(filePath)
+                assert fileInfo
+                assert not stat.S_ISDIR(fileInfo.mode)
+
                 assert mountSource.fileVersions(filePath) == 1
                 assert not mountSource.listDir(filePath)
                 with mountSource.open(mountSource.getFileInfo(filePath)) as file:

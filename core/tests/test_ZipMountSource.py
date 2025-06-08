@@ -6,6 +6,7 @@
 # pylint: disable=protected-access
 
 import os
+import stat
 import sys
 import shutil
 import subprocess
@@ -78,12 +79,18 @@ class TestZipMountSource:
     def test_simple_usage():
         with ZipMountSource(findTestFile('folder-symlink.zip')) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
-                assert mountSource.getFileInfo(folder)
+                fileInfo = mountSource.getFileInfo(folder)
+                assert fileInfo
+                assert stat.S_ISDIR(fileInfo.mode)
+
                 assert mountSource.fileVersions(folder) == 1
                 assert mountSource.listDir(folder)
 
             for filePath in ['/foo/fighter/ufo']:
-                assert mountSource.getFileInfo(filePath)
+                fileInfo = mountSource.getFileInfo(filePath)
+                assert fileInfo
+                assert not stat.S_ISDIR(fileInfo.mode)
+
                 assert mountSource.fileVersions(filePath) == 1
                 assert not mountSource.listDir(filePath)
                 with mountSource.open(mountSource.getFileInfo(filePath)) as file:
@@ -101,6 +108,26 @@ class TestZipMountSource:
                     # Contents of symlink is the symlink destination itself.
                     # This behavior is not consistent with other MountSources and therefore subject to change!
                     assert file.read() == b'fighter'
+
+    @staticmethod
+    def test_transform():
+        with ZipMountSource(findTestFile('folder-symlink.zip'), transform=("(.)/(.)", r"\1_\2")) as mountSource:
+            print(mountSource.listDir("/").keys())
+            for folder in ['/', '/foo', '/foo_fighter']:
+                fileInfo = mountSource.getFileInfo(folder)
+                assert fileInfo
+                assert stat.S_ISDIR(fileInfo.mode)
+                assert mountSource.fileVersions(folder) == 1
+
+            for filePath in ['/foo_fighter_ufo']:
+                fileInfo = mountSource.getFileInfo(filePath)
+                assert fileInfo
+                assert not stat.S_ISDIR(fileInfo.mode)
+
+                assert mountSource.fileVersions(filePath) == 1
+                assert not mountSource.listDir(filePath)
+                with mountSource.open(mountSource.getFileInfo(filePath)) as file:
+                    assert file.read() == b'iriya\n'
 
 
 def benchmark_fast_zipfile_decryption():

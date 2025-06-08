@@ -6,6 +6,7 @@
 # pylint: disable=protected-access
 
 import os
+import stat
 import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -26,12 +27,18 @@ class TestRarMountSource:
     def test_simple_usage():
         with RarMountSource(findTestFile('folder-symlink.rar')) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
-                assert mountSource.getFileInfo(folder)
+                fileInfo = mountSource.getFileInfo(folder)
+                assert fileInfo
+                assert stat.S_ISDIR(fileInfo.mode)
+
                 assert mountSource.fileVersions(folder) == 1
                 assert mountSource.listDir(folder)
 
             for filePath in ['/foo/fighter/ufo']:
-                assert mountSource.getFileInfo(filePath)
+                fileInfo = mountSource.getFileInfo(filePath)
+                assert fileInfo
+                assert not stat.S_ISDIR(fileInfo.mode)
+
                 assert mountSource.fileVersions(filePath) == 1
                 assert not mountSource.listDir(filePath)
                 with mountSource.open(mountSource.getFileInfo(filePath)) as file:
@@ -46,3 +53,5 @@ class TestRarMountSource:
                 with mountSource.open(mountSource.getFileInfo(linkPath)) as file:
                     # Contents of symlink is the symlink destination itself.
                     assert file.read() == b'fighter'
+
+    # TODO 'transform' does not work. Could be made to work easily when refactoring it to use SQLiteIndex
