@@ -560,6 +560,40 @@ class SQLiteIndex:
         )
 
     @staticmethod
+    def checkArchiveStats(
+        archiveFilePath: Optional[str], metadata: Dict[str, Any], verifyModificationTime: bool
+    ) -> None:
+        """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
+
+        if 'tarstats' not in metadata:
+            return
+
+        if not archiveFilePath:
+            raise InvalidIndexError("Archive contains file stats but cannot stat real archive!")
+
+        storedStats = json.loads(metadata['tarstats'])
+        archiveStats = os.stat(archiveFilePath)
+
+        if hasattr(archiveStats, "st_size") and 'st_size' in storedStats:
+            if archiveStats.st_size < storedStats['st_size']:
+                raise InvalidIndexError(
+                    f"Archive for this SQLite index has shrunk in size from "
+                    f"{storedStats['st_size']} to {archiveStats.st_size}"
+                )
+
+        # Only happens very rarely, e.g., for more recent files with the same size.
+        if (
+            verifyModificationTime
+            and hasattr(archiveStats, "st_mtime")
+            and 'st_mtime' in storedStats
+            and archiveStats.st_mtime != storedStats['st_mtime']
+        ):
+            raise InvalidIndexError(
+                f"The modification date for the archive file {storedStats['st_mtime']} "
+                f"to this SQLite index has changed ({str(archiveStats.st_mtime)})",
+            )
+
+    @staticmethod
     def checkMetadataArguments(metadata: Dict, arguments, argumentsToCheck: List[str]):
         # Check arguments used to create the found index.
         # These are only warnings and not forcing a rebuild by default.
