@@ -9,6 +9,7 @@ import io
 import json
 import os
 import re
+import sys
 import stat
 import tarfile
 
@@ -27,6 +28,11 @@ try:
     from libarchive.exception import ArchiveError
 except (ImportError, AttributeError):
     pass
+
+try:
+    import py7zr  # pylint: disable=unused-import
+except ImportError:
+    py7zr = None  # type: ignore
 
 
 class ArchiveEntry:
@@ -618,7 +624,8 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                     try:
                         archive.readData(buffer, 1)
                     except ArchiveError as exception:
-                        if self.passwords:
+                        # Very special case to delegate to py7zr somewhat smartly for encrypted 7z archives.
+                        if entry.formatName() == b'7-Zip' and self.passwords and "py7zr" in sys.modules:
                             raise exception
                         if 'encrypt' in str(exception).lower() and self.printDebug >= 1:
                             print("[Warning] The file contents are encrypted but not the file hierarchy!")

@@ -60,6 +60,8 @@ full = [
     "python-xz ~= 0.4.0",
     "rapidgzip >= 0.13.1",
     "rarfile ~= 4.1",
+    # https://github.com/miurahr/py7zr/issues/640
+    "py7zr ~= 1.0; python_version >= '3.9' and python_version < '3.13'",
     "PySquashfsImage == 0.9.0",
     "lz4 ~= 4.0.0",
     "python-lzo ~= 1.0",
@@ -175,7 +177,11 @@ zstd = [
     'indexed_zstd >= 1.3.1, < 2.0; sys_platform=="darwin"',
     'indexed_zstd >= 1.2.2, < 2.0; platform_system!="Windows"',
 ]
-7z = ["libarchive-c ~= 5.1, < 6.0"]
+7z = [
+    "libarchive-c ~= 5.1, < 6.0",
+    # https://github.com/miurahr/py7zr/issues/640
+    "py7zr ~= 1.0; python_version >= '3.9' and python_version < '3.13'",
+]
 # Pin to < 3.12 because of https://github.com/nathanhi/pyfatfs/issues/41
 fat = [
     'pyfatfs ~= 1.0; python_version < "3.12.0"',

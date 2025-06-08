@@ -181,8 +181,8 @@ Advanced Options:
                         be opened with multiple backends. Arguments specified last will have the
                         highest priority. A comma-separated list may be specified. Possible
                         backends: ['PySquashfsImage', 'indexed_gzip', 'indexed_zstd',
-                        'libarchive', 'lzmaffi', 'pyfatfs', 'rapidgzip', 'rarfile', 'sqlite3',
-                        'xz', 'zipfile'] (default: None)
+                        'libarchive', 'lzmaffi', 'py7zr', 'pyfatfs', 'rapidgzip', 'rarfile',
+                        'sqlite3', 'xz', 'zipfile'] (default: None)
   -d DEBUG, --debug DEBUG
                         Sets the debugging level. Higher means more output. Currently, 3 is the
                         highest. (default: 1)
