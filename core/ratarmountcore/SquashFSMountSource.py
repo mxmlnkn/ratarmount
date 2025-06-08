@@ -9,7 +9,6 @@ import os
 import re
 import stat
 import tarfile
-import traceback
 import zlib
 from timeit import default_timer as timer
 
@@ -75,7 +74,7 @@ from .compressions import findSquashFSOffset
 from .MountSource import FileInfo, MountSource
 from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
 from .SQLiteIndexMountSource import SQLiteIndexMountSource
-from .utils import InvalidIndexError, overrides
+from .utils import overrides
 
 
 class IsalZlibDecompressor(Compressor):
@@ -595,36 +594,6 @@ class SquashFSMountSource(SQLiteIndexMountSource):
             'f_namemax': 256,
         }
 
-    def _tryToOpenFirstFile(self):
-        # Get first row that has the regular file bit set in mode (stat.S_IFREG == 32768 == 1<<15).
-        result = self.index.getConnection().execute(
-            f"""SELECT path,name {SQLiteIndex.FROM_REGULAR_FILES} ORDER BY "offsetheader" ASC LIMIT 1;"""
-        )
-        if not result:
-            return
-        firstFile = result.fetchone()
-        if not firstFile:
-            return
-
-        if self.printDebug >= 2:
-            print(
-                "[Info] The index contains no backend name. Therefore, will try to open the first file as "
-                "an integrity check."
-            )
-        try:
-            fileInfo = self.getFileInfo(firstFile[0] + '/' + firstFile[1])
-            if not fileInfo:
-                return
-
-            with self.open(fileInfo) as file:
-                file.read(1)
-        except Exception as exception:
-            if self.printDebug >= 2:
-                print("[Info] Trying to open the first file raised an exception:", exception)
-            if self.printDebug >= 3:
-                traceback.print_exc()
-            raise InvalidIndexError("Integrity check of opening the first file failed.") from exception
-
     def _checkMetadata(self, metadata: Dict[str, Any]) -> None:
         """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
         SQLiteIndex.checkArchiveStats(self.archiveFilePath, metadata, self.verifyModificationTime)
@@ -635,4 +604,4 @@ class SquashFSMountSource(SQLiteIndexMountSource):
             )
 
         if 'backendName' not in metadata:
-            self._tryToOpenFirstFile()
+            self.index.tryToOpenFirstFile(lambda path: self.open(self.getFileInfo(path)))
