@@ -681,19 +681,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                     f"to this SQLite index has changed ({str(archiveStats.st_mtime)})",
                 )
 
-        # Check arguments used to create the found index.
-        # These are only warnings and not forcing a rebuild by default.
-        # TODO: Add --force options?
         if 'arguments' in metadata:
-            indexArgs = json.loads(metadata['arguments'])
-            argumentsToCheck = ['encoding', 'transformPattern']
-            differingArgs = []
-            for arg in argumentsToCheck:
-                if arg in indexArgs and hasattr(self, arg) and indexArgs[arg] != getattr(self, arg):
-                    differingArgs.append((arg, indexArgs[arg], getattr(self, arg)))
-            if differingArgs:
-                print("[Warning] The arguments used for creating the found index differ from the arguments ")
-                print("[Warning] given for mounting the archive now. In order to apply these changes, ")
-                print("[Warning] recreate the index using the --recreate-index option!")
-                for arg, oldState, newState in differingArgs:
-                    print(f"[Warning] {arg}: index: {oldState}, current: {newState}")
+            SQLiteIndex.checkMetadataArguments(
+                json.loads(metadata['arguments']), self, argumentsToCheck=['encoding', 'transformPattern']
+            )
