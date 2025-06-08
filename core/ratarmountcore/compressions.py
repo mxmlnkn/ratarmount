@@ -78,14 +78,19 @@ except (ImportError, AttributeError):
 try:
     import PySquashfsImage  # pylint: disable=unused-import
 except ImportError:
-    PySquashfsImage = None
+    PySquashfsImage = None  # type: ignore
 
 try:
     import pyfatfs  # pylint: disable=unused-import
-    from pyfatfs import PyFat
+    from pyfatfs.PyFat import PyFat
 except ImportError:
-    pyfatfs = None
-    PyFat = None
+    pyfatfs = None  # type: ignore
+    PyFat = None  # type: ignore
+
+try:
+    import py7zr  # pylint: disable=unused-import
+except ImportError:
+    py7zr = None  # type: ignore
 
 
 CompressionModuleInfo = collections.namedtuple('CompressionModuleInfo', ['name', 'open'])
@@ -241,9 +246,12 @@ def findSquashFSOffset(fileObject, maxSkip=1024 * 1024) -> int:
 
 
 def isFATImage(fileObject) -> bool:
+    if PyFat is None:
+        return False
+
     offset = fileObject.tell()
     try:
-        fs = PyFat.PyFat()
+        fs = PyFat()
         # TODO Avoid possibly slow full FAT parsing here. Only do some quick checks such as PyFatFS.PyFat.parse_header
         #      Calling __set_fp instead of set_fp avoids that but it is not part of the public interface per convention!
         fs._PyFat__set_fp(fileObject)
@@ -262,6 +270,15 @@ def isFATImage(fileObject) -> bool:
 
 
 ARCHIVE_FORMATS: Dict[str, CompressionInfo] = {
+    '7z': CompressionInfo(
+        ['7z', '7zip'],
+        [],
+        [
+            CompressionModuleInfo('libarchive', libarchive_file_reader),
+            CompressionModuleInfo('py7zr', lambda x: py7zr.SevenZipFile(x)),
+        ],
+        lambda x: x.read(6) == b'7z\xbc\xaf\x27\x1c',
+    ),
     'rar': CompressionInfo(
         ['rar'],
         [],
@@ -289,7 +306,11 @@ ARCHIVE_FORMATS: Dict[str, CompressionInfo] = {
     'squashfs': CompressionInfo(
         ['squashfs', 'AppImage', 'snap'],
         [],
-        [CompressionModuleInfo('PySquashfsImage', lambda x: PySquashfsImage.SquashFsImage(x))],
+        [
+            CompressionModuleInfo(
+                'PySquashfsImage', lambda x: PySquashfsImage.SquashFsImage(x) if PySquashfsImage.SquashFsImage else None
+            )
+        ],
         lambda x: findSquashFSOffset(x) >= 0,
     ),
     'fat': CompressionInfo(
@@ -373,9 +394,6 @@ LIBARCHIVE_ARCHIVE_FORMATS = {
         extensions, [], [CompressionModuleInfo('libarchive', libarchive_file_reader)], headerCheck
     )
     for extensions, headerCheck in [
-        # https://github.com/ip7z/7zip/blob/main/DOC/7zFormat.txt
-        # https://py7zr.readthedocs.io/en/latest/archive_format.html
-        (['7z', '7zip'], lambda x: x.read(6) == b'7z\xbc\xaf\x27\x1c'),
         (['ar'], lambda x: x.read(8) == b'<aiaff>\n'),
         # https://download.microsoft.com/download/4/d/a/4da14f27-b4ef-4170-a6e6-5b1ef85b1baa/[ms-cab].pdf
         (['cab'], lambda x: x.read(4) == b'MSCF'),

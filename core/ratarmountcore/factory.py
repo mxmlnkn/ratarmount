@@ -18,12 +18,11 @@ from .compressions import (
     checkForSplitFile,
     isSquashFS,
     libarchive,
+    py7zr,
     rarfile,
     supportedCompressions,
     zipfile,
     PySquashfsImage,
-    LIBARCHIVE_ARCHIVE_FORMATS,
-    LIBARCHIVE_FILTER_FORMATS,
     TAR_COMPRESSION_FORMATS,
 )
 from .utils import CompressionError, RatarmountError
@@ -32,6 +31,7 @@ from .FATMountSource import FATMountSource
 from .FolderMountSource import FolderMountSource
 from .FSSpecMountSource import FSSpecMountSource
 from .GitMountSource import GitMountSource
+from .Py7zrMountSource import Py7zrMountSource
 from .RarMountSource import RarMountSource
 from .SingleFileMountSource import SingleFileMountSource
 from .SQLiteIndexMountSource import SQLiteIndexMountSource
@@ -104,6 +104,13 @@ def _openZipMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optiona
     return ZipMountSource(fileOrPath, **options) if zipfile is not None and zipfile.is_zipfile(fileOrPath) else None
 
 
+def _openPy7zrMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
+    # https://github.com/miurahr/py7zr/issues/659#issuecomment-2954260661
+    if py7zr is not None and py7zr.is_7zfile(fileOrPath):  # type: ignore
+        return Py7zrMountSource(fileOrPath, **options)
+    return None
+
+
 def _openLibarchiveMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
     if libarchive is None:
         return None
@@ -173,11 +180,12 @@ _BACKENDS = {
         _openLibarchiveMountSource,
         [
             s
-            for formats in [LIBARCHIVE_FILTER_FORMATS, LIBARCHIVE_ARCHIVE_FORMATS]
-            for info in formats.values()
+            for info in supportedCompressions.values()
+            if any('libarchive' in module.name for module in info.modules)
             for s in info.suffixes
         ],
     ),
+    "py7zr": (_openPy7zrMountSource, getFormatExtensions('7z')),
     "pyfatfs": (_openFATImage, getFormatExtensions('fat')),
     "sqlar": (_openSqlar, getFormatExtensions('sqlar')),
     "SQLiteIndex": (_openRatarmountIndex, getFormatExtensions('ratarmount-index')),
