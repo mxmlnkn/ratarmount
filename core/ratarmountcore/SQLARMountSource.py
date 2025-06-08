@@ -142,7 +142,7 @@ class SQLARMountSource(MountSource):
 
             # Copy to a temporary file because sqlite cannot work with Python file objects. This can be wasteful!
             fileOrPath.seek(0)
-            self._temporaryFile = tempfile.NamedTemporaryFile(delete=True)
+            self._temporaryFile = tempfile.NamedTemporaryFile(suffix=".ratarmount.sqlar", delete=True)
             shutil.copyfileobj(fileOrPath, self._temporaryFile.file)  # type: ignore
             self._temporaryFile.file.flush()
 

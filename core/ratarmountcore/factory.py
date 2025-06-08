@@ -34,6 +34,7 @@ from .FSSpecMountSource import FSSpecMountSource
 from .GitMountSource import GitMountSource
 from .RarMountSource import RarMountSource
 from .SingleFileMountSource import SingleFileMountSource
+from .SQLiteIndexMountSource import SQLiteIndexMountSource
 from .SQLiteIndexedTar import SQLiteIndexedTar
 from .SQLARMountSource import SQLARMountSource
 from .SquashFSMountSource import SquashFSMountSource
@@ -146,6 +147,10 @@ def _openSqlar(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSo
     return SQLARMountSource(fileOrPath, **options)
 
 
+def _openRatarmountIndex(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
+    return SQLiteIndexMountSource(fileOrPath, **options)
+
+
 def _getTarExtensions() -> List[str]:
     result = ['tar']
     result += ['tar.' + suffix for compression in TAR_COMPRESSION_FORMATS.values() for suffix in compression.suffixes]
@@ -175,6 +180,7 @@ _BACKENDS = {
     ),
     "pyfatfs": (_openFATImage, getFormatExtensions('fat')),
     "sqlar": (_openSqlar, getFormatExtensions('sqlar')),
+    "SQLiteIndex": (_openRatarmountIndex, getFormatExtensions('ratarmount-index')),
 }
 
 
