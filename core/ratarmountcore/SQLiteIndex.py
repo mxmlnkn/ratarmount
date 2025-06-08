@@ -146,6 +146,7 @@ class SQLiteIndex:
     #   - Add 'xattrs' table
     __version__ = '0.6.0'
 
+    MAGIC_BYTES = b'SQLite format 3\x00'  # If it is encrypted, the first 16 B are the (random) salt.
     NUMBER_OF_METADATA_TO_VERIFY = 1000  # shouldn't take more than 1 second according to benchmarks
 
     # The maximum blob size configured by SQLite is exactly 1 GB, see https://www.sqlite.org/limits.html
@@ -298,9 +299,6 @@ class SQLiteIndex:
             opened as file objects but may be useful for any archive given via a file object.
         """
 
-        if not backendName:
-            raise ValueError("A non-empty backend name must be specified!")
-
         self._compressionsToTest = TAR_COMPRESSION_FORMATS.copy()
         self._compressionsToTest.update(LIBARCHIVE_FILTER_FORMATS)
 
@@ -326,8 +324,6 @@ class SQLiteIndex:
         self.backendName = backendName
         self._insertedRowCount = 0
         self._temporaryIndexFile: Optional[Any] = None
-
-        assert self.backendName
 
         # Ignore minimum file count option if an index file path or index folder is configured.
         # For latter, ignore the special empty folder [''], which means that the indexes are stored
@@ -406,10 +402,10 @@ class SQLiteIndex:
             if os.path.isfile(indexPath):
                 os.remove(indexPath)
 
-    def openExisting(self, checkMetadata: Optional[Callable[[Dict[str, Any]], None]] = None):
+    def openExisting(self, checkMetadata: Optional[Callable[[Dict[str, Any]], None]] = None, readOnly: bool = False):
         """Tries to find an already existing index."""
         for indexPath in self.possibleIndexFilePaths:
-            if self._tryLoadIndex(indexPath, checkMetadata=checkMetadata):
+            if self._tryLoadIndex(indexPath, checkMetadata=checkMetadata, readOnly=readOnly):
                 break
 
     def openInMemory(self):
@@ -636,15 +632,18 @@ class SQLiteIndex:
                 print(f"[Warning] {arg}: index: {oldState}, current: {newState}")
 
     def checkMetadataBackend(self, metadata: Dict):
+        # When opening an index without a backend via SQLiteIndexMountSource directly, it should not be checked.
+        if not self.backendName:
+            return
+
         # Because of a lack of sufficient foresight, the backend name was not added to the index in older versions.
         backendName = metadata.get('backendName')
-        if isinstance(backendName, str):
-            if backendName != self.backendName:
-                raise MismatchingIndexError(
-                    f"Cannot open an index created with backend '{backendName}'!\n"
-                    f"Will stop trying to open the archive with backend '{self.backendName}'.\n"
-                    f"Use --recreate-index if '{backendName}' is not installed."
-                )
+        if isinstance(backendName, str) and backendName != self.backendName:
+            raise MismatchingIndexError(
+                f"Cannot open an index created with backend '{backendName}'!\n"
+                f"Will stop trying to open the archive with backend '{self.backendName}'.\n"
+                f"Use --recreate-index if '{backendName}' is not installed."
+            )
 
     def getIndexVersion(self):
         return self.getConnection().execute("""SELECT version FROM versions WHERE name == 'index';""").fetchone()[0]
@@ -1233,7 +1232,9 @@ class SQLiteIndex:
             self.indexFilePath = indexFilePath
             self.indexFilePathDeleteOnClose = deleteOnClose
 
-    def _loadIndex(self, indexFilePath: str, checkMetadata: Optional[Callable[[Dict[str, Any]], None]]) -> None:
+    def _loadIndex(
+        self, indexFilePath: str, checkMetadata: Optional[Callable[[Dict[str, Any]], None]], readOnly: bool = False
+    ) -> None:
         """
         Loads the given index SQLite database and checks it for validity raising an exception if it is invalid.
 
@@ -1309,7 +1310,12 @@ class SQLiteIndex:
 
         # Done downloading and/or extracting the SQLite index.
 
-        self.sqlConnection = self._openSqlDb(temporaryIndexFilePath)
+        if readOnly:
+            uriPath = urllib.parse.quote(temporaryIndexFilePath)
+            # check_same_thread=False can be used because it is read-only and it allows to enable FUSE multithreading
+            self.sqlConnection = SQLiteIndex._openSqlDb(f"file:{uriPath}?mode=ro", uri=True, check_same_thread=False)
+        else:
+            self.sqlConnection = SQLiteIndex._openSqlDb(temporaryIndexFilePath)
         tables = getSqliteTables(self.sqlConnection)
         versions = None
         try:
@@ -1389,7 +1395,10 @@ class SQLiteIndex:
         self._setIndexFilePath(temporaryIndexFilePath)
 
     def _tryLoadIndex(
-        self, indexFilePath: str, checkMetadata: Optional[Callable[[Dict[str, Any]], None]] = None
+        self,
+        indexFilePath: str,
+        checkMetadata: Optional[Callable[[Dict[str, Any]], None]] = None,
+        readOnly: bool = False,
     ) -> bool:
         """Calls loadIndex if index is not loaded already and provides extensive error handling."""
 
@@ -1397,7 +1406,7 @@ class SQLiteIndex:
             return True
 
         try:
-            self._loadIndex(indexFilePath, checkMetadata=checkMetadata)
+            self._loadIndex(indexFilePath, checkMetadata=checkMetadata, readOnly=readOnly)
         except MismatchingIndexError as e:
             raise e
         except Exception as exception:

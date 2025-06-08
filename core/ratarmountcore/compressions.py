@@ -195,6 +195,12 @@ ARCHIVE_FORMATS: Dict[str, CompressionInfo] = {
         [CompressionModuleInfo('sqlite3', lambda x: sqlite3.connect(x))],
         lambda x: x.read(16) == b'SQLite format 3\x00',
     ),
+    'ratarmount-index': CompressionInfo(
+        ['index.sqlite'],
+        [],
+        [CompressionModuleInfo('sqlite3', lambda x: sqlite3.connect(x))],
+        lambda x: x.read(16) == b'SQLite format 3\x00',
+    ),
 }
 
 
