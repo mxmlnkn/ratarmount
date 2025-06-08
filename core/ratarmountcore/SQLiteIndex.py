@@ -559,6 +559,32 @@ class SQLiteIndex:
             """
         )
 
+    def tryToOpenFirstFile(self, openByPath):
+        # Get first row that has the regular file bit set in mode (stat.S_IFREG == 32768 == 1<<15).
+        result = self.getConnection().execute(
+            f"""SELECT path,name {SQLiteIndex.FROM_REGULAR_FILES} ORDER BY "offsetheader" ASC LIMIT 1;"""
+        )
+        if not result:
+            return
+        firstFile = result.fetchone()
+        if not firstFile:
+            return
+
+        if self.printDebug >= 2:
+            print(
+                "[Info] The index contains no backend name. Therefore, will try to open the first file as "
+                "an integrity check."
+            )
+        try:
+            with openByPath(firstFile[0] + '/' + firstFile[1]) as file:
+                file.read(1)
+        except Exception as exception:
+            if self.printDebug >= 2:
+                print("[Info] Trying to open the first file raised an exception:", exception)
+            if self.printDebug >= 3:
+                traceback.print_exc()
+            raise InvalidIndexError("Integrity check of opening the first file failed.") from exception
+
     @staticmethod
     def checkArchiveStats(
         archiveFilePath: Optional[str], metadata: Dict[str, Any], verifyModificationTime: bool
