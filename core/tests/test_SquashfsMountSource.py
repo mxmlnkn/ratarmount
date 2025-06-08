@@ -8,6 +8,7 @@
 import importlib
 import io
 import os
+import stat
 import struct
 import sys
 
@@ -56,12 +57,18 @@ class TestSquashfsMountSource:
                 assert findSquashFSOffset(file) == 0
 
             for folder in ['/', '/foo', '/foo/fighter']:
-                assert mountSource.getFileInfo(folder)
+                fileInfo = mountSource.getFileInfo(folder)
+                assert fileInfo
+                assert stat.S_ISDIR(fileInfo.mode)
+
                 assert mountSource.fileVersions(folder) == 1
                 assert mountSource.listDir(folder)
 
             for filePath in ['/foo/fighter/ufo']:
-                assert mountSource.getFileInfo(filePath)
+                fileInfo = mountSource.getFileInfo(filePath)
+                assert fileInfo
+                assert not stat.S_ISDIR(fileInfo.mode)
+
                 assert mountSource.fileVersions(filePath) == 1
                 assert not mountSource.listDir(filePath)
 
@@ -92,3 +99,23 @@ class TestSquashfsMountSource:
                 assert not mountSource.listDir(linkPath)
                 fileInfo = mountSource.getFileInfo(linkPath)
                 assert fileInfo.linkname == 'fighter'
+
+    @staticmethod
+    @pytest.mark.parametrize('compression', compressionsToTest)
+    def test_transform(compression):
+        with copyTestFile(f'folder-symlink.{compression}.squashfs') as path, SquashFSMountSource(
+            path, transform=("(.)/(.)", r"\1_\2")
+        ) as mountSource:
+            for folder in ['/', '/foo', '/foo_fighter']:
+                fileInfo = mountSource.getFileInfo(folder)
+                assert fileInfo
+                assert stat.S_ISDIR(fileInfo.mode)
+                assert mountSource.fileVersions(folder) == 1
+
+            for filePath in ['/foo_fighter_ufo']:
+                fileInfo = mountSource.getFileInfo(filePath)
+                assert fileInfo
+                assert not stat.S_ISDIR(fileInfo.mode)
+
+                assert mountSource.fileVersions(filePath) == 1
+                assert not mountSource.listDir(filePath)
