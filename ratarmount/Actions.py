@@ -362,14 +362,8 @@ def processParsedArguments(args) -> int:
         args.parallelization = len(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else os.cpu_count()
 
     # Clean backend list
-    supportedModuleNames = [module.name for _, info in supportedCompressions.items() for module in info.modules]
     args.prioritizedBackends = (
-        [
-            backend
-            for backendString in args.use_backend
-            for backend in backendString.split(',')
-            if backend in supportedModuleNames
-        ][::-1]
+        [backend for backendString in args.use_backend for backend in backendString.split(',')][::-1]
         if args.use_backend
         else []
     )
