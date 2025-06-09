@@ -289,6 +289,57 @@ def isEXT4Image(fileObject) -> bool:
     return False
 
 
+def findASARHeader(fileObject) -> Tuple[int, int, int]:
+    """Return triple (start of header JSON, size of header JSON, start of file objects)"""
+    # https://github.com/electron/asar/issues/128
+    # https://github.com/electron/asar
+    # > UInt32: header_size | String: header | Bytes: file1 | ...
+    # > The header_size and header are serialized with Pickle class
+    # > The header is a JSON string, and the header_size is the size of header's Pickle object.
+    # Numbers are in little endian. Pickling writes the data, prepends a uint32 before and pads to 4 B offsets.
+    # Because header_size is always 4 bytes, the implicit "magic" / redundant bytes of this file format are:
+    # \x04\x00\x00\x00
+    # Furthermore because pickling "header" already prepends the length of "header", the actual "header_size"
+    # is completely redundant and can also be used as some kind of integrity check...
+    # I don't understand where the fourth 32-bit number comes from. For some reason, the header seems to be
+    # pickled twice, contrary to the ReadMe!?
+    # https://github.com/electron/asar/issues/16
+    # https://github.com/electron/asar/issues/226
+    # https://knifecoat.com/Posts/ASAR+Format+Spec
+    # -> Nice rant about the format as I have to concur about the usage of pickle-js.
+    fileObject.seek(0)
+    ASAR_MAGIC_SIZE = 4 * 4
+    sizeOfPickledSize, sizeOfPickledPickledPickledHeader, sizeOfPickledPickledHeader, sizeOfPickledHeader = (
+        struct.unpack('<LLLL', fileObject.read(ASAR_MAGIC_SIZE))
+    )
+    assert sizeOfPickledSize == 4
+    assert sizeOfPickledPickledPickledHeader == sizeOfPickledPickledHeader + 4
+    padding = (4 - sizeOfPickledHeader % 4) % 4
+    assert sizeOfPickledPickledHeader == sizeOfPickledHeader + padding + 4
+
+    dataOffset = ASAR_MAGIC_SIZE + sizeOfPickledHeader + padding
+
+    # It would be nice if we could check that dataOffset < file size, but we cannot get that (cheaply)
+    # in case of compressed files or for large headers and because "seek(offset)" will always return that
+    # offset even if it is > file size, so we would actually have to read the data.
+
+    return ASAR_MAGIC_SIZE, sizeOfPickledHeader, dataOffset
+
+
+def isASAR(fileObject) -> bool:
+    offset = fileObject.tell()
+    try:
+        # Reading the header and checking it to be correct JSON is to expensive for large archives.
+        # The unnecessary pickling already should introduce enough redundancy for checks and detection.
+        findASARHeader(fileObject)
+        return True
+    except Exception:
+        pass
+    finally:
+        fileObject.seek(offset)
+    return False
+
+
 ARCHIVE_FORMATS: Dict[str, CompressionInfo] = {
     '7z': CompressionInfo(
         ['7z', '7zip'],
@@ -310,6 +361,12 @@ ARCHIVE_FORMATS: Dict[str, CompressionInfo] = {
         [],
         [CompressionModuleInfo('zipfile', lambda x: zipfile.ZipFile(x))],
         lambda x: x.read(2) == b'PK',
+    ),
+    'asar': CompressionInfo(
+        ['asar'],
+        [],
+        [CompressionModuleInfo('ratarmountcore', lambda x: x)],
+        isASAR,
     ),
     'sqlar': CompressionInfo(
         ['sqlar'],

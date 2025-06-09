@@ -2516,6 +2516,12 @@ if [[ -z "$CI" ]]; then
             'grep' -v 'test.*.py'
     )
 
+    allTextFiles=()
+    while read -r file; do
+        allTextFiles+=( "$file" )
+    done < <( git ls-tree -r --name-only HEAD | 'grep' -E '[.](py|md|txt|sh|yml)' )
+    codespell "${allTextFiles[@]}"
+
     allPythonFiles=()
     while read -r file; do
         allPythonFiles+=( "$file" )
@@ -2525,9 +2531,6 @@ if [[ -z "$CI" ]]; then
     while read -r file; do
         testFiles+=( "$file" )
     done < <( git ls-tree -r --name-only HEAD | 'grep' 'test.*[.]py$' | 'grep' -v 'conftest[.]py$' )
-
-    echo "Checking files:"
-    printf '    %s\n' "${files[@]}" "${testFiles[@]}"
 
     # Parallelism with -j 3 does not improve much anymore and anything larger even worsens the runtime!
     pylint -j 2 --rcfile tests/.pylintrc ratarmount core/ratarmountcore "${testFiles[@]}" | tee pylint.log
@@ -2725,6 +2728,9 @@ pytestedTests+=(
 fi
 
 pytestedTests+=(
+    2709a3348eb2c52302a7606ecf5860bc tests/nested-tar.asar                        foo/fighter/ufo
+    2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar.asar                        foo/lighter.tar/fighter/bar
+
     2709a3348eb2c52302a7606ecf5860bc tests/nested-tar.sqlar                       foo/fighter/ufo
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar.sqlar                       foo/lighter.tar/fighter/bar
     2709a3348eb2c52302a7606ecf5860bc tests/nested-tar-compressed.sqlar            foo/fighter/ufo

@@ -520,3 +520,14 @@ for size in 1M 10M; do
     sudo umount "$mountPoint"
 done
 rmdir "$mountPoint"
+
+# SAR
+sudo apt-get install npm --no-install-recommends
+sudo npm install -g n
+sudo n latest  # 24.1.0
+npx @electron/asar --help
+npx @electron/asar pack non-existing empty.asar
+# For some reason asar removes the top-level folder, so we need to nest it -.-
+mkdir foodir
+mv foo foodir
+npx @electron/asar pack foodir nested-tar.asar

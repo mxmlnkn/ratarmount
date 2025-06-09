@@ -27,6 +27,7 @@ from .compressions import (
 )
 from .utils import CompressionError, RatarmountError
 from .MountSource import MountSource
+from .ASARMountSource import ASARMountSource
 from .EXT4MountSource import EXT4MountSource
 from .FATMountSource import FATMountSource
 from .FolderMountSource import FolderMountSource
@@ -159,6 +160,10 @@ def _openSqlar(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSo
     return SQLARMountSource(fileOrPath, **options)
 
 
+def _openASAR(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
+    return ASARMountSource(fileOrPath, **options)
+
+
 def _openRatarmountIndex(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
     return SQLiteIndexMountSource(fileOrPath, **options)
 
@@ -193,6 +198,7 @@ _BACKENDS = {
     "py7zr": (_openPy7zrMountSource, getFormatExtensions('7z')),
     "pyfatfs": (_openFATImage, getFormatExtensions('fat')),
     "ext4": (_openEXT4Image, getFormatExtensions('ext4')),
+    "asar": (_openASAR, getFormatExtensions('asar')),
     "sqlar": (_openSqlar, getFormatExtensions('sqlar')),
     "SQLiteIndex": (_openRatarmountIndex, getFormatExtensions('ratarmount-index')),
 }

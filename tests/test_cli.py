@@ -266,6 +266,8 @@ ARCHIVES_TO_TEST = [
     ("832c78afcb9832e1a21c18212fc6c38b", "gnu-sparse-files.tar", "01.sparse1.bin"),
     ("832c78afcb9832e1a21c18212fc6c38b", "gnu-sparse-files.tar", "02.normal1.bin"),
     ("832c78afcb9832e1a21c18212fc6c38b", "gnu-sparse-files.tar", "03.sparse1.bin"),
+    ("2709a3348eb2c52302a7606ecf5860bc", "nested-tar.asar", "foo/fighter/ufo"),
+    ("2b87e29fca6ee7f1df6c1a76cb58e101", "nested-tar.asar", "foo/lighter.tar/fighter/bar"),
 ]
 
 
