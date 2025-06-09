@@ -28,9 +28,12 @@ Optional Arguments:
                         (default: )
   -P PARALLELIZATION, --parallelization PARALLELIZATION
                         If an integer other than 1 is specified, then the threaded parallel
-                        bzip2 decoder will be used specified amount of block decoder threads.
-                        Further threads with lighter work may be started. A value of 0 will use
-                        all the available cores (24). (default: 0)
+                        decoders will use the specified amount of block decoder threads. Further
+                        threads with lighter work may be started. A value of 0 will use all the
+                        available cores (24). Fine-granular parallelization for each backend can
+                        be specified with: "<backend>:<parallelization>,:<default
+                        parallelization>,<backend 2>:<parallelization>,..." (default:
+                        :1,rapidgzip-bzip2:0)
   -h, --help            Show this help message and exit.
   -r, --recursive       Mount archives inside archives recursively. Same as --recursion-depth
                         -1. (default: False)

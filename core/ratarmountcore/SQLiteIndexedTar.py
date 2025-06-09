@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import copy
 import io
 import json
 import math
@@ -462,6 +463,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         ignoreZeros                  : bool                      = False,
         verifyModificationTime       : bool                      = False,
         parallelization              : int                       = 1,
+        parallelizations             : Optional[Dict[str, int]]  = None,
         isGnuIncremental             : Optional[bool]            = None,
         printDebug                   : int                       = 0,
         transformRecursiveMountPoint : Optional[Tuple[str, str]] = None,
@@ -519,6 +521,13 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         verifyModificationTime
             If true, then the index will be recreated automatically if the TAR archive has a more
             recent modification time than the index file.
+        parallelization
+            The amount of parallelization to be used for necessary compression backends if it offers
+            parallelization at all and if it makes sense.
+        parallelizations
+            Fine-granular parallelization for each compression backend. Set the empty string
+            key to the default parallelization for backends not explicitly in the dictionary.
+            This has higher precedence than 'parallelization'.
         isGnuIncremental
             If None, then it will be determined automatically. Behavior can be overwritten by setting
             it to a bool value. If true, then prefixes will be stripped from certain paths encountered
@@ -535,7 +544,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         self.ignoreZeros                  = ignoreZeros
         self.verifyModificationTime       = verifyModificationTime
         self.gzipSeekPointSpacing         = gzipSeekPointSpacing
-        self.parallelization              = parallelization
         self.printDebug                   = printDebug
         self.isFileObject                 = fileObject is not None
         self._isGnuIncremental            = isGnuIncremental
@@ -543,8 +551,10 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         self._recursionDepth              = -1
         # fmt: on
         self.prioritizedBackends: List[str] = [] if prioritizedBackends is None else prioritizedBackends
-
         self.maxRecursionDepth = determineRecursionDepth(recursive=recursive, recursionDepth=recursionDepth)
+        self.parallelizations = copy.deepcopy(parallelizations) if parallelizations else {}
+        if '' not in self.parallelizations:
+            self.parallelizations[''] = parallelization
 
         self.transform = (
             (lambda x: re.sub(self.transformPattern[0], self.transformPattern[1], x))
@@ -585,7 +595,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             fileObject,
             gzipSeekPointSpacing,
             encoding,
-            self.parallelization,
+            self.parallelizations,
             prioritizedBackends=self.prioritizedBackends,
             printDebug=self.printDebug,
         )
@@ -1429,7 +1439,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         fileobj: IO[bytes],
         gzipSeekPointSpacing: int,
         encoding: str,
-        parallelization: int,
+        parallelizations: Dict[str, int],
         prioritizedBackends: Optional[List[str]],
         printDebug: int = 0,
     ) -> Tuple[Any, Optional[IO[bytes]], Optional[str]]:
@@ -1453,6 +1463,8 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 f"without any of these modules: {moduleNames}"
             )
 
+        parallelization = 1
+
         if compression == 'gz':
             if SQLiteIndexedTar._useRapidgzip(
                 fileobj,
@@ -1462,7 +1474,13 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 printDebug=printDebug,
             ):
                 isRealFile = hasattr(fileobj, 'name') and fileobj.name and os.path.isfile(fileobj.name)
-                parallelization = 1 if isRealFile and isOnSlowDrive(fileobj.name) else parallelization
+                parallelization = (
+                    1
+                    if isRealFile and isOnSlowDrive(fileobj.name)
+                    else parallelizations.get(
+                        'rapidgzip-gzip', parallelizations.get('rapidgzip', parallelizations.get('', 1))
+                    )
+                )
                 if printDebug >= 3:
                     print(
                         f"[Info] Parallelization to use for rapidgzip backend: {parallelization}, "
@@ -1484,24 +1502,29 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                     fileobj=fileobj, drop_handles=False, spacing=gzipSeekPointSpacing, buffer_size=bufferSize
                 )
         elif compression == 'bz2':
+            parallelization = parallelizations.get('rapidgzip-bzip2', parallelizations.get('', 1))
             tar_file = rapidgzip.IndexedBzip2File(fileobj, parallelization=parallelization)  # type: ignore
         elif (
             compression == 'xz'
             and xz
-            and parallelization != 1
+            and parallelizations.get('xz', parallelizations.get('', 1)) != 1
             and hasattr(fileobj, 'name')
             and os.path.isfile(fileobj.name)
             and platform.system() == 'Linux'
         ):
             tar_file = formatOpen(fileobj)
             if len(tar_file.block_boundaries) > 1:
+                parallelization = parallelizations.get('xz', parallelizations.get('', 1))
                 tar_file.close()
                 tar_file = ParallelXZReader(fileobj.name, parallelization=parallelization)
         else:
             tar_file = formatOpen(fileobj)
 
         if printDebug >= 3:
-            print(f"[Info] Undid {compression} file compression by using: {type(tar_file).__name__}")
+            print(
+                f"[Info] Undid {compression} file compression by using: {type(tar_file).__name__} "
+                f"with parallelization={parallelization}"
+            )
 
         return tar_file, fileobj, compression
 

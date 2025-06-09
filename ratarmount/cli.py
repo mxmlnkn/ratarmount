@@ -125,10 +125,12 @@ For further information, see the ReadMe on the project's homepage:
         help='Unmount the given mount point(s). Equivalent to calling "fusermount -u" for each mount point.')
 
     commonGroup.add_argument(
-        '-P', '--parallelization', type=int, default=0,
-        help='If an integer other than 1 is specified, then the threaded parallel bzip2 decoder will be used '
+        '-P', '--parallelization', type=str, default=":1,rapidgzip-bzip2:0",
+        help='If an integer other than 1 is specified, then the threaded parallel decoders will use the '
              'specified amount of block decoder threads. Further threads with lighter work may be started. '
-             f'A value of 0 will use all the available cores ({defaultParallelization}).')
+             f'A value of 0 will use all the available cores ({defaultParallelization}). Fine-granular '
+             'parallelization for each backend can be specified with: \n'
+             '"<backend>:<parallelization>,:<default parallelization>,<backend 2>:<parallelization>,..."')
 
     commonGroup.add_argument(
         '-v', '--version', action=PrintVersionAction, nargs=0, default=argparse.SUPPRESS,

@@ -359,12 +359,25 @@ def processParsedArguments(args) -> int:
         else:
             args.index_folders = [args.index_folders]
 
-    # Check the parallelization argument and move to global variable
-    assert isinstance(args.parallelization, int)
-    if args.parallelization < 0:
-        raise argparse.ArgumentTypeError("Argument for parallelization must be non-negative!")
-    if args.parallelization == 0:
-        args.parallelization = len(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else os.cpu_count()
+    # Check the parallelization argument
+    parallelizations = (
+        {'': args.parallelization}
+        if args.parallelization.isdigit()
+        else dict(kv.split(':') for kv in args.parallelization.split(','))
+    )
+    args.parallelizations = {}
+    defaultParallelization = len(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else os.cpu_count()
+    for backend, parallelizationString in parallelizations.items():
+        # isdigit does will be false if there is a minus sign, which is what we want.
+        if not parallelizationString.isdigit():
+            raise argparse.ArgumentTypeError(
+                f"Parallelization must be non-negative number but got {parallelizationString} for {backend}!"
+            )
+        args.parallelizations[backend] = (
+            defaultParallelization if int(parallelizationString) == 0 else int(parallelizationString)
+        )
+    if '' not in args.parallelizations:
+        args.parallelizations[''] = defaultParallelization
 
     # Clean backend list
     args.prioritizedBackends = (
@@ -417,7 +430,7 @@ def createFuseMount(args) -> None:
         indexFolders                 = args.index_folders,
         lazyMounting                 = bool(args.lazy),
         passwords                    = list(args.passwords),
-        parallelization              = args.parallelization,
+        parallelizations             = args.parallelizations,
         isGnuIncremental             = args.gnu_incremental,
         writeOverlay                 = args.write_overlay,
         printDebug                   = int(args.debug),
