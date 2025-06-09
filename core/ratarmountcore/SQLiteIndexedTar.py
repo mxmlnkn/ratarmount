@@ -581,7 +581,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         # tarFileObject : File object to the uncompressed (or decompressed) TAR file to read actual data out of.
         # compression   : Stores what kind of compression the originally specified TAR file uses.
         # isTar         : Can be false for the degenerated case of only a bz2 or gz file not containing a TAR
-        self.tarFileObject, self.rawFileObject, self.compression, self.isTar = SQLiteIndexedTar._openCompressedFile(
+        self.tarFileObject, self.rawFileObject, self.compression = SQLiteIndexedTar._openCompressedFile(
             fileObject,
             gzipSeekPointSpacing,
             encoding,
@@ -589,6 +589,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             prioritizedBackends=self.prioritizedBackends,
             printDebug=self.printDebug,
         )
+        self.isTar = SQLiteIndexedTar._detectTar(self.tarFileObject, encoding, printDebug=printDebug)
         if not self.isTar and not self.rawFileObject:
             raise RatarmountError(f"File object ({str(fileObject)}) could not be opened as a TAR file!")
 
@@ -1420,6 +1421,9 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
         return isTar
 
+    # TODO I think this should be factored out into something like factory.py, but a separate file to reduce
+    #      include pollution and it only undoes compressions/filter layers, instead of returning mount sources.
+    #      detectCompression and TAR_COMPRESSION_FORMATS should also be moved there and renamed.
     @staticmethod
     def _openCompressedFile(
         fileobj: IO[bytes],
@@ -1428,7 +1432,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         parallelization: int,
         prioritizedBackends: Optional[List[str]],
         printDebug: int = 0,
-    ) -> Tuple[Any, Optional[IO[bytes]], Optional[str], bool]:
+    ) -> Tuple[Any, Optional[IO[bytes]], Optional[str]]:
         """
         Opens a file possibly undoing the compression.
         Returns (tar_file_obj, raw_file_obj, compression, isTar).
@@ -1439,7 +1443,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             print(f"[Info] Detected compression {compression} for file object:", fileobj)
 
         if compression not in TAR_COMPRESSION_FORMATS:
-            return fileobj, None, compression, SQLiteIndexedTar._detectTar(fileobj, encoding, printDebug=printDebug)
+            return fileobj, None, compression
 
         formatOpen = findAvailableOpen(compression, prioritizedBackends)
         if not formatOpen:
@@ -1499,7 +1503,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         if printDebug >= 3:
             print(f"[Info] Undid {compression} file compression by using: {type(tar_file).__name__}")
 
-        return tar_file, fileobj, compression, SQLiteIndexedTar._detectTar(tar_file, encoding, printDebug=printDebug)
+        return tar_file, fileobj, compression
 
     def _loadOrStoreCompressionOffsets(self):
         self.index.synchronizeCompressionOffsets(self.tarFileObject, self.compression)
