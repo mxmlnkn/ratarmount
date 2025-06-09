@@ -27,6 +27,7 @@ from .compressions import (
 )
 from .utils import CompressionError, RatarmountError
 from .MountSource import MountSource
+from .EXT4MountSource import EXT4MountSource
 from .FATMountSource import FATMountSource
 from .FolderMountSource import FolderMountSource
 from .FSSpecMountSource import FSSpecMountSource
@@ -150,6 +151,10 @@ def _openFATImage(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[Moun
     return FATMountSource(fileOrPath, **options)
 
 
+def _openEXT4Image(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
+    return EXT4MountSource(fileOrPath, **options)
+
+
 def _openSqlar(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
     return SQLARMountSource(fileOrPath, **options)
 
@@ -187,6 +192,7 @@ _BACKENDS = {
     ),
     "py7zr": (_openPy7zrMountSource, getFormatExtensions('7z')),
     "pyfatfs": (_openFATImage, getFormatExtensions('fat')),
+    "ext4": (_openEXT4Image, getFormatExtensions('ext4')),
     "sqlar": (_openSqlar, getFormatExtensions('sqlar')),
     "SQLiteIndex": (_openRatarmountIndex, getFormatExtensions('ratarmount-index')),
 }

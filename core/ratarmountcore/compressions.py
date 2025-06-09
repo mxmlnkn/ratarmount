@@ -88,6 +88,11 @@ except ImportError:
     PyFat = None  # type: ignore
 
 try:
+    import ext4  # pylint: disable=unused-import
+except ImportError:
+    ext4 = None  # type: ignore
+
+try:
     import py7zr  # pylint: disable=unused-import
 except ImportError:
     py7zr = None  # type: ignore
@@ -269,6 +274,21 @@ def isFATImage(fileObject) -> bool:
         fileObject.seek(offset)
 
 
+def isEXT4Image(fileObject) -> bool:
+    if ext4 is None:
+        return False
+
+    offset = fileObject.tell()
+    try:
+        ext4.Volume(fileObject)
+        return True
+    except Exception:
+        pass
+    finally:
+        fileObject.seek(offset)
+    return False
+
+
 ARCHIVE_FORMATS: Dict[str, CompressionInfo] = {
     '7z': CompressionInfo(
         ['7z', '7zip'],
@@ -317,7 +337,13 @@ ARCHIVE_FORMATS: Dict[str, CompressionInfo] = {
         ['fat', 'img', 'dd', 'fat12', 'fat16', 'fat32', 'raw'],
         [],
         [CompressionModuleInfo('pyfatfs', lambda x: x)],
-        lambda x: isFATImage(x),
+        isFATImage,
+    ),
+    'ext4': CompressionInfo(
+        ['ext4', 'img', 'dd', 'raw'],
+        [],
+        [CompressionModuleInfo('ext4', lambda x: x)],
+        isEXT4Image,
     ),
 }
 

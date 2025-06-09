@@ -498,3 +498,25 @@ EOF
 #   'CREATE TABLE sqlar(\n  name TEXT PRIMARY KEY,\n  mode INT,\n  mtime INT,\n  sz INT,\n  data BLOB\n)'),
 #   ('index', 'sqlite_autoindex_sqlar_1', 'sqlar', 3, None)]
 # [('foo',), ('foo/fighter',), ('foo/fighter/ufo',), ('foo/lighter.tar',)]
+
+# EXT4
+mountPoint='ext4mount'
+mkdir "$mountPoint"
+for size in 1M 10M; do
+    name=nested-tar-$size.ext4
+    dd if=/dev/zero of="$name" bs="$size" count=1
+    mkfs.ext4 "$name"
+    # For 1M, I get:
+    #   Filesystem too small for a journal
+    #   Creating filesystem with 256 4k blocks and 128 inodes
+    # I don'T get this for 10M, so I guess I should test with both.
+    sudo mount -o loop "$name" "$mountPoint"  # Still not possible without sudo :(
+    (
+        cd "$mountPoint" &&
+        sudo rmdir --ignore-fail-on-non-empty 'lost+found' &&
+        sudo chmod a+rwx . &&
+        tar -xf "$OLDPWD/tests/nested-tar.tar"
+    )
+    sudo umount "$mountPoint"
+done
+rmdir "$mountPoint"

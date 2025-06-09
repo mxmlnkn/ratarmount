@@ -182,6 +182,7 @@ def printOSSAttributions() -> None:
         # BSD-3 with "name of the copyright holder" explicitly filled in
         ("sqlcipher", "/sqlcipher/sqlcipher/refs/heads/master/LICENSE.txt"),
         ("py7zr", "/miurahr/py7zr/refs/heads/master/LICENSE"),  # LGPL 2.1
+        ("python-ext4", "/Eeems/python-ext4/refs/heads/main/LICENSE"),  # MIT
     ]
     for name, githubPath in sorted(licenses):
         licenseUrl = "https://raw.githubusercontent.com" + githubPath

@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# pylint: disable=wrong-import-order
+# pylint: disable=wrong-import-position
+# pylint: disable=protected-access
+
+import bz2
+import hashlib
+import io
+import os
+import shutil
+import stat
+import sys
+
+import pytest
+
+try:
+    import ext4
+except ImportError:
+    ext4 = None  # type:ignore
+
+from helpers import copyTestFile
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from ratarmountcore.EXT4MountSource import EXT4MountSource  # noqa: E402
+
+
+class TestEXT4MountSource:
+    @staticmethod
+    @pytest.mark.parametrize('path', ['nested-tar-1M.ext4.bz2', 'nested-tar-10M.ext4.bz2'])
+    def test_password(path):
+        if not ext4:
+            return
+        with copyTestFile(path) as tmpPath, bz2.open(tmpPath, 'rb') as bz2File:
+            tmpFileObject = io.BytesIO()
+            shutil.copyfileobj(bz2File, tmpFileObject)
+
+            mountSource = EXT4MountSource(tmpFileObject)
+            for folder in ['/', '/foo', '/foo/fighter']:
+                fileInfo = mountSource.getFileInfo(folder)
+                assert fileInfo
+                assert stat.S_ISDIR(fileInfo.mode)
+
+                assert mountSource.fileVersions(folder) == 1
+                assert mountSource.listDir(folder)
+
+            for filePath in ['/foo/fighter/ufo', '/foo/lighter.tar']:
+                fileInfo = mountSource.getFileInfo(filePath)
+                assert fileInfo
+                assert not stat.S_ISDIR(fileInfo.mode)
+
+                assert mountSource.fileVersions(filePath) == 1
+                assert not mountSource.listDir(filePath)
+
+            with mountSource.open(mountSource.getFileInfo('/foo/fighter/ufo')) as file:
+                assert file.read() == b'iriya\n'
+
+            with mountSource.open(mountSource.getFileInfo('/foo/lighter.tar')) as file:
+                assert hashlib.md5(file.read()).hexdigest() == "2a06cc391128d74e685a6cb7cfe9f94d"
+
+    # TODO Does not use SQLiteIndex backend because it is already usably indexed and it would seem redundant.
+    #      Therefore 'transform' does not work.

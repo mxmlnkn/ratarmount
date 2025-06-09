@@ -80,11 +80,6 @@ class FATMountSource(MountSource):
         return self._listDir(path)
 
     @overrides(MountSource)
-    def listDirModeOnly(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
-        # TODO I think with the low-level API, we could also get the FileInfos
-        return self._listDir(path)
-
-    @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         try:
             entry = self.fileSystem.root_dir.get_entry(path)

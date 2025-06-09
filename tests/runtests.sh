@@ -2946,7 +2946,7 @@ checkRecursiveFolderMounting --lazy
 
 cleanup
 
-rm -f tests/*.index.*
+for file in tests/*.index.*; do git ls-files --error-unmatch "$file" &>/dev/null || 'rm' -f "$file"; done
 for folder in tests/*/; do safeRmdir "$folder"; done
 
 done  # for parallelization
