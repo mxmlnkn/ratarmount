@@ -217,6 +217,9 @@ class IterableArchive:
             except ArchiveError as exception2:
                 raise exception2 from exception
 
+    def formatName(self):
+        return laffi.format_name(self._archive)
+
     def filterNames(self):
         allNames = [laffi.filter_name(self._archive, i) for i in range(laffi.filter_count(self._archive))]
         return [name for name in allNames if name != b'none']
@@ -599,6 +602,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
 
         triedToOpen = False
         fileInfos = []
+        gotAnyEntry = False
         with IterableArchive(self.fileOrPath, passwords=self.passwords, printDebug=self.printDebug) as archive:
             while True:
                 entry = archive.nextEntry()
@@ -616,6 +620,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                             break
                     entryPath = fname
 
+                gotAnyEntry = True
                 fileInfos.append(entry.convertToRow(entry.entryIndex, self.transform, path=entryPath))
                 # Contains file info SQLite row tuples! 4 -> size, 6 -> mode
                 if not triedToOpen and not stat.S_ISDIR(fileInfos[-1][6]) and fileInfos[-1][4] > 0:
@@ -631,11 +636,15 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                             print("[Warning] The file contents are encrypted but not the file hierarchy!")
                             print("[Warning] Specify a password with --password to also view file contents!")
                     triedToOpen = True
-            if len(fileInfos) > 1000:
+
+                if len(fileInfos) > 1000:
+                    self.index.setFileInfos(fileInfos)
+                    fileInfos = []
+
+            if fileInfos:
                 self.index.setFileInfos(fileInfos)
-                fileInfos = []
-        if fileInfos:
-            self.index.setFileInfos(fileInfos)
+            elif not gotAnyEntry and archive.formatName() == b'tar':
+                raise ArchiveError("Supposedly detected a TAR with no entries in it. Rejecting it as unknown format!")
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
         if self.printDebug >= 2:
