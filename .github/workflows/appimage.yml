@@ -24,7 +24,6 @@ jobs:
         name: ratarmount-x86_64.AppImage
         path: "AppImage/ratarmount*-x86_64.AppImage"
 
-
   AppImage-Tests:
     runs-on: ${{ matrix.os }}
     needs: [Manylinux-Appimage]
@@ -99,3 +98,26 @@ jobs:
         export RATARMOUNT_CMD=$PWD/squashfs-root/AppRun
         export PARALLELIZATIONS=${{ matrix.parallelization }}
         bash tests/runtests.sh
+
+  AppImage-Release:
+    runs-on: ubuntu-latest
+    needs: [AppImage-Tests]
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        name: ratarmount-x86_64.AppImage
+
+    - uses: ncipollo/release-action@v1
+      with:
+        artifacts: "ratarmount*-x86_64.AppImage"
+        tag: "nightly"
+        name: "Nightly Release"
+        allowUpdates: true
+        removeArtifacts: true
+        replacesArtifacts: true
+        updateOnlyUnreleased: true
+        prerelease: true
+        makeLatest: false
+        body: |
+          This is the newest as of yet unreleased but tested state.
+          Try this if you have trouble with other versions or you want cutting edge features.
