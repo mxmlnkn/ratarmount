@@ -217,7 +217,7 @@ For further information, see the ReadMe on the project's homepage:
              'The index needs to be (re)created to apply this option!')
 
     recursionGroup.add_argument(
-        '--transform-recursive-mount-point', type=str, nargs=2, metavar=('REGEX_PATTERN', 'REPLACEMENT'),
+        '--transform-recursive-mount-point', type=str, nargs=2, action='append', metavar=('REGEX_PATTERN', 'REPLACEMENT'),
         help='Specify a regex pattern and a replacement string, which will be applied via Python\'s re module '
              'to the full path of the archive to be recursively mounted. E.g., if there are recursive archives: '
              '/folder/archive.tar.gz, you can substitute \'[.][^/]+$\' to \'\' and it will be mounted to '
@@ -362,7 +362,7 @@ For further information, see the ReadMe on the project's homepage:
              'only becomes known after parsing the archive, for which an index is already created.')
 
     advancedGroup.add_argument(
-        '--transform', type=str, nargs=2, metavar=('REGEX_PATTERN', 'REPLACEMENT'),
+        '--transform', type=str, nargs=2, action='append', metavar=('REGEX_PATTERN', 'REPLACEMENT'),
         help='Specify a regex pattern and a replacement string, which will be applied via Python\'s re module '
              'to the full paths of all archive files.')
 

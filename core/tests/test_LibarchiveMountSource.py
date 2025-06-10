@@ -54,7 +54,7 @@ class TestLibarchiveMountSource:
     @pytest.mark.parametrize('compression', ['7z', 'rar', 'zip'])
     def test_transform(compression):
         with copyTestFile('folder-symlink.' + compression) as path, LibarchiveMountSource(
-            path, transform=("(.)/(.)", r"\1_\2")
+            path, transform=[("(.)/(.)", r"\1_\2")]
         ) as mountSource:
             for folder in ['/', '/foo', '/foo_fighter']:
                 fileInfo = mountSource.getFileInfo(folder)

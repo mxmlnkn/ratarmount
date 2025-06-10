@@ -12,7 +12,7 @@ import time
 import traceback
 import urllib.parse
 from dataclasses import dataclass
-from typing import IO, Any, AnyStr, Callable, Dict, List, Optional, Tuple, Union
+from typing import IO, Any, AnyStr, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 try:
     import fsspec
@@ -38,6 +38,9 @@ from .utils import (
     findModuleVersion,
 )
 from .version import __version__
+
+
+TransformPatterns = Optional[Iterable[Tuple[str, str]]]
 
 
 def getSqliteTables(connection: sqlite3.Connection):
@@ -263,6 +266,8 @@ class SQLiteIndex:
         indexMinimumFileCount: int = 0,
         backendName: str = '',
         ignoreCurrentFolder: bool = False,
+        transform: Optional[Iterable[Tuple[str, str]]] = None,
+        **_
     ):
         """
         indexFilePath
@@ -326,6 +331,17 @@ class SQLiteIndex:
                     "and because no explicit index file path is given, try to open an SQLite database in memory first."
                 )
             self.preferMemory = True
+
+        self.transformPattern = transform  # Member name must be so because it was stored in the metadata table!
+        self.transformPath = lambda path: path
+        if self.transformPatterns and all(isinstance(x, tuple) and len(x) == 2 for x in self.transformPatterns):
+            def transformPath(path):
+                for pattern, substitution in self.transformPatterns:
+                    if re.find(pattern, x):
+                        return re.sub(pattern, substitution, x)
+                return path
+
+            self.transformPath = transformPath
 
     @staticmethod
     def getPossibleIndexFilePaths(

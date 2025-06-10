@@ -361,12 +361,6 @@ def processParsedArguments(args) -> int:
 
     args.gzipSeekPointSpacing = int(args.gzip_seek_point_spacing * 1024 * 1024)
 
-    if (args.strip_recursive_tar_extension or args.transform_recursive_mount_point) and determineRecursionDepth(
-        recursive=args.recursive, recursion_depth=args.recursion_depth
-    ) <= 0:
-        print("[Warning] The options --strip-recursive-tar-extension and --transform-recursive-mount-point")
-        print("[Warning] only have an effect when used with recursive mounting.")
-
     if args.transform_recursive_mount_point:
         args.transform_recursive_mount_point = tuple(args.transform_recursive_mount_point)
 
@@ -468,6 +462,15 @@ def processParsedArguments(args) -> int:
         if args.use_backend
         else []
     )
+
+    useSubvolumes = args.disableUnionMount and len(args.mountSources) > 1
+    if (
+        (args.strip_recursive_tar_extension or args.transform_recursive_mount_point)
+        and not useSubvolumes
+        and determineRecursionDepth(recursive=args.recursive, recursion_depth=args.recursion_depth) <= 0
+    ):
+        print("[Warning] The options --strip-recursive-tar-extension and --transform-recursive-mount-point")
+        print("[Warning] only have an effect when used with recursive mounting or --disable-union-mount.")
 
     if args.commit_overlay:
         if len(args.mount_source) != 1:

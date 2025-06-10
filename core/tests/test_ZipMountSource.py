@@ -110,7 +110,7 @@ class TestZipMountSource:
 
     @staticmethod
     def test_transform():
-        with ZipMountSource(findTestFile('folder-symlink.zip'), transform=("(.)/(.)", r"\1_\2")) as mountSource:
+        with ZipMountSource(findTestFile('folder-symlink.zip'), transform=[("(.)/(.)", r"\1_\2"))] as mountSource:
             print(mountSource.listDir("/").keys())
             for folder in ['/', '/foo', '/foo_fighter']:
                 fileInfo = mountSource.getFileInfo(folder)
