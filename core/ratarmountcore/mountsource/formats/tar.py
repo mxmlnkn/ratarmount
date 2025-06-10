@@ -444,8 +444,8 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         parallelizations             : Optional[Dict[str, int]]  = None,
         isGnuIncremental             : Optional[bool]            = None,
         printDebug                   : int                       = 0,
-        transformRecursiveMountPoint : Optional[Tuple[str, str]] = None,
-        transform                    : Optional[Tuple[str, str]] = None,
+        transformRecursiveMountPoint : TransformPatterns         = None,
+        transform                    : TransformPatterns         = None,
         prioritizedBackends          : Optional[List[str]]       = None,
         indexMinimumFileCount        : int                       = 0,
         recursionDepth               : Optional[int]             = None,
@@ -494,7 +494,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             tar will be mounted at <file>/ instead of <file>.tar/.
         transformRecursiveMountPoint
             If specified, then a <path>.tar inside the current tar will be matched with the
-            first argument of the tuple and replaced by the second argument. This new
+            first argument of the firest matching tuple and replaced by the second argument. This new
             modified path is used as recursive mount point. See also Python's re.sub.
         verifyModificationTime
             If true, then the index will be recreated automatically if the TAR archive has a more
@@ -518,7 +518,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         self.encoding                     = encoding
         self.stripRecursiveTarExtension   = stripRecursiveTarExtension
         self.transformRecursiveMountPoint = transformRecursiveMountPoint
-        self.transformPattern             = transform
         self.ignoreZeros                  = ignoreZeros
         self.verifyModificationTime       = verifyModificationTime
         self.gzipSeekPointSpacing         = gzipSeekPointSpacing
@@ -533,12 +532,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         self.parallelizations = copy.deepcopy(parallelizations) if parallelizations else {}
         if '' not in self.parallelizations:
             self.parallelizations[''] = parallelization
-
-        self.transform = (
-            (lambda x: re.sub(self.transformPattern[0], self.transformPattern[1], x))
-            if isinstance(self.transformPattern, (tuple, list)) and len(self.transformPattern) == 2
-            else (lambda x: x)
-        )
 
         # Determine an archive file name to show for debug output and as file name inside the mount point for
         # simple non-TAR gzip/bzip2 stream-compressed files.

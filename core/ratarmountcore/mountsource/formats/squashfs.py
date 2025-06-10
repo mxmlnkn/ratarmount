@@ -417,7 +417,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         verifyModificationTime : bool                      = False,
         printDebug             : int                       = 0,
         indexMinimumFileCount  : int                       = 1000,
-        transform              : Optional[Tuple[str, str]] = None,
+        transform              : TransformPatterns         = None,
         **options
         # fmt: on
     ) -> None:
@@ -447,14 +447,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         self.verifyModificationTime = verifyModificationTime
         self.printDebug             = printDebug
         self.options                = options
-        self.transformPattern       = transform
         # fmt: on
-
-        self.transform = (
-            (lambda x: re.sub(self.transformPattern[0], self.transformPattern[1], x))
-            if isinstance(self.transformPattern, (tuple, list)) and len(self.transformPattern) == 2
-            else (lambda x: x)
-        )
 
         super().__init__(
             SQLiteIndex(
@@ -464,6 +457,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
                 encoding=self.encoding,
                 printDebug=self.printDebug,
                 indexMinimumFileCount=indexMinimumFileCount,
+                transform=transform,
                 backendName='SquashFSMountSource',
             ),
             clearIndexCache=clearIndexCache,
@@ -492,7 +486,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
 
     def _storeMetadata(self) -> None:
         argumentsToSave = ['encoding', 'transformPattern']
-        argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
+        argumentsMetadata = json.dumps({argument: getattr(self.index, argument) for argument in argumentsToSave})
         self.index.storeMetadata(argumentsMetadata, self.archiveFilePath)
 
     def _convertToRow(self, inodeOffset: int, info: "PySquashfsImage.file.File") -> Tuple:  # type: ignore
@@ -505,7 +499,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
             # Note that PySquashfsImage.file.Directory inherits from file.File, i.e., info can also be a directory.
             mode = mode | (stat.S_IFDIR if info.is_dir else stat.S_IFREG)
 
-        path, name = SQLiteIndex.normpath(self.transform(info.path)).rsplit("/", 1)
+        path, name = SQLiteIndex.normpath(self.index.transformPath(info.path)).rsplit("/", 1)
 
         # Currently unused. Squashfs files are stored in multiple blocks, so a single offset is insufficient.
         dataOffset = 0
@@ -614,7 +608,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
 
         if 'arguments' in metadata:
             SQLiteIndex.checkMetadataArguments(
-                json.loads(metadata['arguments']), self, argumentsToCheck=['encoding', 'transformPattern']
+                json.loads(metadata['arguments']), self.index, argumentsToCheck=['encoding', 'transformPattern']
             )
 
         if 'backendName' not in metadata:

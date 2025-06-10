@@ -35,7 +35,7 @@ class ZipMountSource(SQLiteIndexMountSource):
         verifyModificationTime : bool                      = False,
         printDebug             : int                       = 0,
         indexMinimumFileCount  : int                       = 1000,
-        transform              : Optional[Tuple[str, str]] = None,
+        transform              : TransformPatterns         = None,
         **options
         # fmt: on
     ) -> None:
@@ -64,14 +64,7 @@ class ZipMountSource(SQLiteIndexMountSource):
         self.verifyModificationTime = verifyModificationTime
         self.printDebug             = printDebug
         self.options                = options
-        self.transformPattern       = transform
         # fmt: on
-
-        self.transform = (
-            (lambda x: re.sub(self.transformPattern[0], self.transformPattern[1], x))
-            if isinstance(self.transformPattern, (tuple, list)) and len(self.transformPattern) == 2
-            else (lambda x: x)
-        )
 
         ZipMountSource._findPassword(self.fileObject, options.get("passwords", []))
         self.files = {info.header_offset: info for info in self.fileObject.infolist()}
@@ -84,6 +77,7 @@ class ZipMountSource(SQLiteIndexMountSource):
                 encoding=self.encoding,
                 printDebug=self.printDebug,
                 indexMinimumFileCount=indexMinimumFileCount,
+                transform=transform,
                 backendName='ZipMountSource',
             ),
             clearIndexCache=clearIndexCache,
@@ -110,7 +104,7 @@ class ZipMountSource(SQLiteIndexMountSource):
 
     def _storeMetadata(self) -> None:
         argumentsToSave = ['encoding', 'transformPattern']
-        argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
+        argumentsMetadata = json.dumps({argument: getattr(self.index, argument) for argument in argumentsToSave})
         self.index.storeMetadata(argumentsMetadata, self.archiveFilePath)
 
     def _convertToRow(self, info: "zipfile.ZipInfo") -> Tuple:
@@ -135,7 +129,7 @@ class ZipMountSource(SQLiteIndexMountSource):
         else:
             mode = mode | (stat.S_IFDIR if info.is_dir() else stat.S_IFREG)
 
-        path, name = SQLiteIndex.normpath(self.transform(info.filename)).rsplit("/", 1)
+        path, name = SQLiteIndex.normpath(self.index.transformPath(info.filename)).rsplit("/", 1)
 
         # Currently, this is unused. The index only is used for getting metadata. (The data offset
         # is already determined and written out in order to possibly speed up reading of encrypted
@@ -239,7 +233,7 @@ class ZipMountSource(SQLiteIndexMountSource):
 
         if 'arguments' in metadata:
             SQLiteIndex.checkMetadataArguments(
-                json.loads(metadata['arguments']), self, argumentsToCheck=['encoding', 'transformPattern']
+                json.loads(metadata['arguments']), self.index, argumentsToCheck=['encoding', 'transformPattern']
             )
 
         if 'backendName' not in metadata:

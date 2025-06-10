@@ -23,7 +23,7 @@ class TestAutoMountLayer:
             'clearIndexCache': True,
             'recursive': True,
             'parallelization': parallelization,
-            'transformRecursiveMountPoint': ('.*/([^/]*).tar', r'\1'),
+            'transformRecursiveMountPoint': [('.*/([^/]*).tar', r'\1')],
         }
 
         with copyTestFile("packed-100-times.tar.gz") as path, openMountSource(path, **options) as mountSource:
@@ -41,7 +41,7 @@ class TestAutoMountLayer:
             'clearIndexCache': True,
             'recursive': True,
             'parallelization': parallelization,
-            'transformRecursiveMountPoint': ('.*/([^/]*).tar.gz', r'\1'),
+            'transformRecursiveMountPoint': [('.*/([^/]*).tar.gz', r'\1')],
         }
 
         # TODO Using the compressed-1000-times.tar.gz, which is ~200 KiB compressed and uncompressed leads to 12 GiB
@@ -64,7 +64,7 @@ class TestAutoMountLayer:
             'clearIndexCache': True,
             'recursive': True,
             'parallelization': parallelization,
-            'transformRecursiveMountPoint': ('.*/([^/]*).gz', r'\1'),
+            'transformRecursiveMountPoint': [('.*/([^/]*).gz', r'\1')],
         }
 
         # For some reason, the test with 1000 recursion fails reproducibly after ~196 depth, therefore use only 100.
