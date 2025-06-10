@@ -13,9 +13,18 @@ from .utils import overrides
 try:
     import fsspec
     import fsspec.core
-    import fsspec.implementations.http
 except ImportError:
     fsspec = None  # type: ignore
+
+try:
+    from fsspec.implementations.http import HTTPFileSystem
+except ImportError:
+    HTTPFileSystem = None  # type: ignore
+
+try:
+    from fsspec.implementations.github import GithubFileSystem
+except ImportError:
+    GithubFileSystem = None  # type: ignore
 
 try:
     from webdav4.fsspec import WebdavFileSystem
@@ -85,10 +94,11 @@ class FSSpecMountSource(MountSource):
         #  - https://github.com/ray-project/ray/issues/26423#issuecomment-1179561181
         #  - https://github.com/fsspec/filesystem_spec/issues/1713
         #  - https://github.com/skshetry/webdav4/issues/198
-        self._pathsRequireQuoting = isinstance(self.fileSystem, fsspec.implementations.http.HTTPFileSystem)
+        self._pathsRequireQuoting = HTTPFileSystem is not None and isinstance(self.fileSystem, HTTPFileSystem)
         if WebdavFileSystem:
             self._pathsRequireQuoting = self._pathsRequireQuoting or isinstance(self.fileSystem, WebdavFileSystem)
-        self.prefix = prefix.rstrip("/") if prefix and prefix.strip("/") and self.fileSystem.isdir(prefix) else ""
+        self.prefix = prefix.rstrip("/") if prefix and prefix.strip("/") and self.fileSystem.isdir(prefix) else None
+        self._pathsWithoutLeadingSlash = GithubFileSystem is not None and isinstance(self.fileSystem, GithubFileSystem)
 
     def _getPath(self, path: str) -> str:
         if self._pathsRequireQuoting:
@@ -97,6 +107,8 @@ class FSSpecMountSource(MountSource):
             if not path or path == "/":
                 return self.prefix
             return self.prefix.rstrip("/") + "/" + path.lstrip("/")
+        if self._pathsWithoutLeadingSlash:
+            return path.lstrip("/")
         return path
 
     @staticmethod

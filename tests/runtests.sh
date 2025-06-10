@@ -2200,6 +2200,10 @@ checkURLProtocolGithub()
         returnError "$LINENO" 'Failed to read from HTTP server'
     checkFileInTAR 'github://mxmlnkn:ratarmount@v0.15.2/tests' single-file.tar 1a28538854d1884e4415cb9bfb7a2ad8 ||
         returnError "$LINENO" 'Failed to read from HTTP server'
+    checkFileInTAR 'github://mxmlnkn:ratarmount@v0.15.2/' tests/single-file.tar 1a28538854d1884e4415cb9bfb7a2ad8 ||
+        returnError "$LINENO" 'Failed to read from HTTP server'
+    checkFileInTAR 'github://mxmlnkn:ratarmount@v0.15.2' tests/single-file.tar 1a28538854d1884e4415cb9bfb7a2ad8 ||
+        returnError "$LINENO" 'Failed to read from HTTP server'
 }
 
 
