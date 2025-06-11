@@ -13,17 +13,10 @@ import sys
 import time
 import urllib.request
 import zipfile
-from typing import List, Optional
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-from ratarmountcore.compressions import supportedCompressions, stripSuffixFromArchive
-from ratarmountcore.utils import (
-    determineRecursionDepth,
-    imeta,
-    findModuleVersion,
-    removeDuplicatesStable,
-    RatarmountError,
-)
-import ratarmountcore.version
+from ratarmountcore.compressions import stripSuffixFromArchive
+from ratarmountcore.utils import determineRecursionDepth, imeta, removeDuplicatesStable, RatarmountError
 
 try:
     import rarfile
@@ -31,7 +24,6 @@ except ImportError:
     pass
 
 from .fuse import fuse
-from .version import __version__
 from .CLIHelpers import checkInputFileType
 from .WriteOverlay import commitOverlay
 
@@ -54,9 +46,94 @@ def hasFUSENonEmptySupport() -> bool:
     return False  # On macOS, fusermount does not exist and macfuse also seems to complain with nonempty option.
 
 
+def parseRequirement(requirement: str) -> Optional[Tuple[str, List[str], Optional[str]]]:
+    # https://packaging.python.org/en/latest/specifications/name-normalization/
+    # Match only valid project name and avoid cruft like extras and requirements, e.g.,
+    # indexed_gzip >= 1.6.3, != 1.9.4; python_version < '3.8'
+    match = re.match(
+        r"^([A-Za-z0-9]([^A-Za-z0-9]|$)|[A-Za-z0-9][A-Za-z0-9._-]*[A-Za-z0-9])(\[([A-Za-z0-9, ]+)\])?"
+        r"""(.*;.* extra ?== ?["']([^"']+)["'])?""",
+        requirement,
+    )
+    if not match:
+        return None
+    # print(requirement," -> GROUPS:", [match.group(i) for i in range(1 + len(match.groups()))])
+    return match.group(1), match.group(4).split(',') if match.group(4) else [], match.group(6)
+
+
+def printMetadataRecursively(
+    packages: Dict[str, Set[str]],
+    doWithDistribution: Callable[[Any], None],
+    doOnNewLevel: Optional[Callable[[int], None]] = None,
+    level: int = 0,
+    processedPackages: Optional[Set[str]] = None,
+):
+    if processedPackages is None:
+        processedPackages = set()
+
+    if not any(package not in processedPackages for package, _ in packages.items()):
+        return
+    if doOnNewLevel:
+        doOnNewLevel(level)
+
+    requirements: Dict[str, Set[str]] = {}
+    for package, enabledExtras in sorted(packages.items()):
+        # For now, packages specified with different extra will result in the latter being omitted.
+        if package in processedPackages:
+            continue
+        processedPackages.add(package)
+
+        try:
+            distribution = imeta.distribution(package)
+        except imeta.PackageNotFoundError:
+            # Will happen for uninstalled optional or Python version dependent files and built-in modules, such as:
+            #   fastzipfile, argparse, ...
+            continue
+
+        doWithDistribution(distribution)
+
+        for requirement in distribution.requires or []:
+            parsed = parseRequirement(requirement)
+            if not parsed:
+                # Should not happen and does not in my tests.
+                print(f"  Cannot parse requirement: {requirement}")
+                continue
+
+            requiredPackage, packageExtras, extraNamespace = parsed
+            if "full" not in enabledExtras and extraNamespace is not None and extraNamespace not in enabledExtras:
+                continue
+            if requiredPackage in processedPackages:
+                continue
+
+            requirements[requiredPackage] = requirements.get(requiredPackage, set()).union(set(packageExtras))
+
+    printMetadataRecursively(requirements, doWithDistribution, doOnNewLevel, level + 1, processedPackages)
+
+
 def printVersions() -> None:
-    print("ratarmount", __version__)
-    print("ratarmountcore", ratarmountcore.version.__version__)
+    def doForDistribution(distribution):
+        if 'Name' not in distribution.metadata:
+            return
+        print(distribution.metadata['Name'] + " " + distribution.version)
+
+        # Import the module in order to open the shared libraries so that we can look for loaded shared
+        # libraries and list their versions!
+        topLevel = distribution.read_text('top_level.txt')
+        if topLevel:
+            for module in topLevel.strip().split('\n'):
+                # dropboxdrivefs installs a module named "test" and unicrypto a module named "tests".
+                # This seems like a packaging bug to me because the names are too broad and the modules useless.
+                if module and not module.startswith('_') and not module.startswith('test'):
+                    try:
+                        importlib.import_module(module)
+                    except Exception:
+                        pass
+
+    def printOnNewLevel(level):
+        if level > 1:
+            print(f"\nLevel {level} Dependencies:\n")
+
+    printMetadataRecursively({"ratarmount": {"full"}}, doForDistribution, printOnNewLevel)
 
     print()
     print("System Software:")
@@ -76,67 +153,6 @@ def printVersions() -> None:
 
     print("libsqlite3", sqlite3.sqlite_version)
 
-    print()
-    print("Compression Backends:")
-    print()
-
-    def printModuleVersion(moduleName: str):
-        try:
-            importlib.import_module(moduleName)
-        except ImportError:
-            pass
-
-        moduleVersion: Optional[str] = None
-        if moduleName in sys.modules:
-            moduleVersion = findModuleVersion(sys.modules[moduleName])
-        else:
-            try:
-                # May raise importlib.metadata.PackageNotFoundError
-                moduleVersion = imeta.version(moduleName)
-            except Exception:
-                pass
-        if moduleVersion:
-            print(moduleName, moduleVersion)
-
-    modules = [module.name for info in supportedCompressions.values() for module in info.modules]
-    # Indirect dependencies for PySquashfsImage and other things.
-    modules += ["lz4", "python-lzo", "zstandard", "isal", "fast_zip_decryption", "pygit2"]
-    for moduleName in sorted(list(set(modules))):
-        printModuleVersion(moduleName)
-
-    print()
-    print("Fsspec Backends:")
-    print()
-
-    # fmt: off
-    modules = [
-        "fsspec",
-        "sshfs",
-        "smbprotocol",
-        "dropboxdrivefs",
-        "ipfsspec",
-        "s3fs",
-        "webdav4",
-        # Indirect dependencies. Would be nice to be able to get this programmatically but
-        # this might be too much to ask for.
-        "asyncssh",         # sshfs
-        "requests",
-        "aiohttp",          # httpfs, s3fs, ...
-        "pyopenssl",        # sshfs
-        "cryptography",     # smbprotocol
-        "pyspnego",         # smbprotocol
-        "dropbox",
-        "multiformats",
-        "dag-cbor",         # ipfsspec
-        "pure-protobuf",
-        "aiobotocore",      # s3fs
-        "httpx",            # webdav4
-        "python-dateutil",  # webdav4
-    ]
-    # fmt: on
-    for moduleName in sorted(list(modules)):
-        printModuleVersion(moduleName)
-
     mappedFilesFolder = f"/proc/{os.getpid()}/map_files"
     if os.path.isdir(mappedFilesFolder):
         libraries = set(os.readlink(os.path.join(mappedFilesFolder, link)) for link in os.listdir(mappedFilesFolder))
@@ -152,36 +168,112 @@ def printVersions() -> None:
             print(library.rsplit('/', maxsplit=1)[-1])
 
 
+def findShortLicense(distribution) -> str:
+    shortLicense = ""
+
+    # Check classifiers
+    for key, value in distribution.metadata.items():
+        if key == "Classifier" and value.startswith("License ::") and not value.endswith(":: OSI Approved"):
+            if shortLicense:
+                shortLicense += " OR "
+            shortLicense += re.sub(r"([A-Z]+) License", r"\1", value.rsplit("::", 1)[-1].strip())
+
+    # webdav4 only has this License-Expression.
+    if not shortLicense:
+        for key, value in distribution.metadata.items():
+            if key == "License-Expression":
+                shortLicense += value
+                break
+
+    # Check LICENSE key.
+    if not shortLicense and 'LICENSE' in distribution.metadata and '\n' not in distribution.metadata['LICENSE']:
+        shortLicense = distribution.metadata['LICENSE']
+
+    # Analyze LICENSE file.
+    if not shortLicense and 'License-File' in distribution.metadata:
+        licenseContents = distribution.read_text(distribution.metadata['License-File'])
+        if licenseContents:
+            matched = re.match(r"^((MIT|BSD|GPL|LGPL).*)( License)?", licenseContents.split('\n')[0])
+            if matched:
+                shortLicense = matched.group(2)
+
+    return shortLicense
+
+
+def printOSSAttributionsShort() -> None:
+    def doForDistribution(distribution):
+        if 'Name' in distribution.metadata:
+            print(f"{distribution.metadata['Name']:20} {distribution.version:12} {findShortLicense(distribution)}")
+
+    def printOnNewLevel(level):
+        if level > 1:
+            print(f"\nLevel {level} Dependencies:\n")
+
+    printMetadataRecursively({"ratarmount": {"full"}}, doForDistribution, printOnNewLevel)
+
+
 def printOSSAttributions() -> None:
+    def doForDistribution(distribution):
+        if 'Name' not in distribution.metadata:
+            return
+        name = distribution.metadata['Name']
+        print("# " + name)
+        print()
+
+        if 'Summary' in distribution.metadata:
+            print(distribution.metadata['Summary'])
+            print()
+
+        urls = [x for key, x in distribution.metadata.items() if key == 'Project-URL' and x]
+        if urls:
+            print("\n".join(urls))
+            print()
+
+        authors = [x for key, x in distribution.metadata.items() if key == 'Author' and x]
+        if authors:
+            print("Authors:", ", ".join(authors))
+            print()
+
+        # Analyze LICENSE file.
+        urls = [x for key, x in distribution.metadata.items() if key == 'Project-URL' and x]
+        licenses = []
+        for key, value in distribution.metadata.items():
+            if key == 'License-File':
+                # All system-installed packages do not seem to be distributed with a license:
+                # find /usr/lib/python3/dist-packages/ -iname '*license*'
+                licenseContents = distribution.read_text(value) or distribution.read_text(
+                    os.path.join("licenses", value)
+                )
+                if licenseContents:
+                    licenses.append(licenseContents)
+                    continue
+
+        # This is known to happen for system-installed packages :/, and --editable installed packages.
+        if not licenses:
+            path = os.path.join(f"/usr/share/doc/python3-{name}/copyright")
+            if os.path.isfile(path):
+                with open(path, 'rt', encoding='utf-8') as file:
+                    licenses.append(file.read())
+
+        if licenses:
+            for licenseContents in licenses:
+                print("```\n" + licenseContents.strip('\n') + "\n```\n")
+        else:
+            print(name, "License:", findShortLicense(distribution))
+        print()
+
+    printMetadataRecursively({"ratarmount": {"full"}}, doForDistribution)
+
+    # Licenses for non-Python libraries
     licenses = [
-        ("fusepy", "/fusepy/fusepy/refs/heads/master/LICENSE"),  # ISC
-        ("mfusepy", "/mxmlnkn/mfusepy/refs/heads/master/LICENSE"),  # ISC
-        ("python-xz", "/Rogdham/python-xz/refs/heads/master/LICENSE.txt"),  # MIT
-        ("rarfile", "/markokr/rarfile/refs/heads/master/LICENSE"),  # ISC
         ("libfuse", "/libfuse/libfuse/refs/heads/master/LGPL2.txt"),  # LGPL 2.1
         ("libsqlite3", "/sqlite/sqlite/master/LICENSE.md"),  # "The author disclaims copyright to this source code"
         ("cpython", "/python/cpython/main/LICENSE"),  # PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2
         ("libzstd-seek", "/martinellimarco/libzstd-seek/main/LICENSE"),  # MIT
         ("zstd", "/facebook/zstd/dev/LICENSE"),  # BSD-3 with "name of the copyright holder" explicitly filled in
         ("zlib", "/madler/zlib/refs/heads/master/LICENSE"),  # zlib License
-        ("ratarmountcore", "/mxmlnkn/ratarmount/refs/heads/master/core/LICENSE"),  # MIT
-        ("indexed_gzip", "/pauldmccarthy/indexed_gzip/refs/heads/main/LICENSE"),  # zlib License
-        ("indexed_zstd", "/martinellimarco/indexed_zstd/refs/heads/master/LICENSE"),  # MIT
-        ("rapidgzip", "/mxmlnkn/rapidgzip/refs/heads/master/LICENSE-MIT"),  # MIT or Apache License 2.0
-        ("fastzipfile", "/kamilmahmood/fastzipfile/refs/heads/master/LICENSE"),  # MIT
-        ("fast-zip-decryption", "/mxmlnkn/fast-zip-decryption/refs/heads/master/LICENSE"),  # MIT
-        ("fsspec", "/fsspec/filesystem_spec/refs/heads/master/LICENSE"),  # BSD-3
-        ("sshfs", "/fsspec/sshfs/refs/heads/main/LICENSE"),  # Apache License 2.0
-        ("ipfsspec", "/fsspec/ipfsspec/refs/heads/main/LICENSE"),  # MIT
-        ("smbprotocol", "/jborean93/smbprotocol/refs/heads/master/LICENSE"),  # MIT
-        ("dropboxdrivefs", "/fsspec/dropboxdrivefs/refs/heads/master/LICENSE"),  # BSD-3
-        ("s3fs", "/fsspec/s3fs/refs/heads/main/LICENSE.txt"),  # BSD-3
-        ("webdav4", "/skshetry/webdav4/refs/heads/main/LICENSE"),  # MIT
-        ("asyncssh", "/ronf/asyncssh/refs/heads/develop/LICENSE"),  # EPL 2.0
-        ("sqlcipher3", "/coleifer/sqlcipher3/refs/heads/master/LICENSE"),  # zlib License
         # BSD-3 with "name of the copyright holder" explicitly filled in
         ("sqlcipher", "/sqlcipher/sqlcipher/refs/heads/master/LICENSE.txt"),
-        ("py7zr", "/miurahr/py7zr/refs/heads/master/LICENSE"),  # LGPL 2.1
         ("python-ext4", "/Eeems/python-ext4/refs/heads/main/LICENSE"),  # MIT
     ]
     for name, githubPath in sorted(licenses):

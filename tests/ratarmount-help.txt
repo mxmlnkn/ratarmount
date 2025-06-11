@@ -5,7 +5,8 @@ usage: ratarmount [-h] [-c] [-r] [-u] [-P PARALLELIZATION] [-v] [--password PASS
                   [-i] [--gnu-incremental] [--no-gnu-incremental] [--detect-gnu-incremental]
                   [-w WRITE_OVERLAY] [--commit-overlay] [-o FUSE] [-f] [-d DEBUG]
                   [-gs GZIP_SEEK_POINT_SPACING] [-p PREFIX] [--password-file PASSWORD_FILE]
-                  [--use-backend USE_BACKEND] [--oss-attributions] [--disable-union-mount]
+                  [--use-backend USE_BACKEND] [--oss-attributions-short] [--oss-attributions]
+                  [--disable-union-mount]
                   [--union-mount-cache-max-depth UNION_MOUNT_CACHE_MAX_DEPTH]
                   [--union-mount-cache-max-entries UNION_MOUNT_CACHE_MAX_ENTRIES]
                   [--union-mount-cache-timeout UNION_MOUNT_CACHE_TIMEOUT]
@@ -162,6 +163,8 @@ Advanced Options:
                         parsing the archive, for which an index is already created. (default:
                         1000)
   --oss-attributions    Show licenses of used libraries.
+  --oss-attributions-short
+                        Show license identifiers of used libraries.
   --password-file PASSWORD_FILE
                         Specify a file with newline separated passwords for RAR and ZIP files.
                         The passwords will be tried out in order of appearance in the file.

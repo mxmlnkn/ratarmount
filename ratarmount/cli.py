@@ -45,6 +45,14 @@ class PrintOSSAttributionAction(argparse.Action):
         parser.exit()
 
 
+class PrintOSSAttributionShortAction(argparse.Action):
+    def __call__(self, parser, args, values, option_string=None):
+        from .Actions import printOSSAttributionsShort
+
+        printOSSAttributionsShort()
+        parser.exit()
+
+
 def _parseArgs(rawArgs: Optional[List[str]] = None):
     parser = argparse.ArgumentParser(
         prog='ratarmount',
@@ -318,6 +326,10 @@ For further information, see the ReadMe on the project's homepage:
         help='Specify a backend to be used with higher priority for files which might be opened with multiple '
              'backends. Arguments specified last will have the highest priority. A comma-separated list may be '
              f'specified. Possible backends: {moduleNames}')
+
+    advancedGroup.add_argument(
+        '--oss-attributions-short', action=PrintOSSAttributionShortAction, nargs=0, default=argparse.SUPPRESS,
+        help='Show license identifiers of used libraries.')
 
     advancedGroup.add_argument(
         '--oss-attributions', action=PrintOSSAttributionAction, nargs=0, default=argparse.SUPPRESS,
