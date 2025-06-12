@@ -12,6 +12,7 @@ from typing import Any, Dict, IO, Iterable, List, Optional, Union
 from .MountSource import FileInfo, MountSource, createRootFileInfo
 from .StenciledFile import LambdaReaderFile
 from .SQLiteBlobFile import SQLiteBlobFile
+from .formats import replaceFormatCheck, FileFormatID
 from .utils import overrides
 
 try:
@@ -102,6 +103,9 @@ try:
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.backends import default_backend
+
+    # No way to detect encrypted SQLAR.
+    replaceFormatCheck(FileFormatID.SQLAR, lambda x: True)
 except ImportError:
     sqlcipher3 = None  # type:ignore
     PBKDF2HMAC = None  # type:ignore

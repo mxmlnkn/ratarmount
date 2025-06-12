@@ -6,8 +6,9 @@ import os
 import tarfile
 from typing import Optional, Tuple
 
+from ratarmountcore.formats import isTAR
 from ratarmountcore.compressions import checkForSplitFile, findAvailableBackend, supportedCompressions
-from ratarmountcore.utils import detectRawTar, isRandom
+from ratarmountcore.utils import isRandom
 
 try:
     import fsspec
@@ -83,8 +84,9 @@ def checkInputFileType(path: str, encoding: str = tarfile.ENCODING, printDebug: 
             pass
 
         if compression not in supportedCompressions:
-            if detectRawTar(fileobj, encoding):
+            if isTAR(fileobj, encoding):
                 return path, compression
+            fileobj.seek(oldOffset)
 
             if (
                 compression is None

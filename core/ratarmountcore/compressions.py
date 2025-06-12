@@ -3,7 +3,6 @@
 
 import collections
 import concurrent.futures
-import io
 import os
 import platform
 import sqlite3
@@ -13,6 +12,7 @@ import traceback
 
 from typing import Any, Callable, Dict, IO, Iterable, List, Optional, Tuple
 
+from .formats import findSquashFSOffset, isASAR, _checkZlibHeader, _isCpio, _isISO9660
 from .utils import (
     isLatinAlpha,
     isLatinDigit,
@@ -25,6 +25,9 @@ from .utils import (
     CompressionError,
 )
 from .BlockParallelReaders import ParallelXZReader
+from .EXT4MountSource import isEXT4Image
+from .FATMountSource import isFATImage
+from .RarMountSource import isRarFile
 
 try:
     import indexed_gzip  # pylint: disable=unused-import
@@ -93,18 +96,6 @@ except ImportError:
     PySquashfsImage = None  # type: ignore
 
 try:
-    import pyfatfs  # pylint: disable=unused-import
-    from pyfatfs.PyFat import PyFat
-except ImportError:
-    pyfatfs = None  # type: ignore
-    PyFat = None  # type: ignore
-
-try:
-    import ext4  # pylint: disable=unused-import
-except ImportError:
-    ext4 = None  # type: ignore
-
-try:
     import py7zr  # pylint: disable=unused-import
 except ImportError:
     py7zr = None  # type: ignore
@@ -115,22 +106,6 @@ CompressionModuleInfo = collections.namedtuple('CompressionModuleInfo', ['name',
 # "modules" contains a list of CompressionModuleInfo for modules that are available.
 # Those appearing first in this list have priority.
 CompressionInfo = collections.namedtuple('CompressionInfo', ['suffixes', 'doubleSuffixes', 'modules', 'checkHeader'])
-
-
-def checkZlibHeader(file):
-    header = file.read(2)
-    cmf = header[0]
-    if cmf & 0xF != 8:
-        return False
-    if cmf >> 4 > 7:
-        return False
-    flags = header[1]
-    if ((cmf << 8) + flags) % 31 != 0:
-        return False
-    usesDictionary = ((flags >> 5) & 1) != 0
-    if usesDictionary:
-        return False
-    return True
 
 
 TAR_COMPRESSION_FORMATS: Dict[str, CompressionInfo] = {
@@ -180,176 +155,9 @@ TAR_COMPRESSION_FORMATS: Dict[str, CompressionInfo] = {
                 'rapidgzip', lambda x, parallelization=0: rapidgzip.RapidgzipFile(x, parallelization=parallelization)
             )
         ],
-        checkZlibHeader,
+        _checkZlibHeader,
     ),
 }
-
-
-def isRarFile(fileObject: IO[bytes]) -> bool:
-    # @see https://www.rarlab.com/technote.htm#rarsign
-    # > RAR 5.0 signature consists of 8 bytes: 0x52 0x61 0x72 0x21 0x1A 0x07 0x01 0x00.
-    # > You need to search for this signature in supposed archive from beginning and up to maximum SFX module size.
-    # > Just for comparison this is RAR 4.x 7 byte length signature: 0x52 0x61 0x72 0x21 0x1A 0x07 0x00.
-    # > Self-extracting module (SFX)
-    # > Any data preceding the archive signature. Self-extracting module size and contents is not defined.
-    # > At the moment of writing this documentation RAR assumes the maximum SFX module size to not exceed 1 MB,
-    # > but this value can be increased in the future.
-    oldPosition = fileObject.tell()
-    if fileObject.read(6) == b'Rar!\x1a\x07':
-        return True
-    if 'rarfile' in sys.modules:
-        fileObject.seek(oldPosition)
-        fileObject.seek(oldPosition)
-        if rarfile.is_rarfile_sfx(fileObject):
-            return True
-    return False
-
-
-def isSquashFS(fileObject) -> bool:
-    offset = fileObject.tell()
-    try:
-        # https://dr-emann.github.io/squashfs/squashfs.html#_the_superblock
-        magicBytes = fileObject.read(4)
-        if magicBytes != b"hsqs":
-            return False
-
-        _inodeCount, _modificationTime, blockSize, _fragmentCount = struct.unpack('<IIII', fileObject.read(4 * 4))
-        compressor, blockSizeLog2, _flags, _idCount, major, minor = struct.unpack('<HHHHHH', fileObject.read(6 * 2))
-        # root_inode, bytes_used, id_table, xattr_table, inode_table, dir_table, frag_table, export_table =
-        # struct.unpack('<QQQQQQQQ', fileObject.read(8 * 8))
-
-        # The size of a data block in bytes. Must be a power of two between 4096 (4k) and 1048576 (1 MiB).
-        # log2 4096 = 12, log2 1024*1024 = 20
-        if blockSizeLog2 < 12 or blockSizeLog2 > 20 or 2**blockSizeLog2 != blockSize:
-            return False
-
-        if major != 4 or minor != 0:
-            return False
-
-        # Compressions: 0:None, 1:GZIP, 2:LZMA, 3:LZO, 4:XZ, 5:LZ4, 6:ZSTD
-        if compressor > 6:
-            return False
-
-    finally:
-        fileObject.seek(offset)
-
-    return True
-
-
-def findSquashFSOffset(fileObject, maxSkip=1024 * 1024) -> int:
-    """
-    Looks for the SquashFS superblock, which can be at something other than offset 0 for AppImage files.
-    """
-    # https://dr-emann.github.io/squashfs/squashfs.html#_the_superblock
-    if isSquashFS(fileObject):
-        return 0
-
-    oldOffset = fileObject.tell()
-    try:
-        magic = b"hsqs"
-        data = fileObject.read(maxSkip + len(magic))
-        magicOffset = 0
-        while True:
-            magicOffset = data.find(magic, magicOffset + 1)
-            if magicOffset < 0 or magicOffset >= len(data):
-                break
-            fileObject.seek(magicOffset)
-            if isSquashFS(fileObject):
-                return magicOffset
-    finally:
-        fileObject.seek(oldOffset)
-
-    return -1
-
-
-def isFATImage(fileObject) -> bool:
-    if PyFat is None:
-        return False
-
-    offset = fileObject.tell()
-    try:
-        fs = PyFat()
-        # TODO Avoid possibly slow full FAT parsing here. Only do some quick checks such as PyFatFS.PyFat.parse_header
-        #      Calling __set_fp instead of set_fp avoids that but it is not part of the public interface per convention!
-        fs._PyFat__set_fp(fileObject)
-        fs.is_read_only = True
-        try:
-            fs.parse_header()
-            return True
-        except (pyfatfs.PyFATException, ValueError):
-            return False
-        finally:
-            # Reset file object so that it does not get closed! Cannot be None because that is checked.
-            fs._PyFat__fp = io.BytesIO()
-
-    finally:
-        fileObject.seek(offset)
-
-
-def isEXT4Image(fileObject) -> bool:
-    if ext4 is None:
-        return False
-
-    offset = fileObject.tell()
-    try:
-        ext4.Volume(fileObject)
-        return True
-    except Exception:
-        pass
-    finally:
-        fileObject.seek(offset)
-    return False
-
-
-def findASARHeader(fileObject) -> Tuple[int, int, int]:
-    """Return triple (start of header JSON, size of header JSON, start of file objects)"""
-    # https://github.com/electron/asar/issues/128
-    # https://github.com/electron/asar
-    # > UInt32: header_size | String: header | Bytes: file1 | ...
-    # > The header_size and header are serialized with Pickle class
-    # > The header is a JSON string, and the header_size is the size of header's Pickle object.
-    # Numbers are in little endian. Pickling writes the data, prepends a uint32 before and pads to 4 B offsets.
-    # Because header_size is always 4 bytes, the implicit "magic" / redundant bytes of this file format are:
-    # \x04\x00\x00\x00
-    # Furthermore because pickling "header" already prepends the length of "header", the actual "header_size"
-    # is completely redundant and can also be used as some kind of integrity check...
-    # I don't understand where the fourth 32-bit number comes from. For some reason, the header seems to be
-    # pickled twice, contrary to the ReadMe!?
-    # https://github.com/electron/asar/issues/16
-    # https://github.com/electron/asar/issues/226
-    # https://knifecoat.com/Posts/ASAR+Format+Spec
-    # -> Nice rant about the format as I have to concur about the usage of pickle-js.
-    fileObject.seek(0)
-    ASAR_MAGIC_SIZE = 4 * 4
-    sizeOfPickledSize, sizeOfPickledPickledPickledHeader, sizeOfPickledPickledHeader, sizeOfPickledHeader = (
-        struct.unpack('<LLLL', fileObject.read(ASAR_MAGIC_SIZE))
-    )
-    assert sizeOfPickledSize == 4
-    assert sizeOfPickledPickledPickledHeader == sizeOfPickledPickledHeader + 4
-    padding = (4 - sizeOfPickledHeader % 4) % 4
-    assert sizeOfPickledPickledHeader == sizeOfPickledHeader + padding + 4
-
-    dataOffset = ASAR_MAGIC_SIZE + sizeOfPickledHeader + padding
-
-    # It would be nice if we could check that dataOffset < file size, but we cannot get that (cheaply)
-    # in case of compressed files or for large headers and because "seek(offset)" will always return that
-    # offset even if it is > file size, so we would actually have to read the data.
-
-    return ASAR_MAGIC_SIZE, sizeOfPickledHeader, dataOffset
-
-
-def isASAR(fileObject) -> bool:
-    offset = fileObject.tell()
-    try:
-        # Reading the header and checking it to be correct JSON is to expensive for large archives.
-        # The unnecessary pickling already should introduce enough redundancy for checks and detection.
-        findASARHeader(fileObject)
-        return True
-    except Exception:
-        pass
-    finally:
-        fileObject.seek(offset)
-    return False
 
 
 ARCHIVE_FORMATS: Dict[str, CompressionInfo] = {
@@ -459,25 +267,6 @@ LIBARCHIVE_FILTER_FORMATS = {
 }
 
 
-def isCpio(fileObject):
-    # http://justsolve.archiveteam.org/wiki/Cpio
-    # https://github.com/libarchive/libarchive/blob/6110e9c82d8ba830c3440f36b990483ceaaea52c/libarchive/
-    #   archive_read_support_format_cpio.c#L272
-    firstBytes = fileObject.read(5)
-    return firstBytes == b'07070' or firstBytes[:2] in [b'\x71\xc7', b'\xc7\x71']
-
-
-def isISO9660(fileObject):
-    # https://www.iso.org/obp/ui/#iso:std:iso:9660:ed-1:v1:en
-    # http://www.brankin.com/main/technotes/Notes_ISO9660.htm
-    # https://en.wikipedia.org/wiki/ISO_9660
-    # https://en.wikipedia.org/wiki/Optical_disc_image
-    offset = 32 * 1024 + 1
-    udfOffset = 38 * 1024 + 1
-    buffer = fileObject.read(max(offset, udfOffset) + 4)
-    return buffer[offset : offset + 5] == b'CD001' or buffer[udfOffset : udfOffset + 4] == b'NSR0'
-
-
 # Formats are handily listed either in libarchive:
 # https://github.com/libarchive/libarchive/blob/6110e9c82d8ba830c3440f36b990483ceaaea52c/libarchive/
 #   archive_read_support_format_all.c#L32
@@ -494,8 +283,8 @@ LIBARCHIVE_ARCHIVE_FORMATS = {
         (['cab'], lambda x: x.read(4) == b'MSCF'),
         (['deb'], lambda x: x.read(4) == b'\x21\x3c\x61\x72'),
         (['xar'], lambda x: x.read(4) == b'\x78\x61\x72\x21'),
-        (['cpio'], isCpio),
-        (['iso'], isISO9660),
+        (['cpio'], _isCpio),
+        (['iso'], _isISO9660),
         # https://www.iso.org/standard/68004.html
         # https://iipc.github.io/warc-specifications/specifications/warc-format/warc-1.1/#file-and-record-model
         (['warc'], lambda x: x.read(7) == b'WARC/1.'),

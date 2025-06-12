@@ -4,10 +4,12 @@
 import datetime
 import os
 import stat
+import sys
 import time
 from typing import Dict, IO, Iterable, List, Optional, Union
 
 from .MountSource import FileInfo, MountSource, createRootFileInfo
+from .formats import replaceFormatCheck, FileFormatID
 from .utils import overrides
 
 try:
@@ -16,9 +18,35 @@ except ImportError:
     pass
 
 
+def isRarFile(fileObject: IO[bytes]) -> bool:
+    # @see https://www.rarlab.com/technote.htm#rarsign
+    # > RAR 5.0 signature consists of 8 bytes: 0x52 0x61 0x72 0x21 0x1A 0x07 0x01 0x00.
+    # > You need to search for this signature in supposed archive from beginning and up to maximum SFX module size.
+    # > Just for comparison this is RAR 4.x 7 byte length signature: 0x52 0x61 0x72 0x21 0x1A 0x07 0x00.
+    # > Self-extracting module (SFX)
+    # > Any data preceding the archive signature. Self-extracting module size and contents is not defined.
+    # > At the moment of writing this documentation RAR assumes the maximum SFX module size to not exceed 1 MB,
+    # > but this value can be increased in the future.
+    oldPosition = fileObject.tell()
+    if fileObject.read(6) == b'Rar!\x1a\x07':
+        return True
+    if 'rarfile' in sys.modules:
+        fileObject.seek(oldPosition)
+        fileObject.seek(oldPosition)
+        if rarfile.is_rarfile_sfx(fileObject):
+            return True
+    return False
+
+
+replaceFormatCheck(FileFormatID.RAR, isRarFile)
+
+
 class RarMountSource(MountSource):
     # Basically copy paste of ZipMountSource because the interfaces are very similar.
     def __init__(self, fileOrPath: Union[str, IO[bytes]], **options) -> None:
+        if 'rarfile' not in sys.modules:
+            raise RuntimeError("Did not find the rarfile module. Try: pip install rarfile")
+
         self.fileObject = rarfile.RarFile(fileOrPath, 'r')
         RarMountSource._findPassword(self.fileObject, options.get("passwords", []))
 

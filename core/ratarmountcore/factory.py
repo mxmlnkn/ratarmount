@@ -16,7 +16,6 @@ from typing import IO, List, Optional, Union
 
 from .compressions import (
     checkForSplitFile,
-    isSquashFS,
     libarchive,
     py7zr,
     rarfile,
@@ -25,6 +24,7 @@ from .compressions import (
     PySquashfsImage,
     TAR_COMPRESSION_FORMATS,
 )
+from .formats import isSquashFS
 from .utils import CompressionError, RatarmountError
 from .MountSource import MountSource
 from .ASARMountSource import ASARMountSource

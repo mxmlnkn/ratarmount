@@ -31,12 +31,12 @@ from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
 from .SQLiteIndexMountSource import SQLiteIndexMountSource
 from .StenciledFile import RawStenciledFile, StenciledFile
 from .compressions import getGzipInfo, openCompressedFile
+from .formats import mightBeFormat, FileFormatID
 from .utils import (
     RatarmountError,
     InvalidIndexError,
     CompressionError,
     ceilDiv,
-    detectRawTar,
     determineRecursionDepth,
     decodeUnpaddedBase64,
     getXdgCacheHome,
@@ -587,9 +587,12 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             prioritizedBackends=self.prioritizedBackends,
             printDebug=self.printDebug,
         )
-        self.isTar = SQLiteIndexedTar._detectTar(self.tarFileObject, encoding, printDebug=printDebug)
-        if not self.isTar and not self.rawFileObject:
-            raise RatarmountError(f"File object ({str(fileObject)}) could not be opened as a TAR file!")
+        self.isTar = mightBeFormat(self.tarFileObject, FileFormatID.TAR)
+        if not self.isTar:
+            if printDebug >= 3:
+                print(f"[Info] File object {self.tarFileObject} from {self.tarFileName} is not a TAR.")
+            if not self.rawFileObject:
+                raise RatarmountError(f"File object ({str(fileObject)}) could not be opened as a TAR file!")
 
         if self.compression:
             self._recursionDepth += 1
@@ -1407,17 +1410,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 print(f"[Info] Verifying metadata for {rowCount} files took {t1 - t0:.3f} s")
 
         return False
-
-    @staticmethod
-    def _detectTar(fileobj: IO[bytes], encoding: str, printDebug: int = 0) -> bool:
-        if not isinstance(fileobj, io.IOBase) or not fileobj.seekable():
-            return False
-
-        isTar = detectRawTar(fileobj, encoding)
-        if not isTar and printDebug >= 3:
-            print("[Info] File object", fileobj, "is not a TAR.")
-
-        return isTar
 
     def _loadOrStoreCompressionOffsets(self):
         self.index.synchronizeCompressionOffsets(self.tarFileObject, self.compression)

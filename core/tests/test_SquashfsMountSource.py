@@ -18,7 +18,7 @@ from helpers import copyTestFile
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.compressions import findSquashFSOffset  # noqa: E402
+from ratarmountcore.formats import findSquashFSOffset  # noqa: E402
 from ratarmountcore.SquashFSMountSource import SquashFSMountSource  # noqa: E402
 
 

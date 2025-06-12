@@ -13,6 +13,7 @@ from typing import Any, Dict, IO, List, Optional, Tuple, Union
 from .MountSource import FileInfo, MountSource
 from .SQLiteIndex import SQLiteIndex
 from .SQLiteIndexMountSource import SQLiteIndexMountSource
+from .formats import replaceFormatCheck, FileFormatID
 from .utils import overrides
 
 try:
@@ -75,6 +76,9 @@ try:
         file = factory.products[target].file
         file.seek(0)
         return file
+
+    # https://github.com/miurahr/py7zr/issues/659#issuecomment-2954260661
+    replaceFormatCheck(FileFormatID.SEVEN_ZIP, py7zr.is_7zfile)  # type: ignore
 
 except ImportError:
     py7zr = None  # type: ignore

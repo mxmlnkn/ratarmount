@@ -70,10 +70,10 @@ try:
 except ImportError:
     Compressor = object
 
-from .compressions import findSquashFSOffset
 from .MountSource import FileInfo, MountSource
 from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
 from .SQLiteIndexMountSource import SQLiteIndexMountSource
+from .formats import findSquashFSOffset
 from .utils import overrides
 
 

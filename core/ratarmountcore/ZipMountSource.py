@@ -5,12 +5,13 @@ import datetime
 import json
 import re
 import stat
+import sys
 import tarfile
+import zipfile
 from timeit import default_timer as timer
 
 from typing import Any, Dict, IO, List, Optional, Tuple, Union
 
-from .compressions import zipfile
 from .MountSource import FileInfo, MountSource
 from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
 from .SQLiteIndexMountSource import SQLiteIndexMountSource
@@ -43,6 +44,9 @@ class ZipMountSource(SQLiteIndexMountSource):
         **options
         # fmt: on
     ) -> None:
+        if 'zipfile' not in sys.modules:
+            raise RuntimeError("Did not find the zipfile module. Please use Python 3.7+.")
+
         # fmt: off
         self.fileObject             = zipfile.ZipFile(fileOrPath, 'r')
         self.archiveFilePath        = fileOrPath if isinstance(fileOrPath, str) else None

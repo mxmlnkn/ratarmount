@@ -2,20 +2,52 @@
 # -*- coding: utf-8 -*-
 
 import errno
+import io
 import os
 import stat
 from typing import Dict, IO, Iterable, Optional, Union
 
 from .MountSource import FileInfo, MountSource
+from .formats import replaceFormatCheck, FileFormatID
 from .utils import overrides
 
 try:
+    import pyfatfs
     from pyfatfs.FatIO import FatIO
     from pyfatfs.PyFat import PyFat
     from pyfatfs import PyFATException
 except ImportError:
+    pyfatfs = None  # type: ignore
     FatIO = None  # type: ignore
     PyFat = None  # type: ignore
+    PyFATException = None  # type: ignore
+
+
+def isFATImage(fileObject) -> bool:
+    if PyFat is None:
+        return False
+
+    offset = fileObject.tell()
+    try:
+        fs = PyFat()
+        # TODO Avoid possibly slow full FAT parsing here. Only do some quick checks such as PyFatFS.PyFat.parse_header
+        #      Calling __set_fp instead of set_fp avoids that but it is not part of the public interface per convention!
+        fs._PyFat__set_fp(fileObject)
+        fs.is_read_only = True
+        try:
+            fs.parse_header()
+            return True
+        except (pyfatfs.PyFATException, ValueError):
+            return False
+        finally:
+            # Reset file object so that it does not get closed! Cannot be None because that is checked.
+            fs._PyFat__fp = io.BytesIO()
+
+    finally:
+        fileObject.seek(offset)
+
+
+replaceFormatCheck(FileFormatID.FAT, isFATImage)
 
 
 class FATMountSource(MountSource):

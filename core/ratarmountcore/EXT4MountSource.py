@@ -4,6 +4,7 @@
 from typing import Any, Dict, IO, Iterable, Optional, Union
 
 from .MountSource import FileInfo, MountSource
+from .formats import replaceFormatCheck, FileFormatID
 from .utils import overrides
 
 try:
@@ -14,6 +15,24 @@ try:
     ext4.block.BlockIO.readable = lambda self: True
 except ImportError:
     ext4 = None  # type: ignore
+
+
+def isEXT4Image(fileObject) -> bool:
+    if ext4 is None:
+        return False
+
+    offset = fileObject.tell()
+    try:
+        ext4.Volume(fileObject)
+        return True
+    except Exception:
+        pass
+    finally:
+        fileObject.seek(offset)
+    return False
+
+
+replaceFormatCheck(FileFormatID.EXT4, isEXT4Image)
 
 
 class EXT4MountSource(MountSource):

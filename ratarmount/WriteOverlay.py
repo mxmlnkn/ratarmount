@@ -15,7 +15,8 @@ import traceback
 import urllib.parse
 from typing import Any, Callable, Dict, List, Tuple
 
-from ratarmountcore.utils import detectRawTar, overrides, RatarmountError
+from ratarmountcore.formats import isTAR
+from ratarmountcore.utils import overrides, RatarmountError
 from ratarmountcore.FolderMountSource import FolderMountSource
 from ratarmountcore.MountSource import FileInfo, MountSource
 
@@ -431,7 +432,7 @@ def commitOverlay(writeOverlay: str, tarFile: str, encoding: str = tarfile.ENCOD
         raise RatarmountError(f"Specified TAR '{tarFile}' to commit to does not exist or is not a file!")
 
     with open(tarFile, 'rb') as file:
-        if not detectRawTar(file, encoding=encoding):
+        if not isTAR(file, encoding=encoding):
             raise RatarmountError("Currently, only modifications to an uncompressed TAR may be committed.")
 
     try:
