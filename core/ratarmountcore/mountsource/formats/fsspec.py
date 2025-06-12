@@ -1,5 +1,6 @@
 import os
 import stat
+import threading
 import time
 import urllib
 from typing import IO, Dict, Iterable, Optional, Union
@@ -32,6 +33,70 @@ try:
     from dropboxdrivefs import DropboxDriveFileSystem
 except ImportError:
     DropboxDriveFileSystem = None  # type: ignore
+
+try:
+    import fsspec.asyn
+
+    def tryCloseFSSpecIOBeforeFork() -> None:
+        try:
+            # We only cover a single use case: Only the main thread and a single fsspecIO thread are running.
+            # Then, we can close it presumably safely. Anything else would possibly not be thread-safe.
+            # See comments below about resetting the lock.
+            if (
+                len(threading.enumerate()) != 2
+                or not all(thread.name in ["MainThread", "fsspecIO"] for thread in threading.enumerate())
+                or fsspec.asyn.iothread[0] is None
+            ):
+                return
+
+            # The lock was changed 3 years ago to a _lock and get_lock singleton.
+            # https://github.com/fsspec/filesystem_spec/commit/ffe57d6eabe517b4c39c27487fc45b804d314b58
+            # But acquiring the lock does not help us anyway to fix thread-safety in case other threads have
+            # a reference to the event loop after a call to get_loop. Therefore, do the threading checks above
+            # and don't bother with locking.
+            # These are lists with a single element, which is None at first, for some reason Why?
+            ioThread = fsspec.asyn.iothread[0]
+            eventLoop = fsspec.asyn.loop[0]
+
+            if eventLoop is not None:  # Should always be true because else iothread[0] would also be None.
+                # Calling eventLoop.stop() directly does not work for some reason.
+                # Probably needs to be called on the executing thread.
+                eventLoop.call_soon_threadsafe(eventLoop.stop)
+                if ioThread is not None and ioThread.is_alive():
+                    ioThread.join()
+
+            # This should be safe as long as no other thread is using the event loop.
+            # This should not be done if there are potentially other threads using the event loop
+            # because get_loop only accounts for race conditions during event loop creation, but after that,
+            # it simply returns the event loop to be used without any lock, i.e., changing or deleting the
+            # event loop is not thread-safe!
+            # https://github.com/fsspec/filesystem_spec/blob/26f1ea75351e39a80b29b27bea792351f3e8da9f/
+            #   fsspec/asyn.py#L141
+            # The next call to fsspec.asyn.get_loop should simply recreate a new thread and event loop.
+            # But, for my use case, the next call would only be after a fork anyway.
+            # Normally, there is no reason to reset the lock on this thread. However, this is to be used before
+            # forking and we even check against other threads running above, so it should be safe to reset the
+            # lock.
+            # See also https://github.com/fsspec/filesystem_spec/pull/1790
+            reset_after_fork = getattr(fsspec.asyn, 'reset_after_fork', None)
+            reset_lock = getattr(fsspec.asyn, 'reset_lock', None)
+            if reset_lock:
+                reset_lock()
+            elif reset_after_fork:
+                # Theoretically, this call is redundant because fsspec registers it to be called on fork if it exists.
+                reset_after_fork()
+            else:
+                fsspec.asyn.iothread[0] = None
+                fsspec.asyn.loop[0] = None
+                fsspec.asyn.lock = None
+
+        except Exception:
+            pass
+
+except ImportError:
+
+    def tryCloseFSSpecIOBeforeFork() -> None:
+        pass
 
 
 class FSSpecMountSource(MountSource):

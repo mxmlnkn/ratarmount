@@ -317,6 +317,15 @@ class FuseMount(fuse.Operations):
             if self.writeOverlay and self.writeOverlay.root == self.mountPoint:
                 self.writeOverlay.setFolderDescriptor(self.mountPointFd)
 
+        try:
+            import fsspec.asyn
+            reset_after_fork = getattr(fsspec.asyn, 'reset_after_fork')
+            print("reset_after_fork:", reset_after_fork)
+            if reset_after_fork:
+                reset_after_fork()
+        except Exception:
+            pass
+
     @staticmethod
     def _fileInfoToDict(fileInfo: FileInfo):
         # dictionary keys: https://pubs.opengroup.org/onlinepubs/007904875/basedefs/sys/stat.h.html
@@ -336,7 +345,13 @@ class FuseMount(fuse.Operations):
 
     @overrides(fuse.Operations)
     def getattr(self, path: str, fh=None) -> Dict[str, Any]:
-        return self._fileInfoToDict(self._getFileInfo(path))
+        print("GETATTR", path)
+        try:
+            return self._fileInfoToDict(self._getFileInfo(path))
+        except Exception as exception:
+            traceback.print_exc()
+            print("Caught exception when trying to get file metadata.", exception)
+            raise fuse.FuseOSError(errno.EIO) from exception
 
     @overrides(fuse.Operations)
     def readdir(self, path: str, fh):

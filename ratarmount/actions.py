@@ -15,6 +15,7 @@ import zipfile
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from ratarmountcore.compressions import stripSuffixFromArchive
+from ratarmountcore.FSSpecMountSource import tryCloseFSSpecIOBeforeFork
 from ratarmountcore.utils import RatarmountError, determineRecursionDepth, imeta, removeDuplicatesStable
 
 with contextlib.suppress(ImportError):
@@ -531,15 +532,18 @@ def createFuseMount(args) -> None:
     ) as fuseOperationsObject:  # fmt: on
         try:
             # Note that this will not detect threads started in shared libraries, only those started via "threading".
-            if not args.foreground and len(threading.enumerate()) > 1:
-                threadNames = [thread.name for thread in threading.enumerate() if thread.name != "MainThread"]
-                # Fix FUSE hangs with: https://unix.stackexchange.com/a/713621/111050
-                raise ValueError(
-                    "Daemonizing FUSE into the background may result in errors or unkillable hangs because "
-                    f"there are threads still open: {', '.join(threadNames)}!\nCall ratarmount with -f or --foreground."
-                    " If you still want to run it in the background, use the usual shell tools to move it into the "
-                    "background, i.e., nohup ratarmount -f ... &"
-                )
+            if not args.foreground:
+                tryCloseFSSpecIOBeforeFork()
+
+                if len(threading.enumerate()) > 1:
+                    threadNames = [thread.name for thread in threading.enumerate() if thread.name != "MainThread"]
+                    # Fix FUSE hangs with: https://unix.stackexchange.com/a/713621/111050
+                    raise ValueError(
+                        "Daemonizing FUSE into the background may result in errors or unkillable hangs because "
+                        f"there are threads still open: {', '.join(threadNames)}!\nCall ratarmount with -f or --foreground."
+                        " If you still want to run it in the background, use the usual shell tools to move it into the "
+                        "background, i.e., nohup ratarmount -f ... &"
+                    )
 
             fuse.FUSE(
                 operations=fuseOperationsObject,
