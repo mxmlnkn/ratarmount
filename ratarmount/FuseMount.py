@@ -48,7 +48,6 @@ class FuseMount(fuse.Operations):
         self.printDebug: int = int(options.get('printDebug', 0))
         self.writeOverlay: Optional[WritableFolderMountSource] = None
         self.overlayPath: Optional[str] = None
-        self.workingDirectory = os.path.realpath(os.getcwd())
 
         self.mountPoint = os.path.realpath(mountPoint)
         # This check is important for the self-bind test below, which assumes a folder.
@@ -211,9 +210,6 @@ class FuseMount(fuse.Operations):
         if self.printDebug >= 1:
             print("Created mount point at:", self.mountPoint)
 
-        self.newStdout = None
-        self.newStderr = None
-
     def __enter__(self):
         return self
 
@@ -278,40 +274,6 @@ class FuseMount(fuse.Operations):
 
     @overrides(fuse.Operations)
     def init(self, path) -> None:
-        import io
-        import sys
-        #sys.stdout =
-        #sys.stderr = open(os.path.join(self.workingDirectory, 'ratarmount.stderr'), 'wt', buffering=1)
-
-        import ctypes
-        libc = ctypes.CDLL(None)
-
-        c_stdout = ctypes.c_void_p.in_dll(libc, 'stdout')
-        self.newStdout = open(os.path.join(self.workingDirectory, 'ratarmount.stdout'), 'wt', buffering=1)
-        to_fd = self.newStdout.fileno()
-        original_stdout_fd = sys.stdout.fileno()
-        libc.fflush(c_stdout)
-        # Also closes the file descriptor (fd)
-        sys.stdout.close()
-        # Make original_stdout_fd point to the same file as to_fd
-        os.dup2(to_fd, original_stdout_fd)
-        # Create a new sys.stdout that points to the redirected fd
-        sys.stdout = io.TextIOWrapper(os.fdopen(original_stdout_fd, 'wb'))
-
-        c_stderr = ctypes.c_void_p.in_dll(libc, 'stderr')
-        self.newStderr = open(os.path.join(self.workingDirectory, 'ratarmount.stderr'), 'wt', buffering=1)
-        to_fd = self.newStderr.fileno()
-        original_stderr_fd = sys.stderr.fileno()
-        libc.fflush(c_stderr)
-        # Also closes the file descriptor (fd)
-        sys.stderr.close()
-        # Make original_stderr_fd point to the same file as to_fd
-        os.dup2(to_fd, original_stderr_fd)
-        # Create a new sys.stderr that points to the redirected fd
-        sys.stderr = io.TextIOWrapper(os.fdopen(original_stderr_fd, 'wb'))
-
-        print("TEST FROM DAEMONIZED!")
-
         if self.selfBindMount is not None and self.mountPointFd is not None:
             self.selfBindMount.setFolderDescriptor(self.mountPointFd)
             if self.writeOverlay and self.writeOverlay.root == self.mountPoint:
