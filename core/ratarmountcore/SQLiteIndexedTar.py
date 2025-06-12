@@ -7,7 +7,6 @@ import json
 import math
 import multiprocessing.pool
 import os
-import platform
 import re
 import sqlite3
 import stat
@@ -22,26 +21,16 @@ from timeit import default_timer as timer
 from typing import Any, Callable, cast, Dict, Generator, IO, Iterable, List, Optional, Tuple
 
 try:
-    import indexed_gzip
-except ImportError:
-    pass
-
-try:
     import rapidgzip
 except ImportError:
     pass
-
-try:
-    import xz
-except ImportError:
-    xz = None  # type: ignore
 
 from .MountSource import FileInfo, MountSource
 from .ProgressBar import ProgressBar
 from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
 from .SQLiteIndexMountSource import SQLiteIndexMountSource
 from .StenciledFile import RawStenciledFile, StenciledFile
-from .compressions import detectCompression, findAvailableOpen, getGzipInfo, TAR_COMPRESSION_FORMATS
+from .compressions import getGzipInfo, openCompressedFile
 from .utils import (
     RatarmountError,
     InvalidIndexError,
@@ -51,7 +40,6 @@ from .utils import (
     determineRecursionDepth,
     decodeUnpaddedBase64,
     getXdgCacheHome,
-    isOnSlowDrive,
     overrides,
 )
 from .BlockParallelReaders import ParallelXZReader
@@ -591,7 +579,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         # tarFileObject : File object to the uncompressed (or decompressed) TAR file to read actual data out of.
         # compression   : Stores what kind of compression the originally specified TAR file uses.
         # isTar         : Can be false for the degenerated case of only a bz2 or gz file not containing a TAR
-        self.tarFileObject, self.rawFileObject, self.compression = SQLiteIndexedTar._openCompressedFile(
+        self.tarFileObject, self.rawFileObject, self.compression = openCompressedFile(
             fileObject,
             gzipSeekPointSpacing,
             encoding,
@@ -1431,155 +1419,9 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
         return isTar
 
-    # TODO I think this should be factored out into something like factory.py, but a separate file to reduce
-    #      include pollution and it only undoes compressions/filter layers, instead of returning mount sources.
-    #      detectCompression and TAR_COMPRESSION_FORMATS should also be moved there and renamed.
-    @staticmethod
-    def _openCompressedFile(
-        fileobj: IO[bytes],
-        gzipSeekPointSpacing: int,
-        encoding: str,
-        parallelizations: Dict[str, int],
-        prioritizedBackends: Optional[List[str]],
-        printDebug: int = 0,
-    ) -> Tuple[Any, Optional[IO[bytes]], Optional[str]]:
-        """
-        Opens a file possibly undoing the compression.
-        Returns (tar_file_obj, raw_file_obj, compression, isTar).
-        raw_file_obj will be none if compression is None.
-        """
-        compression = detectCompression(fileobj, prioritizedBackends=prioritizedBackends, printDebug=printDebug)
-        if printDebug >= 3:
-            print(f"[Info] Detected compression {compression} for file object:", fileobj)
-
-        if compression not in TAR_COMPRESSION_FORMATS:
-            return fileobj, None, compression
-
-        formatOpen = findAvailableOpen(compression, prioritizedBackends)
-        if not formatOpen:
-            moduleNames = [module.name for module in TAR_COMPRESSION_FORMATS[compression].modules]
-            raise CompressionError(
-                f"Cannot open a {compression} compressed TAR file '{fileobj.name}' "
-                f"without any of these modules: {moduleNames}"
-            )
-
-        parallelization = 1
-
-        if compression == 'gz':
-            if SQLiteIndexedTar._useRapidgzip(
-                fileobj,
-                compression=compression,
-                gzipSeekPointSpacing=gzipSeekPointSpacing,
-                prioritizedBackends=prioritizedBackends,
-                printDebug=printDebug,
-            ):
-                isRealFile = hasattr(fileobj, 'name') and fileobj.name and os.path.isfile(fileobj.name)
-                parallelization = (
-                    1
-                    if isRealFile and isOnSlowDrive(fileobj.name)
-                    else parallelizations.get(
-                        'rapidgzip-gzip', parallelizations.get('rapidgzip', parallelizations.get('', 1))
-                    )
-                )
-                if printDebug >= 3:
-                    print(
-                        f"[Info] Parallelization to use for rapidgzip backend: {parallelization}, "
-                        f"slow drive detected: {isOnSlowDrive(fileobj.name)}"
-                    )
-                tar_file = rapidgzip.RapidgzipFile(
-                    fileobj, parallelization=parallelization, verbose=printDebug >= 2, chunk_size=gzipSeekPointSpacing
-                )
-            else:
-                # The buffer size must be much larger than the spacing or else there will be large performance penalties
-                # even for reading sequentially, see https://github.com/pauldmccarthy/indexed_gzip/issues/89
-                # Use 4x spacing because each raw read seeks from the last index point even if the position did not
-                # change since the last read call. On average, this incurs an overhead of spacing / 2. For 3x spacing,
-                # thisoverhead would be 1/6 = 17%, which should be negligible. The increased memory-usage is not an
-                # issue because internally many buffers are allocated with 4 * spacing size.
-                bufferSize = max(3 * 1024 * 1024, 3 * gzipSeekPointSpacing)
-                # drop_handles keeps a file handle opening as is required to call tell() during decoding
-                tar_file = indexed_gzip.IndexedGzipFile(
-                    fileobj=fileobj, drop_handles=False, spacing=gzipSeekPointSpacing, buffer_size=bufferSize
-                )
-        elif compression == 'bz2':
-            parallelization = parallelizations.get('rapidgzip-bzip2', parallelizations.get('', 1))
-            tar_file = rapidgzip.IndexedBzip2File(fileobj, parallelization=parallelization)  # type: ignore
-        elif (
-            compression == 'xz'
-            and xz
-            and parallelizations.get('xz', parallelizations.get('', 1)) != 1
-            and hasattr(fileobj, 'name')
-            and os.path.isfile(fileobj.name)
-            and platform.system() == 'Linux'
-        ):
-            tar_file = formatOpen(fileobj)
-            if len(tar_file.block_boundaries) > 1:
-                parallelization = parallelizations.get('xz', parallelizations.get('', 1))
-                tar_file.close()
-                tar_file = ParallelXZReader(fileobj.name, parallelization=parallelization)
-        else:
-            tar_file = formatOpen(fileobj)
-
-        if printDebug >= 3:
-            print(
-                f"[Info] Undid {compression} file compression by using: {type(tar_file).__name__} "
-                f"with parallelization={parallelization}"
-            )
-
-        return tar_file, fileobj, compression
-
     def _loadOrStoreCompressionOffsets(self):
         self.index.synchronizeCompressionOffsets(self.tarFileObject, self.compression)
 
     def joinThreads(self):
         if hasattr(self.tarFileObject, 'join_threads'):
             self.tarFileObject.join_threads()
-
-    @staticmethod
-    def _useRapidgzip(
-        rawFileObject: IO[bytes],
-        compression: str,
-        gzipSeekPointSpacing: int,
-        prioritizedBackends: Optional[List[str]],
-        printDebug: int,
-    ) -> bool:
-        if rawFileObject is None or compression != 'gz':
-            return False
-
-        if 'rapidgzip' not in sys.modules:
-            print("[Warning] Cannot use rapidgzip for access to gzip file because it is not installed. Try:")
-            print("[Warning]     python3 -m pip install --user rapidgzip")
-            return False
-
-        # Check whether indexed_gzip might have a higher priority than rapidgzip if both are listed.
-        if (
-            prioritizedBackends
-            and 'indexed_gzip' in prioritizedBackends
-            and (
-                (
-                    'rapidgzip' in prioritizedBackends
-                    and prioritizedBackends.index('indexed_gzip') < prioritizedBackends.index('rapidgzip')
-                )
-                or 'rapidgzip' not in prioritizedBackends
-            )
-        ):
-            # Low index have higher priority (because normally the list would be checked from lowest indexes).
-            return False
-
-        # Only allow mounting of real files. Rapidgzip does work with Python file objects but we don't want to
-        # mount recursive archives all with the parallel gzip decoder because then the cores would be oversubscribed!
-        # Similarly, small files would result in being wholly cached into memory, which probably isn't what the user
-        # had intended by using ratarmount?
-        isRealFile = hasattr(rawFileObject, 'name') and rawFileObject.name and os.path.isfile(rawFileObject.name)
-        hasMultipleChunks = isRealFile and os.stat(rawFileObject.name).st_size >= 4 * gzipSeekPointSpacing
-        if not hasMultipleChunks:
-            if printDebug >= 2:
-                print("[Info] Do not reopen with rapidgzip backend because:")
-                if not isRealFile:
-                    print("[Info]  - the file to open is a recursive file, which limits the usability of ")
-                    print("[Info]    parallel decompression.")
-                if not hasMultipleChunks:
-                    print("[Info]  - is too small to qualify for parallel decompression.")
-            return False
-
-        return True
