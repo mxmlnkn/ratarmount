@@ -1,5 +1,8 @@
+import contextlib
+import ctypes
 import errno
 import os
+import sys
 import traceback
 from typing import IO, Any, Dict, List, Optional, Tuple, Union
 
@@ -46,6 +49,12 @@ class FuseMount(fuse.Operations):
         self.printDebug: int = int(options.get('printDebug', 0))
         self.writeOverlay: Optional[WritableFolderMountSource] = None
         self.overlayPath: Optional[str] = None
+
+        # Only open the log file at the end shortly before it is needed to not end up with an empty file on error.
+        logFilePath: str = options.get('logFile', '')
+        options.pop('logFile', None)
+        if logFilePath:
+            logFilePath = os.path.realpath(logFilePath)
 
         self.mountPoint = os.path.realpath(mountPoint)
         # This check is important for the self-bind test below, which assumes a folder.
@@ -205,6 +214,11 @@ class FuseMount(fuse.Operations):
         statResults = os.lstat(self.mountPoint)
         self.mountPointInfo = {key: getattr(statResults, key) for key in dir(statResults) if key.startswith('st_')}
 
+        # Open log file.
+        self.logFile: Optional[IO[str]] = None
+        if logFilePath:
+            self.logFile = open(logFilePath, 'w', buffering=1, encoding='utf-8')
+
         if self.printDebug >= 1:
             print("Created mount point at:", self.mountPoint)
 
@@ -270,8 +284,34 @@ class FuseMount(fuse.Operations):
         #      Would be really helpful if the file info would contain the actual path and name, too :/
         return self.writeOverlay.updateFileInfo(path[len(subMountPoint) :], fileInfo)
 
+    @staticmethod
+    def _redirectOutput(name: str, file: IO[str]):
+        with contextlib.suppress(OSError, ValueError):
+            libc = ctypes.CDLL('libc.so.6')
+            cstdptr = ctypes.c_void_p.in_dll(libc, name)
+            if cstdptr:
+                libc.fflush(cstdptr)
+
+        pystd = getattr(sys, name, None)
+        if not pystd:
+            return
+
+        # Closing the original stdout and stderr (fd=1, fd=2) and duplicating our file's fd to those,
+        # makes it also work for C-code backends, i.e., libfuse with -o debug! This assumes that sys.stdout
+        # and sys.stderr are using the default fds 1 and 2.
+        pystdFileno = pystd.fileno()
+        with contextlib.suppress(Exception):
+            pystd.close()  # Also closes pystdFileno and makes it reusable.
+        os.dup2(file.fileno(), pystdFileno)
+
+        sys.stdout = file
+
     @overrides(fuse.Operations)
     def init(self, path) -> None:
+        if self.logFile:
+            self._redirectOutput('stdout', self.logFile)
+            self._redirectOutput('stderr', self.logFile)
+
         if self.selfBindMount is not None and self.mountPointFd is not None:
             self.selfBindMount.setFolderDescriptor(self.mountPointFd)
             if self.writeOverlay and self.writeOverlay.root == self.mountPoint:

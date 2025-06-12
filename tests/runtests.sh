@@ -2531,7 +2531,9 @@ if [[ -z "$CI" ]]; then
         allPythonFiles+=( "$file" )
     done < <( git ls-tree -r --name-only HEAD | 'grep' '[.]py$' )
 
-    ruff check --fix --unsafe-fixes --config tests/.ruff.toml -- "${allPythonFiles[@]}"
+    ruff check --config tests/.ruff.toml -- "${allPythonFiles[@]}"
+    ruff check --fix --config tests/.ruff.toml -- "${allPythonFiles[@]}"
+    #ruff check --fix --unsafe-fixes --config tests/.ruff.toml -- "${allPythonFiles[@]}"
 
     testFiles=()
     while read -r file; do

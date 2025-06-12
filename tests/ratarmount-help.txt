@@ -4,9 +4,9 @@ usage: ratarmount [-h] [-c] [-r] [-u] [-P PARALLELIZATION] [-v] [--password PASS
                   [--transform-recursive-mount-point REGEX_PATTERN REPLACEMENT] [-e ENCODING]
                   [-i] [--gnu-incremental] [--no-gnu-incremental] [--detect-gnu-incremental]
                   [-w WRITE_OVERLAY] [--commit-overlay] [-o FUSE] [-f] [-d DEBUG]
-                  [-gs GZIP_SEEK_POINT_SPACING] [-p PREFIX] [--password-file PASSWORD_FILE]
-                  [--use-backend USE_BACKEND] [--oss-attributions-short] [--oss-attributions]
-                  [--disable-union-mount]
+                  [--log-file LOG_FILE] [-gs GZIP_SEEK_POINT_SPACING] [-p PREFIX]
+                  [--password-file PASSWORD_FILE] [--use-backend USE_BACKEND]
+                  [--oss-attributions-short] [--oss-attributions] [--disable-union-mount]
                   [--union-mount-cache-max-depth UNION_MOUNT_CACHE_MAX_DEPTH]
                   [--union-mount-cache-max-entries UNION_MOUNT_CACHE_MAX_ENTRIES]
                   [--union-mount-cache-timeout UNION_MOUNT_CACHE_TIMEOUT]
@@ -162,6 +162,10 @@ Advanced Options:
                         applied for TAR files because the file count only becomes known after
                         parsing the archive, for which an index is already created. (default:
                         1000)
+  --log-file LOG_FILE   Specifies a file to redirect all output into. The redirection only takes
+                        effect after the mount point is provided because, without -f, there is
+                        no other way to get output after daemonization and forking into the
+                        background. (default: )
   --oss-attributions    Show licenses of used libraries.
   --oss-attributions-short
                         Show license identifiers of used libraries.

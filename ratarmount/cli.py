@@ -284,6 +284,12 @@ For further information, see the ReadMe on the project's homepage:
         '-d', '--debug', type=int, default=1,
         help='Sets the debugging level. Higher means more output. Currently, 3 is the highest.')
 
+    advancedGroup.add_argument(
+        '--log-file', type=str, default='',
+        help='Specifies a file to redirect all output into. The redirection only takes effect after the mount point '
+             'is provided because, without -f, there is no other way to get output after daemonization and forking '
+             'into the background.')
+
     # Considerations for the default value:
     #   - seek times for the bz2 backend are between 0.01s and 0.1s
     #   - seek times for the gzip backend are roughly 1/10th compared to bz2 at a default spacing of 4MiB
