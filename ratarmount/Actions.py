@@ -10,6 +10,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import threading
 import time
 import urllib.request
 import zipfile
@@ -534,10 +535,20 @@ def createFuseMount(args) -> None:
         maxCacheEntries              = args.union_mount_cache_max_entries,
         maxSecondsToCache            = args.union_mount_cache_timeout,
         indexMinimumFileCount        = args.index_minimum_file_count,
-        foreground                   = bool(args.foreground),
         # fmt: on
     ) as fuseOperationsObject:
         try:
+            # Note that this will not detect threads started in shared libraries, only those started via "threading".
+            if not args.foreground and len(threading.enumerate()) > 1:
+                threadNames = [thread.name for thread in threading.enumerate() if thread.name != "MainThread"]
+                # Fix FUSE hangs with: https://unix.stackexchange.com/a/713621/111050
+                raise ValueError(
+                    "Daemonizing FUSE into the background may result in errors or unkillable hangs because "
+                    f"there are threads still open: {', '.join(threadNames)}!\nCall ratarmount with -f or --foreground."
+                    " If you still want to run it in the background, use the usual shell tools to move it into the "
+                    "background, i.e., nohup ratarmount -f ... &"
+                )
+
             fuse.FUSE(
                 operations=fuseOperationsObject,
                 mountpoint=args.mount_point,

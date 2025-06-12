@@ -3,7 +3,6 @@
 
 import errno
 import os
-import threading
 import traceback
 from typing import Any, Dict, IO, List, Optional, Tuple, Union
 
@@ -46,7 +45,7 @@ class FuseMount(fuse.Operations):
     # ratarmountcore, StenciledFile, and other layers they have to go through.
     MINIMUM_BLOCK_SIZE = 256 * 1024
 
-    def __init__(self, pathToMount: Union[str, List[str]], mountPoint: str, foreground: bool = True, **options) -> None:
+    def __init__(self, pathToMount: Union[str, List[str]], mountPoint: str, **options) -> None:
         self.printDebug: int = int(options.get('printDebug', 0))
         self.writeOverlay: Optional[WritableFolderMountSource] = None
         self.overlayPath: Optional[str] = None
@@ -211,15 +210,6 @@ class FuseMount(fuse.Operations):
 
         if self.printDebug >= 1:
             print("Created mount point at:", self.mountPoint)
-
-        # Note that this will not detect threads started in shared libraries, only those started via "threading".
-        if not foreground and len(threading.enumerate()) > 1:
-            threadNames = [thread.name for thread in threading.enumerate() if thread.name != "MainThread"]
-            # Fix FUSE hangs with: https://unix.stackexchange.com/a/713621/111050
-            raise ValueError(
-                "Daemonizing FUSE into the background may result in errors or unkillable hangs because "
-                f"there are threads still open: {', '.join(threadNames)}!\nCall ratarmount with -f or --foreground."
-            )
 
     def __enter__(self):
         return self
