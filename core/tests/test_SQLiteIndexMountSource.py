@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# pylint: disable=wrong-import-order
+# pylint: disable=wrong-import-position
+# pylint: disable=protected-access
+
+import os
+import stat
+import sys
+
+from helpers import copyTestFile
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from ratarmountcore.SQLiteIndexMountSource import SQLiteIndexMountSource  # noqa: E402
+
+
+class TestSQLiteIndexMountSource:
+    @staticmethod
+    def test_password():
+        with copyTestFile("nested-tar.index.sqlite") as path, SQLiteIndexMountSource(path) as mountSource:
+            for folder in ['/', '/foo', '/foo/fighter']:
+                fileInfo = mountSource.getFileInfo(folder)
+                assert fileInfo
+                assert stat.S_ISDIR(fileInfo.mode)
+                assert mountSource.fileVersions(folder) == 1
+                assert mountSource.listDir(folder)
+
+            for filePath in ['/foo/fighter/ufo', '/foo/lighter.tar']:
+                fileInfo = mountSource.getFileInfo(filePath)
+                assert fileInfo
+                assert not stat.S_ISDIR(fileInfo.mode)
+
+                assert mountSource.fileVersions(filePath) == 1
+                assert not mountSource.listDir(filePath)
+
+            # File contents cannot be read from a mounted index alone!
+
+            # The 'transform' parameter is ignored because it is only for index creation, not index loading!
