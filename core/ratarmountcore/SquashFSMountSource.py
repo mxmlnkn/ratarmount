@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 # pylint: disable=protected-access, import-outside-toplevel, unused-argument
 

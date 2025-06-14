@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 # pylint: disable=no-member,abstract-method
 # Disable pylint errors. See https://github.com/fsspec/filesystem_spec/issues/1678
