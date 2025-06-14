@@ -111,7 +111,7 @@ def checkInputFileType(path: str, printDebug: int = 0) -> str:
 
         # 2. Try importing possible modules again and print helpful error messages if there is an error.
         for backend in list(ARCHIVE_BACKENDS.values()) + list(COMPRESSION_BACKENDS.values()):
-            intersectingFormats = sorted(list(fid.name for fid in backend.formats))
+            intersectingFormats = sorted(fid.name for fid in backend.formats)
             if not intersectingFormats:
                 continue
 

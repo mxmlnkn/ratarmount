@@ -377,7 +377,7 @@ def extractValuesFromLog(path: str):
 
 def plotSummary(logFiles: List[str]):
     values = [values for logFile in logFiles for values in extractValuesFromLog(logFile)]
-    names = sorted(list({x['name'] for x in values if re.sub(', (unique|duplicate) rows$', '', x['name']) in schemas}))
+    names = sorted({x['name'] for x in values if re.sub(', (unique|duplicate) rows$', '', x['name']) in schemas})
     if not names:
         return
 

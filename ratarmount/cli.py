@@ -111,7 +111,7 @@ For further information, see the ReadMe on the project's homepage:
         from ratarmountcore.archives import ARCHIVE_BACKENDS
         from ratarmountcore.compressions import COMPRESSION_BACKENDS
 
-        backendNames = sorted(list(set(ARCHIVE_BACKENDS.keys()).union(set(COMPRESSION_BACKENDS.keys()))))
+        backendNames = sorted(set(ARCHIVE_BACKENDS.keys()).union(set(COMPRESSION_BACKENDS.keys())))
 
         from ratarmountcore.SQLiteIndexedTar import SQLiteIndexedTar
 

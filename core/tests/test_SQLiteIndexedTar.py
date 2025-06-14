@@ -356,8 +356,8 @@ class TestSQLiteIndexedTarParallelized:
                         else:
                             files.append(path)
 
-                assert set(folders) == set(["/dist", "/dist/a", "/dist/a/b", "/src"])
-                assert set(files) == set(["/dist/a/b/test2.sh", "/src/test.sh", "/README.md"])
+                assert set(folders) == {"/dist", "/dist/a", "/dist/a/b", "/src"}
+                assert set(files) == {"/dist/a/b/test2.sh", "/src/test.sh", "/README.md"}
 
                 for path in folders + files:
                     assert indexedTar.fileVersions(path) == 1
