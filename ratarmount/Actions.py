@@ -15,7 +15,7 @@ import urllib.request
 import zipfile
 from typing import List, Optional
 
-from ratarmountcore.compressions import supportedCompressions, stripSuffixFromTarFile
+from ratarmountcore.compressions import supportedCompressions, stripSuffixFromArchive
 from ratarmountcore.utils import (
     determineRecursionDepth,
     imeta,
@@ -341,7 +341,7 @@ def processParsedArguments(args) -> int:
 
     # Automatically generate a default mount path
     if not args.mount_point:
-        autoMountPoint = stripSuffixFromTarFile(args.mount_source[0])
+        autoMountPoint = stripSuffixFromArchive(args.mount_source[0])
         if args.mount_point == autoMountPoint:
             args.mount_point = os.path.splitext(args.mount_source[0])[0]
         else:

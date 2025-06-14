@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from ratarmountcore.compressions import (  # noqa: E402
     stripSuffixFromCompressedFile,
-    stripSuffixFromTarFile,
+    stripSuffixFromArchive,
     hasMatchingAlphabets,
     checkForSequence,
 )
@@ -32,8 +32,8 @@ def test_stripSuffixFromCompressedFile():
     assert ssc('a.mp3') == 'a.mp3'
 
 
-def test_stripSuffixFromTarFile():
-    sst = stripSuffixFromTarFile
+def test_stripSuffixFromArchive():
+    sst = stripSuffixFromArchive
 
     assert sst('a.tar.bz2') == 'a'
     assert sst('a.tar.BZ2') == 'a'

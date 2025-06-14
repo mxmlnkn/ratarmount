@@ -548,7 +548,7 @@ def stripSuffixFromCompressedFile(path: str) -> str:
     return path
 
 
-def stripSuffixFromTarFile(path: str) -> str:
+def stripSuffixFromArchive(path: str) -> str:
     """Strips extensions like .tar.gz or .gz or .tgz, ..."""
     # 1. Try for conflated suffixes first
     for compression in supportedCompressions.values():

@@ -9,7 +9,7 @@ import traceback
 from dataclasses import dataclass
 from typing import Any, Dict, IO, Iterable, List, Optional, Tuple, Union
 
-from .compressions import stripSuffixFromTarFile
+from .compressions import stripSuffixFromArchive
 from .factory import openMountSource
 from .FolderMountSource import FolderMountSource
 from .MountSource import FileInfo, MountSource, mergeStatfs
@@ -122,7 +122,7 @@ class AutoMountLayer(MountSource):
         """
 
         # For better performance, only look at the suffix not at the magic bytes.
-        strippedFilePath = stripSuffixFromTarFile(path)
+        strippedFilePath = stripSuffixFromArchive(path)
         if strippedFilePath == path:
             return None
 
