@@ -164,7 +164,7 @@ class BenchmarkFullRead:
     @staticmethod
     def plot_bar_comparison(data_file_path, xlabel=None, **kwargs):
         data = {}
-        with open(data_file_path, 'rt', encoding='utf-8') as file:
+        with open(data_file_path, encoding='utf-8') as file:
             for line in file:
                 if line.startswith('#'):
                     continue
@@ -446,7 +446,7 @@ class BenchmarkSshfsMaxRequests:
             data_file_path = cls.DATA_FILE_NAME
 
         data = {}
-        with open(data_file_path, 'rt') as file:
+        with open(data_file_path) as file:
             for line in file:
                 if line.startswith('#'):
                     continue

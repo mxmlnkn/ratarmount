@@ -168,7 +168,7 @@ def test_password_list(tmpdir, passwords, compression):
     passwordFile = os.path.join(tmpdir, "passwords")
     mountPoint = os.path.join(tmpdir, "mountPoint")
 
-    with open(passwordFile, 'wt', encoding='utf-8') as file:
+    with open(passwordFile, 'w', encoding='utf-8') as file:
         for password in passwords:
             file.write(password + '\n')
 
@@ -269,10 +269,6 @@ ARCHIVES_TO_TEST = [
     ("2b87e29fca6ee7f1df6c1a76cb58e101", "nested-tar.sqlar", "foo/lighter.tar/fighter/bar"),
     ("2709a3348eb2c52302a7606ecf5860bc", "nested-tar-compressed.sqlar", "foo/fighter/ufo"),
     ("2b87e29fca6ee7f1df6c1a76cb58e101", "nested-tar-compressed.sqlar", "foo/lighter.tar/fighter/bar"),
-]
-
-
-ZIP_ARCHIVES_TO_TEST = [
     ("2709a3348eb2c52302a7606ecf5860bc", "file-in-non-existing-folder.zip", "foo2/ufo"),
     ("2709a3348eb2c52302a7606ecf5860bc", "rar.zip", "natsu.rar/ufo"),
     ("10d6977ec2ab378e60339323c24f9308", "rar.zip", "natsu.rar/foo"),
@@ -286,10 +282,6 @@ ZIP_ARCHIVES_TO_TEST = [
     ("d3b07384d113edec49eaa6238ad5ff00", "denormal-paths.zip", "root/bar"),
     ("c157a79031e1c40f85931829bc5fc552", "denormal-paths.zip", "foo"),
 ]
-
-# zipfile returns unseekable file object with Python 3.6.
-if sys.version_info[:1] > (3, 6):
-    ARCHIVES_TO_TEST += ZIP_ARCHIVES_TO_TEST
 
 
 LIBARCHIVE_ARCHIVES_TO_TEST = [

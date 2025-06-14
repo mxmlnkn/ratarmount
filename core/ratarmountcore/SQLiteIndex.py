@@ -660,7 +660,7 @@ class SQLiteIndex:
             if printDebug >= 3:
                 print(f"Insufficient permissions to write to: {path}")
 
-        except IOError:
+        except OSError:
             if printDebug >= 2:
                 traceback.print_exc()
                 print("Could not create file:", path)
@@ -1247,7 +1247,7 @@ class SQLiteIndex:
         def _undoCompression(file):
             compression = detectCompression(file, printDebug=self.printDebug)
             if not compression or not any(
-                ((compression in backend.formats) for backend in COMPRESSION_BACKENDS.values())
+                (compression in backend.formats) for backend in COMPRESSION_BACKENDS.values()
             ):
                 return None
 
