@@ -5,17 +5,17 @@ import errno
 import io
 import os
 import stat
-from typing import Dict, IO, Iterable, Optional, Union
+from typing import IO, Dict, Iterable, Optional, Union
 
+from .formats import FileFormatID, replaceFormatCheck
 from .MountSource import FileInfo, MountSource
-from .formats import replaceFormatCheck, FileFormatID
 from .utils import overrides
 
 try:
     import pyfatfs
+    from pyfatfs import PyFATException
     from pyfatfs.FatIO import FatIO
     from pyfatfs.PyFat import PyFat
-    from pyfatfs import PyFATException
 except ImportError:
     pyfatfs = None  # type: ignore
     FatIO = None  # type: ignore

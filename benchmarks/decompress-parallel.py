@@ -12,7 +12,6 @@ import indexed_zstd
 import numpy as np
 import xz
 import zstandard
-
 from ratarmountcore.BlockParallelReaders import ParallelXZReader, ParallelZstdReader
 
 

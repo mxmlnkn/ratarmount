@@ -3,10 +3,9 @@
 
 import bisect
 import io
+from typing import IO, Callable, List, Optional, Tuple
 
-from typing import Callable, IO, List, Optional, Tuple
-
-from .utils import FixedRawIOBase, overrides, _DummyContext
+from .utils import FixedRawIOBase, _DummyContext, overrides
 
 
 class RawStenciledFile(FixedRawIOBase):

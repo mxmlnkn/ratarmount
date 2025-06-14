@@ -9,22 +9,21 @@ import platform
 import struct
 import sys
 import traceback
+from typing import IO, Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, cast
 
-from typing import cast, Any, Callable, Dict, IO, Iterable, List, Optional, Set, Tuple
-
-from .formats import ARCHIVE_FORMATS, COMPRESSION_FORMATS, FileFormatID, FID, mightBeFormat
+from .BlockParallelReaders import ParallelXZReader
+from .formats import ARCHIVE_FORMATS, COMPRESSION_FORMATS, FID, FileFormatID, mightBeFormat
 from .utils import (
-    isLatinAlpha,
-    isLatinDigit,
-    isLatinHexAlpha,
-    isOnSlowDrive,
-    formatNumber,
     ALPHA,
     DIGITS,
     HEX,
     CompressionError,
+    formatNumber,
+    isLatinAlpha,
+    isLatinDigit,
+    isLatinHexAlpha,
+    isOnSlowDrive,
 )
-from .BlockParallelReaders import ParallelXZReader
 
 try:
     import indexed_gzip

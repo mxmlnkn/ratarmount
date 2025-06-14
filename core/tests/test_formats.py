@@ -12,16 +12,15 @@ from helpers import findTestFile
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.formats import (  # noqa: E402
-    mightBeFormat,
-    detectFormats,
-    COMPRESSION_FORMATS,
-    FileFormatID,
-    FILE_FORMATS,
-)
-
 # Appends proper format checkers to 7Z, EXT4, FAT, RAR formats.
 import ratarmountcore.archives  # noqa: E402, F401
+from ratarmountcore.formats import (  # noqa: E402
+    COMPRESSION_FORMATS,
+    FILE_FORMATS,
+    FileFormatID,
+    detectFormats,
+    mightBeFormat,
+)
 
 
 def test_format_detection():

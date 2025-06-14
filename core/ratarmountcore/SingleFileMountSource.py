@@ -6,7 +6,7 @@ import os
 import stat
 import threading
 import time
-from typing import Any, cast, Dict, IO, Iterable, Optional, Union
+from typing import IO, Any, Dict, Iterable, Optional, Union, cast
 
 from .MountSource import FileInfo, MountSource
 from .StenciledFile import RawStenciledFile, StenciledFile

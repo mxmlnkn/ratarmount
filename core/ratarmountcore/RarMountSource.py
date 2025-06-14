@@ -6,10 +6,10 @@ import os
 import stat
 import sys
 import time
-from typing import Dict, IO, Iterable, List, Optional, Union
+from typing import IO, Dict, Iterable, List, Optional, Union
 
+from .formats import FileFormatID, replaceFormatCheck
 from .MountSource import FileInfo, MountSource, createRootFileInfo
-from .formats import replaceFormatCheck, FileFormatID
 from .utils import overrides
 
 try:

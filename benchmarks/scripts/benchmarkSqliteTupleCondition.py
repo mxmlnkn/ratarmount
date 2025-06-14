@@ -7,7 +7,6 @@ import time
 
 import numpy as np
 
-
 schema = """
 CREATE TABLE "files" (
     "path" VARCHAR(65535),

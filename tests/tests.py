@@ -18,7 +18,6 @@ if __name__ == '__main__' or __package__ is not None:
 from ratarmountcore.MountSource import FileInfo
 from ratarmountcore.SQLiteIndexedTar import SQLiteIndexedTar, SQLiteIndexedTarUserData
 
-
 print("\nTest creating and using an index with .tar.gz files with SQLiteIndexedTar")
 
 

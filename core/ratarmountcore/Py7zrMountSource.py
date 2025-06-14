@@ -3,17 +3,16 @@
 
 import io
 import json
-import sys
 import stat
+import sys
 import tarfile
 from timeit import default_timer as timer
+from typing import IO, Any, Dict, List, Optional, Tuple, Union
 
-from typing import Any, Dict, IO, List, Optional, Tuple, Union
-
+from .formats import FileFormatID, replaceFormatCheck
 from .MountSource import FileInfo, MountSource
 from .SQLiteIndex import SQLiteIndex
 from .SQLiteIndexMountSource import SQLiteIndexMountSource
-from .formats import replaceFormatCheck, FileFormatID
 from .utils import overrides
 
 try:

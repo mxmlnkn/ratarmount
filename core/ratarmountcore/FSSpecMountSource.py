@@ -5,7 +5,7 @@ import os
 import stat
 import time
 import urllib
-from typing import Dict, IO, Iterable, Optional, Union
+from typing import IO, Dict, Iterable, Optional, Union
 
 from .MountSource import FileInfo, MountSource, createRootFileInfo
 from .utils import overrides

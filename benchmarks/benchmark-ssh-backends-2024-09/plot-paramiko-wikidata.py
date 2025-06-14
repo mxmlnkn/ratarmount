@@ -1,6 +1,7 @@
 import re
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
 
 with open("log", 'rt') as data:
     data = [(float(line.split(' ')[1]), float(line.split(' ')[4])) for line in data]

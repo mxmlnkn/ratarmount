@@ -3,11 +3,10 @@
 
 import os
 import sqlite3
-import time
 import tempfile
+import time
 
 import matplotlib.pyplot as plt
-
 
 fileNameLength = 256
 

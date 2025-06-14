@@ -7,8 +7,8 @@ import os
 import sys
 
 from ratarmountcore.archives import ARCHIVE_BACKENDS
-from ratarmountcore.compressions import checkForSplitFile, COMPRESSION_BACKENDS
-from ratarmountcore.formats import detectFormats, FileFormatID
+from ratarmountcore.compressions import COMPRESSION_BACKENDS, checkForSplitFile
+from ratarmountcore.formats import FileFormatID, detectFormats
 from ratarmountcore.utils import isRandom
 
 try:

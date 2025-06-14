@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from typing import Dict, Iterable, IO, List, Optional, Tuple, Union
+from typing import IO, Dict, Iterable, List, Optional, Tuple, Union
 
 from .MountSource import FileInfo, MountSource, createRootFileInfo
 from .utils import overrides

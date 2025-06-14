@@ -6,7 +6,6 @@
 import sys
 import traceback
 
-
 try:
     import mfusepy as fuse  # type: ignore
 except AttributeError as importException:

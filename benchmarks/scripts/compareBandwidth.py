@@ -3,10 +3,9 @@
 import os
 import sys
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.lines import Line2D
-
 
 lineStyles = ['-', ':', (0, (1, 7)), (0, (4, 3, 1, 3)), '--']
 colors = ['tab:blue', 'tab:red', 'tab:purple', 'r']  # https://matplotlib.org/3.1.1/_images/dflt_style_changes-1.png

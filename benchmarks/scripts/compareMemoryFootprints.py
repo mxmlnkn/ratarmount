@@ -7,8 +7,8 @@ import sys
 from collections import OrderedDict
 from itertools import cycle
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def loadMemoryTracingData(fileName):

@@ -15,7 +15,7 @@ import tempfile
 import traceback
 from typing import List, Optional
 
-from ratarmountcore.utils import getXdgCacheHome, RatarmountError
+from ratarmountcore.utils import RatarmountError, getXdgCacheHome
 
 try:
     import argcomplete

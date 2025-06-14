@@ -5,11 +5,11 @@
 
 import shutil
 import tempfile
-from typing import Any, Callable, Dict, IO, Iterable, List, Optional, Union
+from typing import IO, Any, Callable, Dict, Iterable, List, Optional, Union
 
 from .MountSource import FileInfo, MountSource
 from .SQLiteIndex import SQLiteIndex
-from .utils import overrides, RatarmountError
+from .utils import RatarmountError, overrides
 
 
 class SQLiteIndexMountSource(MountSource):

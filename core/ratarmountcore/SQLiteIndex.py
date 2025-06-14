@@ -13,9 +13,8 @@ import tempfile
 import time
 import traceback
 import urllib.parse
-
-from typing import Any, AnyStr, Callable, Dict, IO, List, Optional, Tuple, Union
 from dataclasses import dataclass
+from typing import IO, Any, AnyStr, Callable, Dict, List, Optional, Tuple, Union
 
 try:
     import fsspec
@@ -32,20 +31,19 @@ try:
 except ImportError:
     pass
 
-from .version import __version__
+from .compressions import COMPRESSION_BACKENDS, detectCompression, findAvailableBackend
+from .formats import FILE_FORMATS, FileFormatID
 from .MountSource import FileInfo, createRootFileInfo
-from .compressions import detectCompression, findAvailableBackend, COMPRESSION_BACKENDS
-from .formats import FILE_FORMATS
 from .SQLiteBlobFile import SQLiteBlobsFile, WriteSQLiteBlobs
-from .formats import FileFormatID
 from .utils import (
     CompressionError,
     IndexNotOpenError,
     InvalidIndexError,
-    RatarmountError,
     MismatchingIndexError,
+    RatarmountError,
     findModuleVersion,
 )
+from .version import __version__
 
 
 def getSqliteTables(connection: sqlite3.Connection):
