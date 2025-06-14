@@ -440,6 +440,12 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
             autoPrioritizedBackends = [
                 backend for backend, value in _BACKENDS.items() if matchesExtension(fileOrPath, value[1])
             ]
+    else:
+        autoPrioritizedBackends = [
+            backend
+            for backend, value in _BACKENDS.items()
+            if matchesExtension(options.get('tarFileName', ''), value[1])
+        ]
 
     prioritizedBackends = options.get("prioritizedBackends", [])
     triedBackends = set()
