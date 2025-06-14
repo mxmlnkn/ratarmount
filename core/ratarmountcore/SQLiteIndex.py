@@ -34,14 +34,10 @@ except ImportError:
 
 from .version import __version__
 from .MountSource import FileInfo, createRootFileInfo
-from .compressions import (
-    CompressionInfo,
-    LIBARCHIVE_FILTER_FORMATS,
-    TAR_COMPRESSION_FORMATS,
-    detectCompression,
-    findAvailableBackend,
-)
+from .compressions import detectCompression, findAvailableBackend, COMPRESSION_BACKENDS
+from .formats import FILE_FORMATS
 from .SQLiteBlobFile import SQLiteBlobsFile, WriteSQLiteBlobs
+from .formats import FileFormatID
 from .utils import (
     CompressionError,
     IndexNotOpenError,
@@ -299,9 +295,6 @@ class SQLiteIndex:
             opened as file objects but may be useful for any archive given via a file object.
         """
 
-        self._compressionsToTest = TAR_COMPRESSION_FORMATS.copy()
-        self._compressionsToTest.update(LIBARCHIVE_FILTER_FORMATS)
-
         self.printDebug = printDebug
         self.sqlConnection: Optional[sqlite3.Connection] = None
         # Will hold the actually opened valid path to an index file
@@ -315,7 +308,6 @@ class SQLiteIndex:
             indexFolders,
             archiveFilePath,
             ignoreCurrentFolder,
-            compressionsToTest=self._compressionsToTest,
         )
         # stores which parent folders were last tried to add to database and therefore do exist
         self.parentFolderCache: List[Tuple[str, str]] = []
@@ -349,7 +341,6 @@ class SQLiteIndex:
         indexFolders: Optional[List[str]] = None,
         archiveFilePath: Optional[str] = None,
         ignoreCurrentFolder: bool = False,
-        compressionsToTest: Optional[Dict[str, CompressionInfo]] = None,
     ) -> List[str]:
         if indexFilePath == ':memory:':
             return []
@@ -376,12 +367,13 @@ class SQLiteIndex:
         # check for file existence before adding it as a default, although I think it might not be necessary. */
         defaultIndexFilePath = archiveFilePath + ".index.sqlite"
         defaultIndexFilePaths = [defaultIndexFilePath]
-        if compressionsToTest:
-            for _, info in compressionsToTest.items():
-                for suffix in info.suffixes:
-                    path = defaultIndexFilePath + '.' + suffix
-                    if os.path.isfile(path) and os.stat(path).st_size > 0:
-                        defaultIndexFilePaths.append(path)
+        for extensions in [
+            FILE_FORMATS[fid].extensions for backend in COMPRESSION_BACKENDS.values() for fid in backend.formats
+        ]:
+            for extension in extensions:
+                path = defaultIndexFilePath + '.' + extension
+                if os.path.isfile(path) and os.stat(path).st_size > 0:
+                    defaultIndexFilePaths.append(path)
 
         if not indexFolders:
             possibleIndexFilePaths.extend(defaultIndexFilePaths)
@@ -492,10 +484,10 @@ class SQLiteIndex:
             ]
 
             for moduleName in set(
-                module.name
-                for _, info in TAR_COMPRESSION_FORMATS.items()
-                for module in info.modules
-                if module.name in sys.modules
+                module
+                for info in COMPRESSION_BACKENDS.values()
+                for module, _ in info.requiredModules
+                if module in sys.modules
             ):
                 moduleVersion = findModuleVersion(sys.modules[moduleName])
                 if moduleVersion:
@@ -1258,10 +1250,10 @@ class SQLiteIndex:
         temporaryFolder = os.environ.get("RATARMOUNT_INDEX_TMPDIR", None)
 
         def _undoCompression(file):
-            compression = detectCompression(
-                file, printDebug=self.printDebug, compressionsToTest=self._compressionsToTest
-            )
-            if not compression or compression not in self._compressionsToTest:
+            compression = detectCompression(file, printDebug=self.printDebug)
+            if not compression or not any(
+                ((compression in backend.formats) for backend in COMPRESSION_BACKENDS.values())
+            ):
                 return None
 
             if self.printDebug >= 2:
@@ -1269,10 +1261,15 @@ class SQLiteIndex:
 
             backend = findAvailableBackend(compression)
             if not backend:
-                moduleNames = [module.name for module in TAR_COMPRESSION_FORMATS[compression].modules]
+                packages = [
+                    x[1]
+                    for info in COMPRESSION_BACKENDS.values()
+                    for x in info.requiredModules
+                    if compression in info.formats
+                ]
                 raise CompressionError(
                     f"Cannot open a {compression} compressed index file {indexFilePath} "
-                    f"without any of these modules: {moduleNames}"
+                    f"without any of these packages: {packages}"
                 )
 
             return backend.open(file)
@@ -1442,7 +1439,7 @@ class SQLiteIndex:
         for table in ['bzip2blocks', 'gzipindex', 'gzipindexes', 'zstdblocks']:
             self.getConnection().execute(f"DROP TABLE IF EXISTS {table}")
 
-    def synchronizeCompressionOffsets(self, fileObject: IO[bytes], compression: str):
+    def synchronizeCompressionOffsets(self, fileObject: IO[bytes], compression: FileFormatID):
         """
         Will load block offsets from SQLite database to backend if a fitting table exists.
         Else it will force creation and store the block offsets of the compression backend into a new table.
@@ -1467,7 +1464,7 @@ class SQLiteIndex:
         # and therefore completed the implicit compression offset creation.
         db = self.getConnection()
 
-        if compression in ['bz2', 'zst']:
+        if compression in [FileFormatID.BZIP2, FileFormatID.ZSTANDARD]:
             setBlockOffsets = getattr(fileObject, 'set_block_offsets')
             getBlockOffsets = getattr(fileObject, 'block_offsets')
             if not setBlockOffsets or not getBlockOffsets:
@@ -1476,9 +1473,9 @@ class SQLiteIndex:
                 return
 
             table_name = ''
-            if compression == 'bz2':
+            if compression == FileFormatID.BZIP2:
                 table_name = 'bzip2blocks'
-            elif compression == 'zst':
+            elif compression == FileFormatID.ZSTANDARD:
                 table_name = 'zstdblocks'
 
             tables = getSqliteTables(db)
@@ -1489,12 +1486,14 @@ class SQLiteIndex:
                     return
                 except Exception as exception:
                     if self.printDebug >= 2:
-                        print(f"[Info] Could not load {compression} block offset data. Will create it from scratch.")
+                        print(
+                            f"[Info] Could not load {compression.name} block offset data. Will create it from scratch."
+                        )
                         print(exception)
                     if self.printDebug >= 3:
                         traceback.print_exc()
             else:
-                print(f"[Info] The index does not yet contain {compression} block offset data. Will write it out.")
+                print(f"[Info] The index does not yet contain {compression.name} block offset data. Will write it out.")
 
             tables = getSqliteTables(db)
             if table_name in tables:
@@ -1507,7 +1506,7 @@ class SQLiteIndex:
         if (
             hasattr(fileObject, 'import_index')
             and hasattr(fileObject, 'export_index')
-            and compression in ['gz', 'zlib']
+            and compression in [FileFormatID.GZIP, FileFormatID.ZLIB]
         ):
             tables = getSqliteTables(db)
 
@@ -1525,7 +1524,7 @@ class SQLiteIndex:
             return
 
         # Note that for xz seeking, loading and storing block indexes is unnecessary because it has an index included!
-        if compression in [None, 'xz']:
+        if compression in [FileFormatID.XZ]:
             return
 
         assert False, (

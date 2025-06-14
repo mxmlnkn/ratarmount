@@ -13,7 +13,7 @@ import sys
 import tarfile
 import tempfile
 import traceback
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from ratarmountcore.utils import getXdgCacheHome, RatarmountError
 
@@ -105,12 +105,15 @@ For further information, see the ReadMe on the project's homepage:
     defaultParallelization = len(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else os.cpu_count()
 
     # https://github.com/kislyuk/argcomplete/blob/a2b8bc6461bcfc919bc3f4b3f83c7716bd078583/argcomplete/finders.py#L117
-    supportedCompressions: Dict[str, Any] = {}
+    backendNames: List[str] = []
     DEFAULT_GZIP_SEEK_POINT_SPACING = 16 * 1024 * 1024
     if "_ARGCOMPLETE" not in os.environ:
-        from ratarmountcore.compressions import supportedCompressions as sc
+        # Expensive imports because they import all required modules for each format.
+        from ratarmountcore.archives import ARCHIVE_BACKENDS
+        from ratarmountcore.compressions import COMPRESSION_BACKENDS
 
-        supportedCompressions = sc
+        backendNames = sorted(list(set(ARCHIVE_BACKENDS.keys()).union(set(COMPRESSION_BACKENDS.keys()))))
+
         from ratarmountcore.SQLiteIndexedTar import SQLiteIndexedTar
 
         DEFAULT_GZIP_SEEK_POINT_SPACING = SQLiteIndexedTar.DEFAULT_GZIP_SEEK_POINT_SPACING
@@ -319,13 +322,11 @@ For further information, see the ReadMe on the project's homepage:
         help='Specify a file with newline separated passwords for RAR and ZIP files. '
              'The passwords will be tried out in order of appearance in the file.')
 
-    moduleNames = sorted(list(set(module.name for info in supportedCompressions.values() for module in info.modules)))
-
     advancedGroup.add_argument(
         '--use-backend', type=str, action='append',
         help='Specify a backend to be used with higher priority for files which might be opened with multiple '
              'backends. Arguments specified last will have the highest priority. A comma-separated list may be '
-             f'specified. Possible backends: {moduleNames}')
+             f'specified. Possible backends: {backendNames}')
 
     advancedGroup.add_argument(
         '--oss-attributions-short', action=PrintOSSAttributionShortAction, nargs=0, default=argparse.SUPPRESS,

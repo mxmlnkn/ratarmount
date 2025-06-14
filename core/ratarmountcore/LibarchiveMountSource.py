@@ -16,10 +16,11 @@ import tarfile
 from timeit import default_timer as timer
 from typing import Any, Callable, Dict, IO, List, Optional, Tuple, Union, cast
 
-from .compressions import LIBARCHIVE_FILTER_FORMATS
 from .MountSource import FileInfo, MountSource
 from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
 from .SQLiteIndexMountSource import SQLiteIndexMountSource
+from .compressions import COMPRESSION_BACKENDS
+from .formats import FILE_FORMATS
 from .utils import InvalidIndexError, overrides
 
 try:
@@ -611,7 +612,9 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
 
                 entryPath = None
                 if entry.entryIndex == 0 and self.tarFileName and entry.formatName() == b'raw':
-                    libarchiveSuffixes = [s for _, info in LIBARCHIVE_FILTER_FORMATS.items() for s in info.suffixes]
+                    libarchiveSuffixes = [
+                        s for fid in COMPRESSION_BACKENDS['libarchive'].formats for s in FILE_FORMATS[fid].extensions
+                    ]
                     fname = os.path.basename(self.tarFileName)
                     for suffix in ['gz', 'bz2', 'bzip2', 'gzip', 'xz', 'zst', 'zstd'] + libarchiveSuffixes:
                         suffix = '.' + suffix

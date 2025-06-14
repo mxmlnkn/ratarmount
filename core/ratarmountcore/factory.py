@@ -12,37 +12,18 @@ import sys
 import traceback
 import warnings
 
-from typing import IO, List, Optional, Union
+from typing import Dict, IO, Iterable, List, Union
 
-from .compressions import (
-    checkForSplitFile,
-    libarchive,
-    py7zr,
-    rarfile,
-    supportedCompressions,
-    zipfile,
-    PySquashfsImage,
-    TAR_COMPRESSION_FORMATS,
-)
-from .formats import isSquashFS
+from .archives import ARCHIVE_BACKENDS
+from .compressions import checkForSplitFile, COMPRESSION_BACKENDS
+from .formats import FileFormatID, FILE_FORMATS
 from .utils import CompressionError, RatarmountError
 from .MountSource import MountSource
-from .ASARMountSource import ASARMountSource
-from .EXT4MountSource import EXT4MountSource
-from .FATMountSource import FATMountSource
 from .FolderMountSource import FolderMountSource
 from .FSSpecMountSource import FSSpecMountSource
 from .GitMountSource import GitMountSource
-from .Py7zrMountSource import Py7zrMountSource
-from .RarMountSource import RarMountSource
 from .SingleFileMountSource import SingleFileMountSource
-from .SQLiteIndexMountSource import SQLiteIndexMountSource
-from .SQLiteIndexedTar import SQLiteIndexedTar
-from .SQLARMountSource import SQLARMountSource
-from .SquashFSMountSource import SquashFSMountSource
 from .StenciledFile import JoinedFileFromFactory
-from .ZipMountSource import ZipMountSource
-from .LibarchiveMountSource import LibarchiveMountSource
 
 try:
     import fsspec
@@ -84,128 +65,6 @@ try:
 
 except ImportError:
     FixedDropboxDriveFileSystem = None  # type: ignore
-
-
-def _openRarMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
-    return RarMountSource(fileOrPath, **options) if rarfile is not None and rarfile.is_rarfile_sfx(fileOrPath) else None
-
-
-def _openTarMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
-    if isinstance(fileOrPath, str):
-        if 'tarFileName' in options:
-            copiedOptions = options.copy()
-            del copiedOptions['tarFileName']
-            return SQLiteIndexedTar(fileOrPath, **copiedOptions)
-        return SQLiteIndexedTar(fileOrPath, **options)
-    return SQLiteIndexedTar(fileObject=fileOrPath, **options)
-
-
-def _openZipMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
-    # is_zipfile might yields some false positives, but those should then raise exceptions, which
-    # are caught, so it should be fine. See: https://bugs.python.org/issue42096
-    return ZipMountSource(fileOrPath, **options) if zipfile is not None and zipfile.is_zipfile(fileOrPath) else None
-
-
-def _openPy7zrMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
-    # https://github.com/miurahr/py7zr/issues/659#issuecomment-2954260661
-    if py7zr is not None and py7zr.is_7zfile(fileOrPath):  # type: ignore
-        return Py7zrMountSource(fileOrPath, **options)
-    return None
-
-
-def _openLibarchiveMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
-    if libarchive is None:
-        return None
-
-    printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
-
-    try:
-        if printDebug >= 2:
-            print("[Info] Trying to open archive with libarchive backend.")
-        return LibarchiveMountSource(fileOrPath, **options)
-    except Exception as exception:
-        if printDebug >= 2:
-            print("[Info] Checking for libarchive file raised an exception:", exception)
-        if printDebug >= 3:
-            traceback.print_exc()
-    finally:
-        try:
-            if hasattr(fileOrPath, 'seek'):
-                fileOrPath.seek(0)  # type: ignore
-        except Exception as exception:
-            if printDebug >= 1:
-                print("[Info] seek(0) raised an exception:", exception)
-            if printDebug >= 2:
-                traceback.print_exc()
-    return None
-
-
-def _openPySquashfsImage(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
-    # Better to check file type here because I am unsure about what the MountSource semantic should be
-    # regarding file object closing when it raises an exception in the constructor.
-    if PySquashfsImage is not None and (isinstance(fileOrPath, str) or isSquashFS(fileOrPath)):
-        return SquashFSMountSource(fileOrPath, **options)
-    return None
-
-
-def _openFATImage(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
-    return FATMountSource(fileOrPath, **options)
-
-
-def _openEXT4Image(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
-    return EXT4MountSource(fileOrPath, **options)
-
-
-def _openSqlar(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
-    return SQLARMountSource(fileOrPath, **options)
-
-
-def _openASAR(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
-    return ASARMountSource(fileOrPath, **options)
-
-
-def _openRatarmountIndex(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
-    return SQLiteIndexMountSource(fileOrPath, **options)
-
-
-def _getTarExtensions() -> List[str]:
-    result = ['tar']
-    result += ['tar.' + suffix for compression in TAR_COMPRESSION_FORMATS.values() for suffix in compression.suffixes]
-    result += [suffix for compression in TAR_COMPRESSION_FORMATS.values() for suffix in compression.doubleSuffixes]
-    return result
-
-
-def getFormatExtensions(formatName: str) -> List[str]:
-    return supportedCompressions[formatName].suffixes if formatName in supportedCompressions else []
-
-
-# Map of backends to their respective open-function and also some extension
-# for which that particular backend will be tested first. Should all be lowercase
-_BACKENDS = {
-    "rarfile": (_openRarMountSource, getFormatExtensions('rar')),
-    "tarfile": (_openTarMountSource, _getTarExtensions()),
-    "zipfile": (_openZipMountSource, getFormatExtensions('zip')),
-    "pysquashfsimage": (_openPySquashfsImage, getFormatExtensions('squashfs')),
-    "libarchive": (
-        _openLibarchiveMountSource,
-        [
-            s
-            for info in supportedCompressions.values()
-            if any('libarchive' in module.name for module in info.modules)
-            for s in info.suffixes
-        ],
-    ),
-    "py7zr": (_openPy7zrMountSource, getFormatExtensions('7z')),
-    "pyfatfs": (_openFATImage, getFormatExtensions('fat')),
-    "ext4": (_openEXT4Image, getFormatExtensions('ext4')),
-    "asar": (_openASAR, getFormatExtensions('asar')),
-    "sqlar": (_openSqlar, getFormatExtensions('sqlar')),
-    "SQLiteIndex": (_openRatarmountIndex, getFormatExtensions('ratarmount-index')),
-}
-
-
-def matchesExtension(fileName: str, extensions: List[str]) -> bool:
-    return any(fileName.lower().endswith('.' + extension.lower()) for extension in extensions)
 
 
 def _openGitMountSource(url: str) -> Union[MountSource, IO[bytes], str]:
@@ -399,6 +258,22 @@ def tryOpenURL(url, printDebug: int) -> Union[MountSource, IO[bytes], str]:
     return result
 
 
+def _matchesExtension(fileName: str, formats: Iterable[FileFormatID]) -> bool:
+    return any(
+        fileName.lower().endswith('.' + extension.lower())
+        for format in formats
+        for extension in FILE_FORMATS[format].extensions
+    )
+
+
+def findBackendsByExtension(fileName: str) -> List[str]:
+    return [backend for backend, info in ARCHIVE_BACKENDS.items() if _matchesExtension(fileName, info.formats)] + [
+        info.delegatedArchiveBackend
+        for _, info in COMPRESSION_BACKENDS.items()
+        if _matchesExtension(fileName, info.formats)
+    ]
+
+
 def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource:
     printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
 
@@ -437,36 +312,32 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
                 [(lambda file=file: open(file, 'rb')) for file in filesToJoin]  # type: ignore
             )
         else:
-            autoPrioritizedBackends = [
-                backend for backend, value in _BACKENDS.items() if matchesExtension(fileOrPath, value[1])
-            ]
+            autoPrioritizedBackends = findBackendsByExtension(fileOrPath)
     else:
-        autoPrioritizedBackends = [
-            backend
-            for backend, value in _BACKENDS.items()
-            if matchesExtension(options.get('tarFileName', ''), value[1])
-        ]
+        autoPrioritizedBackends = findBackendsByExtension(options.get('tarFileName', ''))
 
     prioritizedBackends = options.get("prioritizedBackends", [])
     triedBackends = set()
-    tarCompressionBackends = [module.name for _, info in TAR_COMPRESSION_FORMATS.items() for module in info.modules]
+    # Map user-specified backend prioritization such as rapidgzip, indexed_bzip2, ... to tarfile,
+    # which actually undoes those.
+    mapToArchiveBackend: Dict[str, str] = {
+        backend: info.delegatedArchiveBackend for backend, info in COMPRESSION_BACKENDS.items()
+    }
 
-    for name in prioritizedBackends + autoPrioritizedBackends + list(_BACKENDS.keys()):
-        if name in tarCompressionBackends:
-            name = "tarfile"
+    for name in prioritizedBackends + autoPrioritizedBackends + list(ARCHIVE_BACKENDS.keys()):
+        name = mapToArchiveBackend.get(name, name)
         if name in triedBackends:
             continue
         triedBackends.add(name)
-        if name not in _BACKENDS:
+        if name not in ARCHIVE_BACKENDS:
             if printDebug >= 1:
-                print(f"[Info] Skipping unknown compression backend: {name}")
+                print(f"[Info] Skipping unknown archive backend: {name}")
             continue
 
         try:
             if printDebug >= 3:
                 print(f"[Info] Try to open with {name}")
-            backendOpen, _ = _BACKENDS[name]
-            result = backendOpen(fileOrPath, **options)
+            result = ARCHIVE_BACKENDS[name].open(fileOrPath, **options)
             if result:
                 if printDebug >= 2:
                     print(f"[Info] Opened archive with {name} backend.")

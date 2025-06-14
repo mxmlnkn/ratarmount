@@ -30,7 +30,7 @@ from .ProgressBar import ProgressBar
 from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
 from .SQLiteIndexMountSource import SQLiteIndexMountSource
 from .StenciledFile import RawStenciledFile, StenciledFile
-from .compressions import getGzipInfo, openCompressedFile
+from .compressions import getGzipInfo, openCompressedFile, COMPRESSION_BACKENDS
 from .formats import mightBeFormat, FileFormatID
 from .utils import (
     RatarmountError,
@@ -579,11 +579,14 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         # tarFileObject : File object to the uncompressed (or decompressed) TAR file to read actual data out of.
         # compression   : Stores what kind of compression the originally specified TAR file uses.
         # isTar         : Can be false for the degenerated case of only a bz2 or gz file not containing a TAR
+        self.compression: Optional[FileFormatID] = None
         self.tarFileObject, self.rawFileObject, self.compression = openCompressedFile(
             fileObject,
-            gzipSeekPointSpacing,
-            encoding,
-            self.parallelizations,
+            gzipSeekPointSpacing=gzipSeekPointSpacing,
+            parallelizations=self.parallelizations,
+            enabledBackends=[
+                backend for backend, info in COMPRESSION_BACKENDS.items() if info.delegatedArchiveBackend == 'tarfile'
+            ],
             prioritizedBackends=self.prioritizedBackends,
             printDebug=self.printDebug,
         )
@@ -614,9 +617,9 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         except Exception:
             pass
 
-        if self.compression == 'gz':
+        if self.compression == FileFormatID.GZIP:
             self.blockSize = max(self.blockSize, gzipSeekPointSpacing)
-        elif self.compression == 'bzip2':
+        elif self.compression == FileFormatID.BZIP2:
             # There is no API yet to query the exact block size, but most bzip2 files have 900K blocks.
             # The bzip2 block size is in reference to the BWT buffer, so the decompressed block data will be
             # larger to some extend. Therefore, 1 MiB blocks should be an alright guess for all bzip2 files.
@@ -626,7 +629,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         self.fileObjectLock = threading.Lock()
 
         if (
-            self.compression == 'xz'
+            self.compression == FileFormatID.XZ
             and len(getattr(self.tarFileObject, 'block_boundaries', (0, 0))) <= 1
             and self._archiveFileSize > 1024 * 1024
         ):
@@ -1294,7 +1297,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 'ignoreZeros',
             ]
 
-            if self.compression == 'gz':
+            if self.compression == FileFormatID.GZIP:
                 argumentsToCheck.append('gzipSeekPointSpacing')
 
             SQLiteIndex.checkMetadataArguments(indexArgs, self, argumentsToCheck)
@@ -1412,7 +1415,8 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         return False
 
     def _loadOrStoreCompressionOffsets(self):
-        self.index.synchronizeCompressionOffsets(self.tarFileObject, self.compression)
+        if self.compression:
+            self.index.synchronizeCompressionOffsets(self.tarFileObject, self.compression)
 
     def joinThreads(self):
         if hasattr(self.tarFileObject, 'join_threads'):

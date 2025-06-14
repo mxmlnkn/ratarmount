@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import collections
 import concurrent.futures
+import dataclasses
+import itertools
 import os
 import platform
-import sqlite3
 import struct
 import sys
 import traceback
 
-from typing import Any, Callable, Dict, IO, Iterable, List, Optional, Tuple
+from typing import cast, Any, Callable, Dict, IO, Iterable, List, Optional, Set, Tuple
 
-from .formats import findSquashFSOffset, isASAR, _checkZlibHeader, _isCpio, _isISO9660
+from .formats import ARCHIVE_FORMATS, COMPRESSION_FORMATS, FileFormatID, FID, mightBeFormat
 from .utils import (
     isLatinAlpha,
     isLatinDigit,
@@ -25,27 +25,24 @@ from .utils import (
     CompressionError,
 )
 from .BlockParallelReaders import ParallelXZReader
-from .EXT4MountSource import isEXT4Image
-from .FATMountSource import isFATImage
-from .RarMountSource import isRarFile
 
 try:
-    import indexed_gzip  # pylint: disable=unused-import
+    import indexed_gzip
 except ImportError:
     indexed_gzip = None  # type: ignore
 
 try:
-    import indexed_zstd  # pylint: disable=unused-import
+    import indexed_zstd
 except ImportError:
     indexed_zstd = None  # type: ignore
 try:
-    import lzmaffi  # pylint: disable=unused-import
+    import lzmaffi
 
 except ImportError:
     lzmaffi = None  # type: ignore
 
 try:
-    import xz  # pylint: disable=unused-import
+    import xz
 except ImportError:
     if 'xz' not in sys.modules:
         # For some reason, only this import triggers mypy. All the others are fine.
@@ -53,31 +50,19 @@ except ImportError:
         xz = None  # type: ignore
 
 try:
-    import rapidgzip  # pylint: disable=unused-import
+    import rapidgzip
 except ImportError:
     rapidgzip = None  # type: ignore
 
 try:
-    import rarfile  # pylint: disable=unused-import
-except ImportError:
-    rarfile = None  # type: ignore
-
-try:
-    import zstandard  # pylint: disable=unused-import
+    import zstandard
 except ImportError:
     zstandard = None  # type: ignore
 
 
-# The file object returned by ZipFile.open is not seekable in Python 3.6 for some reason.
-# Therefore disable ZIP support there!
-# I don't see it documented, instead, I tested different Python versions with Docker.
-if sys.version_info[0:2] >= (3, 6):
-    import zipfile  # pylint: disable=unused-import
-else:
-    zipfile = None
-
-
 try:
+    # Must be imported because findAvailableBackend checks for it to be in sys.modules!
+    # Although, I'm unsure whether it gets implicitly added to sys.modules below when importing file_reader.
     import libarchive  # pylint: disable=unused-import
 except (ImportError, AttributeError):
     libarchive = None  # type: ignore
@@ -90,282 +75,136 @@ except (ImportError, AttributeError):
         raise ImportError("Please install python-libarchive-c with: pip install libarchive-c")
 
 
-try:
-    import PySquashfsImage  # pylint: disable=unused-import
-except ImportError:
-    PySquashfsImage = None  # type: ignore
-
-try:
-    import py7zr  # pylint: disable=unused-import
-except ImportError:
-    py7zr = None  # type: ignore
-
-
-CompressionModuleInfo = collections.namedtuple('CompressionModuleInfo', ['name', 'open'])
-# Defining lambdas does not yet check the names of entities used inside the lambda!
-# "modules" contains a list of CompressionModuleInfo for modules that are available.
-# Those appearing first in this list have priority.
-CompressionInfo = collections.namedtuple('CompressionInfo', ['suffixes', 'doubleSuffixes', 'modules', 'checkHeader'])
-
-
-TAR_COMPRESSION_FORMATS: Dict[str, CompressionInfo] = {
-    'bz2': CompressionInfo(
-        ['bz2', 'bzip2'],
-        ['tb2', 'tbz', 'tbz2', 'tz2'],
-        [
-            CompressionModuleInfo(
-                'rapidgzip',
-                (lambda x, parallelization=0: rapidgzip.IndexedBzip2File(x, parallelization=parallelization)),
-            )
-        ],
-        lambda x: (x.read(4)[:3] == b'BZh' and x.read(6) == (0x314159265359).to_bytes(6, 'big')),
-    ),
-    'gz': CompressionInfo(
-        ['gz', 'gzip'],
-        ['taz', 'tgz'],
-        [
-            CompressionModuleInfo(
-                'rapidgzip', lambda x, parallelization=1: rapidgzip.RapidgzipFile(x, parallelization=parallelization)
-            ),
-            CompressionModuleInfo('indexed_gzip', lambda x, parallelization=1: indexed_gzip.IndexedGzipFile(fileobj=x)),
-        ],
-        lambda x: x.read(2) == b'\x1f\x8b',
-    ),
-    'xz': CompressionInfo(
-        ['xz'],
-        ['txz'],
-        # Prioritize xz over lzmaffi
-        [
-            CompressionModuleInfo('xz', lambda x, parallelization=1: xz.open(x)),
-            CompressionModuleInfo('lzmaffi', lambda x, parallelization=1: lzmaffi.open(x)),
-        ],
-        lambda x: x.read(6) == b"\xfd7zXZ\x00",
-    ),
-    'zst': CompressionInfo(
-        ['zst', 'zstd'],
-        ['tzst'],
-        [CompressionModuleInfo('indexed_zstd', lambda x, parallelization=1: indexed_zstd.IndexedZstdFile(x.fileno()))],
-        lambda x: x.read(4) == (0xFD2FB528).to_bytes(4, 'little'),
-    ),
-    'zlib': CompressionInfo(
-        ['zz', 'zlib'],
-        [],
-        [
-            CompressionModuleInfo(
-                'rapidgzip', lambda x, parallelization=0: rapidgzip.RapidgzipFile(x, parallelization=parallelization)
-            )
-        ],
-        _checkZlibHeader,
-    ),
+TAR_CONTRACTED_EXTENSIONS: Dict[FileFormatID, List[str]] = {
+    FID.BZIP2: ['tb2', 'tbz', 'tbz2', 'tz2'],
+    FID.GZIP: ['taz', 'tgz'],
+    FID.XZ: ['txz'],
+    FID.ZSTANDARD: ['tzst'],
 }
 
 
-ARCHIVE_FORMATS: Dict[str, CompressionInfo] = {
-    '7z': CompressionInfo(
-        ['7z', '7zip'],
-        [],
-        [
-            CompressionModuleInfo('libarchive', libarchive_file_reader),
-            CompressionModuleInfo('py7zr', lambda x: py7zr.SevenZipFile(x)),
-        ],
-        lambda x: x.read(6) == b'7z\xbc\xaf\x27\x1c',
-    ),
-    'rar': CompressionInfo(
-        ['rar'],
-        [],
-        [CompressionModuleInfo('rarfile', lambda x: rarfile.RarFile(x))],
-        isRarFile,
-    ),
-    'zip': CompressionInfo(
-        ['zip'],
-        [],
-        [CompressionModuleInfo('zipfile', lambda x: zipfile.ZipFile(x))],
-        lambda x: x.read(2) == b'PK',
-    ),
-    'asar': CompressionInfo(
-        ['asar'],
-        [],
-        [CompressionModuleInfo('ratarmountcore', lambda x: x)],
-        isASAR,
-    ),
-    'sqlar': CompressionInfo(
-        ['sqlar'],
-        [],
-        [CompressionModuleInfo('sqlite3', lambda x: sqlite3.connect(x))],
-        lambda x: x.read(16) == b'SQLite format 3\x00',
-    ),
-    'ratarmount-index': CompressionInfo(
-        ['index.sqlite'],
-        [],
-        [CompressionModuleInfo('sqlite3', lambda x: sqlite3.connect(x))],
-        lambda x: x.read(16) == b'SQLite format 3\x00',
-    ),
-    'squashfs': CompressionInfo(
-        ['squashfs', 'AppImage', 'snap'],
-        [],
-        [
-            CompressionModuleInfo(
-                'PySquashfsImage', lambda x: PySquashfsImage.SquashFsImage(x) if PySquashfsImage.SquashFsImage else None
-            )
-        ],
-        lambda x: findSquashFSOffset(x) >= 0,
-    ),
-    'fat': CompressionInfo(
-        ['fat', 'img', 'dd', 'fat12', 'fat16', 'fat32', 'raw'],
-        [],
-        [CompressionModuleInfo('pyfatfs', lambda x: x)],
-        isFATImage,
-    ),
-    'ext4': CompressionInfo(
-        ['ext4', 'img', 'dd', 'raw'],
-        [],
-        [CompressionModuleInfo('ext4', lambda x: x)],
-        isEXT4Image,
-    ),
-}
-
-# libarchive support is split into filters (compressors or encoders working on a single file) and (archive) formats.
-# For now, only list formats here that are not supported by other backends, because libarchive is slower anyway.
-#
-# Filters are handily listed either in libarchive:
-# https://github.com/libarchive/libarchive/blob/6110e9c82d8ba830c3440f36b990483ceaaea52c/libarchive/
-#   archive_read_support_filter_by_code.c#L32
-# Or in python-libarchive-c:
-# https://github.com/Changaco/python-libarchive-c/blob/5f7008d876103bac84c40905d00bb6b5afbab91a/libarchive/
-#   ffi.py#L254
-# It is unexpected that rpm is handled as a filter. Maybe it is implemented similar to rpm2cpio?
-LIBARCHIVE_FILTER_FORMATS = {
-    extensions[0]: CompressionInfo(
-        extensions, [], [CompressionModuleInfo('libarchive', libarchive_file_reader)], headerCheck
-    )
-    # TODO It would be nice to add support for all LZ-based formats such as lz4, lzip, lzip to rapidgzip.
-    for extensions, headerCheck in [
-        # https://github.com/libarchive/libarchive/blob/6110e9c82d8ba830c3440f36b990483ceaaea52c/libarchive/
-        # archive_read_support_filter_grzip.c#L46
-        # It is almost impossible to find the original sources or a specification:
-        # https://t2sde.org/packages/grzip
-        # ftp://ftp.ac-grenoble.fr/ge/compression/grzip-0.3.0.tar.bz2
-        (['grz', 'grzip'], lambda x: x.read(12) == b'GRZipII\x00\x02\x04:)'),
-        # https://github.com/ckolivas/lrzip/blob/master/doc/magic.header.txt
-        (['lrz', 'lrzip'], lambda x: x.read(5) == b'LRZI\x00'),
-        # https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md#general-structure-of-lz4-frame-format
-        (['lz4'], lambda x: x.read(4) == b'\x04\x22\x4d\x18'),
-        # https://www.ietf.org/archive/id/draft-diaz-lzip-09.txt
-        (['lz', 'lzip'], lambda x: x.read(5) == b'LZIP\x01'),
-        # https://github.com/jljusten/LZMA-SDK/blob/master/DOC/lzma-specification.txt
-        # https://github.com/frizb/FirmwareReverseEngineering/blob/master/IdentifyingCompressionAlgorithms.md#lzma
-        (['lzma'], lambda x: x.read(3) == b'\x5d\x00\x00'),
-        (['lzo', 'lzop'], lambda x: x.read(9) == b'\x89\x4c\x5a\x4f\x00\x0d\x0a\x1a\x0a'),
-        # https://refspecs.linuxbase.org/LSB_4.1.0/LSB-Core-generic/LSB-Core-generic/pkgformat.html
-        (['rpm'], lambda x: x.read(4) == b'\xed\xab\xee\xdb'),
-        # https://en.wikipedia.org/wiki/Uuencoding
-        (['uu'], lambda x: x.read(6) == b'begin '),
-        # https://github.com/file/file/blob/master/magic/Magdir/compress
-        (['Z'], lambda x: x.read(2) == b'\x1f\x9d'),
-        # Supported by SQLiteIndexedTar: bzip2, gzip, xz, zstd
-    ]
-}
+@dataclasses.dataclass
+class CompressionBackendInfo:
+    # Opens a file object from a path or file object and additional options (kwargs).
+    open: Callable[..., IO[bytes]]
+    # Supported file formats. These are for quick checks and prioritization based on file extension.
+    formats: Set[FileFormatID]
+    # If a format is suspected e.g. by extension or by a non-module dependent format check,
+    # the modules listed here are checked and the module package name can be suggested to be installed.
+    # Tuple: (module name, package name)
+    requiredModules: List[Tuple[str, str]]
+    delegatedArchiveBackend: str
 
 
-# Formats are handily listed either in libarchive:
-# https://github.com/libarchive/libarchive/blob/6110e9c82d8ba830c3440f36b990483ceaaea52c/libarchive/
-#   archive_read_support_format_all.c#L32
-# Or in python-libarchive-c:
-# https://github.com/Changaco/python-libarchive-c/blob/5f7008d876103bac84c40905d00bb6b5afbab91a/libarchive/
-#   ffi.py#L243
-LIBARCHIVE_ARCHIVE_FORMATS = {
-    extensions[0]: CompressionInfo(
-        extensions, [], [CompressionModuleInfo('libarchive', libarchive_file_reader)], headerCheck
-    )
-    for extensions, headerCheck in [
-        (['ar'], lambda x: x.read(8) == b'<aiaff>\n'),
-        # https://download.microsoft.com/download/4/d/a/4da14f27-b4ef-4170-a6e6-5b1ef85b1baa/[ms-cab].pdf
-        (['cab'], lambda x: x.read(4) == b'MSCF'),
-        (['deb'], lambda x: x.read(4) == b'\x21\x3c\x61\x72'),
-        (['xar'], lambda x: x.read(4) == b'\x78\x61\x72\x21'),
-        (['cpio'], _isCpio),
-        (['iso'], _isISO9660),
-        # https://www.iso.org/standard/68004.html
-        # https://iipc.github.io/warc-specifications/specifications/warc-format/warc-1.1/#file-and-record-model
-        (['warc'], lambda x: x.read(7) == b'WARC/1.'),
-        (['xar'], lambda x: x.read(4) == b'xar!'),
-        # Supported by other backends: tar, rar, zip
-        # Not supported because it has no magic identification and therefore is only trouble: lha, mtree
-        # http://fileformats.archiveteam.org/wiki/LHA
-        # > LHA can be identified with high accuracy, but doing so can be laborious,
-        # > due to the lack of a signature, and other complicating factors.
-    ]
-}
-
-
-# This dictionary is deprecated. The design has become all chaotic. As can still be seen int he name,
-# it initially started out with what is now TAR_COMPRESSION_FORMATS, i.e., to generically undo pure compression layers.
-# But now, it is used for various assorted things such as:
-#  - Checking the input arguments for support file types.
-#  - Listing supported file formats and backends in the help message.
-#  - Stripping extensions for the the --strip-recursive-tar-extension option.
-#  - Determine auto-prioritized backends based on the extension.
-#  - Showing a helpful error message what module to install when trying to open an archive without it.
-#    Currently somewhat broken because "libarchive" should recommend the "libarchive-c" module.
-# The key in this dictionary is basically unused except for one or maybe two locations, most of which could be changed
-# to simply use the CompressionModuleInfo.
-# The CompressionModuleInfo.open member is also unused for most formats. It is only used in detectCompression, which
-# by default only iterates over TAR_COMPRESSION_FORMATS!
-# There is a distinction here to be made between pure compression formats and archive formats.
-supportedCompressions = {
-    **TAR_COMPRESSION_FORMATS,
-    **ARCHIVE_FORMATS,
-    **LIBARCHIVE_FILTER_FORMATS,
-    **LIBARCHIVE_ARCHIVE_FORMATS,
+COMPRESSION_BACKENDS: Dict[str, CompressionBackendInfo] = {
+    'rapidgzip-bzip2': CompressionBackendInfo(
+        (lambda x, parallelization=0: rapidgzip.IndexedBzip2File(x, parallelization=parallelization)),
+        {FID.BZIP2},
+        [('rapidgzip', 'rapidgzip')],
+        'tarfile',
+    ),
+    'rapidgzip': CompressionBackendInfo(
+        (lambda x, parallelization=1: rapidgzip.RapidgzipFile(x, parallelization=parallelization)),
+        {FID.GZIP, FID.ZLIB},
+        [('rapidgzip', 'rapidgzip')],
+        'tarfile',
+    ),
+    'indexed_gzip': CompressionBackendInfo(
+        (lambda x, parallelization=1: indexed_gzip.IndexedGzipFile(fileobj=x)),
+        {FID.GZIP},
+        [('indexed_gzip', 'indexed_gzip')],
+        'tarfile',
+    ),
+    # Prioritize xz over lzmaffi
+    'xz': CompressionBackendInfo(
+        (lambda x, parallelization=1: cast(IO[bytes], xz.open(x))), {FID.XZ}, [('xz', 'python-xz')], 'tarfile'
+    ),
+    'lzmaffi': CompressionBackendInfo(
+        (lambda x, parallelization=1: lzmaffi.open(x)), {FID.XZ}, [('lzmaffi', 'lzmaffi')], 'tarfile'
+    ),
+    'indexed_zstd': CompressionBackendInfo(
+        (lambda x, parallelization=1: indexed_zstd.IndexedZstdFile(x.fileno())),
+        {FID.ZSTANDARD},
+        [('indexed_zstd', 'indexed_zstd')],
+        'tarfile',
+    ),
+    'libarchive': CompressionBackendInfo(
+        libarchive_file_reader,
+        {
+            # Also supported by other backends, which should be used first.
+            FID.BZIP2,
+            FID.GZIP,
+            FID.XZ,
+            FID.ZSTANDARD,
+            # Compression formats
+            FID.GRZIP,
+            FID.LRZIP,
+            FID.LZ4,
+            FID.LZIP,
+            FID.LZMA,
+            FID.LZOP,
+            FID.RPM,
+            FID.UU,
+            FID.Z,
+        },
+        [('libarchive', 'libarchive-c')],
+        'libarchive',
+    ),
 }
 
 
 def findAvailableBackend(
-    compression: str, prioritizedBackends: Optional[List[str]] = None
-) -> Optional[CompressionModuleInfo]:
-    if compression not in supportedCompressions:
-        return None
+    compression: FileFormatID,
+    enabledBackends: Optional[List[str]] = None,
+    prioritizedBackends: Optional[List[str]] = None,
+) -> Optional[CompressionBackendInfo]:
+    if prioritizedBackends is None:
+        prioritizedBackends = []
 
-    modules = supportedCompressions[compression].modules
-    if prioritizedBackends:
-        for moduleName in prioritizedBackends:
-            if moduleName in sys.modules:
-                for module in modules:
-                    if module.name == moduleName and module.open:
-                        return module
+    matchingBackends = [
+        backend
+        for backend, info in COMPRESSION_BACKENDS.items()
+        if (enabledBackends is None or backend in enabledBackends) and compression in info.formats
+    ]
 
-    for module in modules:
-        if module.name in sys.modules:
-            return module
+    for backendName in prioritizedBackends:
+        if backendName not in matchingBackends or backendName not in COMPRESSION_BACKENDS:
+            continue
+        backend = COMPRESSION_BACKENDS[backendName]
+        if all(module in sys.modules for module, _ in backend.requiredModules):
+            return backend
+
+    for backendName in matchingBackends:
+        if backendName in prioritizedBackends or backendName not in COMPRESSION_BACKENDS:
+            continue
+        backend = COMPRESSION_BACKENDS[backendName]
+        if all(module in sys.modules for module, _ in backend.requiredModules):
+            return backend
 
     return None
 
 
 def stripSuffixFromCompressedFile(path: str) -> str:
     """Strips compression suffixes like .bz2, .gz, ..."""
-    for compression in supportedCompressions.values():
-        for suffix in compression.suffixes:
-            if path.lower().endswith('.' + suffix.lower()):
-                return path[: -(len(suffix) + 1)]
-
+    for formatInfo in COMPRESSION_FORMATS.values():
+        for extension in formatInfo.extensions:
+            if path.lower().endswith('.' + extension.lower()):
+                return path[: -(len(extension) + 1)]
     return path
 
 
 def stripSuffixFromArchive(path: str) -> str:
-    """Strips extensions like .tar.gz or .gz or .tgz, ..."""
-    # 1. Try for conflated suffixes first
-    for compression in supportedCompressions.values():
-        for suffix in compression.doubleSuffixes + ['t' + s for s in compression.suffixes]:
-            if path.lower().endswith('.' + suffix.lower()):
-                return path[: -(len(suffix) + 1)]
-
-    # 2. Remove compression suffixes
-    path = stripSuffixFromCompressedFile(path)
-
-    # 3. Remove .tar if we are left with it after the compression suffix removal
-    if path.lower().endswith('.tar'):
-        path = path[:-4]
-
+    """Strips extensions like .tar.gz or .gz or .tgz, .rar, .zip ..."""
+    extensions = itertools.chain(
+        (e for extensions in TAR_CONTRACTED_EXTENSIONS.values() for e in extensions),
+        ('t' + e for formatInfo in COMPRESSION_FORMATS.values() for e in formatInfo.extensions),
+        ('tar.' + e for formatInfo in COMPRESSION_FORMATS.values() for e in formatInfo.extensions),
+        (e for formatInfo in COMPRESSION_FORMATS.values() for e in formatInfo.extensions),
+        (e for formatInfo in ARCHIVE_FORMATS.values() for e in formatInfo.extensions),
+    )
+    for extension in extensions:
+        if path.lower().endswith('.' + extension.lower()):
+            return path[: -(len(extension) + 1)]
     return path
 
 
@@ -506,11 +345,7 @@ def detectCompression(
     fileobj: IO[bytes],
     prioritizedBackends: Optional[List[str]] = None,
     printDebug: int = 0,
-    compressionsToTest: Optional[Dict[str, CompressionInfo]] = None,
-) -> Optional[str]:
-    if compressionsToTest is None:
-        compressionsToTest = TAR_COMPRESSION_FORMATS
-
+) -> Optional[FileFormatID]:
     # isinstance(fileobj, io.IOBase) does not work for everything, e.g., for paramiko.sftp_file.SFTPFile
     # because it does not inherit from io.IOBase. Therefore, do duck-typing and test for required methods.
     expectedMethods = ['seekable', 'seek', 'read', 'tell']
@@ -532,22 +367,16 @@ def detectCompression(
         return None
 
     oldOffset = fileobj.tell()
-    for compressionId, compression in compressionsToTest.items():
-        # The header check is a necessary condition not a sufficient condition.
-        # Especially for gzip, which only has 2 magic bytes, false positives might happen.
-        # Therefore, only use the magic bytes based check if the module could not be found
-        # in order to still be able to print pinpoint error messages.
-        matches = compression.checkHeader(fileobj)
-        fileobj.seek(oldOffset)
-        if not matches:
+    for compressionId, compressionInfo in COMPRESSION_FORMATS.items():
+        if not mightBeFormat(fileobj, compressionId):
             continue
 
-        backend = findAvailableBackend(compressionId, prioritizedBackends)
+        backend = findAvailableBackend(compressionId, prioritizedBackends=prioritizedBackends)
         # If no appropriate module exists, then don't do any further checks.
         if not backend:
             if printDebug >= 1:
                 print(
-                    f"[Warning] A given file with magic bytes for {compressionId} could not be opened because "
+                    f"[Warning] A given file with magic bytes for {compressionId.name} could not be opened because "
                     "no appropriate Python module could be loaded. Are some dependencies missing? To install "
                     "ratarmountcore with all dependencies do: python3 -m pip install --user ratarmountcore[full]"
                 )
@@ -561,7 +390,7 @@ def detectCompression(
             # Reading 1B from a single-frame zst file might require decompressing it fully in order
             # to get uncompressed file size! Avoid that. The magic bytes should suffice mostly.
             # TODO: Make indexed_zstd not require the uncompressed size for the read call.
-            if compressionId != 'zst':
+            if compressionId != FID.ZSTANDARD:
                 compressedFileobj.read(1)
             compressedFileobj.close()
             fileobj.seek(oldOffset)
@@ -628,11 +457,11 @@ def useRapidgzip(
 def openCompressedFile(
     fileobj: IO[bytes],
     gzipSeekPointSpacing: int,
-    encoding: str,
     parallelizations: Dict[str, int],
+    enabledBackends: Optional[List[str]] = None,
     prioritizedBackends: Optional[List[str]] = None,
     printDebug: int = 0,
-) -> Tuple[Any, Optional[IO[bytes]], Optional[str]]:
+) -> Tuple[Any, Optional[IO[bytes]], Optional[FileFormatID]]:
     """
     Opens a file possibly undoing the compression.
     Returns (tar_file_obj, raw_file_obj, compression).
@@ -641,21 +470,32 @@ def openCompressedFile(
     compression = detectCompression(fileobj, prioritizedBackends=prioritizedBackends, printDebug=printDebug)
     if printDebug >= 3:
         print(f"[Info] Detected compression {compression} for file object:", fileobj)
-
-    if compression not in TAR_COMPRESSION_FORMATS:
+    if not compression:
         return fileobj, None, compression
 
-    backend = findAvailableBackend(compression, prioritizedBackends)
+    matchingBackends = [
+        backend
+        for backend, info in COMPRESSION_BACKENDS.items()
+        if (enabledBackends is None or backend in enabledBackends) and compression in info.formats
+    ]
+    if not matchingBackends:
+        return fileobj, None, compression
+
+    backend = findAvailableBackend(
+        compression, enabledBackends=enabledBackends, prioritizedBackends=prioritizedBackends
+    )
     if not backend:
-        moduleNames = [module.name for module in TAR_COMPRESSION_FORMATS[compression].modules]
+        packages = [
+            package for backend in matchingBackends for _, package in COMPRESSION_BACKENDS[backend].requiredModules
+        ]
         raise CompressionError(
             f"Cannot open a {compression} compressed TAR file '{fileobj.name}' "
-            f"without any of these modules: {moduleNames}"
+            f"without any of these packages: {packages}"
         )
 
     parallelization = 1
 
-    if compression == 'gz':
+    if compression == FID.GZIP:
         if useRapidgzip(
             fileobj,
             gzipSeekPointSpacing=gzipSeekPointSpacing,
@@ -690,19 +530,20 @@ def openCompressedFile(
             decompressedFileObject = indexed_gzip.IndexedGzipFile(
                 fileobj=fileobj, drop_handles=False, spacing=gzipSeekPointSpacing, buffer_size=bufferSize
             )
-    elif compression == 'bz2':
+    elif compression == FID.BZIP2:
         parallelization = parallelizations.get('rapidgzip-bzip2', parallelizations.get('', 1))
         decompressedFileObject = rapidgzip.IndexedBzip2File(fileobj, parallelization=parallelization)  # type: ignore
     elif (
-        compression == 'xz'
+        compression == FID.XZ
         and xz
         and parallelizations.get('xz', parallelizations.get('', 1)) != 1
         and hasattr(fileobj, 'name')
         and os.path.isfile(fileobj.name)
         and platform.system() == 'Linux'
     ):
+        block_boundaries = getattr(fileobj, 'block_boundaries', [])
         decompressedFileObject = backend.open(fileobj)
-        if len(decompressedFileObject.block_boundaries) > 1:
+        if block_boundaries and len(block_boundaries) > 1:
             parallelization = parallelizations.get('xz', parallelizations.get('', 1))
             decompressedFileObject.close()
             decompressedFileObject = ParallelXZReader(fileobj.name, parallelization=parallelization)

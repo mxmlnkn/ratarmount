@@ -113,6 +113,13 @@ ARCHIVE_BACKENDS: Dict[str, ArchiveBackendInfo] = {
             FID.CPIO,
             FID.ISO9660,
             FID.WARC,
+            # py7zr cannot handle symbolic links, therefore prefer libarchive!
+            # But, libarchive does not support decrpytion.
+            FID.SEVEN_ZIP,
+            # Archive formats supported by other backends with higher precedence
+            FID.RAR,
+            FID.TAR,
+            FID.ZIP,
             # Compression formats
             FID.BZIP2,
             FID.GZIP,
@@ -128,7 +135,7 @@ ARCHIVE_BACKENDS: Dict[str, ArchiveBackendInfo] = {
             FID.UU,
             FID.Z,
         },
-        [('libarchive', 'python-libarchive-c')],
+        [('libarchive', 'libarchive-c')],
     ),
     "py7zr": ArchiveBackendInfo(Py7zrMountSource, {FID.SEVEN_ZIP}, [('py7zr', 'py7zr')]),
     "pyfatfs": ArchiveBackendInfo(FATMountSource, {FID.FAT}, [('pyfatfs', 'pyfatfs')]),

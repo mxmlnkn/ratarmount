@@ -407,7 +407,7 @@ def processParsedArguments(args) -> int:
     # Manually check that all specified TARs and folders exist
     def checkMountSource(path):
         try:
-            return checkInputFileType(path, encoding=args.encoding, printDebug=args.debug)[0]
+            return checkInputFileType(path, printDebug=args.debug)
         except argparse.ArgumentTypeError as e:
             if (
                 os.path.isdir(path)
