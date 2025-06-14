@@ -39,7 +39,7 @@ from .compressions import (
     LIBARCHIVE_FILTER_FORMATS,
     TAR_COMPRESSION_FORMATS,
     detectCompression,
-    findAvailableOpen,
+    findAvailableBackend,
 )
 from .SQLiteBlobFile import SQLiteBlobsFile, WriteSQLiteBlobs
 from .utils import (
@@ -1267,15 +1267,15 @@ class SQLiteIndex:
             if self.printDebug >= 2:
                 print(f"[Info] Detected {compression}-compressed index.")
 
-            formatOpen = findAvailableOpen(compression)
-            if not formatOpen:
+            backend = findAvailableBackend(compression)
+            if not backend:
                 moduleNames = [module.name for module in TAR_COMPRESSION_FORMATS[compression].modules]
                 raise CompressionError(
                     f"Cannot open a {compression} compressed index file {indexFilePath} "
                     f"without any of these modules: {moduleNames}"
                 )
 
-            return formatOpen(file)
+            return backend.open(file)
 
         def _copyToTemp(file):
             self._temporaryIndexFile = tempfile.NamedTemporaryFile(suffix=".tmp.sqlite.index", dir=temporaryFolder)

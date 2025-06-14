@@ -6,7 +6,7 @@ import os
 import tarfile
 from typing import Optional, Tuple
 
-from ratarmountcore.compressions import checkForSplitFile, findAvailableOpen, supportedCompressions
+from ratarmountcore.compressions import checkForSplitFile, findAvailableBackend, supportedCompressions
 from ratarmountcore.utils import detectRawTar, isRandom
 
 try:
@@ -62,11 +62,11 @@ def checkInputFileType(path: str, encoding: str = tarfile.ENCODING, printDebug: 
             if compression != 'zst':
                 raise Exception()  # early exit because we catch it anyways
 
-            formatOpen = findAvailableOpen(compression)
-            if not formatOpen:
+            backend = findAvailableBackend(compression)
+            if not backend:
                 raise Exception()  # early exit because we catch it anyways
 
-            zstdFile = formatOpen(fileobj)
+            zstdFile = backend.open(fileobj)
 
             if not zstdFile.is_multiframe() and fileSize > 1024 * 1024:
                 print(f"[Warning] The specified file '{path}'")
@@ -106,7 +106,7 @@ def checkInputFileType(path: str, encoding: str = tarfile.ENCODING, printDebug: 
 
             raise argparse.ArgumentTypeError(f"Archive '{path}' cannot be opened!")
 
-    if not findAvailableOpen(compression):
+    if not findAvailableBackend(compression):
         moduleNames = [module.name for module in supportedCompressions[compression].modules]
         raise argparse.ArgumentTypeError(
             f"Cannot open a {compression} compressed TAR file '{fileobj.name}' "

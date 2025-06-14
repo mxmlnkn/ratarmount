@@ -531,7 +531,9 @@ supportedCompressions = {
 }
 
 
-def findAvailableOpen(compression: str, prioritizedBackends: Optional[List[str]] = None) -> Optional[Callable]:
+def findAvailableBackend(
+    compression: str, prioritizedBackends: Optional[List[str]] = None
+) -> Optional[CompressionModuleInfo]:
     if compression not in supportedCompressions:
         return None
 
@@ -541,11 +543,11 @@ def findAvailableOpen(compression: str, prioritizedBackends: Optional[List[str]]
             if moduleName in sys.modules:
                 for module in modules:
                     if module.name == moduleName and module.open:
-                        return module.open
+                        return module
 
     for module in modules:
         if module.name in sys.modules:
-            return module.open
+            return module
 
     return None
 
@@ -751,9 +753,9 @@ def detectCompression(
         if not matches:
             continue
 
-        formatOpen = findAvailableOpen(compressionId, prioritizedBackends)
+        backend = findAvailableBackend(compressionId, prioritizedBackends)
         # If no appropriate module exists, then don't do any further checks.
-        if not formatOpen:
+        if not backend:
             if printDebug >= 1:
                 print(
                     f"[Warning] A given file with magic bytes for {compressionId} could not be opened because "
@@ -765,7 +767,7 @@ def detectCompression(
         try:
             # Disable parallelization because it may lead to unnecessary expensive prefetching.
             # We only need to read 1 byte anyway to verify correctness.
-            compressedFileobj = formatOpen(fileobj, parallelization=1)
+            compressedFileobj = backend.open(fileobj, parallelization=1)
 
             # Reading 1B from a single-frame zst file might require decompressing it fully in order
             # to get uncompressed file size! Avoid that. The magic bytes should suffice mostly.
@@ -854,8 +856,8 @@ def openCompressedFile(
     if compression not in TAR_COMPRESSION_FORMATS:
         return fileobj, None, compression
 
-    formatOpen = findAvailableOpen(compression, prioritizedBackends)
-    if not formatOpen:
+    backend = findAvailableBackend(compression, prioritizedBackends)
+    if not backend:
         moduleNames = [module.name for module in TAR_COMPRESSION_FORMATS[compression].modules]
         raise CompressionError(
             f"Cannot open a {compression} compressed TAR file '{fileobj.name}' "
@@ -910,13 +912,13 @@ def openCompressedFile(
         and os.path.isfile(fileobj.name)
         and platform.system() == 'Linux'
     ):
-        decompressedFileObject = formatOpen(fileobj)
+        decompressedFileObject = backend.open(fileobj)
         if len(decompressedFileObject.block_boundaries) > 1:
             parallelization = parallelizations.get('xz', parallelizations.get('', 1))
             decompressedFileObject.close()
             decompressedFileObject = ParallelXZReader(fileobj.name, parallelization=parallelization)
     else:
-        decompressedFileObject = formatOpen(fileobj)
+        decompressedFileObject = backend.open(fileobj)
 
     if printDebug >= 3:
         print(
