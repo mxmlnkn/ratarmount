@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 # This file is supposed to provide the 'fuse' symbol.
 # pylint: disable=unused-import
 

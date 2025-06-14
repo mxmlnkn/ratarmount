@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 # libarchive.ffi produces many false positives on my local system and there seems to be nothing else works.
 # pylint: disable=no-member

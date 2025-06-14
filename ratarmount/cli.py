@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 # PYTHON_ARGCOMPLETE_OK
 
 # We explicitly do want to import everything as late as possible here in order to speed up calls by argcomplete!

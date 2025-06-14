@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 from typing import IO, Any, Dict, Iterable, Optional, Union
 
