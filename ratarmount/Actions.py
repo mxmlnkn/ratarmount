@@ -279,7 +279,7 @@ def printOSSAttributions() -> None:
         try:
             licenseContents = urllib.request.urlopen(licenseUrl).read().decode()
         except urllib.error.HTTPError as error:
-            licenseContents = f"Failed to get license at {licenseUrl} because of: {str(error)}"
+            licenseContents = f"Failed to get license at {licenseUrl} because of: {error!s}"
         homepage = "https://github.com" + '/'.join(githubPath.split('/', 3)[:3])
         print(f"# {name}\n\n{homepage}\n\n\n```\n{licenseContents}\n```\n\n")
 

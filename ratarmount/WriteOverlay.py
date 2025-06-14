@@ -197,7 +197,7 @@ class WritableFolderMountSource(fuse.Operations):
 
         self.sqlConnection.execute(
             f"""UPDATE "files" SET {', '.join(assignments)} WHERE "path" == ? and "name" == ?""",
-            tuple(values) + (folder, name),
+            (*values, folder, name),
         )
 
     def _initFileMetadata(self, path: str):

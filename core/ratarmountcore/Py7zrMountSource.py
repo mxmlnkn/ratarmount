@@ -225,7 +225,7 @@ class Py7zrMountSource(SQLiteIndexMountSource):
         if not files:
             return fileobj
 
-        for password in [None] + passwords:
+        for password in [None, *passwords]:
             fileobj = openFile(password)
             try:
                 openInMemory(fileobj, files[0].filename)

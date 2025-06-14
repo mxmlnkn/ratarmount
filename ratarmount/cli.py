@@ -298,7 +298,7 @@ For further information, see the ReadMe on the project's homepage:
     #        the spacing would have to be 1800MiB at which point it would become almost useless
     advancedGroup.add_argument(
         '-gs', '--gzip-seek-point-spacing', type=float,
-        default=int(math.ceil(DEFAULT_GZIP_SEEK_POINT_SPACING / 1024 / 1024)),
+        default=math.ceil(DEFAULT_GZIP_SEEK_POINT_SPACING / 1024 / 1024),
         help='This only is applied when the index is first created or recreated with the -c option. '
              'The spacing given in MiB specifies the seek point distance in the uncompressed data. '
              'A distance of 16MiB means that archives smaller than 16MiB in uncompressed size will '

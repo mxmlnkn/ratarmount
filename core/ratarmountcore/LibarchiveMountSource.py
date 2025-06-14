@@ -178,7 +178,7 @@ class IterableArchive:
     # > If you are using the raw handler, you should generally not enable any other handler
     # Note that the lz4 and zstd filters are not available in the manylinux2014 container (CentOS Linux
     # release 7.9.2009 (Core))
-    ENABLED_FORMATS = ['7zip', 'ar', 'cab', 'cpio', 'iso9660', 'lha', 'rar', 'rar5', 'tar', 'xar', 'warc', 'zip']
+    ENABLED_FORMATS = ('7zip', 'ar', 'cab', 'cpio', 'iso9660', 'lha', 'rar', 'rar5', 'tar', 'xar', 'warc', 'zip')
 
     def __init__(
         self,
@@ -614,7 +614,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                         s for fid in COMPRESSION_BACKENDS['libarchive'].formats for s in FILE_FORMATS[fid].extensions
                     ]
                     fname = os.path.basename(self.tarFileName)
-                    for suffix in ['gz', 'bz2', 'bzip2', 'gzip', 'xz', 'zst', 'zstd'] + libarchiveSuffixes:
+                    for suffix in ['gz', 'bz2', 'bzip2', 'gzip', 'xz', 'zst', 'zstd', *libarchiveSuffixes]:
                         suffix = '.' + suffix
                         if fname.lower().endswith(suffix.lower()) and len(fname) > len(suffix):
                             fname = fname[: -len(suffix)]

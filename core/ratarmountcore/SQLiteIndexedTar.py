@@ -153,7 +153,7 @@ class _TarFileMetadataReader:
         if fixedPath is None and printDebug >= 1:
             print(f"[Warning] ignored prefix '{encodedPrefix!r}' because it was not found in TAR header prefix.")
             print("[Warning]", realPrefix[:30] if realPrefix else realPrefix)
-            print(f"[Info] TAR header offset: {tarInfo.offset}, type: {str(tarInfo.type)}")
+            print(f"[Info] TAR header offset: {tarInfo.offset}, type: {tarInfo.type!s}")
             print("[Info] name:", tarInfo.name)
             print()
 
@@ -586,7 +586,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             if printDebug >= 3:
                 print(f"[Info] File object {self.tarFileObject} from {self.tarFileName} is not a TAR.")
             if not self.rawFileObject:
-                raise RatarmountError(f"File object ({str(fileObject)}) could not be opened as a TAR file!")
+                raise RatarmountError(f"File object ({fileObject!s}) could not be opened as a TAR file!")
 
         if self.compression:
             self._recursionDepth += 1
@@ -1157,7 +1157,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             # the archive should already have been determines as different.
             raise InvalidIndexError(
                 f"The modification date for the TAR file {storedStats['st_mtime']} "
-                f"is older than the one stored in the SQLite index ({str(archiveStats.st_mtime)})",
+                f"is older than the one stored in the SQLite index ({archiveStats.st_mtime!s})",
             )
 
         # Checking is expensive and would basically do the same work as creating the database anyway.
@@ -1271,7 +1271,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             ):
                 raise InvalidIndexError(
                     f"The modification date for the TAR file {storedStats['st_mtime']} "
-                    f"to this SQLite index has changed ({str(tarStats.st_mtime)})",
+                    f"to this SQLite index has changed ({tarStats.st_mtime!s})",
                 )
 
         # Check arguments used to create the found index.
@@ -1345,7 +1345,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 # features like GNU LongLink which store additional metadata in further TAR blocks.
                 offsetHeader = int(row[2])
                 offsetData = int(row[3])
-                headerBlockCount = max(1, int(math.ceil((offsetData - offsetHeader) / 512))) * 512
+                headerBlockCount = max(1, math.ceil((offsetData - offsetHeader) / 512)) * 512
                 with StenciledFile(fileStencils=[(self.tarFileObject, offsetHeader, headerBlockCount)]) as file:
                     with tarfile.open(fileobj=file, mode='r|', ignore_zeros=True, encoding=self.encoding) as archive:
                         tarInfo = next(iter(archive))
