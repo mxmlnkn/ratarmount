@@ -11,24 +11,23 @@ import stat
 import sys
 import traceback
 import warnings
-
-from typing import Dict, IO, Iterable, List, Union
+from typing import IO, Dict, Iterable, List, Union
 
 from .archives import ARCHIVE_BACKENDS
-from .compressions import checkForSplitFile, COMPRESSION_BACKENDS
-from .formats import FileFormatID, FILE_FORMATS
-from .utils import CompressionError, RatarmountError
-from .MountSource import MountSource
+from .compressions import COMPRESSION_BACKENDS, checkForSplitFile
 from .FolderMountSource import FolderMountSource
+from .formats import FILE_FORMATS, FileFormatID
 from .FSSpecMountSource import FSSpecMountSource
 from .GitMountSource import GitMountSource
+from .MountSource import MountSource
 from .SingleFileMountSource import SingleFileMountSource
 from .StenciledFile import JoinedFileFromFactory
+from .utils import CompressionError, RatarmountError
 
 try:
     import fsspec
-    import fsspec.utils
     import fsspec.implementations.http
+    import fsspec.utils
 except ImportError:
     fsspec = None  # type: ignore
 

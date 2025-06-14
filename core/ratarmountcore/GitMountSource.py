@@ -4,7 +4,7 @@
 import io
 import os
 import stat
-from typing import Dict, Iterable, IO, Optional, Union
+from typing import IO, Dict, Iterable, Optional, Union
 
 try:
     import pygit2

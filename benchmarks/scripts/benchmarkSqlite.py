@@ -5,12 +5,12 @@ import os
 import re
 import sqlite3
 import sys
-import time
 import tempfile
+import time
 from typing import Any, Dict, List, Tuple
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.lines import Line2D
 
 rowsPerInsert = 1000

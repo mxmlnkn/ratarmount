@@ -17,15 +17,15 @@ import zipfile
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from ratarmountcore.compressions import stripSuffixFromArchive
-from ratarmountcore.utils import determineRecursionDepth, imeta, removeDuplicatesStable, RatarmountError
+from ratarmountcore.utils import RatarmountError, determineRecursionDepth, imeta, removeDuplicatesStable
 
 try:
     import rarfile
 except ImportError:
     pass
 
-from .fuse import fuse
 from .CLIHelpers import checkInputFileType
+from .fuse import fuse
 from .WriteOverlay import commitOverlay
 
 

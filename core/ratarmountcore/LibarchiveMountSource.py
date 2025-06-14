@@ -9,18 +9,17 @@ import io
 import json
 import os
 import re
-import sys
 import stat
+import sys
 import tarfile
-
 from timeit import default_timer as timer
-from typing import Any, Callable, Dict, IO, List, Optional, Tuple, Union, cast
+from typing import IO, Any, Callable, Dict, List, Optional, Tuple, Union, cast
 
+from .compressions import COMPRESSION_BACKENDS
+from .formats import FILE_FORMATS
 from .MountSource import FileInfo, MountSource
 from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
 from .SQLiteIndexMountSource import SQLiteIndexMountSource
-from .compressions import COMPRESSION_BACKENDS
-from .formats import FILE_FORMATS
 from .utils import InvalidIndexError, overrides
 
 try:

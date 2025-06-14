@@ -3,11 +3,10 @@
 
 import io
 import sqlite3
+from typing import IO, Optional, cast
 
-from typing import cast, IO, Optional
-
-from .utils import overrides
 from .StenciledFile import JoinedFile, LambdaReaderFile
+from .utils import overrides
 
 
 # CPython 3.11 added blobopen! https://docs.python.org/3/library/sqlite3.html#sqlite3.Blob

@@ -5,16 +5,15 @@ import os
 import re
 import stat
 import traceback
-
 from dataclasses import dataclass
-from typing import Any, Dict, IO, Iterable, List, Optional, Tuple, Union
+from typing import IO, Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from .compressions import stripSuffixFromArchive
 from .factory import openMountSource
 from .FolderMountSource import FolderMountSource
 from .MountSource import FileInfo, MountSource, mergeStatfs
 from .SQLiteIndexedTar import SQLiteIndexedTar, SQLiteIndexedTarUserData
-from .utils import determineRecursionDepth, overrides, RatarmountError
+from .utils import RatarmountError, determineRecursionDepth, overrides
 
 
 class AutoMountLayer(MountSource):

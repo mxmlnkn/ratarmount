@@ -16,15 +16,13 @@ import tarfile
 import tempfile
 
 import rapidgzip
-
 from helpers import copyTestFile
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import pytest  # noqa: E402
-
-from ratarmountcore.utils import RatarmountError  # noqa: E402
 from ratarmountcore.SQLiteIndexedTar import SQLiteIndexedTar, SQLiteIndexedTarUserData  # noqa: E402
+from ratarmountcore.utils import RatarmountError  # noqa: E402
 
 
 @pytest.mark.parametrize("parallelization", [1, 2, 4])

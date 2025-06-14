@@ -8,7 +8,6 @@ import os
 import signal
 from typing import List, Optional
 
-
 try:
     import xz
 except ImportError:
@@ -19,7 +18,7 @@ try:
 except ImportError:
     indexed_zstd = None  # type: ignore
 
-from .utils import overrides, LRUCache, Prefetcher
+from .utils import LRUCache, Prefetcher, overrides
 
 _parallelXzReaderFile = None
 _parallelZstdReaderFile = None

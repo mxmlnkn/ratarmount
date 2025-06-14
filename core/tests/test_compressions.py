@@ -10,10 +10,10 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from ratarmountcore.compressions import (  # noqa: E402
-    stripSuffixFromCompressedFile,
-    stripSuffixFromArchive,
-    hasMatchingAlphabets,
     checkForSequence,
+    hasMatchingAlphabets,
+    stripSuffixFromArchive,
+    stripSuffixFromCompressedFile,
 )
 from ratarmountcore.utils import ALPHA, DIGITS, HEX, formatNumber  # noqa: E402
 

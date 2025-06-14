@@ -15,33 +15,32 @@ import threading
 import time
 import traceback
 import urllib.parse
-
 from timeit import default_timer as timer
-from typing import Any, Callable, cast, Dict, Generator, IO, Iterable, List, Optional, Tuple
+from typing import IO, Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, cast
 
 try:
     import rapidgzip
 except ImportError:
     pass
 
+from .BlockParallelReaders import ParallelXZReader
+from .compressions import COMPRESSION_BACKENDS, getGzipInfo, openCompressedFile
+from .formats import FileFormatID, mightBeFormat
 from .MountSource import FileInfo, MountSource
 from .ProgressBar import ProgressBar
 from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
 from .SQLiteIndexMountSource import SQLiteIndexMountSource
 from .StenciledFile import RawStenciledFile, StenciledFile
-from .compressions import getGzipInfo, openCompressedFile, COMPRESSION_BACKENDS
-from .formats import mightBeFormat, FileFormatID
 from .utils import (
-    RatarmountError,
-    InvalidIndexError,
     CompressionError,
+    InvalidIndexError,
+    RatarmountError,
     ceilDiv,
-    determineRecursionDepth,
     decodeUnpaddedBase64,
+    determineRecursionDepth,
     getXdgCacheHome,
     overrides,
 )
-from .BlockParallelReaders import ParallelXZReader
 
 
 class _TarFileMetadataReader:

@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import dataclasses
 import os
 import stat
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-import dataclasses
-from typing import Any, Dict, IO, Iterable, List, Optional, Union
+from typing import IO, Any, Dict, Iterable, List, Optional, Union
 
 
-@dataclass
+@dataclasses.dataclass
 class FileInfo:
     # fmt: off
     size     : int

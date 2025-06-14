@@ -4,8 +4,8 @@
 import errno
 import os
 import re
-import sqlite3
 import shutil
+import sqlite3
 import stat
 import subprocess
 import tarfile
@@ -15,10 +15,10 @@ import traceback
 import urllib.parse
 from typing import Any, Callable, Dict, List, Tuple
 
-from ratarmountcore.formats import isTAR
-from ratarmountcore.utils import overrides, RatarmountError
 from ratarmountcore.FolderMountSource import FolderMountSource
+from ratarmountcore.formats import isTAR
 from ratarmountcore.MountSource import FileInfo, MountSource
+from ratarmountcore.utils import RatarmountError, overrides
 
 from .fuse import fuse
 

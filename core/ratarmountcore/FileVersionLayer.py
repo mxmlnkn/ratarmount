@@ -4,9 +4,7 @@
 import enum
 import os
 import stat
-
-
-from typing import Any, Dict, IO, Iterable, List, Optional, Tuple, Union
+from typing import IO, Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from .MountSource import FileInfo, MountSource
 from .utils import overrides

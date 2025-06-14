@@ -14,7 +14,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from ratarmountcore.SQLiteBlobFile import SQLiteBlobFile, SQLiteBlobsFile  # noqa: E402
 
-
 testData = b"1234567890"
 tmpFile = tempfile.TemporaryFile()
 tmpFile.write(testData)

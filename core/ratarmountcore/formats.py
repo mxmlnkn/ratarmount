@@ -30,7 +30,7 @@ import enum
 import struct
 import tarfile
 import zipfile
-from typing import Callable, Dict, IO, List, Optional, Set, Tuple, Union
+from typing import IO, Callable, Dict, List, Optional, Set, Tuple, Union
 
 
 class FileFormatID(enum.Enum):

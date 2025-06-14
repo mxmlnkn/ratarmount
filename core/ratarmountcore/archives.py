@@ -3,23 +3,21 @@
 
 import dataclasses
 import traceback
+from typing import IO, Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
-from typing import Any, Callable, Dict, IO, List, Optional, Set, Tuple, Union
-
-from .formats import FileFormatID
-
-from .MountSource import MountSource
 from .ASARMountSource import ASARMountSource
 from .EXT4MountSource import EXT4MountSource
 from .FATMountSource import FATMountSource
+from .formats import FileFormatID
+from .LibarchiveMountSource import LibarchiveMountSource
+from .MountSource import MountSource
 from .Py7zrMountSource import Py7zrMountSource
 from .RarMountSource import RarMountSource
-from .SQLiteIndexMountSource import SQLiteIndexMountSource
-from .SQLiteIndexedTar import SQLiteIndexedTar
 from .SQLARMountSource import SQLARMountSource
+from .SQLiteIndexedTar import SQLiteIndexedTar
+from .SQLiteIndexMountSource import SQLiteIndexMountSource
 from .SquashFSMountSource import SquashFSMountSource
 from .ZipMountSource import ZipMountSource
-from .LibarchiveMountSource import LibarchiveMountSource
 
 try:
     import libarchive

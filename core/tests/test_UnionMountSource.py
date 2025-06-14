@@ -14,7 +14,6 @@ from typing import Dict, List
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import pytest  # noqa: E402
-
 from ratarmountcore.FolderMountSource import FolderMountSource  # noqa: E402
 from ratarmountcore.SQLiteIndexedTar import SQLiteIndexedTar  # noqa: E402
 from ratarmountcore.UnionMountSource import UnionMountSource  # noqa: E402

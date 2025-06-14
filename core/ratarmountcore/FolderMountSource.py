@@ -3,7 +3,7 @@
 
 import os
 import stat
-from typing import Any, Dict, IO, Iterable, List, Optional, Union
+from typing import IO, Any, Dict, Iterable, List, Optional, Union
 
 from .MountSource import FileInfo, MountSource
 from .utils import overrides

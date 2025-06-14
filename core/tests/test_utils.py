@@ -10,17 +10,17 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from ratarmountcore.utils import (  # noqa: E402
+    ALPHA,
+    DIGITS,
+    HEX,
+    LRUCache,
+    Prefetcher,
     ceilDiv,
     formatNumber,
     isLatinAlpha,
     isLatinDigit,
     isLatinHexAlpha,
     isRandom,
-    ALPHA,
-    DIGITS,
-    HEX,
-    LRUCache,
-    Prefetcher,
 )
 
 

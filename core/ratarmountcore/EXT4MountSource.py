@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from typing import Any, Dict, IO, Iterable, Optional, Union
+from typing import IO, Any, Dict, Iterable, Optional, Union
 
+from .formats import FileFormatID, replaceFormatCheck
 from .MountSource import FileInfo, MountSource
-from .formats import replaceFormatCheck, FileFormatID
 from .utils import overrides
 
 try:

@@ -7,12 +7,12 @@ import sqlite3
 import sys
 import tempfile
 import urllib.parse
-from typing import Any, Dict, IO, Iterable, List, Optional, Union
+from typing import IO, Any, Dict, Iterable, List, Optional, Union
 
+from .formats import FileFormatID, replaceFormatCheck
 from .MountSource import FileInfo, MountSource, createRootFileInfo
-from .StenciledFile import LambdaReaderFile
 from .SQLiteBlobFile import SQLiteBlobFile
-from .formats import replaceFormatCheck, FileFormatID
+from .StenciledFile import LambdaReaderFile
 from .utils import overrides
 
 try:
@@ -95,14 +95,13 @@ except ImportError:
 #  - https://sqlite.org/src/sqlar/sqlite.sqlar?r=release
 
 try:
-    from sqlcipher3 import dbapi2 as sqlcipher3  # type:ignore
-
     # This package is required by many other packages, so it is almost safe to require it:
     # Required-by: asyncssh, azure-identity, azure-storage-blob, fido2, gajim, msal, oci, omemo-dr, pyOpenSSL, pyspnego,
     #              smbprotocol, types-paramiko, types-pyOpenSSL, types-redis
-    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-    from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    from sqlcipher3 import dbapi2 as sqlcipher3  # type:ignore
 
     # No way to detect encrypted SQLAR.
     replaceFormatCheck(FileFormatID.SQLAR, lambda x: True)

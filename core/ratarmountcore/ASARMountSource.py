@@ -8,14 +8,13 @@ import stat
 import tarfile
 import threading
 from timeit import default_timer as timer
+from typing import IO, Any, Dict, List, Optional, Tuple, Union, cast
 
-from typing import cast, Any, Dict, IO, List, Optional, Tuple, Union
-
+from .formats import findASARHeader
 from .MountSource import FileInfo, MountSource
 from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
 from .SQLiteIndexMountSource import SQLiteIndexMountSource
 from .StenciledFile import RawStenciledFile, StenciledFile
-from .formats import findASARHeader
 from .utils import overrides
 
 

@@ -3,6 +3,7 @@
 
 import site
 import sys
+
 from setuptools import setup
 
 # workaround https://github.com/pypa/pip/issues/7953

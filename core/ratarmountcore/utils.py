@@ -3,6 +3,7 @@
 
 import base64
 import collections
+import importlib
 import io
 import math
 import os
@@ -10,10 +11,7 @@ import pathlib
 import platform
 import sys
 import types
-
 from typing import Dict, Generic, Iterable, List, Optional, TypeVar, Union, get_type_hints
-
-import importlib
 
 try:
     import importlib.metadata

@@ -9,8 +9,7 @@ import sys
 import tarfile
 import zipfile
 from timeit import default_timer as timer
-
-from typing import Any, Dict, IO, List, Optional, Tuple, Union
+from typing import IO, Any, Dict, List, Optional, Tuple, Union
 
 from .MountSource import FileInfo, MountSource
 from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData

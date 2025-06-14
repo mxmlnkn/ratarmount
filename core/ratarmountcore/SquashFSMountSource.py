@@ -11,8 +11,7 @@ import stat
 import tarfile
 import zlib
 from timeit import default_timer as timer
-
-from typing import Any, Dict, IO, List, Optional, Tuple, Union
+from typing import IO, Any, Dict, List, Optional, Tuple, Union
 
 try:
     import deflate
@@ -70,10 +69,10 @@ try:
 except ImportError:
     Compressor = object
 
+from .formats import findSquashFSOffset
 from .MountSource import FileInfo, MountSource
 from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
 from .SQLiteIndexMountSource import SQLiteIndexMountSource
-from .formats import findSquashFSOffset
 from .utils import overrides
 
 

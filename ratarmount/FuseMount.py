@@ -4,18 +4,18 @@
 import errno
 import os
 import traceback
-from typing import Any, Dict, IO, List, Optional, Tuple, Union
+from typing import IO, Any, Dict, List, Optional, Tuple, Union
 
-from ratarmountcore.utils import determineRecursionDepth, overrides
+from ratarmountcore.AutoMountLayer import AutoMountLayer
+
+# These imports can be particularly expensive when all fsspec backends are installed.
+from ratarmountcore.factory import openMountSource
 from ratarmountcore.FileVersionLayer import FileVersionLayer
 from ratarmountcore.FolderMountSource import FolderMountSource
 from ratarmountcore.MountSource import FileInfo, MountSource
 from ratarmountcore.SubvolumesMountSource import SubvolumesMountSource
 from ratarmountcore.UnionMountSource import UnionMountSource
-
-# These imports can be particularly expensive when all fsspec backends are installed.
-from ratarmountcore.factory import openMountSource
-from ratarmountcore.AutoMountLayer import AutoMountLayer
+from ratarmountcore.utils import determineRecursionDepth, overrides
 
 from .fuse import fuse
 from .WriteOverlay import WritableFolderMountSource

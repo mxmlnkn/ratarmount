@@ -4,8 +4,7 @@
 import os
 import stat
 import time
-
-from typing import Any, Dict, Iterable, IO, List, Optional, Set, Tuple, Union
+from typing import IO, Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 from .MountSource import FileInfo, MountSource, createRootFileInfo, mergeStatfs
 from .utils import overrides

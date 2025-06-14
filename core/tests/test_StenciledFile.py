@@ -20,7 +20,6 @@ from ratarmountcore.StenciledFile import (  # noqa: E402
     StenciledFile,
 )
 
-
 testData = b"1234567890"
 tmpFile = tempfile.TemporaryFile()
 tmpFile.write(testData)

@@ -6,10 +6,10 @@
 # pylint: disable=protected-access
 
 import os
-import stat
-import sys
 import shutil
+import stat
 import subprocess
+import sys
 import tempfile
 import time
 import zipfile
