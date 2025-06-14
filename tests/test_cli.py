@@ -55,7 +55,7 @@ class RunRatarmount:
         self.debug = debug
         self.timeout = 4
         self.mountPoint = mountPoint
-        args = ['-f', '-d', str(debug)] + arguments + [mountPoint]
+        args = ['-f', '-d', str(debug), *arguments, mountPoint]
         self.thread = threading.Thread(target=ratarmountcli, args=(args,))
 
         self._stdout = None
@@ -362,7 +362,7 @@ def test_file_in_archive(archivePath, pathInArchive, checksum, parallelization):
 
         # Test with forced index recreation first and then with index loading.
         for forceIndexCreation in [True, False]:
-            testArgs = ["-c"] + args if forceIndexCreation else args
+            testArgs = ["-c", *args] if forceIndexCreation else args
             with RunRatarmount(mountPoint, testArgs) as ratarmountInstance:
                 path = os.path.join(mountPoint, pathInArchive)
                 assert os.path.isfile(path)
@@ -379,11 +379,11 @@ def test_file_in_archive(archivePath, pathInArchive, checksum, parallelization):
                         if "Creating offset dictionary" not in output:
                             print(
                                 "Looks like index was not created while executing: ratarmount "
-                                + ' '.join(testArgs + [mountPoint])
+                                + ' '.join([*testArgs, mountPoint])
                             )
                     else:
                         if "Successfully loaded offset dictionary" not in output:
                             print(
                                 "Looks like index was not loaded while executing: ratarmount "
-                                + ' '.join(testArgs + [mountPoint])
+                                + ' '.join([*testArgs, mountPoint])
                             )

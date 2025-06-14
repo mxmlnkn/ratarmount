@@ -508,7 +508,7 @@ def getSchemasToBenchmark() -> List[Tuple[str, str, bool]]:
     schemasToBenchmark = []
     for label, schema in schemas.items():
         schemasToBenchmark.append((label + ', unique rows', schema, False))
-        if benchmarkWithDuplicates and 'deduplicat' in label or 'view' in label:
+        if (benchmarkWithDuplicates and 'deduplicat' in label) or 'view' in label:
             schemasToBenchmark.append((label + ', duplicate rows', schema, True))
     return schemasToBenchmark
 

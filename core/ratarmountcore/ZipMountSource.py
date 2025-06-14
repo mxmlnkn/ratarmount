@@ -190,7 +190,7 @@ class ZipMountSource(SQLiteIndexMountSource):
         if not files:
             return None
 
-        for password in [None] + passwords:
+        for password in [None, *passwords]:
             fileobj.setpassword(password)
             try:
                 with fileobj.open(files[0]) as file:

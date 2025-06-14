@@ -10,7 +10,7 @@ timeout = int(sys.argv[2]) if len(sys.argv) > 2 else 60
 
 t0 = time.time()
 with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
-    n = max(1, int(math.ceil(timeout / 5)))
+    n = max(1, math.ceil(timeout / 5))
     for i in range(n):
         try:
             if sock.connect_ex(("127.0.0.1", int(sys.argv[1]))) == 0:

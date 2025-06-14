@@ -186,7 +186,7 @@ class Prefetcher:
         # logStep**maxConsecutiveCount = maximumToPrefetch
         #   => logStep = exp(ln(maximumToPrefetch)/maxConsecutiveCount)
         #   => logStep**consecutiveCount = exp(ln(maximumToPrefetch) * consecutiveCount/maxConsecutiveCount)
-        prefetchCount = int(round(math.exp(math.log(maximumToPrefetch) * consecutiveCount / (self.memorySize - 1))))
+        prefetchCount = round(math.exp(math.log(maximumToPrefetch) * consecutiveCount / (self.memorySize - 1)))
         return range(self.lastFetched[-1] + 1, self.lastFetched[-1] + 1 + prefetchCount)
 
 

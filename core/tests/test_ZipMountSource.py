@@ -55,10 +55,10 @@ def create_encrypted_test_file(path):
 
         command = []
         if shutil.which("zip"):
-            command = ["zip", "--encrypt", "--password", password, str(path)] + list(files.keys())
+            command = ["zip", "--encrypt", "--password", password, str(path), *files.keys()]
         elif shutil.which("7z") or shutil.which("7z.exe"):
             binary = "7z" if shutil.which("7z") else "7z.exe"
-            command = [binary, "a", "-p" + password, str(path)] + list(files.keys())
+            command = [binary, "a", "-p" + password, str(path), *files.keys()]
         elif 'pyminizip' in sys.modules:
             print("Create zip file with pyminizip.")
             pyminizip.compress_multiple(list(files.keys()), [], str(path), password, 3)

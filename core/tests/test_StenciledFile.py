@@ -32,7 +32,7 @@ randomTmpFile.write(randomTestData)
 class TestStenciledFile:
     @staticmethod
     def _createStenciledFile(file, stencils):
-        return StenciledFile(fileStencils=[(file,) + stencil for stencil in stencils])
+        return StenciledFile(fileStencils=[(file, *stencil) for stencil in stencils])
 
     @staticmethod
     def test_empty_file():
@@ -50,7 +50,7 @@ class TestStenciledFile:
     @staticmethod
     def test_findStencil():
         stenciledFile = RawStenciledFile(
-            [(tmpFile,) + stencil for stencil in [(1, 2), (2, 2), (0, 2), (4, 4), (1, 8), (0, 1)]]
+            [(tmpFile, *stencil) for stencil in [(1, 2), (2, 2), (0, 2), (4, 4), (1, 8), (0, 1)]]
         )
         expectedResults = [0, 0, 1, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 5]
         for offset, iExpectedStencil in enumerate(expectedResults):

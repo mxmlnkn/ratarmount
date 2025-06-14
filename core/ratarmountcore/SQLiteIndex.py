@@ -601,7 +601,7 @@ class SQLiteIndex:
         ):
             raise InvalidIndexError(
                 f"The modification date for the archive file {storedStats['st_mtime']} "
-                f"to this SQLite index has changed ({str(archiveStats.st_mtime)})",
+                f"to this SQLite index has changed ({archiveStats.st_mtime!s})",
             )
 
     @staticmethod
@@ -940,8 +940,7 @@ class SQLiteIndex:
         self.getConnection().row_factory = oldRowFactory
 
         gotResults = bool(directory)
-        if '' in directory:
-            del directory['']
+        directory.pop('', None)
         return directory if gotResults else None
 
     def listDirModeOnly(self, path: str) -> Optional[Dict[str, int]]:
@@ -964,8 +963,7 @@ class SQLiteIndex:
 
         directory = {row[0]: row[1] for row in rows}
         gotResults = bool(directory)
-        if '' in directory:
-            del directory['']
+        directory.pop('', None)
         return directory if gotResults else None
 
     def fileVersions(self, path: str) -> Dict[str, FileInfo]:

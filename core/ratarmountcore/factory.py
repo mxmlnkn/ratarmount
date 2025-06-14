@@ -34,7 +34,7 @@ try:
     from sshfs import SSHFileSystem
 
     class FixedSSHFileSystem(SSHFileSystem):
-        protocols = ["sftp", "ssh", "scp"]
+        protocols = ("sftp", "ssh", "scp")
         cachable = False
 
         def open(self, *args, **kwargs):
@@ -358,4 +358,4 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
     if joinedFileName and not isinstance(fileOrPath, str):
         return SingleFileMountSource(joinedFileName, fileOrPath)
 
-    raise CompressionError(f"Archive to open ({str(fileOrPath)}) has unrecognized format!")
+    raise CompressionError(f"Archive to open ({fileOrPath!s}) has unrecognized format!")

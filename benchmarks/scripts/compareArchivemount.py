@@ -373,7 +373,7 @@ def plotRatarmountParallelComparison(fileName, compression):
         )
 
     ax.set_ylim([0, ax.get_ylim()[1]])
-    ax.set_yticks(list(ax.get_yticks()) + [1])
+    ax.set_yticks([*ax.get_yticks(), 1])
     ax.grid(axis='y')
 
     ax.legend(loc='best')
