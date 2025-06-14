@@ -108,7 +108,7 @@ class RawStenciledFile(FixedRawIOBase):
     @overrides(io.RawIOBase)
     def fileno(self) -> int:
         # This is a virtual Python level file object and therefore does not have a valid OS file descriptor!
-        raise io.UnsupportedOperation()
+        raise io.UnsupportedOperation
 
     @overrides(io.RawIOBase)
     def seekable(self) -> bool:
@@ -257,7 +257,7 @@ class RawJoinedFileFromFactory(io.RawIOBase):
     @overrides(io.RawIOBase)
     def fileno(self) -> int:
         # This is a virtual Python level file object and therefore does not have a valid OS file descriptor!
-        raise io.UnsupportedOperation()
+        raise io.UnsupportedOperation
 
     @overrides(io.RawIOBase)
     def seekable(self) -> bool:
@@ -393,7 +393,7 @@ class LambdaReaderFile(io.RawIOBase):
     @overrides(io.RawIOBase)
     def fileno(self) -> int:
         # This is a virtual Python level file object and therefore does not have a valid OS file descriptor!
-        raise io.UnsupportedOperation()
+        raise io.UnsupportedOperation
 
     @overrides(io.RawIOBase)
     def seekable(self) -> bool:

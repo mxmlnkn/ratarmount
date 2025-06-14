@@ -5,7 +5,6 @@ import copy
 import io
 import json
 import math
-import multiprocessing.pool
 import os
 import re
 import sqlite3
@@ -59,13 +58,7 @@ class _TarFileMetadataReader:
         self._setxattrs = setxattrs
         self._updateProgressBar = updateProgressBar
         self._recursionDepth = recursionDepth
-
         self._lastUpdateTime = time.time()
-
-        self._futures: List[multiprocessing.pool.AsyncResult] = []
-        self._filesToMountRecursively: List[Tuple] = []
-        self._fileInfos: List[Tuple] = []
-        self._xattrs: List[Tuple] = []
 
     @staticmethod
     def _getTarPrefix(fileObject: IO[bytes], tarInfo: tarfile.TarInfo, printDebug: int) -> Optional[bytes]:
@@ -887,7 +880,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
             # Apply regex transformation to get mount point
             pattern = self.transformRecursiveMountPoint
-            modifiedPath = '/' + ('/'.join([modifiedFolder, modifiedName])).lstrip('/')
+            modifiedPath = '/' + (modifiedFolder + '/' + modifiedName).lstrip('/')
             if isinstance(pattern, (tuple, list)) and len(pattern) == 2:
                 modifiedPath = '/' + re.sub(pattern[0], pattern[1], modifiedPath).lstrip('/')
                 modifiedFolder, modifiedName = modifiedPath.rsplit('/', 1)

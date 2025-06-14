@@ -427,7 +427,7 @@ class BenchmarkSshfsMaxRequests:
 
         with open(data_file_path, 'wb') as csv_file:
             csv_file.write(b"# max requests, size/B, time/s\n")
-            for i in range(repetitions):
+            for _i in range(repetitions):
                 for max_requests in [1, 2, 4, 16, 64, 128, 256, 512, 1024, 4096]:
                     t0 = time.time()
                     size = len(sshfs_fs.open(src_path, max_requests=max_requests).read())
@@ -495,7 +495,7 @@ class BenchmarkSshfsBlockSize:
 
         with open(data_file_path, 'wb') as csv_file:
             csv_file.write(b"# block size/B, size/B, time/s\n")
-            for i in range(repetitions):
+            for _i in range(repetitions):
                 for block_size_in_KiB in [1, 2, 4, 8, 16, 64, 128, 256, 512, 1024, 4096]:
                     block_size = block_size_in_KiB * 1024
                     t0 = time.time()
@@ -543,7 +543,7 @@ class BenchmarkAsyncsshMaxRequests(BenchmarkSshfsMaxRequests):
 
         with open(data_file_path, 'wb') as csv_file:
             csv_file.write(b"# max requests, size/B, time/s\n")
-            for i in range(repetitions):
+            for _i in range(repetitions):
                 for max_requests in [1, 2, 4, 16, 64, 128, 256, 512, 1024, 4096]:
                     t0 = time.time()
                     size = len(BenchmarkAsyncsshMaxRequests.download(src_path, max_requests=max_requests))
@@ -580,7 +580,7 @@ class BenchmarkSshfsOverread:
         csv_file = open(data_file_path, 'wb')
         csv_file.write(b"# chunk size/B, size/B, time/s\n")
 
-        for i in range(repetitions):
+        for _i in range(repetitions):
             for chunk_size_in_KiB in [-1, 4 << 20, 2 << 20, 1 << 20, 512 * 1024, 128 * 1024, 4 * 1024, 32]:
                 chunk_size = chunk_size_in_KiB * 1024 if chunk_size_in_KiB >= 0 else chunk_size_in_KiB
                 chunk_count = (file_size + chunk_size - 1) // chunk_size if chunk_size > 0 else 1
@@ -591,7 +591,7 @@ class BenchmarkSshfsOverread:
 
                     t0 = time.time()
                     size = 0
-                    for i in range(chunk_count):
+                    for _i in range(chunk_count):
                         read_size = len(file.read(chunk_size))
                         # print(f"Read {read_size} out of {chunk_size} for chunk {i}.")
                         size += read_size
@@ -633,9 +633,9 @@ class BenchmarkExample:
 
         # ...
 
-        fig.tight_layout()
-        for extension in ['png', 'pdf']:
-            fig.savefig(data_file_path.rsplit('.', maxsplit=1)[0] + '.' + extension, dpi=plot_dpi)
+        # fig.tight_layout()
+        # for extension in ['png', 'pdf']:
+        #    fig.savefig(data_file_path.rsplit('.', maxsplit=1)[0] + '.' + extension, dpi=plot_dpi)
 
 
 hostname = "127.0.0.1"

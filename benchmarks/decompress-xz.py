@@ -94,7 +94,7 @@ def benchmark_lzma_compress():
 
         while True:
             data = file.read(32 * 1024 * 1024)
-            compressed = lzma.compress(data)
+            lzma.compress(data)
             readSize = len(data)
             if readSize == 0:
                 break

@@ -103,7 +103,7 @@ def simpleParallelZstdReading(filename):
 if __name__ == '__main__':
     for module in ('zstandard', 'indexed_zstd', 'ratarmountcore'):
         if hasattr(sys.modules[module], '__version__'):
-            print(module, "version:", getattr(sys.modules[module], '__version__'))
+            print(module, "version:", sys.modules[module].__version__)
     print()
 
     filename = sys.argv[1]

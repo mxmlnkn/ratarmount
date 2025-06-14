@@ -41,7 +41,6 @@ if benchmarkPrimary:
     # 16_000_000 and fileNameLength=256 does not fit into ~70 GB of free RAM when using /dev/shm.
     #   The problem is the 'view, sort and deduplicate after, unique rows' benchmark.
     #   The 'sort after, no vacuum, unique rows' also already has a database size of 14 426 091 520 B.
-    # nFilesToBenchmark = [3_000, 10_000, 32_000, 100_000, 320_000, 1_000_000, 2_000_000, 4_000_000, 8_000_000]
     nFilesToBenchmark = [
         3_000,
         10_000,
@@ -54,8 +53,6 @@ if benchmarkPrimary:
         8_000_000,
         16_000_000,
     ]
-    # nFilesToBenchmark = [3_000, 10_000, 32_000, 100_000, 320_000, 1_000_000, 2_000_000, 4_000_000, 8_000_000, 16_000_000]
-    # nFilesToBenchmark = [16_000_000]
 else:
     comparePrimaryKeys = False
     comparePostProcessing = False
@@ -109,7 +106,7 @@ schemas.update(
         'varchar,varchar primary key sort after, no vacuum': (
             schemaFilesTemporary,
             # Post-processing
-            f'''
+            '''
             INSERT OR REPLACE INTO "files" SELECT * FROM "filestmp" ORDER BY "path","hash",rowid;
             DROP TABLE "filestmp";
             ''',
@@ -133,7 +130,7 @@ if comparePostProcessing:
             'varchar,varchar primary key sort after, no vacuum, no ORDER BY path-hash': (
                 schemaFilesTemporary,
                 # Post-processing
-                f'''
+                '''
                 INSERT OR REPLACE INTO "files" SELECT * FROM "filestmp" ORDER BY rowid;
                 DROP TABLE "filestmp";
                 ''',
@@ -142,7 +139,7 @@ if comparePostProcessing:
             'varchar,varchar primary key sort after': (
                 schemaFilesTemporary,
                 # Post-processing
-                f'''
+                '''
                 INSERT OR REPLACE INTO "files" SELECT * FROM "filestmp" ORDER BY "path","hash",rowid;
                 DROP TABLE "filestmp";
                 VACUUM;  /* Without VACUUM, the database size is larger than without filestmp! */
@@ -219,7 +216,7 @@ if compareSchemaWithViews:
                 # but the ORDER BY path,name is neither necessary, or probably helpful when inserting into the view,
                 # because, for the actual data, the PRIMARY KEY tuple uses the IDs for each path/name and therefore
                 # may have a different order.
-                f'''
+                '''
                 INSERT OR REPLACE INTO "files" SELECT * FROM "filestmp" ORDER BY rowid;
                 DROP TABLE "filestmp";
                 VACUUM;  /* Without VACUUM, the database size is larger than without filestmp! */
@@ -229,7 +226,7 @@ if compareSchemaWithViews:
             'varchar,varchar view, sort and deduplicate (batch inner join) after': (
                 schemaFilesViewWithTemporary,
                 # Post-processing
-                f'''
+                '''
                 /* The ORDER BY is important for performance! See also the comments for comparing the ORDER BY
                  * on the filestmp -> files INSERT statement comparison. It changes algorithmic complexity!
                  * These statements still have the same complexity as the non-view version, i.e., O(n). */
@@ -276,7 +273,7 @@ if compareSchemaWithViews:
             'varchar,varchar view, sort and deduplicate (batch insert trigger) after': (
                 schemaFilesViewWithTemporary,
                 # Post-processing
-                f'''
+                '''
                 INSERT OR IGNORE INTO paths(value) SELECT DISTINCT "path" FROM "filestmp" ORDER BY "path";
                 INSERT OR IGNORE INTO hashes(value) SELECT DISTINCT "hash" FROM "filestmp" ORDER BY "hash";
 
@@ -301,7 +298,7 @@ if compareSchemaWithViews:
             'varchar,varchar view, sort and deduplicate (full batch insert trigger) after': (
                 schemaFilesViewWithTemporary,
                 # Post-processing
-                f'''
+                '''
                 DROP TRIGGER IF EXISTS "files_insert";
                 CREATE TRIGGER "files_insert" INSTEAD OF INSERT ON "files"
                 BEGIN
@@ -330,7 +327,7 @@ timeRegexes = {
     # fmt: off
     'name'              : r'(?:Label: (.*)|(CREATE TABLE .*))',
     'tinsert'           : r'Inserting ([0-9]+) file names with [0-9]+ characters took ([0-9.]+) s '
-                          + 'when excluding PRNG time',
+                           'when excluding PRNG time',
     'tselectpath'       : r'Selecting ([0-9]+) paths took ([0-9.]+) s',
     'tselectpathstart'  : r'Selecting ([0-9]+) paths starting with took ([0-9.]+) s',
     'tselecthash'       : r'Selecting ([0-9]+) hashes took ([0-9.]+) s',
@@ -375,7 +372,6 @@ def extractValuesFromBlock(block: str) -> Dict[str, Any]:
 
 
 def extractValuesFromLog(path: str):
-    result = []
     with open(path, 'rt', encoding='utf-8') as file:
         return [extractValuesFromBlock(block) for block in file.read().split('\n\n') if block]
 
@@ -699,7 +695,7 @@ def benchmarkSchemas(nFiles: int, log, plotAllMeasurements: bool) -> None:
         tTotalInsert = sum(insertTimes) + (t1Commit - t0Commit) + (t1Sort - t0Sort)
         log(
             f"Inserting {nFiles} file names with {fileNameLength} characters took {tTotalInsert:.3f} s "
-            + "when excluding PRNG time"
+            "when excluding PRNG time"
         )
 
         if plotAllMeasurements:
@@ -712,7 +708,7 @@ def benchmarkSchemas(nFiles: int, log, plotAllMeasurements: bool) -> None:
 
         ########### SELECT benchmarks ###########
 
-        def benchmarkSelect(entity, sqlCommand, makeRow):
+        def benchmarkSelect(connection, entity, sqlCommand, makeRow, label=label):
             nFilesSelect = (
                 10
                 if 'LIKE' in sqlCommand or entity == 'hashes' or (entity == 'paths' and 'integer primary' in label)
@@ -722,7 +718,7 @@ def benchmarkSchemas(nFiles: int, log, plotAllMeasurements: bool) -> None:
             selectTimes = []
             for i in range(nFilesSelect):
                 t0 = time.time()
-                db.execute(sqlCommand, makeRow(i)).fetchall()
+                connection.execute(sqlCommand, makeRow(i)).fetchall()
                 t1 = time.time()
                 selectTimes += [t1 - t0]
             t1Select = time.time()
@@ -732,6 +728,7 @@ def benchmarkSchemas(nFiles: int, log, plotAllMeasurements: bool) -> None:
             log(f"Selecting {nFilesSelect} {entity} took {tTotalSelectTime:.3f} s excluding PRNG time")
 
         benchmarkSelect(
+            db,
             'paths',
             'SELECT hash FROM files WHERE path == (?)',
             lambda j: (os.urandom(fileNameLength // 2).hex(),),
@@ -741,6 +738,7 @@ def benchmarkSchemas(nFiles: int, log, plotAllMeasurements: bool) -> None:
         # No need to benchmark this after the (path,name) schema, which avoids LIKE match clauses.
         if comparePrimaryKeys:
             benchmarkSelect(
+                db,
                 'paths starting with',
                 'SELECT hash FROM files WHERE path LIKE (?)',
                 lambda j: (os.urandom(fileNameLength // 2).hex() + '%',),
@@ -748,12 +746,14 @@ def benchmarkSchemas(nFiles: int, log, plotAllMeasurements: bool) -> None:
 
             # Normally, selecting only by name is not done! Only selecting by (path,name) tuples.
             benchmarkSelect(
+                db,
                 'hashes',
                 'SELECT path FROM files WHERE "hash" == (?);',
                 lambda j: (np.random.randint(0, nFiles),),
             )
         else:
             benchmarkSelect(
+                db,
                 'path,hash',
                 'SELECT path FROM files WHERE ("path", "hash") == (?,?);',
                 lambda j: (np.random.randint(0, nFiles), np.random.randint(0, nFiles)),

@@ -58,7 +58,7 @@ def checkInputFileType(path: str, printDebug: int = 0) -> str:
                 zstdFile = COMPRESSION_BACKENDS['indexed_std'].open(fileobj)
 
                 # Determining if there are many frames in zstd is O(1) with is_multiframe
-                is_multiframe = getattr(zstdFile, 'is_multiframe')
+                is_multiframe = getattr(zstdFile, 'is_multiframe', None)
                 if is_multiframe and not is_multiframe() and os.stat(path).st_size > 1024 * 1024:
                     print(f"[Warning] The specified file '{path}'")
                     print("[Warning] is compressed using zstd but only contains one zstd frame. This makes it ")
@@ -93,9 +93,9 @@ def checkInputFileType(path: str, printDebug: int = 0) -> str:
 
         # 2. Check for some obscure archive formats.
         supportedCompressions = {
-            id
+            fid
             for backend in list(ARCHIVE_BACKENDS.values()) + list(COMPRESSION_BACKENDS.values())
-            for id in backend.formats
+            for fid in backend.formats
             if all(module in sys.modules for module, _ in backend.requiredModules)
         }
         if not supportedCompressions.intersection(formats):

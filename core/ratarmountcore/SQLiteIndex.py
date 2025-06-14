@@ -612,10 +612,11 @@ class SQLiteIndex:
         # Check arguments used to create the found index.
         # These are only warnings and not forcing a rebuild by default.
         # TODO: Add option to force index rebuild on metadata mismatch?
-        differingArgs = []
-        for arg in argumentsToCheck:
-            if arg in metadata and hasattr(arguments, arg) and metadata[arg] != getattr(arguments, arg):
-                differingArgs.append((arg, metadata[arg], getattr(arguments, arg)))
+        differingArgs = [
+            (arg, metadata[arg], getattr(arguments, arg))
+            for arg in argumentsToCheck
+            if arg in metadata and hasattr(arguments, arg) and metadata[arg] != getattr(arguments, arg)
+        ]
         if differingArgs:
             print("[Warning] The arguments used for creating the found index differ from the arguments ")
             print("[Warning] given for mounting the archive now. In order to apply these changes, ")
@@ -845,7 +846,7 @@ class SQLiteIndex:
             # fmt: on
         )
 
-        fileInfo = FileInfo(
+        return FileInfo(
             # fmt: off
             size     = row['size'],
             mtime    = row['mtime'],
@@ -856,8 +857,6 @@ class SQLiteIndex:
             userdata = [userData],
             # fmt: on
         )
-
-        return fileInfo
 
     @staticmethod
     def normpath(path: str):
@@ -987,8 +986,7 @@ class SQLiteIndex:
         rows = self.getConnection().execute(
             'SELECT * FROM "files" WHERE "path" == (?) AND "name" == (?) ORDER BY "offsetheader" ASC', (path, name)
         )
-        result = {str(version + 1): self._rowToFileInfo(row) for version, row in enumerate(rows)}
-        return result
+        return {str(version + 1): self._rowToFileInfo(row) for version, row in enumerate(rows)}
 
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         """
@@ -1236,7 +1234,7 @@ class SQLiteIndex:
             should not be used, e.g., because the version is incompatible.
         """
         if self.indexIsLoaded():
-            return None
+            return
 
         # Download and/or extract the file to a temporary file if necessary.
 
@@ -1293,7 +1291,7 @@ class SQLiteIndex:
                     _copyToTemp(fileToCopy)
         else:
             if not os.path.isfile(indexFilePath):
-                return None
+                return
 
             with open(indexFilePath, 'rb') as file:
                 decompressedFile = _undoCompression(file)
@@ -1465,8 +1463,8 @@ class SQLiteIndex:
         db = self.getConnection()
 
         if compression in [FileFormatID.BZIP2, FileFormatID.ZSTANDARD]:
-            setBlockOffsets = getattr(fileObject, 'set_block_offsets')
-            getBlockOffsets = getattr(fileObject, 'block_offsets')
+            setBlockOffsets = getattr(fileObject, 'set_block_offsets', None)
+            getBlockOffsets = getattr(fileObject, 'block_offsets', None)
             if not setBlockOffsets or not getBlockOffsets:
                 print("[Warning] The given file object misses the expected methods for getting/setting")
                 print("[Warning] the block offsets. Subsequent loads might be slow.")
@@ -1527,12 +1525,12 @@ class SQLiteIndex:
         if compression in [FileFormatID.XZ]:
             return
 
-        assert False, (
-            f"Could not load or store block offsets for {compression} " "probably because adding support was forgotten!"
+        raise NotImplementedError(
+            f"Could not load or store block offsets for {compression} probably because adding support was forgotten!"
         )
 
     def _loadGzipIndex(self, fileObject: IO[bytes], table: str) -> bool:
-        importIndex = getattr(fileObject, 'import_index')
+        importIndex = getattr(fileObject, 'import_index', None)
         if not importIndex:
             return False
 
@@ -1580,7 +1578,7 @@ class SQLiteIndex:
         return False
 
     def _storeGzipIndex(self, fileObject: IO[bytes]):
-        exportIndex = getattr(fileObject, 'export_index')
+        exportIndex = getattr(fileObject, 'export_index', None)
         if not exportIndex:
             print("[Warning] The given file object misses the expected methods for getting/setting")
             print("[Warning] the block offsets. Subsequent loads might be slow.")

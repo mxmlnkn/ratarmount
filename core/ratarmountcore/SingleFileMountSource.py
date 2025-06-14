@@ -74,7 +74,7 @@ class SingleFileMountSource(MountSource):
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         pathWithSlash = path.rstrip('/') + '/'
         if self.path.startswith(pathWithSlash):
-            fileInfo = FileInfo(
+            return FileInfo(
                 # fmt: off
                 size     = 0,
                 mtime    = self.mtime,
@@ -85,7 +85,6 @@ class SingleFileMountSource(MountSource):
                 userdata = [],
                 # fmt: on
             )
-            return fileInfo
 
         return self._createFileInfo() if path == self.path else None
 

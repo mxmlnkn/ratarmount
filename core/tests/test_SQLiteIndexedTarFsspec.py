@@ -21,7 +21,7 @@ except ImportError:
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.SQLiteIndexedTarFsspec import SQLiteIndexedTarFileSystem as ratarfs  # noqa: E402
+from ratarmountcore.SQLiteIndexedTarFsspec import SQLiteIndexedTarFileSystem as RatarFS  # noqa: E402
 
 
 def findTestFile(relativePathOrName):
@@ -33,7 +33,7 @@ def findTestFile(relativePathOrName):
 
 
 def test_fileSystem():
-    fs = ratarfs(findTestFile('single-file.tar'))
+    fs = RatarFS(findTestFile('single-file.tar'))
 
     assert 'bar' in fs.ls("/", detail=False)
     assert 'bar' in [info['name'] for info in fs.ls("/", detail=True)]

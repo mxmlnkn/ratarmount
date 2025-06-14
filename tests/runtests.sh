@@ -2092,7 +2092,8 @@ checkURLProtocolSSH()
 
     local pid fingerprint publicKey mountPoint port file
     # rm -f ssh_host_key; ssh-keygen -q -N "" -C "" -t ed25519 -f ssh_host_key
-    cat <<EOF > ssh_host_key
+    TMP_FILES_TO_CLEANUP+=('ssh_host_key')
+    cat <<EOF > 'ssh_host_key'
 -----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
 QyNTUxOQAAACA6luxe0F9n0zBbFW6DExxYAMz2tinaHPb9IwLmreJMzgAAAIhe3ftsXt37
@@ -2113,13 +2114,14 @@ EOF
     [[ -f ~/.ssh/id_ed25519 ]] || ssh-keygen -q -N "" -t ed25519 -f ~/.ssh/id_ed25519
     publicKey=$( cat ~/.ssh/id_ed25519.pub )
     file='ssh_user_ca'
+    TMP_FILES_TO_CLEANUP+=("$file")
     if [[ ! -f "$file" ]] || ! 'grep' -q -F "$publicKey" "$file"; then
         echo "$publicKey" >> "$file"
     fi
 
     killRogueSSH
     port=8022
-    python3 tests/start-asyncssh-server.py &
+    python3 'tests/start-asyncssh-server.py' &
     pid=$!
     echo "Started SSH server with process ID $pid"
     sleep 2
@@ -2397,7 +2399,7 @@ checkURLProtocolIPFS()
 checkURLProtocolWebDAV()
 {
     if ! pip show wsgidav &>/dev/null; then
-        echoerr "Skipping WebDAV test because wsigdav package is not installed."
+        echoerr "Skipping WebDAV test because wsgidav package is not installed."
         return 0
     fi
 
@@ -2418,6 +2420,8 @@ checkURLProtocolWebDAV()
     local user password
     user='pqvfumqbqp'
     password='ioweb123GUIweb'
+
+    TMP_FILES_TO_CLEANUP+=('wsgidav-config.yaml')
 
 cat <<EOF > wsgidav-config.yaml
 http_authenticator:
@@ -2526,6 +2530,8 @@ if [[ -z "$CI" ]]; then
     while read -r file; do
         allPythonFiles+=( "$file" )
     done < <( git ls-tree -r --name-only HEAD | 'grep' '[.]py$' )
+
+    ruff check --fix --unsafe-fixes --config tests/.ruff.toml -- "${allPythonFiles[@]}"
 
     testFiles=()
     while read -r file; do

@@ -46,6 +46,7 @@ def readLabelsFromFirstComment(fileName):
             line = line.strip()
             if line[0] == '#':
                 return line[1:].strip().split(' ')
+        return None
 
 
 def loadData(fileName):
@@ -336,7 +337,7 @@ def plotRatarmountParallelComparison(fileName, compression):
             return None
 
         nFiles = sdf.apply(lambda row: row['nFolders'] * row['nFilesPerFolder'], axis=1)
-        sdf = sdf.assign(**{'nFiles': nFiles})
+        sdf = sdf.assign(nFiles=nFiles)
 
         sdf = sdf.loc[:, ['nFiles', 'duration/s']]
         sdf = sdf.groupby('nFiles')

@@ -272,11 +272,12 @@ def findModuleVersion(moduleOrName: Union[str, types.ModuleType]) -> Optional[st
     # And note that importlib.metadata has only been introduced in Python 3.8 and has been
     # provisional until including Python 3.9, meaning it can still take years to be available
     # and stable on all systems or I have to add yet another dependency just to get the damn version.
-    if hasattr(module, '__version__'):
-        return str(getattr(module, '__version__'))
+    version = getattr(module, '__version__', None)
+    if version:
+        return str(version)
 
-    if hasattr(module, '__file__'):
-        moduleFilePath = getattr(module, '__file__')
+    moduleFilePath = getattr(module, '__file__', None)
+    if moduleFilePath:
         for distribution in imeta.distributions():
             try:
                 if distributionContainsFile(distribution, moduleFilePath) and 'Version' in distribution.metadata:

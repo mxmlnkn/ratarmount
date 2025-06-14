@@ -419,9 +419,7 @@ class TestSQLiteIndexedTarParallelized:
                     for i in range(parallelism)
                 ]
 
-                results = []
-                for i in range(parallelism):
-                    results.append(pool.submit(read_sequences, files[i], i % 2 == 0))
+                results = [pool.submit(read_sequences, files[i], i % 2 == 0) for i in range(parallelism)]
                 for result in results:
                     result.result()
 

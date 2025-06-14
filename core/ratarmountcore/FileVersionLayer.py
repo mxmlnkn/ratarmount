@@ -73,7 +73,7 @@ class FileVersionLayer(MountSource):
                 continue
 
             # Simply append normal existing folders
-            tmpFilePath = '/'.join([filePath, part])
+            tmpFilePath = filePath + '/' + part
             if self.mountSource.getFileInfo(tmpFilePath):
                 filePath = tmpFilePath
                 fileVersion = 0
@@ -156,7 +156,7 @@ class FileVersionLayer(MountSource):
         files = listDir(path)
         if files is not None:
             if isinstance(files, dict):
-                for _, fileInfo in files.items():
+                for fileInfo in files.values():
                     if isinstance(fileInfo, FileInfo):
                         fileInfo.userdata.append(FileType.FILE)
             return files
@@ -174,7 +174,7 @@ class FileVersionLayer(MountSource):
         if not pathIsSpecialVersionsFolder:
             files = listDir(path)
             if isinstance(files, dict):
-                for _, fileInfo in files.items():
+                for fileInfo in files.values():
                     if isinstance(fileInfo, FileInfo):
                         fileInfo.userdata.append(FileType.FILE)
             return files

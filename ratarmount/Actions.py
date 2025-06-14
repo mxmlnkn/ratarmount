@@ -507,8 +507,8 @@ def createFuseMount(args) -> None:
 
     from .FuseMount import FuseMount  # pylint: disable=import-outside-toplevel
 
+    # fmt: off
     with FuseMount(
-        # fmt: off
         pathToMount                  = args.mount_source,
         clearIndexCache              = bool(args.recreate_index),
         recursive                    = bool(args.recursive),
@@ -535,8 +535,7 @@ def createFuseMount(args) -> None:
         maxCacheEntries              = args.union_mount_cache_max_entries,
         maxSecondsToCache            = args.union_mount_cache_timeout,
         indexMinimumFileCount        = args.index_minimum_file_count,
-        # fmt: on
-    ) as fuseOperationsObject:
+    ) as fuseOperationsObject:  # fmt: on
         try:
             # Note that this will not detect threads started in shared libraries, only those started via "threading".
             if not args.foreground and len(threading.enumerate()) > 1:

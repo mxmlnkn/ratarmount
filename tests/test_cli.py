@@ -87,7 +87,7 @@ class RunRatarmount:
             if any(word in output or word in errors for word in problematicWords):
                 print("===== stdout =====\n", output)
                 print("===== stderr =====\n", errors)
-                assert False, "There were warnings or errors during execution of ratarmount!"
+                raise AssertionError("There were warnings or errors during execution of ratarmount!")
 
         finally:
             self.unmount()
@@ -122,7 +122,7 @@ class RunRatarmount:
                     mount_list += f"\n{exception}"
                 raise RuntimeError(
                     "Expected mount point but it isn't one!"
-                    + "\n===== stderr =====\n"
+                    "\n===== stderr =====\n"
                     + self.getStderr()
                     + "\n===== stdout =====\n"
                     + self.getStdout()
@@ -149,10 +149,6 @@ class RunRatarmount:
 # https://github.com/libarchive/libarchive/issues/579#issuecomment-118440525
 @pytest.mark.parametrize("compression", ["rar", "zip"] + ([] if sqlcipher3 is None else ["sqlar"]))
 def test_password(tmpdir, compression):
-    # The file object returned by ZipFile.open is not seekable in Python 3.6 for some reason.
-    if compression == "zip" and sys.version_info[0] == 3 and sys.version_info[1] <= 6:
-        return
-
     password = 'foo'
     mountPoint = str(tmpdir)
     with copyTestFile("encrypted-nested-tar." + compression) as encryptedFile, RunRatarmount(
@@ -169,10 +165,6 @@ def test_password(tmpdir, compression):
 @pytest.mark.parametrize("compression", ["rar", "zip"])
 @pytest.mark.parametrize("passwords", [["foo"], ["foo", "bar"], ["bar", "foo"]])
 def test_password_list(tmpdir, passwords, compression):
-    # The file object returned by ZipFile.open is not seekable in Python 3.6 for some reason.
-    if compression == "zip" and sys.version_info[0] == 3 and sys.version_info[1] <= 6:
-        return
-
     passwordFile = os.path.join(tmpdir, "passwords")
     mountPoint = os.path.join(tmpdir, "mountPoint")
 
@@ -354,7 +346,7 @@ if ext4:
 
 
 @pytest.mark.parametrize("parallelization", [1, 2, 0])
-@pytest.mark.parametrize("checksum,archivePath,pathInArchive", ARCHIVES_TO_TEST)
+@pytest.mark.parametrize(("checksum", "archivePath", "pathInArchive"), ARCHIVES_TO_TEST)
 def test_file_in_archive(archivePath, pathInArchive, checksum, parallelization):
     with copyTestFile(archivePath) as tmpArchive:
         assert os.path.isfile(tmpArchive)
