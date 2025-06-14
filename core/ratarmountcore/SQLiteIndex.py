@@ -585,12 +585,15 @@ class SQLiteIndex:
         storedStats = json.loads(metadata['tarstats'])
         archiveStats = os.stat(archiveFilePath)
 
-        if hasattr(archiveStats, "st_size") and 'st_size' in storedStats:
-            if archiveStats.st_size < storedStats['st_size']:
-                raise InvalidIndexError(
-                    f"Archive for this SQLite index has shrunk in size from "
-                    f"{storedStats['st_size']} to {archiveStats.st_size}"
-                )
+        if (
+            hasattr(archiveStats, 'st_size')
+            and 'st_size' in storedStats
+            and archiveStats.st_size < storedStats['st_size']
+        ):
+            raise InvalidIndexError(
+                f"Archive for this SQLite index has shrunk in size from "
+                f"{storedStats['st_size']} to {archiveStats.st_size}"
+            )
 
         # Only happens very rarely, e.g., for more recent files with the same size.
         if (

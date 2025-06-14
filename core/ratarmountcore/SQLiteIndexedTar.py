@@ -1139,7 +1139,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
         # Sizes should be determined and larger or equal
         if (
-            not hasattr(archiveStats, "st_size")
+            not hasattr(archiveStats, 'st_size')
             or 'st_size' not in storedStats
             or archiveStats.st_size < storedStats['st_size']
         ):
@@ -1228,7 +1228,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             storedStats = json.loads(metadata['tarstats'])
             tarStats = os.stat(self.tarFileName)
 
-            if hasattr(tarStats, "st_size") and 'st_size' in storedStats:
+            if hasattr(tarStats, 'st_size') and 'st_size' in storedStats:
                 if tarStats.st_size < storedStats['st_size']:
                     raise InvalidIndexError(
                         f"TAR file for this SQLite index has shrunk in size from "
@@ -1346,51 +1346,52 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 offsetHeader = int(row[2])
                 offsetData = int(row[3])
                 headerBlockCount = max(1, math.ceil((offsetData - offsetHeader) / 512)) * 512
-                with StenciledFile(fileStencils=[(self.tarFileObject, offsetHeader, headerBlockCount)]) as file:
-                    with tarfile.open(fileobj=file, mode='r|', ignore_zeros=True, encoding=self.encoding) as archive:
-                        tarInfo = next(iter(archive))
-                        realFileInfos, _, _, _ = _TarFileMetadataReader._processTarInfo(
-                            tarInfo,
-                            file,  # only used for isGnuIncremental == True
-                            "",  # pathPrefix
-                            offsetHeader,  # will be added to all offsets to get the real offset
-                            isGnuIncremental=self._isGnuIncremental,
-                            mountRecursively=False,
-                            transform=self.transform,
-                            recursionDepth=0,
-                            printDebug=self.printDebug,
-                        )
+                with StenciledFile(
+                    fileStencils=[(self.tarFileObject, offsetHeader, headerBlockCount)]
+                ) as file, tarfile.open(fileobj=file, mode='r|', ignore_zeros=True, encoding=self.encoding) as archive:
+                    tarInfo = next(iter(archive))
+                    realFileInfos, _, _, _ = _TarFileMetadataReader._processTarInfo(
+                        tarInfo,
+                        file,  # only used for isGnuIncremental == True
+                        "",  # pathPrefix
+                        offsetHeader,  # will be added to all offsets to get the real offset
+                        isGnuIncremental=self._isGnuIncremental,
+                        mountRecursively=False,
+                        transform=self.transform,
+                        recursionDepth=0,
+                        printDebug=self.printDebug,
+                    )
 
-                        if not realFileInfos:
+                    if not realFileInfos:
+                        return False
+                    realFileInfo = realFileInfos[0]
+
+                    # Bool columns will have been converted to int 0 or 1 when reading from SQLite.
+                    # In order to compare with the read result correctly, we need to convert them to bool, too.
+                    storedFileInfo = list(row)
+                    for index in [-1, -2]:
+                        if storedFileInfo[index] not in [0, 1]:
                             return False
-                        realFileInfo = realFileInfos[0]
+                        storedFileInfo[index] = bool(storedFileInfo[index])
 
-                        # Bool columns will have been converted to int 0 or 1 when reading from SQLite.
-                        # In order to compare with the read result correctly, we need to convert them to bool, too.
-                        storedFileInfo = list(row)
-                        for index in [-1, -2]:
-                            if storedFileInfo[index] not in [0, 1]:
-                                return False
-                            storedFileInfo[index] = bool(storedFileInfo[index])
+                    # Do not compare the path because it might have the parent TAR prepended to it for
+                    # recursive TARs and this is hard to ignore any other way.
+                    storedFileInfo[0] = realFileInfo[0]  # path
+                    storedFileInfo[11] = realFileInfo[11]  # isTar
 
-                        # Do not compare the path because it might have the parent TAR prepended to it for
-                        # recursive TARs and this is hard to ignore any other way.
-                        storedFileInfo[0] = realFileInfo[0]  # path
-                        storedFileInfo[11] = realFileInfo[11]  # isTar
-
-                        commonSize = min(len(storedFileInfo), len(realFileInfo))
-                        # Do not check newly added columns such as isgenerated and recursiondepth.
-                        if commonSize > 13:
-                            storedFileInfo[13] = realFileInfo[13]  # is generated
-                        if commonSize > 14:
-                            storedFileInfo[14] = realFileInfo[14]  # recursion depth
-                        if storedFileInfo[:commonSize] != list(realFileInfo)[:commonSize]:
-                            if self.printDebug >= 3:
-                                print("[Info] Stored file info:")
-                                print("[Info]", storedFileInfo)
-                                print("[Info] differs from recomputed one:")
-                                print("[Info]", realFileInfo)
-                            return False
+                    commonSize = min(len(storedFileInfo), len(realFileInfo))
+                    # Do not check newly added columns such as isgenerated and recursiondepth.
+                    if commonSize > 13:
+                        storedFileInfo[13] = realFileInfo[13]  # is generated
+                    if commonSize > 14:
+                        storedFileInfo[14] = realFileInfo[14]  # recursion depth
+                    if storedFileInfo[:commonSize] != list(realFileInfo)[:commonSize]:
+                        if self.printDebug >= 3:
+                            print("[Info] Stored file info:")
+                            print("[Info]", storedFileInfo)
+                            print("[Info] differs from recomputed one:")
+                            print("[Info]", realFileInfo)
+                        return False
 
             return True
         except tarfile.TarError:
