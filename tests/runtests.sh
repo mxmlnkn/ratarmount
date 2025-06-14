@@ -1880,15 +1880,12 @@ checkURLProtocolHTTP()
     wget -O /dev/null 127.0.0.1:$port
 
 
-    local check
-    for check in checkFileInTARForeground checkFileInTAR; do
-        $check "$protocol://127.0.0.1:$port/tests/single-file.tar" 'bar' d3b07384d113edec49eaa6238ad5ff00 ||
-            returnError "$LINENO" 'Failed to read from HTTP server'
-        $check "$protocol://127.0.0.1:$port/tests/" 'single-file.tar' 1a28538854d1884e4415cb9bfb7a2ad8 ||
-            returnError "$LINENO" 'Failed to read from HTTP server'
-        $check "$protocol://127.0.0.1:$port/tests" 'single-file.tar' 1a28538854d1884e4415cb9bfb7a2ad8 ||
-            returnError "$LINENO" 'Failed to read from HTTP server'
-    done
+    checkFileInTARForeground "$protocol://127.0.0.1:$port/tests/single-file.tar" 'bar' d3b07384d113edec49eaa6238ad5ff00 ||
+        returnError "$LINENO" 'Failed to read from HTTP server'
+    checkFileInTARForeground "$protocol://127.0.0.1:$port/tests/" 'single-file.tar' 1a28538854d1884e4415cb9bfb7a2ad8 ||
+        returnError "$LINENO" 'Failed to read from HTTP server'
+    checkFileInTARForeground "$protocol://127.0.0.1:$port/tests" 'single-file.tar' 1a28538854d1884e4415cb9bfb7a2ad8 ||
+        returnError "$LINENO" 'Failed to read from HTTP server'
 
     kill $pid &>/dev/null
     rmdir "$mountPoint"
@@ -2131,15 +2128,12 @@ EOF
 
     mountPoint=$( mktemp -d --suffix .test.ratarmount )
 
-    local check
-    for check in checkFileInTARForeground checkFileInTAR; do
-        $check "ssh://127.0.0.1:$port/tests/single-file.tar" 'bar' d3b07384d113edec49eaa6238ad5ff00 ||
-            returnError "$LINENO" 'Failed to read from SSH server'
-        $check "ssh://127.0.0.1:$port/tests/" 'single-file.tar' 1a28538854d1884e4415cb9bfb7a2ad8 ||
-            returnError "$LINENO" 'Failed to read from SSH server'
-        $check "ssh://127.0.0.1:$port/tests" 'single-file.tar' 1a28538854d1884e4415cb9bfb7a2ad8 ||
-            returnError "$LINENO" 'Failed to read from SSH server'
-    done
+    checkFileInTARForeground "ssh://127.0.0.1:$port/tests/single-file.tar" 'bar' d3b07384d113edec49eaa6238ad5ff00 ||
+        returnError "$LINENO" 'Failed to read from SSH server'
+    checkFileInTARForeground "ssh://127.0.0.1:$port/tests/" 'single-file.tar' 1a28538854d1884e4415cb9bfb7a2ad8 ||
+        returnError "$LINENO" 'Failed to read from SSH server'
+    checkFileInTARForeground "ssh://127.0.0.1:$port/tests" 'single-file.tar' 1a28538854d1884e4415cb9bfb7a2ad8 ||
+        returnError "$LINENO" 'Failed to read from SSH server'
 
     kill $pid
     killRogueSSH
@@ -2311,15 +2305,12 @@ client.upload_file(path, bucket_name, 'single-file.tar')
     export AWS_SECRET_ACCESS_KEY=0123456789012345678901234567890123456789
 
     # At last, test ratarmount.
-    local check
-    for check in checkFileInTARForeground checkFileInTAR; do
-        $check "s3://bucket/single-file.tar" 'bar' d3b07384d113edec49eaa6238ad5ff00 ||
-            returnError "$LINENO" 'Failed to read from S3 server'
-        $check "s3://bucket/" 'single-file.tar' 1a28538854d1884e4415cb9bfb7a2ad8 ||
-            returnError "$LINENO" 'Failed to read from S3 server'
-        $check "s3://bucket" 'single-file.tar' 1a28538854d1884e4415cb9bfb7a2ad8 ||
-            returnError "$LINENO" 'Failed to read from S3 server'
-    done
+    checkFileInTARForeground "s3://bucket/single-file.tar" 'bar' d3b07384d113edec49eaa6238ad5ff00 ||
+        returnError "$LINENO" 'Failed to read from S3 server'
+    checkFileInTARForeground "s3://bucket/" 'single-file.tar' 1a28538854d1884e4415cb9bfb7a2ad8 ||
+        returnError "$LINENO" 'Failed to read from S3 server'
+    checkFileInTARForeground "s3://bucket" 'single-file.tar' 1a28538854d1884e4415cb9bfb7a2ad8 ||
+        returnError "$LINENO" 'Failed to read from S3 server'
 
     kill $pid &>/dev/null
 
@@ -2396,13 +2387,10 @@ checkURLProtocolIPFS()
     #added QmcbpsdbKYMpMjXvoFbr9pUWC3Z7ZQVXuEoPFRHaNukAsX tests/single-file.tar
     #added QmZwm9gKZaayGWqYtMgj6cd4JaNK1Yp2ChYZhXrERGq4Gi tests
 
-    local check
-    for check in checkFileInTARForeground checkFileInTAR; do
-        $check "ipfs://QmcbpsdbKYMpMjXvoFbr9pUWC3Z7ZQVXuEoPFRHaNukAsX" bar \
-            d3b07384d113edec49eaa6238ad5ff00 || returnError "$LINENO" 'Failed to read from IPFS'
-        $check "ipfs://QmZwm9gKZaayGWqYtMgj6cd4JaNK1Yp2ChYZhXrERGq4Gi" single-file.tar \
-            1a28538854d1884e4415cb9bfb7a2ad8 || returnError "$LINENO" 'Failed to read from IPFS'
-    done
+    checkFileInTARForeground "ipfs://QmcbpsdbKYMpMjXvoFbr9pUWC3Z7ZQVXuEoPFRHaNukAsX" bar \
+        d3b07384d113edec49eaa6238ad5ff00 || returnError "$LINENO" 'Failed to read from IPFS'
+    checkFileInTARForeground "ipfs://QmZwm9gKZaayGWqYtMgj6cd4JaNK1Yp2ChYZhXrERGq4Gi" single-file.tar \
+        1a28538854d1884e4415cb9bfb7a2ad8 || returnError "$LINENO" 'Failed to read from IPFS'
 
     if [[ -n "$pid" ]]; then kill "$pid"; fi
 }
@@ -2422,13 +2410,10 @@ checkURLProtocolWebDAV()
     local pid=$!
     sleep 5
 
-    local check
-    for check in checkFileInTARForeground checkFileInTAR; do
-        $check "webdav://127.0.0.1:$port/single-file.tar" bar \
-            d3b07384d113edec49eaa6238ad5ff00 || returnError "$LINENO" 'Failed to read from WebDAV server'
-        $check "webdav://127.0.0.1:$port" single-file.tar \
-            1a28538854d1884e4415cb9bfb7a2ad8 || returnError "$LINENO" 'Failed to read from WebDAV server'
-    done
+    checkFileInTARForeground "webdav://127.0.0.1:$port/single-file.tar" bar \
+        d3b07384d113edec49eaa6238ad5ff00 || returnError "$LINENO" 'Failed to read from WebDAV server'
+    checkFileInTARForeground "webdav://127.0.0.1:$port" single-file.tar \
+        1a28538854d1884e4415cb9bfb7a2ad8 || returnError "$LINENO" 'Failed to read from WebDAV server'
 
     kill "$pid"
 
@@ -2456,22 +2441,19 @@ EOF
     pid=$!
     sleep 5
 
-    local check
-    for check in checkFileInTARForeground checkFileInTAR; do
-        $check "webdav://$user:$password@127.0.0.1:$port/single-file.tar" bar \
-            d3b07384d113edec49eaa6238ad5ff00 || returnError "$LINENO" 'Failed to read from WebDAV server'
-        $check "webdav://$user:$password@127.0.0.1:$port" single-file.tar \
-            1a28538854d1884e4415cb9bfb7a2ad8 || returnError "$LINENO" 'Failed to read from WebDAV server'
+    checkFileInTARForeground "webdav://$user:$password@127.0.0.1:$port/single-file.tar" bar \
+        d3b07384d113edec49eaa6238ad5ff00 || returnError "$LINENO" 'Failed to read from WebDAV server'
+    checkFileInTARForeground "webdav://$user:$password@127.0.0.1:$port" single-file.tar \
+        1a28538854d1884e4415cb9bfb7a2ad8 || returnError "$LINENO" 'Failed to read from WebDAV server'
 
-        export WEBDAV_USER=$user
-        export WEBDAV_PASSWORD=$password
-        $check "webdav://127.0.0.1:$port/single-file.tar" bar \
-            d3b07384d113edec49eaa6238ad5ff00 || returnError "$LINENO" 'Failed to read from WebDAV server'
-        $check "webdav://127.0.0.1:$port" single-file.tar \
-            1a28538854d1884e4415cb9bfb7a2ad8 || returnError "$LINENO" 'Failed to read from WebDAV server'
-        unset WEBDAV_USER
-        unset WEBDAV_PASSWORD
-    done
+    export WEBDAV_USER=$user
+    export WEBDAV_PASSWORD=$password
+    checkFileInTARForeground "webdav://127.0.0.1:$port/single-file.tar" bar \
+        d3b07384d113edec49eaa6238ad5ff00 || returnError "$LINENO" 'Failed to read from WebDAV server'
+    checkFileInTARForeground "webdav://127.0.0.1:$port" single-file.tar \
+        1a28538854d1884e4415cb9bfb7a2ad8 || returnError "$LINENO" 'Failed to read from WebDAV server'
+    unset WEBDAV_USER
+    unset WEBDAV_PASSWORD
 
     # This server using SSL also works, but do not overload it with regular tests.
     # ratarmount 'webdav://www.dlp-test.com\WebDAV:WebDAV@www.dlp-test.com/webdav' mounted
