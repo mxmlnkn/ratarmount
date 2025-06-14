@@ -3,7 +3,7 @@ target-version = "py37"
 
 [lint]
 select = [
-    "A", "B", "E", "F", "G", "I", "W", "N", "ASYNC", "COM", "FLY", "FURB", "ICN", "INT", "ISC", "LOG",
+    "A", "B", "E", "F", "G", "I", "W", "N", "ASYNC", "C4", "COM", "FLY", "FURB", "ICN", "INT", "ISC", "LOG",
     "PERF", "PIE", "PLW", "PT", "PYI", "RET", "RSE", "TID", "TC", "UP", "YTT"
 ]
 ignore = ["F401", "N802", "N803", "N806", "N815", "N816", "N999", "COM812", "PERF203", "PLW0603", "PLW2901", "TC006"]

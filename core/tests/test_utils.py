@@ -114,11 +114,11 @@ def test_LRUCache():
     assert 32 not in cache
     assert cache[33] == 133
 
-    assert sorted(list(cache.keys())) == [6, 7, 33]
+    assert sorted(cache.keys()) == [6, 7, 33]
     del cache[33]
     assert len(cache) == 2
     assert 33 not in cache
-    assert sorted(list(cache.keys())) == [6, 7]
+    assert sorted(cache.keys()) == [6, 7]
 
     cache.clear()
     assert not cache

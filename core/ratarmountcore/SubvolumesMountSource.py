@@ -63,9 +63,7 @@ class SubvolumesMountSource(MountSource):
 
     def _listDir(self, path: str, onlyMode: bool):
         if path == '/':
-            return {
-                name: self.rootFileInfo.mode if onlyMode else self.rootFileInfo for name in self.mountSources.keys()
-            }
+            return dict.fromkeys(self.mountSources.keys(), self.rootFileInfo.mode if onlyMode else self.rootFileInfo)
 
         result = self._findMountSource(path)
         if result is None:

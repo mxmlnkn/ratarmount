@@ -480,12 +480,12 @@ class SQLiteIndex:
                 makeVersionRow('index', SQLiteIndex.__version__),
             ]
 
-            for moduleName in set(
+            for moduleName in {
                 module
                 for info in COMPRESSION_BACKENDS.values()
                 for module, _ in info.requiredModules
                 if module in sys.modules
-            ):
+            }:
                 moduleVersion = findModuleVersion(sys.modules[moduleName])
                 if moduleVersion:
                     versions += [makeVersionRow(moduleName, moduleVersion)]
@@ -1632,5 +1632,4 @@ class SQLiteIndex:
         if 'gzipindex' in tables or 'gzipindexes' in tables:
             table = 'gzipindexes' if 'gzipindexes' in tables else 'gzipindex'
             return SQLiteBlobsFile(connection, table, 'data', buffer_size=SQLiteIndex._MAX_BLOB_SIZE)
-
         return None

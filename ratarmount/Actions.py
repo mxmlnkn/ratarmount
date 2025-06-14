@@ -153,16 +153,16 @@ def printVersions() -> None:
 
     mappedFilesFolder = f"/proc/{os.getpid()}/map_files"
     if os.path.isdir(mappedFilesFolder):
-        libraries = set(os.readlink(os.path.join(mappedFilesFolder, link)) for link in os.listdir(mappedFilesFolder))
+        libraries = {os.readlink(os.path.join(mappedFilesFolder, link)) for link in os.listdir(mappedFilesFolder)}
         # Only look for shared libraries with versioning suffixed. Ignore all ending on .so.
-        libraries = set(library for library in libraries if '.so.' in library)
+        libraries = {library for library in libraries if '.so.' in library}
 
         if libraries:
             print()
             print("Versioned Loaded Shared Libraries:")
             print()
 
-        for library in sorted(list(libraries)):
+        for library in sorted(libraries):
             print(library.rsplit('/', maxsplit=1)[-1])
 
 

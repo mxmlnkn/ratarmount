@@ -48,7 +48,7 @@ def plotMemoryOverTime(fileNames, plotFileName='memory-over-time', fileNameSizeM
 
     colorCycler = cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
     groupToColor = {}
-    for key in sorted(list(set([getColorGroup(name) for name in fileNames]))):
+    for key in sorted({getColorGroup(name) for name in fileNames}):
         if key not in groupToColor:
             groupToColor[key] = next(colorCycler)
 
@@ -60,7 +60,7 @@ def plotMemoryOverTime(fileNames, plotFileName='memory-over-time', fileNameSizeM
 
     groupToLineStyle = {}
     lineCycler = cycle([":", "--", "-", "-."])
-    for key in sorted(list(set([getLineStyleGroup(name) for name in fileNames]))):
+    for key in sorted({getLineStyleGroup(name) for name in fileNames}):
         if key not in groupToLineStyle:
             groupToLineStyle[key] = next(lineCycler)
 

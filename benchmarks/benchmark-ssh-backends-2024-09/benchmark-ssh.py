@@ -182,7 +182,7 @@ class BenchmarkFullRead:
             return np.mean(t), np.std(t, ddof=1)
 
         results = {label: compute_statistics(np.array(bandwidths)) for label, bandwidths in data.items()}
-        bar_labels = sorted(list(results.keys()), key=lambda x: results[x][0])
+        bar_labels = sorted(results.keys(), key=lambda x: results[x][0])
 
         bar_positions = np.arange(len(bar_labels))
         bar_values = [results[x][0] for x in bar_labels]
@@ -465,7 +465,7 @@ class BenchmarkSshfsMaxRequests:
             return np.mean(t), np.std(t, ddof=1)
 
         results = {label: compute_statistics(np.array(bandwidths)) for label, bandwidths in data.items()}
-        bar_labels = sorted(list(results.keys()))
+        bar_labels = sorted(results.keys())
 
         bar_positions = np.arange(len(bar_labels))
         bar_values = [results[x][0] for x in bar_labels]
