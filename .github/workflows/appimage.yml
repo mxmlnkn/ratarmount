@@ -111,6 +111,8 @@ jobs:
     - uses: ncipollo/release-action@v1
       with:
         artifacts: "ratarmount*-x86_64.AppImage"
+        tag: "nightly"
+        commit: "master"
         name: "Nightly Release"
         allowUpdates: true
         removeArtifacts: true
