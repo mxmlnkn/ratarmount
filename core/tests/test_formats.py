@@ -34,7 +34,7 @@ def test_format_detection():
             # The caching should not change the results!
             formats = detectFormats(file)
             assert formats == {fid for fid, info in FILE_FORMATS.items() if mightBeFormat(file, info)}, name
-            assert formats == {fid for fid in FILE_FORMATS.keys() if mightBeFormat(file, fid)}, name
+            assert formats == {fid for fid in FILE_FORMATS if mightBeFormat(file, fid)}, name
 
             splitName = name.rsplit('.', 1)
             if len(splitName) > 1 and name and name[0] != '.':

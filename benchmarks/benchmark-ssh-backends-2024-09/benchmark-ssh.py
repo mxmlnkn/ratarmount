@@ -526,10 +526,9 @@ class BenchmarkAsyncsshMaxRequests(BenchmarkSshfsMaxRequests):
         ssh_options = load_config()
 
         async def run_client():
-            async with asyncssh.connect(hostname, port, options=ssh_options) as conn:
-                async with conn.start_sftp_client() as sftp:
-                    file = await sftp.open(path, "rb")
-                    return await file.read()
+            async with asyncssh.connect(hostname, port, options=ssh_options) as conn, conn.start_sftp_client() as sftp:
+                file = await sftp.open(path, "rb")
+                return await file.read()
 
         try:
             return asyncio.run(run_client())

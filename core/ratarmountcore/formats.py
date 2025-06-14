@@ -227,9 +227,7 @@ def _checkZlibHeader(fileobj: IO[bytes]) -> bool:
     if ((cmf << 8) + flags) % 31 != 0:
         return False
     usesDictionary = ((flags >> 5) & 1) != 0
-    if usesDictionary:
-        return False
-    return True
+    return not usesDictionary
 
 
 def _isBZIP2(fileobj: IO[bytes]) -> bool:

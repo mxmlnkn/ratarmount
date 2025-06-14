@@ -244,7 +244,7 @@ def getModule(module: Union[str, types.ModuleType]) -> Optional[types.ModuleType
             importlib.import_module(module)
         except ImportError:
             pass
-    return sys.modules[module] if module in sys.modules else None
+    return sys.modules.get(module, None)
 
 
 def findModuleVersion(moduleOrName: Union[str, types.ModuleType]) -> Optional[str]:

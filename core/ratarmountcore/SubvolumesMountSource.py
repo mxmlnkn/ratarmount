@@ -14,7 +14,7 @@ class SubvolumesMountSource(MountSource):
         self.mountSources: Dict[str, MountSource] = mountSources
         self.printDebug = printDebug
 
-        for name in self.mountSources.keys():
+        for name in self.mountSources:
             if '/' in name:
                 raise ValueError(f"Mount source names may not contain slashes! ({name})")
 

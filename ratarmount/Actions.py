@@ -496,9 +496,8 @@ def createFuseMount(args) -> None:
         fusekwargs['modules'] = 'subdir'
         fusekwargs['subdir'] = args.prefix
 
-    if os.path.isdir(args.mount_point) and os.listdir(args.mount_point):
-        if hasFUSENonEmptySupport():
-            fusekwargs['nonempty'] = True
+    if os.path.isdir(args.mount_point) and os.listdir(args.mount_point) and hasFUSENonEmptySupport():
+        fusekwargs['nonempty'] = True
 
     from .FuseMount import FuseMount  # pylint: disable=import-outside-toplevel
 

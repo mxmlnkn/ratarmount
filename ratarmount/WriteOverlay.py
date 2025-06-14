@@ -281,10 +281,7 @@ class WritableFolderMountSource(fuse.Operations):
     def utimens(self, path, times=None):
         """Argument "times" is a (atime, mtime) tuple. If "times" is None, use the current time."""
 
-        if times is None:
-            mtime = time.time()
-        else:
-            mtime = times[1]
+        mtime = time.time() if times is None else times[1]
 
         self._setFileMetadata(path, lambda p: os.utime(p, times), {'mtime': mtime})
 
@@ -520,7 +517,7 @@ def commitOverlay(writeOverlay: str, tarFile: str, encoding: str = tarfile.ENCOD
 
     def runWithoutLocale(*args, check=True, **kwargs):
         adjustedEnvironment = os.environ.copy()
-        for key in [k for k in adjustedEnvironment.keys() if k.startswith('LC_')]:
+        for key in [k for k in adjustedEnvironment if k.startswith('LC_')]:
             del adjustedEnvironment[key]
         adjustedEnvironment['LC_LANG'] = 'C'
         adjustedEnvironment['LANGUAGE'] = 'C'
