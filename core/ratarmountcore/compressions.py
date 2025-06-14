@@ -711,10 +711,10 @@ def detectCompression(
     # isinstance(fileobj, io.IOBase) does not work for everything, e.g., for paramiko.sftp_file.SFTPFile
     # because it does not inherit from io.IOBase. Therefore, do duck-typing and test for required methods.
     expectedMethods = ['seekable', 'seek', 'read', 'tell']
-    isFileObject = any(not hasattr(fileobj, method) for method in expectedMethods)
-    if isFileObject or not fileobj.seekable():
+    isNotFileObject = any(not hasattr(fileobj, method) for method in expectedMethods)
+    if isNotFileObject or not fileobj.seekable():
         if printDebug >= 2:
-            seekable = fileobj.seekable() if isFileObject else None
+            seekable = None if isNotFileObject else fileobj.seekable()
             print(
                 f"[Warning] Cannot detect compression for given Python object {fileobj} "
                 f"because it does not look like a file object or is not seekable ({seekable})."

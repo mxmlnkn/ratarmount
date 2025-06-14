@@ -2618,7 +2618,7 @@ fi
 python3 core/tests/test_ZipMountSource.py
 
 
-rm -f tests/*.index.*
+rm -f tests/*.*.index.*
 'cp' 'tests/single-file.tar' 'tests/#not-a-good-name! Ör, is it?.tar'
 
 
@@ -2735,6 +2735,13 @@ pytestedTests+=(
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar.sqlar                       foo/lighter.tar/fighter/bar
     2709a3348eb2c52302a7606ecf5860bc tests/nested-tar-compressed.sqlar            foo/fighter/ufo
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar-compressed.sqlar            foo/lighter.tar/fighter/bar
+
+    # Directly testing the .ext.bz2 does not work with --ignore-zeros
+    # because the nested TAR gets detected before trying EXT4.
+    2709a3348eb2c52302a7606ecf5860bc tests/nested-tar-1M.ext4                     foo/fighter/ufo
+    2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar-1M.ext4                     foo/lighter.tar/fighter/bar
+    2709a3348eb2c52302a7606ecf5860bc tests/nested-tar-10M.ext4                    foo/fighter/ufo
+    2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar-10M.ext4                    foo/lighter.tar/fighter/bar
 
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.gzip.squashfs           foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lz4.squashfs            foo/fighter/ufo
@@ -2915,6 +2922,7 @@ fi
 # Intended for AppImage integration tests, for which the pytest unit tests are decidedly not sufficient
 # to detect, e.g., missing libraries in the AppImage.
 if [[ $TEST_EXTERNAL_COMMAND -eq 1 ]]; then
+    for file in tests/*.ext4.bz2; do bzip2 -d -k -f "$file"; done
     tests+=( "${pytestedTests[@]}" )
 fi
 

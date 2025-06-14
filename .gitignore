@@ -37,6 +37,7 @@ linuxdeploy
 *.tar
 *.snap
 *.squashfs
+*.ext4
 *.tmp
 *.[0-9]
 

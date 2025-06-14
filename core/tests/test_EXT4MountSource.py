@@ -9,7 +9,6 @@ import bz2
 import hashlib
 import io
 import os
-import shutil
 import stat
 import sys
 
@@ -35,7 +34,8 @@ class TestEXT4MountSource:
             return
         with copyTestFile(path) as tmpPath, bz2.open(tmpPath, 'rb') as bz2File:
             tmpFileObject = io.BytesIO()
-            shutil.copyfileobj(bz2File, tmpFileObject)
+            tmpFileObject.write(bz2File.read())
+            tmpFileObject.seek(0)
 
             mountSource = EXT4MountSource(tmpFileObject)
             for folder in ['/', '/foo', '/foo/fighter']:

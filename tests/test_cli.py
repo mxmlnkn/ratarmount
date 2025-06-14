@@ -23,6 +23,11 @@ from ratarmountcore.compressions import libarchive  # noqa: E402
 from ratarmount.cli import cli as ratarmountcli  # noqa: E402
 
 try:
+    import ext4
+except ImportError:
+    ext4 = None  # type:ignore
+
+try:
     import sqlcipher3
 except ImportError:
     sqlcipher3 = None  # type:ignore
@@ -268,6 +273,10 @@ ARCHIVES_TO_TEST = [
     ("832c78afcb9832e1a21c18212fc6c38b", "gnu-sparse-files.tar", "03.sparse1.bin"),
     ("2709a3348eb2c52302a7606ecf5860bc", "nested-tar.asar", "foo/fighter/ufo"),
     ("2b87e29fca6ee7f1df6c1a76cb58e101", "nested-tar.asar", "foo/lighter.tar/fighter/bar"),
+    ("2709a3348eb2c52302a7606ecf5860bc", "nested-tar.sqlar", "foo/fighter/ufo"),
+    ("2b87e29fca6ee7f1df6c1a76cb58e101", "nested-tar.sqlar", "foo/lighter.tar/fighter/bar"),
+    ("2709a3348eb2c52302a7606ecf5860bc", "nested-tar-compressed.sqlar", "foo/fighter/ufo"),
+    ("2b87e29fca6ee7f1df6c1a76cb58e101", "nested-tar-compressed.sqlar", "foo/lighter.tar/fighter/bar"),
 ]
 
 
@@ -333,15 +342,15 @@ if libarchive:
     ARCHIVES_TO_TEST += LIBARCHIVE_ARCHIVES_TO_TEST
 
 
-SQLAR_TO_TEST = [
-    ("2709a3348eb2c52302a7606ecf5860bc", "nested-tar.sqlar", "foo/fighter/ufo"),
-    ("2b87e29fca6ee7f1df6c1a76cb58e101", "nested-tar.sqlar", "foo/lighter.tar/fighter/bar"),
-    ("2709a3348eb2c52302a7606ecf5860bc", "nested-tar-compressed.sqlar", "foo/fighter/ufo"),
-    ("2b87e29fca6ee7f1df6c1a76cb58e101", "nested-tar-compressed.sqlar", "foo/lighter.tar/fighter/bar"),
+EXT4_TO_TEST = [
+    ("2709a3348eb2c52302a7606ecf5860bc", "nested-tar-1M.ext4.bz2", "nested-tar-1M.ext4/foo/fighter/ufo"),
+    ("2b87e29fca6ee7f1df6c1a76cb58e101", "nested-tar-1M.ext4.bz2", "nested-tar-1M.ext4/foo/lighter.tar/fighter/bar"),
+    ("2709a3348eb2c52302a7606ecf5860bc", "nested-tar-10M.ext4.bz2", "nested-tar-10M.ext4/foo/fighter/ufo"),
+    ("2b87e29fca6ee7f1df6c1a76cb58e101", "nested-tar-10M.ext4.bz2", "nested-tar-10M.ext4/foo/lighter.tar/fighter/bar"),
 ]
 
-if sqlcipher3:
-    ARCHIVES_TO_TEST += SQLAR_TO_TEST
+if ext4:
+    ARCHIVES_TO_TEST += EXT4_TO_TEST
 
 
 @pytest.mark.parametrize("parallelization", [1, 2, 0])
@@ -356,10 +365,15 @@ def test_file_in_archive(archivePath, pathInArchive, checksum, parallelization):
             "-P",
             str(parallelization),
             "--detect-gnu-incremental",
-            "--ignore-zeros",
             "--recursive",
             tmpArchive,
         ]
+
+        # The compressed .ext4.bz2 files need SQLiteIndexedTar to undo the compression (which is a leftover legacy
+        # and architecture design failure) and with --ignore-zeros it would mount the nested TAR int the same step!
+        if 'ext4' not in archivePath:
+            args.insert(0, "--ignore-zeros")
+
         print(f"ratarmount -P {parallelization} {tmpArchive} mounted at {mountPoint} -> access: {pathInArchive}")
 
         # Test with forced index recreation first and then with index loading.
