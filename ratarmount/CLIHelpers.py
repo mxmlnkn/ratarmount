@@ -20,33 +20,31 @@ except ImportError:
     sqlcipher3 = None  # type: ignore
 
 
-def checkInputFileType(
-    tarFile: str, encoding: str = tarfile.ENCODING, printDebug: int = 0
-) -> Tuple[str, Optional[str]]:
+def checkInputFileType(path: str, encoding: str = tarfile.ENCODING, printDebug: int = 0) -> Tuple[str, Optional[str]]:
     """Raises an exception if it is not an accepted archive format else returns the real path and compression type."""
 
-    splitURI = tarFile.split('://')
+    splitURI = path.split('://')
     if len(splitURI) > 1:
         protocol = splitURI[0]
         if fsspec is None:
             raise argparse.ArgumentTypeError("Detected an URI, but fsspec was not found. Try: pip install fsspec.")
         if protocol not in fsspec.available_protocols():
             raise argparse.ArgumentTypeError(
-                f"URI: {tarFile} uses an unknown protocol. Protocols known by fsspec are: "
+                f"URI: {path} uses an unknown protocol. Protocols known by fsspec are: "
                 + ', '.join(fsspec.available_protocols())
             )
-        return tarFile, None
+        return path, None
 
-    if not os.path.isfile(tarFile):
-        raise argparse.ArgumentTypeError(f"File '{tarFile}' is not a file!")
-    tarFile = os.path.realpath(tarFile)
+    if not os.path.isfile(path):
+        raise argparse.ArgumentTypeError(f"File '{path}' is not a file!")
+    path = os.path.realpath(path)
 
-    result = checkForSplitFile(tarFile)
+    result = checkForSplitFile(path)
     if result:
         return result[0][0], 'part' + result[1]
 
-    with open(tarFile, 'rb') as fileobj:
-        fileSize = os.stat(tarFile).st_size
+    with open(path, 'rb') as fileobj:
+        fileSize = os.stat(path).st_size
 
         # Header checks are enough for this step.
         oldOffset = fileobj.tell()
@@ -71,7 +69,7 @@ def checkInputFileType(
             zstdFile = formatOpen(fileobj)
 
             if not zstdFile.is_multiframe() and fileSize > 1024 * 1024:
-                print(f"[Warning] The specified file '{tarFile}'")
+                print(f"[Warning] The specified file '{path}'")
                 print("[Warning] is compressed using zstd but only contains one zstd frame. This makes it ")
                 print("[Warning] impossible to use true seeking! Please (re)compress your TAR using multiple ")
                 print("[Warning] frames in order for ratarmount to do be able to do fast seeking to requested ")
@@ -86,18 +84,18 @@ def checkInputFileType(
 
         if compression not in supportedCompressions:
             if detectRawTar(fileobj, encoding):
-                return tarFile, compression
+                return path, compression
 
             if (
                 compression is None
                 and sqlcipher3 is not None
-                and tarFile.lower().endswith(".sqlar")
+                and path.lower().endswith(".sqlar")
                 and isRandom(fileobj.read(4096))
             ):
-                return tarFile, 'sqlar'
+                return path, 'sqlar'
 
             if printDebug >= 2:
-                print(f"Archive '{tarFile}' (compression: {compression}) cannot be opened!")
+                print(f"Archive '{path}' (compression: {compression}) cannot be opened!")
 
             if printDebug >= 1:
                 print("[Info] Supported compressions:", list(supportedCompressions.keys()))
@@ -106,7 +104,7 @@ def checkInputFileType(
                     print("[Warning]  - apt install libarchive13")
                     print("[Warning]  - yum install libarchive")
 
-            raise argparse.ArgumentTypeError(f"Archive '{tarFile}' cannot be opened!")
+            raise argparse.ArgumentTypeError(f"Archive '{path}' cannot be opened!")
 
     if not findAvailableOpen(compression):
         moduleNames = [module.name for module in supportedCompressions[compression].modules]
@@ -115,4 +113,4 @@ def checkInputFileType(
             f"without any of these modules: {moduleNames}"
         )
 
-    return tarFile, compression
+    return path, compression
