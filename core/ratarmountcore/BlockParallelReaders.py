@@ -69,7 +69,8 @@ class BlockParallelReader(io.BufferedIOBase):
         self.cacheMissCount: int = 0
         self.cachePrefetchCount: int = 0
 
-        assert self.fileobj.seekable() and self.fileobj.readable()
+        assert self.fileobj.seekable()
+        assert self.fileobj.readable()
 
     def join_threads(self):
         self._pool.close()
@@ -120,7 +121,7 @@ class BlockParallelReader(io.BufferedIOBase):
     @overrides(io.BufferedIOBase)
     def fileno(self) -> int:
         # This is a virtual Python level file object and therefore does not have a valid OS file descriptor!
-        raise io.UnsupportedOperation()
+        raise io.UnsupportedOperation
 
     @overrides(io.BufferedIOBase)
     def seekable(self) -> bool:
@@ -310,14 +311,10 @@ class ParallelXZReader(BlockParallelReader):
         # Opening the pool and and the files on each worker at this point might be a point to discuss
         # but it leads to uniform latencies for the subsequent read calls.
         pool = self._getPool()
-
-        results = []
-        for _ in range(self.parallelization * 4):
-            results.append(pool.apply_async(os.getpid))  # will trigger worker initialization, i.e., _tryOpenGlobalFile
-
-        pids = set()
+        # will trigger worker initialization, i.e., _tryOpenGlobalFile
+        results = [pool.apply_async(os.getpid) for _ in range(self.parallelization * 4)]
         for result in results:
-            pids.add(result.get())
+            result.get()
 
     @staticmethod
     def _initWorker2(filename):

@@ -135,7 +135,7 @@ class TestLibarchiveMountSource:
 
     @staticmethod
     @pytest.mark.parametrize(
-        'path,lineSize',
+        ('path', 'lineSize'),
         [
             # libarchive bug: https://github.com/libarchive/libarchive/issues/2106
             # ('two-large-files-32Ki-lines-each-1024B.7z', 1024),

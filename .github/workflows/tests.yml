@@ -27,6 +27,11 @@ jobs:
         ( cd core && python3 -m pip install --user .[full] )
         python3 -m pip install --user .
 
+    - name: Style Check With Ruff
+      run: |
+        python3 -m pip install ruff
+        ruff check --config tests/.ruff.toml -- $( git ls-tree -r --name-only HEAD | 'grep' -E '[.]py$' )
+
     - name: Style Check With Black
       run: |
         python3 -m pip install black

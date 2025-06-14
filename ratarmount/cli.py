@@ -25,7 +25,7 @@ except ImportError:
 
 class _CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):
     def add_arguments(self, actions):
-        actions = sorted(actions, key=lambda x: getattr(x, 'option_strings'))
+        actions = sorted(actions, key=lambda action: action.option_strings)
         super().add_arguments(actions)
 
 

@@ -369,10 +369,10 @@ class AutoMountLayer(MountSource):
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
-        for _, mountInfo in self.mounted.items():
+        for mountInfo in self.mounted.values():
             mountInfo.mountSource.__exit__(exception_type, exception_value, exception_traceback)
 
     def joinThreads(self):
-        for _, mountInfo in self.mounted.items():
+        for mountInfo in self.mounted.values():
             if hasattr(mountInfo.mountSource, 'joinThreads'):
                 mountInfo.mountSource.joinThreads()

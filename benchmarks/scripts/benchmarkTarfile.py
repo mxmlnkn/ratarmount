@@ -11,6 +11,7 @@ import time
 
 def byteSizeFormat(size, decimal_places=3):
     for unit in ['B', 'KiB', 'MiB', 'GiB', 'TiB']:
+        assert unit
         if size < 1024.0:
             break
         size /= 1024.0
@@ -70,7 +71,7 @@ def benchmarkTarfile(filename):
     with open(filename, 'rb') as file:
         loadedTarFile = tarfile.open(fileobj=file, mode='r:')
         count = 0
-        for fileinfo in loadedTarFile:
+        for _fileinfo in loadedTarFile:
             count += 1
 
         print("Files in TAR", count)

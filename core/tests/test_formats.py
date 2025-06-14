@@ -35,11 +35,11 @@ def test_format_detection():
         with open(path, 'rb') as file:
             # The caching should not change the results!
             formats = detectFormats(file)
-            assert formats == {id for id, format in FILE_FORMATS.items() if mightBeFormat(file, format)}, name
-            assert formats == {id for id in FILE_FORMATS.keys() if mightBeFormat(file, id)}, name
+            assert formats == {fid for fid, info in FILE_FORMATS.items() if mightBeFormat(file, info)}, name
+            assert formats == {fid for fid in FILE_FORMATS.keys() if mightBeFormat(file, fid)}, name
 
             splitName = name.rsplit('.', 1)
-            if len(splitName) > 1 and splitName[0]:
+            if len(splitName) > 1 and name and name[0] != '.':
                 extension = splitName[-1]
                 message = f"{name} with extension {extension} was detected as possibly {formats}"
                 # Except for encrypted SQLAR, the format and extension should match.

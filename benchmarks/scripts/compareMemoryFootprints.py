@@ -43,7 +43,9 @@ def plotMemoryOverTime(fileNames, plotFileName='memory-over-time', fileNameSizeM
         ylabel='Resident Memory / MiB',
     )
 
-    getColorGroup = lambda x: x.split(os.sep)[-1].split('-')[0].split('.')[0]
+    def getColorGroup(x):
+        return x.split(os.sep)[-1].split('-')[0].split('.')[0]
+
     colorCycler = cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
     groupToColor = {}
     for key in sorted(list(set([getColorGroup(name) for name in fileNames]))):
@@ -204,9 +206,9 @@ dataFolder = sys.argv[1]
 os.chdir(dataFolder)
 
 for sizeMiB in [1, 8, 64, 256]:
-    for type in ['saving', 'loading']:
-        files = [f for f in os.listdir('.') if fnmatch.fnmatch(f, '*-' + str(sizeMiB) + '-MiB-' + type + '.dat')]
-        plotMemoryOverTime(files, 'resident-memory-over-time-' + type, sizeMiB)
+    for benchmark in ['saving', 'loading']:
+        files = [f for f in os.listdir('.') if fnmatch.fnmatch(f, '*-' + str(sizeMiB) + '-MiB-' + benchmark + '.dat')]
+        plotMemoryOverTime(files, 'resident-memory-over-time-' + benchmark, sizeMiB)
     try:
         plotPerformanceComparison('serializationBenchmark.dat', sizeMiB)
     except Exception as e:

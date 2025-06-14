@@ -129,9 +129,7 @@ class TestStenciledFile:
         parallelism = 24
         with concurrent.futures.ThreadPoolExecutor(24) as pool:
             lock = threading.Lock()
-            results = []
-            for _ in range(parallelism):
-                results.append(pool.submit(TestStenciledFile.test_successive_reads, lock))
+            results = [pool.submit(TestStenciledFile.test_successive_reads, lock) for _ in range(parallelism)]
             for result in results:
                 result.result()
 

@@ -104,7 +104,7 @@ def plotRandomDataAnalysis():
     ymins = []
     ymaxs = []
     t0 = time.time()
-    for i in range(nRepeat):
+    for _i in range(nRepeat):
         sys.stdout.write(".")
         sys.stdout.flush()
         data = os.urandom(nStop)

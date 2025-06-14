@@ -82,7 +82,7 @@ class WriteSQLiteBlobs(io.RawIOBase):
     @overrides(io.RawIOBase)
     def fileno(self) -> int:
         # This is a virtual Python level file object and therefore does not have a valid OS file descriptor!
-        raise io.UnsupportedOperation()
+        raise io.UnsupportedOperation
 
     @overrides(io.RawIOBase)
     def seekable(self) -> bool:
@@ -120,7 +120,7 @@ class WriteSQLiteBlobs(io.RawIOBase):
         # We are always at SEEK_END because no real seeking is implemented.
         if (whence in [io.SEEK_CUR, io.SEEK_END] and offset == 0) or (whence == io.SEEK_SET and offset == self.tell()):
             return self._size
-        raise io.UnsupportedOperation()
+        raise io.UnsupportedOperation
 
     @overrides(io.RawIOBase)
     def tell(self) -> int:

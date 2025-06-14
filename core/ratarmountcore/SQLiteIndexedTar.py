@@ -5,7 +5,6 @@ import copy
 import io
 import json
 import math
-import multiprocessing.pool
 import os
 import re
 import sqlite3
@@ -18,7 +17,7 @@ import traceback
 import urllib.parse
 
 from timeit import default_timer as timer
-from typing import Any, Callable, cast, Dict, Generator, IO, Iterable, List, Optional, Tuple
+from typing import Any, Callable, cast, Dict, Generator, IO, Iterable, List, Optional, Tuple, TYPE_CHECKING
 
 try:
     import rapidgzip
@@ -43,6 +42,9 @@ from .utils import (
     overrides,
 )
 from .BlockParallelReaders import ParallelXZReader
+
+if TYPE_CHECKING:
+    import multiprocessing.pool
 
 
 class _TarFileMetadataReader:
@@ -887,7 +889,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
             # Apply regex transformation to get mount point
             pattern = self.transformRecursiveMountPoint
-            modifiedPath = '/' + ('/'.join([modifiedFolder, modifiedName])).lstrip('/')
+            modifiedPath = '/' + (modifiedFolder + '/' + modifiedName).lstrip('/')
             if isinstance(pattern, (tuple, list)) and len(pattern) == 2:
                 modifiedPath = '/' + re.sub(pattern[0], pattern[1], modifiedPath).lstrip('/')
                 modifiedFolder, modifiedName = modifiedPath.rsplit('/', 1)

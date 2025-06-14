@@ -45,6 +45,7 @@ def readLabelsFromFirstComment(fileName):
             line = line.strip()
             if line[0] == '#':
                 return line[1:].strip().split(' ')
+        return None
 
 
 def loadData(fileName):

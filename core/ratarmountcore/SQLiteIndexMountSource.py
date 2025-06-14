@@ -84,7 +84,7 @@ class SQLiteIndexMountSource(MountSource):
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @overrides(MountSource)
     def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:

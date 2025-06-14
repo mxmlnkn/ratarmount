@@ -102,7 +102,7 @@ class RarMountSource(MountSource):
         else:
             mtime = 0
 
-        fileInfo = FileInfo(
+        return FileInfo(
             # fmt: off
             size     = info.file_size,
             mtime    = mtime,
@@ -114,8 +114,6 @@ class RarMountSource(MountSource):
             userdata = [(normalizedPath, info)],
             # fmt: on
         )
-
-        return fileInfo
 
     @overrides(MountSource)
     def isImmutable(self) -> bool:

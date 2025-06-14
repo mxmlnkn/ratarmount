@@ -261,8 +261,8 @@ def tryOpenURL(url, printDebug: int) -> Union[MountSource, IO[bytes], str]:
 def _matchesExtension(fileName: str, formats: Iterable[FileFormatID]) -> bool:
     return any(
         fileName.lower().endswith('.' + extension.lower())
-        for format in formats
-        for extension in FILE_FORMATS[format].extensions
+        for formatId in formats
+        for extension in FILE_FORMATS[formatId].extensions
     )
 
 

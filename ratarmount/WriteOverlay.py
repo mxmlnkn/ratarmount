@@ -547,10 +547,11 @@ def commitOverlay(writeOverlay: str, tarFile: str, encoding: str = tarfile.ENCOD
                     stderr=subprocess.PIPE,
                 )
 
-                unfilteredLines = []
-                for line in tarDelete.stderr.decode().split("\n"):
-                    if 'tar: Exiting with failure' not in line and 'Not found in archive' not in line and line.strip():
-                        unfilteredLines.append(line)
+                unfilteredLines = [
+                    line
+                    for line in tarDelete.stderr.decode().split("\n")
+                    if 'tar: Exiting with failure' not in line and 'Not found in archive' not in line and line.strip()
+                ]
 
                 if unfilteredLines:
                     for line in unfilteredLines:

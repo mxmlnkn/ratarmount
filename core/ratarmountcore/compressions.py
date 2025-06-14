@@ -367,7 +367,7 @@ def detectCompression(
         return None
 
     oldOffset = fileobj.tell()
-    for compressionId, compressionInfo in COMPRESSION_FORMATS.items():
+    for compressionId in COMPRESSION_FORMATS.keys():
         if not mightBeFormat(fileobj, compressionId):
             continue
 

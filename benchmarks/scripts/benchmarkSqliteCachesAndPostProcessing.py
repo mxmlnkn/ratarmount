@@ -46,7 +46,7 @@ def benchmarkCacheSizes(nFiles):
         t1InsertAll = time.time()
         print(
             f"Inserting {nFiles} file names with {fileNameLength} characters and cache size {cacheSize} "
-            + f"took {t1InsertAll - t0InsertAll:.3f} s"
+            f"took {t1InsertAll - t0InsertAll:.3f} s"
         )
 
         insertionTimes += [t1InsertAll - t0InsertAll]

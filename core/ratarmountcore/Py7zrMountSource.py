@@ -42,7 +42,7 @@ try:
 
         @overrides(Py7zIO)
         def read(self, size: Optional[int] = None) -> bytes:
-            raise NotImplementedError()
+            raise NotImplementedError
 
         @overrides(Py7zIO)
         def flush(self) -> None:
