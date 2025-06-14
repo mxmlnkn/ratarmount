@@ -141,9 +141,7 @@ def printVersions() -> None:
     print("Python", sys.version.split(' ', maxsplit=1)[0])
 
     try:
-        fusermountVersion = subprocess.run(
-            ["fusermount", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False
-        ).stdout.strip()
+        fusermountVersion = subprocess.run(["fusermount", "--version"], capture_output=True, check=False).stdout.strip()
         print("fusermount", re.sub('.* ([0-9][.][0-9.]+).*', r'\1', fusermountVersion.decode()))
     except Exception:
         pass
@@ -252,7 +250,7 @@ def printOSSAttributions() -> None:
         if not licenses:
             path = os.path.join(f"/usr/share/doc/python3-{name}/copyright")
             if os.path.isfile(path):
-                with open(path, 'rt', encoding='utf-8') as file:
+                with open(path, encoding='utf-8') as file:
                     licenses.append(file.read())
 
         if licenses:
@@ -292,7 +290,7 @@ def unmount(mountPoint: str, printDebug: int = 0) -> None:
     # https://github.com/python/cpython/issues/96328#issuecomment-2027458283
 
     try:
-        subprocess.run(["fusermount", "-u", mountPoint], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.run(["fusermount", "-u", mountPoint], check=True, capture_output=True)
         if printDebug >= 2:
             print("[Info] Successfully called fusermount -u.")
         return
@@ -315,9 +313,7 @@ def unmount(mountPoint: str, printDebug: int = 0) -> None:
             binaryPath = os.path.join(folder, "fusermount")
             if fusermountPath != binaryPath and os.path.isfile(binaryPath) and os.access(binaryPath, os.X_OK):
                 try:
-                    subprocess.run(
-                        [binaryPath, "-u", mountPoint], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-                    )
+                    subprocess.run([binaryPath, "-u", mountPoint], check=True, capture_output=True)
                     if printDebug >= 2:
                         print(f"[Info] Successfully called {binaryPath} -u '{mountPoint}'.")
                     return
@@ -329,7 +325,7 @@ def unmount(mountPoint: str, printDebug: int = 0) -> None:
 
     if os.path.ismount(mountPoint):
         try:
-            subprocess.run(["umount", mountPoint], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            subprocess.run(["umount", mountPoint], check=True, capture_output=True)
             if printDebug >= 2:
                 print(f"[Info] Successfully called umount -u '{mountPoint}'.")
             return

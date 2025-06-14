@@ -458,13 +458,13 @@ def commitOverlay(writeOverlay: str, tarFile: str, encoding: str = tarfile.ENCOD
         uriPath = urllib.parse.quote(databasePath)
         sqlConnection = sqlite3.connect(f"file:{uriPath}?mode=ro", uri=True)
 
-        with open(deletionList, 'at', encoding=encoding) as deletionListFile:
+        with open(deletionList, 'a', encoding=encoding) as deletionListFile:
             for path, name in sqlConnection.execute("SELECT path,name FROM files WHERE deleted == 1;"):
                 addToDeletionFile(deletionListFile, f"{path}/{name}".lstrip('/'))
 
     # Delete all files to be replaced with other files
-    with open(deletionList, 'at', encoding=encoding) as deletionListFile, open(
-        appendList, 'at', encoding=encoding
+    with open(deletionList, 'a', encoding=encoding) as deletionListFile, open(
+        appendList, 'a', encoding=encoding
     ) as appendListFile:
         # For temporary SQLite file suffixes, see https://www.sqlite.org/tempfiles.html
         suffixes = ['', '-journal', '-shm', '-wal']

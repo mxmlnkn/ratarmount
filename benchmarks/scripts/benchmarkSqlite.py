@@ -371,7 +371,7 @@ def extractValuesFromBlock(block: str) -> Dict[str, Any]:
 
 
 def extractValuesFromLog(path: str):
-    with open(path, 'rt', encoding='utf-8') as file:
+    with open(path, encoding='utf-8') as file:
         return [extractValuesFromBlock(block) for block in file.read().split('\n\n') if block]
 
 
@@ -698,7 +698,7 @@ def benchmarkSchemas(nFiles: int, log, plotAllMeasurements: bool) -> None:
         )
 
         if plotAllMeasurements:
-            with open(f"{fname} {label} insert.dat", 'wt', encoding='utf-8') as dataFile:
+            with open(f"{fname} {label} insert.dat", 'w', encoding='utf-8') as dataFile:
                 for t in insertTimes:
                     dataFile.write(str(t) + '\n')
 
@@ -776,7 +776,7 @@ def benchmarkSchemas(nFiles: int, log, plotAllMeasurements: bool) -> None:
 
 
 logFilePath = "sqlite primary key benchmark.log"
-with open(logFilePath, 'wt', encoding='utf-8') as logFile:
+with open(logFilePath, 'w', encoding='utf-8') as logFile:
 
     def log(line):
         print(line)

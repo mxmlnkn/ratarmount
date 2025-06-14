@@ -53,7 +53,7 @@ def benchmark_python_xz():
     gc.collect()
     print(f"After garbage collection: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024} MiB RSS")
     if result is not None:
-        print((h.heap() - result))
+        print(h.heap() - result)
     print(f"Reading {size} B took: {t1 - t0}s")
 
 

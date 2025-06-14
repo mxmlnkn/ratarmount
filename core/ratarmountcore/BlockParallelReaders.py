@@ -155,7 +155,7 @@ class BlockParallelReader(io.BufferedIOBase):
         blocks = []
         blockNumber = self._findBlock(self.blockBoundaries, self._offset)
         if blockNumber is None:
-            return bytes()
+            return b""
 
         self.requestCount += 1
         firstBlockOffset = self._offset - self.blockBoundaries[blockNumber]
@@ -228,7 +228,7 @@ class BlockParallelReader(io.BufferedIOBase):
                 pendingBlocks += 1
 
         # Concatenate data from blocks as necessary
-        result = bytes()
+        result = b""
         while blocks:
             block = blocks.pop(0)
             if not block.ready():
