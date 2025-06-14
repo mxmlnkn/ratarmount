@@ -57,11 +57,6 @@ jobs:
         pylint -j 2 --rcfile tests/.pylintrc ratarmount core/ratarmountcore tests/*.py core/tests/*.py | tee pylint.log
         ! 'egrep' ': E[0-9]{4}: ' pylint.log
 
-    - name: Lint With Pytype
-      run: |
-        python3 -m pip install pytype
-        pytype -d import-error -P$( cd core && pwd ):$( pwd ) ratarmount/*.py core/ratarmountcore/*.py
-
     - name: Lint With Mypy
       run: |
         yes | python3 -m pip install --upgrade-strategy eager --upgrade types-dataclasses mypy
@@ -73,8 +68,35 @@ jobs:
         sudo apt-get -y install shellcheck
         shellcheck -e SC2064 tests/*.sh
 
+  Longer-Running-Checks:
+    runs-on: ubuntu-latest
+    needs: [Static-Code-Checks]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        # Pytype does not support Python 3.13 as of 2025-06.
+        python-version: '3.12'
+
+    - name: Install pip Dependencies
+      run: |
+        sudo apt-get -y install liblzo2-dev
+        python3 -m pip install --upgrade pip
+        python3 -m pip install --user pytest lz4 PySquashfsImage asyncssh fsspec pygit2 sqlcipher3-wheels
+        ( cd core && python3 -m pip install --user .[full] )
+        python3 -m pip install --user .
+
+    - name: Lint With Pytype
+      run: |
+        python3 -m pip install pytype
+        pytype -d import-error -P$( cd core && pwd ):$( pwd ) ratarmount/*.py core/ratarmountcore/*.py
+
   Tests:
     runs-on: ${{ matrix.os }}
+    needs: [Static-Code-Checks]
 
     strategy:
       matrix:
