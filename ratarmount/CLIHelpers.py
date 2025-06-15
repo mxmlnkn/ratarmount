@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import contextlib
 import importlib
 import os
 import sys
@@ -82,10 +83,8 @@ def checkInputFileType(path: str, printDebug: int = 0) -> str:
             # Do not yet return errors because another backend could work.
             for module, _ in backend.requiredModules:
                 if module not in sys.modules:
-                    try:
+                    with contextlib.suppress(Exception):
                         importlib.import_module(module)
-                    except Exception:
-                        pass
 
             if all(module in sys.modules for module, _ in backend.requiredModules):
                 return path

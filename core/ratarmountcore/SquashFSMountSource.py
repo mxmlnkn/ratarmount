@@ -2,6 +2,7 @@
 
 # pylint: disable=protected-access, import-outside-toplevel, unused-argument
 
+import contextlib
 import io
 import json
 import os
@@ -547,10 +548,8 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         #     self._fd.close()
         #     ^^^^^^^^^^^^^^
         # AttributeError: 'NoneType' object has no attribute 'close'
-        try:
+        with contextlib.suppress(AttributeError):
             self.image.close()  # pytype: disable=attribute-error
-        except AttributeError:
-            pass
 
     @overrides(SQLiteIndexMountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback) -> None:
@@ -576,10 +575,8 @@ class SquashFSMountSource(SQLiteIndexMountSource):
     @overrides(MountSource)
     def statfs(self) -> Dict[str, Any]:
         blockSize = 512
-        try:
+        with contextlib.suppress(Exception):
             blockSize = os.fstat(self.rawFileObject.fileno()).st_blksize
-        except Exception:
-            pass
 
         blockSize = max(blockSize, self.image._sblk.block_size)
         return {

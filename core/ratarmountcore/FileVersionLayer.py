@@ -117,7 +117,7 @@ class FileVersionLayer(MountSource):
 
             resolvedPath = os.path.join(mountPoint, resolvedPath.lstrip('/'))
 
-            if resolvedPath != path:
+            if resolvedPath != path:  # noqa: SIM108
                 # The file version is only of importance to resolve self-references.
                 # It seems undecidable to me whether to return the given fileVersion or 0 here.
                 # Returning 0 would feel more correct because the we switched to another file and the version

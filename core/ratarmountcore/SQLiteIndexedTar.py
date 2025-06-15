@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import contextlib
 import copy
 import io
 import json
@@ -17,10 +18,8 @@ import urllib.parse
 from timeit import default_timer as timer
 from typing import IO, Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, cast
 
-try:
+with contextlib.suppress(ImportError):
     import rapidgzip
-except ImportError:
-    pass
 
 from .BlockParallelReaders import ParallelXZReader
 from .compressions import COMPRESSION_BACKENDS, getGzipInfo, openCompressedFile

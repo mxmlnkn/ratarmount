@@ -5,6 +5,7 @@
 # pylint: disable=import-outside-toplevel
 
 import argparse
+import contextlib
 import json
 import math
 import os
@@ -16,10 +17,8 @@ from typing import List, Optional
 
 from ratarmountcore.utils import RatarmountError, getXdgCacheHome
 
-try:
+with contextlib.suppress(ImportError):
     import argcomplete
-except ImportError:
-    pass
 
 
 class _CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):

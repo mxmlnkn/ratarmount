@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import contextlib
 import io
 import os
 import stat
@@ -30,10 +31,8 @@ class SingleFileMountSource(MountSource):
         self.size: int = self.fileobj.seek(0, io.SEEK_END)
 
         fileno = None
-        try:
+        with contextlib.suppress(Exception):
             fileno = self.fileobj.fileno()
-        except Exception:
-            pass
 
         self._statfs = {}
         if fileno is not None:

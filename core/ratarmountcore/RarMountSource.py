@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import contextlib
 import datetime
 import os
 import stat
@@ -11,10 +12,8 @@ from .formats import FileFormatID, replaceFormatCheck
 from .MountSource import FileInfo, MountSource, createRootFileInfo
 from .utils import overrides
 
-try:
+with contextlib.suppress(ImportError):
     import rarfile
-except ImportError:
-    pass
 
 
 def isRarFile(fileObject: IO[bytes]) -> bool:

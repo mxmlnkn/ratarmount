@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import contextlib
 import importlib
 import json
 import os
@@ -18,10 +19,8 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 from ratarmountcore.compressions import stripSuffixFromArchive
 from ratarmountcore.utils import RatarmountError, determineRecursionDepth, imeta, removeDuplicatesStable
 
-try:
+with contextlib.suppress(ImportError):
     import rarfile
-except ImportError:
-    pass
 
 from .CLIHelpers import checkInputFileType
 from .fuse import fuse
@@ -124,10 +123,8 @@ def printVersions() -> None:
                 # dropboxdrivefs installs a module named "test" and unicrypto a module named "tests".
                 # This seems like a packaging bug to me because the names are too broad and the modules useless.
                 if module and not module.startswith('_') and not module.startswith('test'):
-                    try:
+                    with contextlib.suppress(Exception):
                         importlib.import_module(module)
-                    except Exception:
-                        pass
 
     def printOnNewLevel(level):
         if level > 1:

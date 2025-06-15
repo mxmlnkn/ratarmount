@@ -2,6 +2,7 @@
 
 import base64
 import collections
+import contextlib
 import importlib
 import io
 import math
@@ -240,10 +241,8 @@ def getModule(module: Union[str, types.ModuleType]) -> Optional[types.ModuleType
         return module
 
     if module not in sys.modules:
-        try:
+        with contextlib.suppress(ImportError):
             importlib.import_module(module)
-        except ImportError:
-            pass
     return sys.modules.get(module, None)
 
 

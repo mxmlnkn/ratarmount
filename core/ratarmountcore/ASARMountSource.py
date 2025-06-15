@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import contextlib
 import json
 import os
 import re
@@ -122,10 +123,8 @@ class ASARMountSource(SQLiteIndexMountSource):
 
         # Try to get block size from the real opened file.
         self.blockSize = 512
-        try:
+        with contextlib.suppress(Exception):
             self.blockSize = os.fstat(self.fileObject.fileno()).st_blksize
-        except Exception:
-            pass
 
         self.fileObjectLock = threading.Lock()
 

@@ -3,6 +3,7 @@
 # libarchive.ffi produces many false positives on my local system and there seems to be nothing else works.
 # pylint: disable=no-member
 
+import contextlib
 import ctypes
 import io
 import json
@@ -69,10 +70,8 @@ class ArchiveEntry:
         if not path:
             path = laffi.entry_pathname(self._entry)
             if path is not None:
-                try:
+                with contextlib.suppress(UnicodeError):
                     path = path.decode(self.encoding)
-                except UnicodeError:
-                    pass
         return path
 
     def filetype(self):
@@ -96,10 +95,8 @@ class ArchiveEntry:
                 path = laffi.entry_hardlink(self._entry)
 
         if isinstance(path, bytes):
-            try:
+            with contextlib.suppress(UnicodeError):
                 path = path.decode(self.encoding)
-            except UnicodeError:
-                pass
 
         return path
 

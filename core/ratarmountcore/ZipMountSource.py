@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import contextlib
 import datetime
 import json
 import re
@@ -19,10 +20,8 @@ try:
     # Importing this patches the zipfile module as a "side" effect!
     import fast_zip_decryption  # pylint: disable=unused-import
 except (ImportError, Exception):
-    try:
+    with contextlib.suppress(ImportError, Exception):
         import fastzipfile  # pylint: disable=unused-import
-    except (ImportError, Exception):
-        pass
 
 
 class ZipMountSource(SQLiteIndexMountSource):

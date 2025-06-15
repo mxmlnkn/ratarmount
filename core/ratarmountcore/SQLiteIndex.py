@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import contextlib
 import json
 import os
 import re
@@ -20,15 +21,11 @@ try:
 except ImportError:
     fsspec = None  # type: ignore
 
-try:
+with contextlib.suppress(ImportError):
     import indexed_gzip
-except ImportError:
-    pass
 
-try:
+with contextlib.suppress(ImportError):
     import rapidgzip
-except ImportError:
-    pass
 
 from .compressions import COMPRESSION_BACKENDS, detectCompression, findAvailableBackend
 from .formats import FILE_FORMATS, FileFormatID
@@ -838,11 +835,11 @@ class SQLiteIndex:
         userData = SQLiteIndexedTarUserData(
             # fmt: off
             offset         = row['offset'],
-            offsetheader   = row['offsetheader'] if 'offsetheader' in row.keys() else 0,
+            offsetheader   = row['offsetheader'] if 'offsetheader' in row.keys() else 0,  # noqa: SIM118
             istar          = row['istar'],
-            issparse       = row['issparse'] if 'issparse' in row.keys() else False,
-            isgenerated    = row['isgenerated'] if 'isgenerated' in row.keys() else False,
-            recursiondepth = row['recursiondepth'] if 'recursiondepth' in row.keys() else False,
+            issparse       = row['issparse'] if 'issparse' in row.keys() else False,  # noqa: SIM118
+            isgenerated    = row['isgenerated'] if 'isgenerated' in row.keys() else False,  # noqa: SIM118
+            recursiondepth = row['recursiondepth'] if 'recursiondepth' in row.keys() else False,  # noqa: SIM118
             # fmt: on
         )
 
@@ -1355,10 +1352,8 @@ class SQLiteIndex:
 
         except Exception as e:
             # indexIsLoaded checks self.sqlConnection, so close it before returning because it was found to be faulty
-            try:
+            with contextlib.suppress(sqlite3.Error):
                 self.sqlConnection.close()
-            except sqlite3.Error:
-                pass
             self.sqlConnection = None
 
             raise e

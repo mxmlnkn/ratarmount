@@ -71,7 +71,7 @@ for label, stats_per_chunk_size in results.items():
         label=labels[label],
         capsize=2,
     )
-    i_bar += 1
+    i_bar += 1  # noqa: SIM113
 
 ax.set_xticks(bar_positions)
 ax.set_xticklabels([format_bytes(size) for size in chunk_sizes])
