@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import io
 import json
 import stat
@@ -8,11 +6,11 @@ import tarfile
 from timeit import default_timer as timer
 from typing import IO, Any, Dict, List, Optional, Tuple, Union
 
-from .formats import FileFormatID, replaceFormatCheck
-from .MountSource import FileInfo, MountSource
-from .SQLiteIndex import SQLiteIndex
-from .SQLiteIndexMountSource import SQLiteIndexMountSource
-from .utils import overrides
+from ratarmountcore.formats import FileFormatID, replaceFormatCheck
+from ratarmountcore.mountsource import FileInfo, MountSource
+from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
+from ratarmountcore.SQLiteIndex import SQLiteIndex
+from ratarmountcore.utils import overrides
 
 try:
     import py7zr

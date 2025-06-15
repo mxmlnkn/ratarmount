@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # pylint: disable=wrong-import-order
 # pylint: disable=wrong-import-position
 # pylint: disable=protected-access
@@ -10,7 +8,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.RarMountSource import RarMountSource  # noqa: E402
+from ratarmountcore.mountsource.formats.rar import RarMountSource  # noqa: E402
 
 
 def findTestFile(relativePathOrName):

@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import contextlib
 import json
 import os
@@ -10,12 +8,12 @@ import threading
 from timeit import default_timer as timer
 from typing import IO, Any, Dict, List, Optional, Tuple, Union, cast
 
-from .formats import findASARHeader
-from .MountSource import FileInfo, MountSource
-from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
-from .SQLiteIndexMountSource import SQLiteIndexMountSource
-from .StenciledFile import RawStenciledFile, StenciledFile
-from .utils import overrides
+from ratarmountcore.formats import findASARHeader
+from ratarmountcore.mountsource import FileInfo, MountSource
+from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
+from ratarmountcore.SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
+from ratarmountcore.StenciledFile import RawStenciledFile, StenciledFile
+from ratarmountcore.utils import overrides
 
 
 # https://www.electronjs.org/docs/latest/glossary#asar

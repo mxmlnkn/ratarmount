@@ -1,14 +1,12 @@
-#!/usr/bin/env python3
-
 import argparse
 import contextlib
 import importlib
 import os
 import sys
 
-from ratarmountcore.archives import ARCHIVE_BACKENDS
 from ratarmountcore.compressions import COMPRESSION_BACKENDS, checkForSplitFile
 from ratarmountcore.formats import FileFormatID, detectFormats
+from ratarmountcore.mountsource.archives import ARCHIVE_BACKENDS
 from ratarmountcore.utils import isRandom
 
 try:

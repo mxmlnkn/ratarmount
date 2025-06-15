@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import contextlib
 import io
 import os
@@ -8,9 +6,9 @@ import threading
 import time
 from typing import IO, Any, Dict, Iterable, Optional, Union, cast
 
-from .MountSource import FileInfo, MountSource
-from .StenciledFile import RawStenciledFile, StenciledFile
-from .utils import overrides
+from ratarmountcore.mountsource import FileInfo, MountSource
+from ratarmountcore.StenciledFile import RawStenciledFile, StenciledFile
+from ratarmountcore.utils import overrides
 
 
 class SingleFileMountSource(MountSource):

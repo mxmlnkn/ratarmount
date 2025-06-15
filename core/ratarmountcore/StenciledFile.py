@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import bisect
 import io
 from typing import IO, Callable, List, Optional, Tuple

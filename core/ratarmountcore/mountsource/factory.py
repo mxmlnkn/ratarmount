@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # pylint: disable=no-member,abstract-method
 # Disable pylint errors. See https://github.com/fsspec/filesystem_spec/issues/1678
 
@@ -12,16 +10,17 @@ import traceback
 import warnings
 from typing import IO, Dict, Iterable, List, Union
 
+from ratarmountcore.compressions import COMPRESSION_BACKENDS, checkForSplitFile
+from ratarmountcore.formats import FILE_FORMATS, FileFormatID
+from ratarmountcore.StenciledFile import JoinedFileFromFactory
+from ratarmountcore.utils import CompressionError, RatarmountError
+
+from . import MountSource
 from .archives import ARCHIVE_BACKENDS
-from .compressions import COMPRESSION_BACKENDS, checkForSplitFile
-from .FolderMountSource import FolderMountSource
-from .formats import FILE_FORMATS, FileFormatID
-from .FSSpecMountSource import FSSpecMountSource
-from .GitMountSource import GitMountSource
-from .MountSource import MountSource
-from .SingleFileMountSource import SingleFileMountSource
-from .StenciledFile import JoinedFileFromFactory
-from .utils import CompressionError, RatarmountError
+from .compositing.singlefile import SingleFileMountSource
+from .formats.folder import FolderMountSource
+from .formats.fsspec import FSSpecMountSource
+from .formats.git import GitMountSource
 
 try:
     import fsspec

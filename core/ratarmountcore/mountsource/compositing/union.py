@@ -1,12 +1,10 @@
-#!/usr/bin/env python3
-
 import os
 import stat
 import time
 from typing import IO, Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
-from .MountSource import FileInfo, MountSource, createRootFileInfo, mergeStatfs
-from .utils import overrides
+from ratarmountcore.mountsource import FileInfo, MountSource, createRootFileInfo, mergeStatfs
+from ratarmountcore.utils import overrides
 
 
 class UnionMountSource(MountSource):

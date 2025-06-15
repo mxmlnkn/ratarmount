@@ -1,10 +1,8 @@
-#!/usr/bin/env python3
-
 from typing import IO, Any, Dict, Iterable, Optional, Union
 
-from .formats import FileFormatID, replaceFormatCheck
-from .MountSource import FileInfo, MountSource
-from .utils import overrides
+from ratarmountcore.formats import FileFormatID, replaceFormatCheck
+from ratarmountcore.mountsource import FileInfo, MountSource
+from ratarmountcore.utils import overrides
 
 try:
     import ext4

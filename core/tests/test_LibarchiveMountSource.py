@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # pylint: disable=wrong-import-order
 # pylint: disable=wrong-import-position
 # pylint: disable=protected-access
@@ -17,7 +15,7 @@ from helpers import copyTestFile, findTestFile
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.LibarchiveMountSource import IterableArchive, LibarchiveMountSource  # noqa: E402
+from ratarmountcore.mountsource.formats.libarchive import IterableArchive, LibarchiveMountSource  # noqa: E402
 
 
 class TestLibarchiveMountSource:

@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # pylint: disable=wrong-import-order
 # pylint: disable=wrong-import-position
 # pylint: disable=protected-access
@@ -22,7 +20,7 @@ from helpers import copyTestFile
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.EXT4MountSource import EXT4MountSource  # noqa: E402
+from ratarmountcore.mountsource.formats.ext4 import EXT4MountSource  # noqa: E402
 
 
 class TestEXT4MountSource:

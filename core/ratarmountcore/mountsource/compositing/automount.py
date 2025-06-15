@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import os
 import re
 import stat
@@ -7,12 +5,12 @@ import traceback
 from dataclasses import dataclass
 from typing import IO, Any, Dict, Iterable, List, Optional, Tuple, Union
 
-from .compressions import stripSuffixFromArchive
-from .factory import openMountSource
-from .FolderMountSource import FolderMountSource
-from .MountSource import FileInfo, MountSource, mergeStatfs
-from .SQLiteIndexedTar import SQLiteIndexedTar, SQLiteIndexedTarUserData
-from .utils import RatarmountError, determineRecursionDepth, overrides
+from ratarmountcore.compressions import stripSuffixFromArchive
+from ratarmountcore.mountsource import FileInfo, MountSource, mergeStatfs
+from ratarmountcore.mountsource.factory import openMountSource
+from ratarmountcore.mountsource.formats.folder import FolderMountSource
+from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar, SQLiteIndexedTarUserData
+from ratarmountcore.utils import RatarmountError, determineRecursionDepth, overrides
 
 
 class AutoMountLayer(MountSource):

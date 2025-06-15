@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # pylint: disable=protected-access, import-outside-toplevel, unused-argument
 
 import contextlib
@@ -69,11 +67,11 @@ try:
 except ImportError:
     Compressor = object
 
-from .formats import findSquashFSOffset
-from .MountSource import FileInfo, MountSource
-from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
-from .SQLiteIndexMountSource import SQLiteIndexMountSource
-from .utils import overrides
+from ratarmountcore.formats import findSquashFSOffset
+from ratarmountcore.mountsource import FileInfo, MountSource
+from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
+from ratarmountcore.SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
+from ratarmountcore.utils import overrides
 
 
 class IsalZlibDecompressor(Compressor):

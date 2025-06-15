@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # pylint: disable=wrong-import-order
 # pylint: disable=wrong-import-position
 # pylint: disable=protected-access
@@ -12,7 +10,7 @@ from helpers import copyTestFile
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.Py7zrMountSource import Py7zrMountSource, py7zr  # noqa: E402
+from ratarmountcore.mountsource.formats.py7zr import Py7zrMountSource, py7zr  # noqa: E402
 
 
 class TestPy7zrMountSource:

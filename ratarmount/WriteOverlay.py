@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import errno
 import os
 import re
@@ -14,9 +12,9 @@ import traceback
 import urllib.parse
 from typing import Any, Callable, Dict, List, Tuple
 
-from ratarmountcore.FolderMountSource import FolderMountSource
 from ratarmountcore.formats import isTAR
-from ratarmountcore.MountSource import FileInfo, MountSource
+from ratarmountcore.mountsource import FileInfo, MountSource
+from ratarmountcore.mountsource.formats.folder import FolderMountSource
 from ratarmountcore.utils import RatarmountError, overrides
 
 from .fuse import fuse

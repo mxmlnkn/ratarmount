@@ -1,13 +1,11 @@
-#!/usr/bin/env python3
-
 # pylint: disable=abstract-method,unused-argument
 
 import stat
 
 import fsspec
 
-from .MountSource import MountSource
-from .SQLiteIndexedTar import SQLiteIndexedTar
+from .mountsource import MountSource
+from .mountsource.formats.tar import SQLiteIndexedTar
 from .utils import overrides
 
 

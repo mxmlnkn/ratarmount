@@ -1,13 +1,11 @@
-#!/usr/bin/env python3
-
 import os
 import stat
 import time
 import urllib
 from typing import IO, Dict, Iterable, Optional, Union
 
-from .MountSource import FileInfo, MountSource, createRootFileInfo
-from .utils import overrides
+from ratarmountcore.mountsource import FileInfo, MountSource, createRootFileInfo
+from ratarmountcore.utils import overrides
 
 try:
     import fsspec

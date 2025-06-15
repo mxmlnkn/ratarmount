@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import io
 import os
 import stat
@@ -10,8 +8,8 @@ try:
 except ImportError:
     pygit2 = None  # type: ignore
 
-from .MountSource import FileInfo, MountSource
-from .utils import overrides
+from ratarmountcore.mountsource import FileInfo, MountSource
+from ratarmountcore.utils import overrides
 
 
 class GitMountSource(MountSource):

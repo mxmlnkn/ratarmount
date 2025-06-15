@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """
 Contains some quick format checks. Should not try to import large dependencies.
 If the dependency is necessary, the check function should be moved into the respective MountSource implementation.

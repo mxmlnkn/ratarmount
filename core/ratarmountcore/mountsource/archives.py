@@ -1,22 +1,21 @@
-#!/usr/bin/env python3
-
 import dataclasses
 import traceback
 from typing import IO, Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
-from .ASARMountSource import ASARMountSource
-from .EXT4MountSource import EXT4MountSource
-from .FATMountSource import FATMountSource
-from .formats import FileFormatID
-from .LibarchiveMountSource import LibarchiveMountSource
-from .MountSource import MountSource
-from .Py7zrMountSource import Py7zrMountSource
-from .RarMountSource import RarMountSource
-from .SQLARMountSource import SQLARMountSource
-from .SQLiteIndexedTar import SQLiteIndexedTar
+from ratarmountcore.formats import FileFormatID
+
+from . import MountSource
+from .formats.asar import ASARMountSource
+from .formats.ext4 import EXT4MountSource
+from .formats.fat import FATMountSource
+from .formats.libarchive import LibarchiveMountSource
+from .formats.py7zr import Py7zrMountSource
+from .formats.rar import RarMountSource
+from .formats.sqlar import SQLARMountSource
+from .formats.squashfs import SquashFSMountSource
+from .formats.tar import SQLiteIndexedTar
+from .formats.zip import ZipMountSource
 from .SQLiteIndexMountSource import SQLiteIndexMountSource
-from .SquashFSMountSource import SquashFSMountSource
-from .ZipMountSource import ZipMountSource
 
 try:
     import libarchive

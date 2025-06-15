@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # PYTHON_ARGCOMPLETE_OK
 
 # We explicitly do want to import everything as late as possible here in order to speed up calls by argcomplete!
@@ -29,7 +28,7 @@ class _CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescr
 
 class PrintVersionAction(argparse.Action):
     def __call__(self, parser, args, values, option_string=None):
-        from .Actions import printVersions
+        from .actions import printVersions
 
         printVersions()
         parser.exit()
@@ -37,7 +36,7 @@ class PrintVersionAction(argparse.Action):
 
 class PrintOSSAttributionAction(argparse.Action):
     def __call__(self, parser, args, values, option_string=None):
-        from .Actions import printOSSAttributions
+        from .actions import printOSSAttributions
 
         printOSSAttributions()
         parser.exit()
@@ -45,7 +44,7 @@ class PrintOSSAttributionAction(argparse.Action):
 
 class PrintOSSAttributionShortAction(argparse.Action):
     def __call__(self, parser, args, values, option_string=None):
-        from .Actions import printOSSAttributionsShort
+        from .actions import printOSSAttributionsShort
 
         printOSSAttributionsShort()
         parser.exit()
@@ -107,12 +106,12 @@ For further information, see the ReadMe on the project's homepage:
     DEFAULT_GZIP_SEEK_POINT_SPACING = 16 * 1024 * 1024
     if "_ARGCOMPLETE" not in os.environ:
         # Expensive imports because they import all required modules for each format.
-        from ratarmountcore.archives import ARCHIVE_BACKENDS
         from ratarmountcore.compressions import COMPRESSION_BACKENDS
+        from ratarmountcore.mountsource.archives import ARCHIVE_BACKENDS
 
         backendNames = sorted(set(ARCHIVE_BACKENDS.keys()).union(set(COMPRESSION_BACKENDS.keys())))
 
-        from ratarmountcore.SQLiteIndexedTar import SQLiteIndexedTar
+        from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar
 
         DEFAULT_GZIP_SEEK_POINT_SPACING = SQLiteIndexedTar.DEFAULT_GZIP_SEEK_POINT_SPACING
 
@@ -402,7 +401,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> int:
 
     try:
         args = _parseArgs(rawArgs)
-        from .Actions import processParsedArguments
+        from .actions import processParsedArguments
 
         return processParsedArguments(args)
     except (FileNotFoundError, RatarmountError, argparse.ArgumentTypeError, ValueError) as exception:

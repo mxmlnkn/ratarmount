@@ -1,9 +1,7 @@
-#!/usr/bin/env python3
-
 from typing import IO, Dict, Iterable, List, Optional, Tuple, Union
 
-from .MountSource import FileInfo, MountSource, createRootFileInfo
-from .utils import overrides
+from ratarmountcore.mountsource import FileInfo, MountSource, createRootFileInfo
+from ratarmountcore.utils import overrides
 
 
 class SubvolumesMountSource(MountSource):

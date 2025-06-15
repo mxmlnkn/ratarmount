@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import contextlib
 import copy
 import io
@@ -21,15 +19,15 @@ from typing import IO, Any, Callable, Dict, Generator, Iterable, List, Optional,
 with contextlib.suppress(ImportError):
     import rapidgzip
 
-from .BlockParallelReaders import ParallelXZReader
-from .compressions import COMPRESSION_BACKENDS, getGzipInfo, openCompressedFile
-from .formats import FileFormatID, mightBeFormat
-from .MountSource import FileInfo, MountSource
-from .ProgressBar import ProgressBar
-from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
-from .SQLiteIndexMountSource import SQLiteIndexMountSource
-from .StenciledFile import RawStenciledFile, StenciledFile
-from .utils import (
+from ratarmountcore.BlockParallelReaders import ParallelXZReader
+from ratarmountcore.compressions import COMPRESSION_BACKENDS, getGzipInfo, openCompressedFile
+from ratarmountcore.formats import FileFormatID, mightBeFormat
+from ratarmountcore.mountsource import FileInfo, MountSource
+from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
+from ratarmountcore.ProgressBar import ProgressBar
+from ratarmountcore.SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
+from ratarmountcore.StenciledFile import RawStenciledFile, StenciledFile
+from ratarmountcore.utils import (
     CompressionError,
     InvalidIndexError,
     RatarmountError,

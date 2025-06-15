@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """Ratarmount
 
 This is the frontend for ratarmount.

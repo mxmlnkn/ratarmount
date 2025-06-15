@@ -1,14 +1,12 @@
-#!/usr/bin/env python3
-
 import errno
 import io
 import os
 import stat
 from typing import IO, Dict, Iterable, Optional, Union
 
-from .formats import FileFormatID, replaceFormatCheck
-from .MountSource import FileInfo, MountSource
-from .utils import overrides
+from ratarmountcore.formats import FileFormatID, replaceFormatCheck
+from ratarmountcore.mountsource import FileInfo, MountSource
+from ratarmountcore.utils import overrides
 
 try:
     import pyfatfs

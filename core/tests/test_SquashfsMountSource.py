@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # pylint: disable=wrong-import-order
 # pylint: disable=wrong-import-position
 # pylint: disable=protected-access
@@ -17,7 +15,7 @@ from helpers import copyTestFile
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from ratarmountcore.formats import findSquashFSOffset  # noqa: E402
-from ratarmountcore.SquashFSMountSource import SquashFSMountSource  # noqa: E402
+from ratarmountcore.mountsource.formats.squashfs import SquashFSMountSource  # noqa: E402
 
 compressionsToTest = []
 if importlib.util.find_spec('PySquashfsImage'):

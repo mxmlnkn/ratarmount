@@ -1,19 +1,17 @@
-#!/usr/bin/env python3
-
 import errno
 import os
 import traceback
 from typing import IO, Any, Dict, List, Optional, Tuple, Union
 
-from ratarmountcore.AutoMountLayer import AutoMountLayer
+from ratarmountcore.mountsource import FileInfo, MountSource
 
 # These imports can be particularly expensive when all fsspec backends are installed.
-from ratarmountcore.factory import openMountSource
-from ratarmountcore.FileVersionLayer import FileVersionLayer
-from ratarmountcore.FolderMountSource import FolderMountSource
-from ratarmountcore.MountSource import FileInfo, MountSource
-from ratarmountcore.SubvolumesMountSource import SubvolumesMountSource
-from ratarmountcore.UnionMountSource import UnionMountSource
+from ratarmountcore.mountsource.compositing.automount import AutoMountLayer
+from ratarmountcore.mountsource.compositing.subvolumes import SubvolumesMountSource
+from ratarmountcore.mountsource.compositing.union import UnionMountSource
+from ratarmountcore.mountsource.compositing.versioning import FileVersionLayer
+from ratarmountcore.mountsource.factory import openMountSource
+from ratarmountcore.mountsource.formats.folder import FolderMountSource
 from ratarmountcore.utils import determineRecursionDepth, overrides
 
 from .fuse import fuse

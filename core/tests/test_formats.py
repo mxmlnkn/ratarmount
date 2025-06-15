@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # pylint: disable=unused-import
 # pylint: disable=wrong-import-position
 # pylint: disable=protected-access
@@ -12,7 +10,7 @@ from helpers import findTestFile
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Appends proper format checkers to 7Z, EXT4, FAT, RAR formats.
-import ratarmountcore.archives  # noqa: E402, F401
+import ratarmountcore.mountsource.archives  # noqa: E402, F401
 from ratarmountcore.formats import (  # noqa: E402
     COMPRESSION_FORMATS,
     FILE_FORMATS,

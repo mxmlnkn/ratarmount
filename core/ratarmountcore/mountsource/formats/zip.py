@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import contextlib
 import datetime
 import json
@@ -11,17 +9,17 @@ import zipfile
 from timeit import default_timer as timer
 from typing import IO, Any, Dict, List, Optional, Tuple, Union
 
-from .MountSource import FileInfo, MountSource
-from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
-from .SQLiteIndexMountSource import SQLiteIndexMountSource
-from .utils import overrides
+from ratarmountcore.mountsource import FileInfo, MountSource
+from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
+from ratarmountcore.SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
+from ratarmountcore.utils import overrides
 
 try:
     # Importing this patches the zipfile module as a "side" effect!
-    import fast_zip_decryption  # pylint: disable=unused-import
+    import fast_zip_decryption  # pylint: disable=unused-import  # noqa: F401
 except (ImportError, Exception):
     with contextlib.suppress(ImportError, Exception):
-        import fastzipfile  # pylint: disable=unused-import
+        import fastzipfile  # pylint: disable=unused-import  # noqa: F401
 
 
 class ZipMountSource(SQLiteIndexMountSource):

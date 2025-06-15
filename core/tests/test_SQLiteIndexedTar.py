@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # pylint: disable=wrong-import-order
 # pylint: disable=wrong-import-position
 # pylint: disable=protected-access
@@ -20,7 +18,7 @@ from helpers import copyTestFile
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import pytest  # noqa: E402
-from ratarmountcore.SQLiteIndexedTar import SQLiteIndexedTar, SQLiteIndexedTarUserData  # noqa: E402
+from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar, SQLiteIndexedTarUserData  # noqa: E402
 from ratarmountcore.utils import RatarmountError  # noqa: E402
 
 

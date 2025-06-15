@@ -1,14 +1,12 @@
-#!/usr/bin/env python3
-
 # pylint: disable=abstract-method
 
 import shutil
 import tempfile
 from typing import IO, Any, Callable, Dict, Iterable, List, Optional, Union
 
-from .MountSource import FileInfo, MountSource
-from .SQLiteIndex import SQLiteIndex
-from .utils import RatarmountError, overrides
+from ratarmountcore.mountsource import FileInfo, MountSource
+from ratarmountcore.SQLiteIndex import SQLiteIndex
+from ratarmountcore.utils import RatarmountError, overrides
 
 
 class SQLiteIndexMountSource(MountSource):

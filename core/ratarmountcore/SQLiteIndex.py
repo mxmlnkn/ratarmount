@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import contextlib
 import json
 import os
@@ -29,7 +27,7 @@ with contextlib.suppress(ImportError):
 
 from .compressions import COMPRESSION_BACKENDS, detectCompression, findAvailableBackend
 from .formats import FILE_FORMATS, FileFormatID
-from .MountSource import FileInfo, createRootFileInfo
+from .mountsource import FileInfo, createRootFileInfo
 from .SQLiteBlobFile import SQLiteBlobsFile, WriteSQLiteBlobs
 from .utils import (
     CompressionError,
@@ -832,16 +830,16 @@ class SQLiteIndex:
 
     @staticmethod
     def _rowToFileInfo(row: Dict[str, Any]) -> FileInfo:
+        # fmt: off
         userData = SQLiteIndexedTarUserData(
-            # fmt: off
             offset         = row['offset'],
             offsetheader   = row['offsetheader'] if 'offsetheader' in row.keys() else 0,  # noqa: SIM118
             istar          = row['istar'],
             issparse       = row['issparse'] if 'issparse' in row.keys() else False,  # noqa: SIM118
             isgenerated    = row['isgenerated'] if 'isgenerated' in row.keys() else False,  # noqa: SIM118
             recursiondepth = row['recursiondepth'] if 'recursiondepth' in row.keys() else False,  # noqa: SIM118
-            # fmt: on
         )
+        # fmt: on
 
         return FileInfo(
             # fmt: off

@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import io
 import sqlite3
 from typing import IO, Optional, cast

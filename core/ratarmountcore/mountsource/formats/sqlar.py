@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import os
 import shutil
 import sqlite3
@@ -8,11 +6,11 @@ import tempfile
 import urllib.parse
 from typing import IO, Any, Dict, Iterable, List, Optional, Union
 
-from .formats import FileFormatID, replaceFormatCheck
-from .MountSource import FileInfo, MountSource, createRootFileInfo
-from .SQLiteBlobFile import SQLiteBlobFile
-from .StenciledFile import LambdaReaderFile
-from .utils import overrides
+from ratarmountcore.formats import FileFormatID, replaceFormatCheck
+from ratarmountcore.mountsource import FileInfo, MountSource, createRootFileInfo
+from ratarmountcore.SQLiteBlobFile import SQLiteBlobFile
+from ratarmountcore.StenciledFile import LambdaReaderFile
+from ratarmountcore.utils import overrides
 
 try:
     import rapidgzip

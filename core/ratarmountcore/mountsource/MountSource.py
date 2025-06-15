@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import dataclasses
 import os
 import stat

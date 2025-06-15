@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import contextlib
 import datetime
 import os
@@ -8,9 +6,9 @@ import sys
 import time
 from typing import IO, Dict, Iterable, List, Optional, Union
 
-from .formats import FileFormatID, replaceFormatCheck
-from .MountSource import FileInfo, MountSource, createRootFileInfo
-from .utils import overrides
+from ratarmountcore.formats import FileFormatID, replaceFormatCheck
+from ratarmountcore.mountsource import FileInfo, MountSource, createRootFileInfo
+from ratarmountcore.utils import overrides
 
 with contextlib.suppress(ImportError):
     import rarfile

@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # libarchive.ffi produces many false positives on my local system and there seems to be nothing else works.
 # pylint: disable=no-member
 
@@ -15,12 +13,12 @@ import tarfile
 from timeit import default_timer as timer
 from typing import IO, Any, Callable, Dict, List, Optional, Tuple, Union, cast
 
-from .compressions import COMPRESSION_BACKENDS
-from .formats import FILE_FORMATS
-from .MountSource import FileInfo, MountSource
-from .SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
-from .SQLiteIndexMountSource import SQLiteIndexMountSource
-from .utils import InvalidIndexError, overrides
+from ratarmountcore.compressions import COMPRESSION_BACKENDS
+from ratarmountcore.formats import FILE_FORMATS
+from ratarmountcore.mountsource import FileInfo, MountSource
+from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
+from ratarmountcore.SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
+from ratarmountcore.utils import InvalidIndexError, overrides
 
 try:
     # Use the FFI directly because the higher-level interface does not work sufficiently for our use case.
