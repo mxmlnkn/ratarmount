@@ -43,6 +43,7 @@ class FileFormatID(enum.Enum):
     AR               = 0x107
     XAR              = 0x108
     CPIO             = 0x109
+    MIME             = 0x10A  # EML and MHT files
     # "TAR"-like compression formats without compression
     TAR              = 0x201
     ASAR             = 0x202
@@ -280,6 +281,8 @@ ARCHIVE_FORMATS: Dict[FileFormatID, FileFormatInfo] = {
     FID.EXT4: FileFormatInfo(['ext4', 'img', 'dd', 'raw'], None),
     # Other archive formats
     FID.RATARMOUNT_INDEX: FileFormatInfo(['index.sqlite'], b'SQLite format 3\x00'),
+    # Email formats
+    FID.MIME: FileFormatInfo(['eml', 'mht'], None, None),  # No magic bytes, will be detected by content
     # https://www.iso.org/standard/68004.html
     # https://iipc.github.io/warc-specifications/specifications/warc-format/warc-1.1/#file-and-record-model
     FID.WARC: FileFormatInfo(['warc'], b'WARC/1.'),

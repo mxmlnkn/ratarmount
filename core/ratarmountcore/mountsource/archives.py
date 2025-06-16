@@ -9,6 +9,7 @@ from .formats.asar import ASARMountSource
 from .formats.ext4 import EXT4MountSource
 from .formats.fat import FATMountSource
 from .formats.libarchive import LibarchiveMountSource
+from .formats.mime import MIMEMountSource
 from .formats.py7zr import Py7zrMountSource
 from .formats.rar import RarMountSource
 from .formats.sqlar import SQLARMountSource
@@ -138,5 +139,6 @@ ARCHIVE_BACKENDS: Dict[str, ArchiveBackendInfo] = {
     "ext4": ArchiveBackendInfo(EXT4MountSource, {FID.EXT4}, [('ext4', 'ext4')]),
     "asar": ArchiveBackendInfo(ASARMountSource, {FID.ASAR}, []),
     "sqlar": ArchiveBackendInfo(SQLARMountSource, {FID.SQLAR}, []),
+    "mime": ArchiveBackendInfo(MIMEMountSource, {FID.MIME}, [('email', '')]),
     "RatarmountIndex": ArchiveBackendInfo(SQLiteIndexMountSource, {FID.RATARMOUNT_INDEX}, []),
 }
