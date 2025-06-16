@@ -61,6 +61,13 @@ function installAppImagePythonPackages()
         "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir rapidgzip
     fi
 
+    # Install first, because it exactly pins cachetools to 6.0.0, nothing else allowed, instead of doing
+    # more relaxed matching. It works with major version 5 as well as 6, so it is fine to force a downgrade
+    # to make it work with: # https://github.com/googleapis/google-auth-library-python/blob/main/setup.py
+    # which requires "cachetools>=2.0.0,<6.0" and is required by gcsfs.
+    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ext4 &>/dev/null
+    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir cachetools==5 &>/dev/null
+
     # https://github.com/nathanhi/pyfatfs/issues/41
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir \
         'git+https://github.com/mxmlnkn/pyfatfs.git@master#egginfo=pyfatfs'

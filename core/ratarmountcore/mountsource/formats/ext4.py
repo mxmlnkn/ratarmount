@@ -6,10 +6,6 @@ from ratarmountcore.utils import overrides
 
 try:
     import ext4
-
-    # https://github.com/Eeems/python-ext4/issues/3
-    ext4.block.BlockIO.seekable = lambda self: True
-    ext4.block.BlockIO.readable = lambda self: True
 except ImportError:
     ext4 = None  # type: ignore
 

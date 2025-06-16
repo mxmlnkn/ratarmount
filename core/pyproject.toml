@@ -80,7 +80,6 @@ full = [
     'isal ~= 1.0; python_version < "3.14.0"',
     # Pin to < 3.12 because of https://github.com/nathanhi/pyfatfs/issues/41
     'pyfatfs ~= 1.0; python_version < "3.12.0"',
-    'ext4 ~= 1.0; python_version >= "3.11.0"',
     'fast_zip_decryption; python_version >= "3.8.0"',
     'fastzipfile; python_version < "3.8.0"',
     "pygit2",
@@ -189,7 +188,8 @@ fat = [
     # Not allowed by PyPI
     #'pyfatfs@git+https://github.com/mxmlnkn/pyfatfs.git@v1.2.0 ; python_version >= "3.12.0"',
 ]
-ext4 = ['ext4 ~= 1.0; python_version >= "3.11.0"']
+# Not part of 'full' because it does exact pinning for its dependencies, which does lead to dependency conflicts.
+ext4 = ['ext4 ~= 1.1; python_version >= "3.9.0"']
 # All optional dependencies of asyncssh via sshfs. I have not yet needed any of these.
 # Half of these are installed anyway via other dependencies.
 full-ssh = [
