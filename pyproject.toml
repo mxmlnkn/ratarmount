@@ -41,6 +41,7 @@ classifiers = [
     "Topic :: System :: Archiving :: Compression",
     "Topic :: System :: Filesystems",
     "Topic :: Utilities",
+    "Topic :: Desktop Environment :: File Managers",
 ]
 urls = {Homepage = "https://github.com/mxmlnkn/ratarmount"}
 # Python >= 3.7 because of sqlite3.Connection.backup being used.
@@ -75,9 +76,11 @@ sqlar = ["ratarmountcore[sqlar]"]
 fat = ["ratarmountcore[fat]"]
 ext4 = ["ratarmountcore[ext4]"]
 git = ["ratarmountcore[git]"]
+gui = ["PyQt6>=6.4.0"]
 
 [project.scripts]
 ratarmount = "ratarmount.cli:cli"
+ratarmount-gui = "ratarmount.gui:main"
 
 [tool.setuptools]
 py-modules = ["ratarmount"]
