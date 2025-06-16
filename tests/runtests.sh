@@ -78,6 +78,8 @@ cleanup()
         if [ -e "$file" ]; then echo "Failed to clean up: $file"; fi
     done
     TMP_FILES_TO_CLEANUP=()
+
+    for service in httpd ipfs pyftpdlib wsgidav; do pkill -f "$service" || true; done
 }
 
 trap 'cleanup' EXIT
