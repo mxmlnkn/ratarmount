@@ -8,8 +8,20 @@ on:
 
 jobs:
   Manylinux-Appimage:
-    runs-on: ubuntu-latest
-    container: quay.io/pypa/manylinux_2_28_x86_64
+    strategy:
+      matrix:
+        # https://docs.github.com/en/actions/using-github-hosted-runners/using-github-hosted-runners/
+        #   about-github-hosted-runners
+        # https://github.blog/changelog/
+        #   2025-01-16-linux-arm64-hosted-runners-now-available-for-free-in-public-repositories-public-preview/
+        os: ['ubuntu-latest']
+        arch: ['x86_64']
+        include:
+        - os: 'ubuntu-24.04-arm'
+          arch: 'aarch64'
+
+    runs-on: ${{ matrix.os }}
+    container: quay.io/pypa/manylinux_2_28_${{ matrix.arch }}
     env:
       APP_PYTHON_VERSION: "3.12"
     steps:
@@ -21,8 +33,8 @@ jobs:
 
     - uses: actions/upload-artifact@v4
       with:
-        name: ratarmount-x86_64.AppImage
-        path: "AppImage/ratarmount*-x86_64.AppImage"
+        name: ratarmount-${{ matrix.arch }}.AppImage
+        path: "AppImage/ratarmount*-${{ matrix.arch }}.AppImage"
 
   AppImage-Tests:
     runs-on: ${{ matrix.os }}
@@ -30,8 +42,12 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-latest]
         parallelization: [0, 1, 2]
+        include:
+        - os: 'ubuntu-24.04-arm'
+          arch: 'aarch64'
+        - os: 'ubuntu-latest'
+          arch: 'x86_64'
 
     steps:
     - uses: actions/checkout@v4
@@ -47,12 +63,12 @@ jobs:
 
     - uses: actions/download-artifact@v4
       with:
-        name: ratarmount-x86_64.AppImage
+        name: ratarmount-${{ matrix.arch }}.AppImage
 
     - name: Install AppImage
       run: |
-        chmod u+x ratarmount*-x86_64.AppImage
-        mv ratarmount*-x86_64.AppImage /usr/local/bin/ratarmount
+        chmod u+x ratarmount*.AppImage
+        mv ratarmount*.AppImage /usr/local/bin/ratarmount
         echo "/usr/local/bin" >> $GITHUB_PATH
 
     - name: Install Dependencies
@@ -106,11 +122,11 @@ jobs:
     steps:
     - uses: actions/download-artifact@v4
       with:
-        name: ratarmount-x86_64.AppImage
+        pattern: ratarmount-*.AppImage
 
     - uses: ncipollo/release-action@v1
       with:
-        artifacts: "ratarmount*-x86_64.AppImage"
+        artifacts: "ratarmount*.AppImage"
         tag: "nightly"
         commit: "master"
         name: "Nightly Release"

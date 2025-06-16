@@ -2248,8 +2248,10 @@ checkURLProtocolS3()
     port=8053
 
     if [[ ! -f weed ]]; then
-        wget -q 'https://github.com/seaweedfs/seaweedfs/releases/download/3.74/linux_amd64_large_disk.tar.gz'
-        tar -xf 'linux_amd64_large_disk.tar.gz'
+        arch='arm64'
+        if [[ $( uname -m ) =~ x86 ]]; then arch='amd64'; fi
+        wget -q 'https://github.com/seaweedfs/seaweedfs/releases/download/3.74/linux_'"$arch"'_large_disk.tar.gz'
+        tar -xf 'linux_'"$arch"'_large_disk.tar.gz'
     fi
     [[ -x weed ]] || chmod u+x weed
 
@@ -2360,13 +2362,15 @@ checkURLProtocolIPFS()
 
     # Using impacket/examples/smbserver.py does not work for a multidude of reasons.
     # Therefore set up a server with tests/install-smbd.sh from outside and check for its existence here.
-    local ipfs
+    local ipfs arch
     if command -v ipfs &>/dev/null; then
         ipfs=ipfs
     elif [[ -f ipfs ]]; then
         ipfs=./ipfs
     else
-        wget -q -O- 'https://github.com/ipfs/kubo/releases/download/v0.30.0/kubo_v0.30.0_linux-amd64.tar.gz' |
+        arch='arm64'
+        if [[ $( uname -m ) =~ x86 ]]; then arch='amd64'; fi
+        wget -q -O- 'https://github.com/ipfs/kubo/releases/download/v0.30.0/kubo_v0.30.0_linux-'"$arch"'.tar.gz' |
             tar -zx kubo/ipfs
         ipfs=kubo/ipfs
     fi

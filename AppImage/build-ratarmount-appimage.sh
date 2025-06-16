@@ -58,7 +58,7 @@ function installAppImagePythonPackages()
         "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir \
             'git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=rapidgzip&subdirectory=python/rapidgzip'
     else
-        "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir rapidgzip
+        "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir rapidgzip || exit 1
     fi
 
     # Install first, because it exactly pins cachetools to 6.0.0, nothing else allowed, instead of doing
@@ -72,8 +72,8 @@ function installAppImagePythonPackages()
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir \
         'git+https://github.com/mxmlnkn/pyfatfs.git@master#egginfo=pyfatfs'
 
-    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ../core
-    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ..[full,sqlar]
+    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ../core || exit 1
+    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ..[full,sqlar] || exit 1
 
     # These lines are only to document the individual package sizes. They are all installed with [full] above.
     # ratarmount-0.10.0-manylinux2014_x86_64.AppImage (the first one!) was 13.6 MB
@@ -133,8 +133,18 @@ function installAppImageSystemLibraries()
     elif commandExists yum; then
         yumCommand='yum'
     elif commandExists dpkg; then
-        libraries+=( $( dpkg -L libfuse2 | 'grep' '/lib.*[.]so' ) )
-        libraries+=( $( dpkg -L libarchive13 | 'grep' '/lib.*[.]so' ) )
+        # On Ubuntu 24.04.2 LTS for ARM, installing libfuse2 does install libfuse2t64 (for 64-bit time_t support!).
+        # Unfortunately, dpkg -L does not know about this alias -.-.
+        for package in libfuse2 libarchive13; do
+            if dpkg -L "$package" &>/dev/null; then
+                libraries+=( $( dpkg -L "$package" | 'grep' '/lib.*[.]so' ) )
+            elif dpkg -L "${package}t64" &>/dev/null; then
+                libraries+=( $( dpkg -L "${package}t64" | 'grep' '/lib.*[.]so' ) )
+            else
+                echo 'Failed to find libfuse2!'
+                exit 1
+            fi
+        done
         libraries+=( $( dpkg -L libarchive-dev | 'grep' '/lib.*[.]so' ) )
         libraries+=( $( dpkg -L lzo | 'grep' '/lib.*[.]so' ) )
         libraries+=( $( dpkg -L liblzma5 | 'grep' '/lib.*[.]so' ) )
@@ -180,11 +190,22 @@ function trimAppImage()
     APP_PYTHON_LIB="${APP_PYTHON_BASE}/lib/python${APP_PYTHON_VERSION}"
     "$APP_PYTHON_BIN" -s -m pip uninstall -y build setuptools wheel pip
 
+    # site-packages/test   https://github.com/fsspec/dropboxdrivefs/issues/23
+    # site-packages/tests  https://github.com/skelsec/unicrypto/issues/9
     'rm' -rf \
         "$APP_PYTHON_LIB/site-packages/indexed_gzip/tests" \
         "$APP_PYTHON_LIB/site-packages/indexed_gzip/"*.c \
         "$APP_PYTHON_LIB/site-packages/indexed_gzip/"*.h \
-        "$APP_PYTHON_LIB/site-packages/indexed_gzip/"*.pxd
+        "$APP_PYTHON_LIB/site-packages/indexed_gzip/"*.pxd \
+        "$APP_PYTHON_LIB/site-packages/test" \
+        "$APP_PYTHON_LIB/site-packages/tests" \
+        "$APP_PYTHON_LIB/site-packages/crcmod/test.py" \
+        "$APP_PYTHON_LIB/site-packages/sniffio/_tests" \
+        "$APP_PYTHON_LIB/site-packages/fsspec/tests" \
+        "$APP_PYTHON_LIB/site-packages/adlfs/tests" \
+        "$APP_PYTHON_LIB/site-packages/aioitertools/tests" \
+        "$APP_PYTHON_LIB/lib-dynload/_test"* \
+        "$APP_PYTHON_LIB/config-"*
 
     #"$APP_PYTHON_LIB/email"  # imported by urllib, importlib, site-packages/packaging/metadata.py
     #"$APP_PYTHON_LIB/html"   # Needed by botocore
@@ -246,12 +267,17 @@ function trimAppImage()
            "$APP_PYTHON_LIB/uu.py" \
            "$APP_PYTHON_LIB/xdrlib.py" \
            "$APP_PYTHON_LIB/lib2to3"
+
+    find "$APP_PYTHON_BASE/bin/" -type f -not -name 'python*' -delete
+
     find "$APP_DIR/usr/lib/" -name 'libtk*.so' -delete
     find "$APP_DIR/usr/lib/" -name 'libtcl*.so' -delete
     find "$APP_DIR" -type d -empty -print0 | xargs -0 rmdir
     find "$APP_DIR" -type d -empty -print0 | xargs -0 rmdir
     find "$APP_DIR" -name '__pycache__' -print0 | xargs -0 rm -r
-    find "$APP_PYTHON_LIB/site-packages/" -name '*.so' -size +1M -print0 | xargs -0 strip --strip-debug
+
+    find "$APP_PYTHON_LIB/site-packages/" -name '*.so' -size +128K -print0 | xargs -0 strip --strip-debug
+    find "${APP_DIR}/" -name '*.so' -size +128K -print0 | xargs -0 strip --strip-debug
 }
 
 
@@ -279,7 +305,7 @@ fi
 APP_BASE="ratarmount-$APPIMAGE_PLATFORM"
 APP_DIR="$APP_BASE.AppDir"
 if [[ -z $APP_PYTHON_VERSION ]]; then
-    APP_PYTHON_VERSION=3.12
+    APP_PYTHON_VERSION=3.13
 fi
 APP_PYTHON_BIN="$APP_DIR/opt/python$APP_PYTHON_VERSION/bin/python$APP_PYTHON_VERSION"
 
