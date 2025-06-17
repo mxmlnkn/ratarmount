@@ -59,13 +59,14 @@ except ImportError:
 try:
     # Must be imported because findAvailableBackend checks for it to be in sys.modules!
     # Although, I'm unsure whether it gets implicitly added to sys.modules below when importing file_reader.
+    # OSError can happen when dependencies are missing, e.g., libicuuc.so.74.
     import libarchive  # pylint: disable=unused-import
-except (ImportError, AttributeError):
+except Exception:
     libarchive = None  # type: ignore
 
 try:
     from libarchive import file_reader as libarchive_file_reader
-except (ImportError, AttributeError):
+except Exception:
 
     def libarchive_file_reader(path):
         raise ImportError("Please install python-libarchive-c with: pip install libarchive-c")

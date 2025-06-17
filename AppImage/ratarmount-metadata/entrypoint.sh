@@ -19,13 +19,21 @@ ARGS=( -u -I -m ratarmount "$@" )
 #     https://www.gnu.org/software/bash/manual/html_node/Bash-Builtins.html
 #     https://www.gnu.org/software/bash/manual/html_node/Bourne-Shell-Builtins.html
 #     https://www.gnu.org/software/bash/manual/html_node/The-Set-Builtin.html
-read -r firstLine 2>/dev/null < {{ python-executable }}
-if [[ "$firstLine" =~ ^#\!.*bash$ ]]; then
-    # Sourcing the file avoids the shebang being interpreted and another bash process being started.
-    # However, this means that this Python wrapper script, which checks $0 to get its location, is wrong
-    # and needs to be patched to use BASH_SOURCE.
-    BASH_ARGV0={{ python-executable }}
-    . {{ python-executable }} "${ARGS[@]}"
-else
-    {{ python-executable }} "${ARGS[@]}"
-fi
+# Exec avoids another bash process being started.
+# exec {{ python-executable }} "${ARGS[@]}"
+# Directly call python3 binary to avoid another indirection: https://github.com/niess/python-appimage/issues/90
+
+# Resolve the calling command (preserving symbolic links).
+export APPIMAGE_COMMAND=$( command -v -- "$ARGV0" )
+
+# Export TCl/Tk
+#export TCL_LIBRARY="${APPDIR}/usr/share/tcltk/tcl8.6"
+#export TK_LIBRARY="${APPDIR}/usr/share/tcltk/tk8.6"
+#export TKPATH="${TK_LIBRARY}"
+
+# Export SSL certificate
+export SSL_CERT_FILE="${APPDIR}/opt/_internal/certs.pem"
+
+# Added exec and made it Python version-agnostic using globbing.
+PYTHON3=( "$APPDIR"/opt/python3.*/bin/python3* )
+exec "${PYTHON3[0]}" "${ARGS[@]}"

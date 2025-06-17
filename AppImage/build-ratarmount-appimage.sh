@@ -22,8 +22,10 @@ function installSystemRequirements()
     yum -y install epel-release
     # We need to install development dependencies to build Python packages from source and we also need
     # to install libraries such as libarchive in order to copy them into the AppImage.
-    yum install -y fuse fakeroot patchelf fuse-libs libsqlite3x strace desktop-file-utils libzstd-devel \
-        libarchive libarchive-devel lzop lzo lzo-devel
+    yum install -y fuse fakeroot patchelf fuse-libs libsqlite3x strace desktop-file-utils libzstd-devel
+    if [[ "$APPIMAGE_VARIANT" != 'slim' ]]; then
+        yum install -y libarchive libarchive-devel lzop lzo lzo-devel
+    fi
 }
 
 function installAppImageTools()
@@ -73,6 +75,14 @@ function installAppImagePythonPackages()
         'git+https://github.com/mxmlnkn/pyfatfs.git@master#egginfo=pyfatfs'
 
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ../core || exit 1
+
+    if [[ "$APPIMAGE_VARIANT" == 'slim' ]]; then
+        # Especially do not install fsspec-backends, which quadtruple the AppImage size.
+        "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir .. || exit 1
+        "$APP_PYTHON_BIN" -I -m pip uninstall -y --no-cache-dir libarchive-c
+        return
+    fi
+
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ..[full,sqlar] || exit 1
 
     # These lines are only to document the individual package sizes. They are all installed with [full] above.
@@ -87,14 +97,22 @@ function installAppImagePythonPackages()
     #    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir requests aiohttp sshfs smbprotocol pygit2<1.15 fsspec
     # This bloats the AppImage to 38.5 MB :/. Extracts to 121.0 MB
     #    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir s3fs gcsfs adlfs dropboxdrivefs
-
+    # The move from Python 3.12 to Python 3.13 bloads the AppImage by another 50% from 40 MB to 60 MB :(
+    # I think it is time for a slim version, especially when adding a Qt GUI in the future.
+    # The problem is, even without fsspec backensd, the AppImage still comes out as 36 MB!
+    # The main contributors to size are:
+    #   - libicudata.so (~40 MB), which for some reason was not bundled for ratarmount-0.15.0.
+    #     Find out why, e.g., by looking for it with 'readelf -d elfbin' for all shared libraries.
+    #     -> used by libicuuc.so.74 by libxml2 by libarchive. libarchive will not work without this :(
+    #        I guess the slim version also has to work without libarchive.
+    #   - rapidgzip, which has a rather large binary for some reason (lookup tables?).
+    #     Maybe use indexed_gzip for the slim AppImage until I have fixed the size (and GIL) problems :(.
+    #   - Another large contributour is python-zstandard needed by PySquashFSImage!
+    #   - 0.15.2 also had a rapidgzip .so file that was only 10 MB instead of 40 MB! strip --strip-debug helps!
+    #     Stripping the binary reduces the AppImage from 20 MB to 13 MB. I guess for an AppImage version called
+    #     slim, it is fine to trade debugability for a smaller size.
     # These are untested but small enough that we can just install them for now. Maybe they even work.
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir gcsfs adlfs dropboxdrivefs
-
-    # Need to install it manually because it is disabled for Python >=3.12 because of:
-    # https://github.com/nathanhi/pyfatfs/issues/41
-    # And we need to apply a patch for that.
-    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir pyfatfs
 }
 
 function installAppImageSystemLibraries()
@@ -123,9 +141,10 @@ function installAppImageSystemLibraries()
     #    libpthread.so.0 => /lib64/libpthread.so.0
     #    /lib64/ld-linux-x86-64.so.2
     # linuxdeploy automatically bundles transitive dependencies! I only need to specify libarchive.so manually
-    # because it is dynamically loaded by python-libarchive-c, which linuxdeploy does notice automatically.
-    local libraries=( $( find /lib64/ -name 'libcrypto.so*' ) )
-    local yumCommand=''
+    # because it is dynamically loaded by python-libarchive-c, which linuxdeploy does not notice automatically.
+    local libraries package packages yumCommand=''
+    libraries=( $( find /lib64/ -name 'libcrypto.so*' ) )
+
     if commandExists repoquery; then
         yumCommand='repoquery'
     elif commandExists dnf; then
@@ -133,31 +152,36 @@ function installAppImageSystemLibraries()
     elif commandExists yum; then
         yumCommand='yum'
     elif commandExists dpkg; then
+        packages=(libfuse2)
+        if [[ "$APPIMAGE_VARIANT" != 'slim' ]]; then
+            packages+=(libarchive13 libarchive-dev lzo liblzma5)
+        fi
+
         # On Ubuntu 24.04.2 LTS for ARM, installing libfuse2 does install libfuse2t64 (for 64-bit time_t support!).
         # Unfortunately, dpkg -L does not know about this alias -.-.
-        for package in libfuse2 libarchive13; do
+        for package in "${packages[@]}"; do
             if dpkg -L "$package" &>/dev/null; then
                 libraries+=( $( dpkg -L "$package" | 'grep' '/lib.*[.]so' ) )
             elif dpkg -L "${package}t64" &>/dev/null; then
                 libraries+=( $( dpkg -L "${package}t64" | 'grep' '/lib.*[.]so' ) )
             else
-                echo 'Failed to find libfuse2!'
+                echo "Failed to find $package"'!'
                 exit 1
             fi
         done
-        libraries+=( $( dpkg -L libarchive-dev | 'grep' '/lib.*[.]so' ) )
-        libraries+=( $( dpkg -L lzo | 'grep' '/lib.*[.]so' ) )
-        libraries+=( $( dpkg -L liblzma5 | 'grep' '/lib.*[.]so' ) )
     else
         echo -e "\e[31mCannot gather FUSE libs into AppImage without (dnf) repoquery.\e[0m"
     fi
 
     if [[ -n "$yumCommand" ]]; then
-        libraries+=( $( $yumCommand -l fuse-libs | 'grep' 'lib64.*[.]so' ) )
-        libraries+=( $( $yumCommand -l libarchive | 'grep' 'lib64.*[.]so' ) )
-        libraries+=( $( $yumCommand -l libarchive-devel | 'grep' 'lib64.*[.]so' ) )
-        libraries+=( $( $yumCommand -l lzo | 'grep' 'lib64.*[.]so' ) )
-        libraries+=( $( $yumCommand -l xz-devel | 'grep' 'lib64.*[.]so' ) )
+        packages=(fuse-libs)
+        if [[ "$APPIMAGE_VARIANT" != 'slim' ]]; then
+            packages+=(libarchive libarchive-devel lzo xz-devel)
+        fi
+
+        for package in "${packages[@]}"; do
+            libraries+=( $( $yumCommand -l "$package" | 'grep' 'lib64.*[.]so' ) )
+        done
     fi
 
     # For some reason, the simple libarchive.so file without any version suffix is only installed with the development
@@ -180,8 +204,10 @@ function installAppImageSystemLibraries()
         'cp' -a "${libraries[@]}" "$APP_DIR"/usr/lib/
     fi
 
-    APPIMAGE_EXTRACT_AND_RUN=1 linuxdeploy --appdir="$APP_DIR" "${libraries[@]/#/--library=}" \
-        --executable="$( which fusermount )" --executable="$( which lzop )"
+    if [[ "$APPIMAGE_VARIANT" != 'slim' ]]; then
+        APPIMAGE_EXTRACT_AND_RUN=1 linuxdeploy --appdir="$APP_DIR" "${libraries[@]/#/--library=}" \
+            --executable="$( which fusermount )" --executable="$( which lzop )"
+    fi
 }
 
 function trimAppImage()
@@ -272,12 +298,30 @@ function trimAppImage()
 
     find "$APP_DIR/usr/lib/" -name 'libtk*.so' -delete
     find "$APP_DIR/usr/lib/" -name 'libtcl*.so' -delete
-    find "$APP_DIR" -type d -empty -print0 | xargs -0 rmdir
-    find "$APP_DIR" -type d -empty -print0 | xargs -0 rmdir
+
+    # May be worth thinking about not deleting them when I have a GUI. But even then, all systems that may want
+    # to use a GUI should have these installed with X11, I think, and I had some bad issues with bundled X11
+    # libraries not being protocol/binary compatible with the installed X11 server and segfaulting.
+    rm -rf \
+        "$APP_PYTHON_LIB/lib-dynload/"*tkinter* \
+        "$APP_DIR/usr/lib/"lib{X,freetype,fontconfig}*.so*
+
+    # find "$APP_DIR" -type f -name '*.so*' -exec bash -c 'readelf -d "$0" | grep libicu && echo "$0"' {} \;
+    #  <- required by libicuuc.so.74 (I think) <- required by libxml2.so.2 <- libarchive.so
+    # Are there shared libraries not being needed?
+    # Check with: find "$APP_DIR" -type f -name '*.so*' -exec bash -c 'echo $0; readelf -d "$0" |
+    #     sed -nr "s|.*Shared library: \[([^]]*)\]|  \1|p" |
+    #     grep -v -E "lib(c|m|pthread|stdc[+][+]|gcc_s|z|dl)[.]so"' {} \;
+    #find "$APP_DIR/usr/lib/" -name 'libicu*.so*' -delete
+
+    find "$APP_DIR" -type d -empty -print0 | xargs -0 -I{} rmdir -- {}
+    find "$APP_DIR" -type d -empty -print0 | xargs -0 -I{} rmdir -- {}
     find "$APP_DIR" -name '__pycache__' -print0 | xargs -0 rm -r
 
-    find "$APP_PYTHON_LIB/site-packages/" -name '*.so' -size +128K -print0 | xargs -0 strip --strip-debug
-    find "${APP_DIR}/" -name '*.so' -size +128K -print0 | xargs -0 strip --strip-debug
+    if [ "$APPIMAGE_VARIANT" == 'slim' ]; then
+        find "$APP_PYTHON_LIB/site-packages/" -name '*.so' -size +128k -print0 | xargs -0 strip --strip-debug
+        find "${APP_DIR}/" -name '*.so' -size +128k -print0 | xargs -0 strip --strip-debug
+    fi
 }
 
 
@@ -437,5 +481,5 @@ if [[ -z "$version" ]]; then
     version=$( sed -n -E "s|.*__version__ = '([0-9.]+).*'|\1|p" ../ratarmount/version.py )
 fi
 if [[ -n "$version" ]]; then
-    'mv' -- "$APP_BASE.AppImage" "ratarmount-$version-$APPIMAGE_ARCH.AppImage"
+    'mv' -- "$APP_BASE.AppImage" "ratarmount-$version-$APPIMAGE_VARIANT-$APPIMAGE_ARCH.AppImage"
 fi

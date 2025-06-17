@@ -16,14 +16,20 @@ jobs:
         #   2025-01-16-linux-arm64-hosted-runners-now-available-for-free-in-public-repositories-public-preview/
         os: ['ubuntu-latest']
         arch: ['x86_64']
+        variant: ['slim', 'full']
         include:
         - os: 'ubuntu-24.04-arm'
           arch: 'aarch64'
+          variant: 'slim'
+        - os: 'ubuntu-24.04-arm'
+          arch: 'aarch64'
+          variant: 'full'
 
     runs-on: ${{ matrix.os }}
     container: quay.io/pypa/manylinux_2_28_${{ matrix.arch }}
     env:
       APP_PYTHON_VERSION: "3.12"
+      APPIMAGE_VARIANT: ${{ matrix.variant }}
     steps:
     - uses: actions/checkout@v4
 
@@ -33,7 +39,7 @@ jobs:
 
     - uses: actions/upload-artifact@v4
       with:
-        name: ratarmount-${{ matrix.arch }}.AppImage
+        name: ratarmount-${{ matrix.variant }}-${{ matrix.arch }}.AppImage
         path: "AppImage/ratarmount*-${{ matrix.arch }}.AppImage"
 
   AppImage-Tests:
@@ -63,7 +69,7 @@ jobs:
 
     - uses: actions/download-artifact@v4
       with:
-        name: ratarmount-${{ matrix.arch }}.AppImage
+        name: ratarmount-full-${{ matrix.arch }}.AppImage
 
     - name: Install AppImage
       run: |
@@ -126,7 +132,7 @@ jobs:
 
     - uses: ncipollo/release-action@v1
       with:
-        artifacts: "ratarmount*.AppImage"
+        artifacts: "ratarmount*.AppImage/*.AppImage"
         tag: "nightly"
         commit: "master"
         name: "Nightly Release"
