@@ -8,6 +8,7 @@ import stat
 import sys
 import traceback
 import warnings
+from pathlib import Path
 from typing import IO, Dict, Iterable, List, Union
 
 from ratarmountcore.compressions import COMPRESSION_BACKENDS, checkForSplitFile
@@ -271,7 +272,7 @@ def findBackendsByExtension(fileName: str) -> List[str]:
     ]
 
 
-def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource:
+def openMountSource(fileOrPath: Union[str, IO[bytes], os.PathLike], **options) -> MountSource:
     printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
 
     if isinstance(fileOrPath, str) and '://' in fileOrPath:
@@ -290,14 +291,15 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
 
     autoPrioritizedBackends: List[str] = []
     joinedFileName = ''
-    if isinstance(fileOrPath, str):
-        if not os.path.exists(fileOrPath):
-            raise RatarmountError(f"Mount source does not exist: {fileOrPath}")
+    if isinstance(fileOrPath, (str, os.PathLike)):
+        path = Path(fileOrPath)
+        if not path.exists():
+            raise RatarmountError(f"Mount source does not exist: {fileOrPath!s}")
 
-        if os.path.isdir(fileOrPath):
-            return FolderMountSource('.' if fileOrPath == '.' else os.path.realpath(fileOrPath))
+        if path.is_dir():
+            return FolderMountSource('.' if str(fileOrPath) == '.' else path.resolve())
 
-        splitFileResult = checkForSplitFile(fileOrPath)
+        splitFileResult = checkForSplitFile(str(fileOrPath))
         if splitFileResult:
             filesToJoin = splitFileResult[0]
             joinedFileName = os.path.basename(filesToJoin[0]).rsplit('.', maxsplit=1)[0]
@@ -309,6 +311,7 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
                 [(lambda file=file: open(file, 'rb')) for file in filesToJoin]  # type: ignore
             )
         else:
+            fileOrPath = str(fileOrPath)
             autoPrioritizedBackends = findBackendsByExtension(fileOrPath)
     else:
         autoPrioritizedBackends = findBackendsByExtension(options.get('tarFileName', ''))
@@ -354,7 +357,7 @@ def openMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource
                 if printDebug >= 2:
                     traceback.print_exc()
 
-    if joinedFileName and not isinstance(fileOrPath, str):
+    if joinedFileName and not isinstance(fileOrPath, (str, os.PathLike)):
         return SingleFileMountSource(joinedFileName, fileOrPath)
 
     raise CompressionError(f"Archive to open ({fileOrPath!s}) has unrecognized format!")

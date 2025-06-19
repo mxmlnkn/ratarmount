@@ -27,8 +27,8 @@ class FolderMountSource(MountSource):
     This class manages one folder as mount source offering methods for listing folders, reading files, and others.
     """
 
-    def __init__(self, path: str) -> None:
-        self.root: str = path
+    def __init__(self, path: Union[str, os.PathLike]) -> None:
+        self.root = str(path)
         self._statfs = FolderMountSource._getStatfsForFolder(self.root)
 
     def setFolderDescriptor(self, fd: int) -> None:

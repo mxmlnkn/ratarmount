@@ -12,6 +12,7 @@ import time
 import traceback
 import urllib.parse
 from dataclasses import dataclass
+from pathlib import Path
 from typing import IO, Any, AnyStr, Callable, Dict, List, Optional, Tuple, Union
 
 try:
@@ -648,9 +649,9 @@ class SQLiteIndex:
             if folder:
                 os.makedirs(folder, exist_ok=True)
 
-            with open(path, 'wb') as file:
-                file.write(b'\0' * 1024 * 1024)
-            os.remove(path)
+            file = Path(path)
+            file.write_bytes(b'\0' * 1024 * 1024)
+            file.unlink()
 
             return True
 

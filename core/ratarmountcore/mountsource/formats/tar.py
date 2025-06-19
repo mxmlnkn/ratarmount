@@ -14,7 +14,7 @@ import time
 import traceback
 import urllib.parse
 from timeit import default_timer as timer
-from typing import IO, Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, cast
+from typing import IO, Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union, cast
 
 with contextlib.suppress(ImportError):
     import rapidgzip
@@ -425,28 +425,28 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
     # fmt: off
     def __init__(
         self,
-        tarFileName                  : Optional[str]             = None,
-        fileObject                   : Optional[IO[bytes]]       = None,
+        tarFileName                  : Optional[Union[str, os.PathLike]] = None,
+        fileObject                   : Optional[IO[bytes]]               = None,
         *,  # force all parameters after to be keyword-only
-        writeIndex                   : bool                      = False,
-        clearIndexCache              : bool                      = False,
-        indexFilePath                : Optional[str]             = None,
-        indexFolders                 : Optional[List[str]]       = None,
-        recursive                    : bool                      = False,
-        gzipSeekPointSpacing         : int                       = DEFAULT_GZIP_SEEK_POINT_SPACING,
-        encoding                     : str                       = tarfile.ENCODING,
-        stripRecursiveTarExtension   : bool                      = False,
-        ignoreZeros                  : bool                      = False,
-        verifyModificationTime       : bool                      = False,
-        parallelization              : int                       = 1,
-        parallelizations             : Optional[Dict[str, int]]  = None,
-        isGnuIncremental             : Optional[bool]            = None,
-        printDebug                   : int                       = 0,
-        transformRecursiveMountPoint : Optional[Tuple[str, str]] = None,
-        transform                    : Optional[Tuple[str, str]] = None,
-        prioritizedBackends          : Optional[List[str]]       = None,
-        indexMinimumFileCount        : int                       = 0,
-        recursionDepth               : Optional[int]             = None,
+        writeIndex                   : bool                              = False,
+        clearIndexCache              : bool                              = False,
+        indexFilePath                : Optional[str]                     = None,
+        indexFolders                 : Optional[List[str]]               = None,
+        recursive                    : bool                              = False,
+        gzipSeekPointSpacing         : int                               = DEFAULT_GZIP_SEEK_POINT_SPACING,
+        encoding                     : str                               = tarfile.ENCODING,
+        stripRecursiveTarExtension   : bool                              = False,
+        ignoreZeros                  : bool                              = False,
+        verifyModificationTime       : bool                              = False,
+        parallelization              : int                               = 1,
+        parallelizations             : Optional[Dict[str, int]]          = None,
+        isGnuIncremental             : Optional[bool]                    = None,
+        printDebug                   : int                               = 0,
+        transformRecursiveMountPoint : Optional[Tuple[str, str]]         = None,
+        transform                    : Optional[Tuple[str, str]]         = None,
+        prioritizedBackends          : Optional[List[str]]               = None,
+        indexMinimumFileCount        : int                               = 0,
+        recursionDepth               : Optional[int]                     = None,
         # pylint: disable=unused-argument
         **kwargs
     ) -> None:
@@ -540,12 +540,12 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         # simple non-TAR gzip/bzip2 stream-compressed files.
         self.tarFileName: str
         if fileObject:
-            self.tarFileName = tarFileName or '<file object>'
+            self.tarFileName = str(tarFileName or '<file object>')
         else:
             if tarFileName:
                 # Keep the EXACT file path, do not convert to an absolute path, or else we might trigger
                 # recursive FUSE calls, which hangs everything!
-                self.tarFileName = tarFileName
+                self.tarFileName = str(tarFileName)
             else:
                 raise RatarmountError("At least one of tarFileName and fileObject arguments should be set!")
         self._fileNameIsURL = re.match('[A-Za-z0-9]*://', self.tarFileName) is not None
