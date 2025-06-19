@@ -114,18 +114,22 @@ class TestStenciledFile:
             assert stenciledFile2.read(1) == testData[i : i + 1]
 
     @staticmethod
-    def test_successive_reads(lock=None):
+    def successive_reads_test(lock=None):
         stenciledFile = StenciledFile([(randomTmpFile, 0, len(randomTestData))], lock)
         batchSize = 1024
         for i in range(len(randomTestData) // batchSize):
             assert stenciledFile.read(batchSize) == randomTestData[i * batchSize : (i + 1) * batchSize]
 
     @staticmethod
+    def test_successive_reads():
+        TestStenciledFile.successive_reads_test()
+
+    @staticmethod
     def test_multithreaded_reading():
         parallelism = 24
         with concurrent.futures.ThreadPoolExecutor(24) as pool:
             lock = threading.Lock()
-            results = [pool.submit(TestStenciledFile.test_successive_reads, lock) for _ in range(parallelism)]
+            results = [pool.submit(TestStenciledFile.successive_reads_test, lock) for _ in range(parallelism)]
             for result in results:
                 result.result()
 
