@@ -194,7 +194,7 @@ class TestAutoMountLayer:
                 nestedRoot
                 + "/nested-tar.tar": {
                     3: lambda path: checkFile(path, size=20480),
-                    4: lambda path: checkNonExisting(path),
+                    4: checkNonExisting,
                 },
                 nestedRoot
                 + "/foo": {

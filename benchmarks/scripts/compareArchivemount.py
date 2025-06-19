@@ -40,7 +40,7 @@ def axisValueReduction(ax, axis, reduction, init):
 
 
 def readLabelsFromFirstComment(fileName):
-    with open(fileName) as file:
+    with open(fileName, encoding='utf-8') as file:
         for line in file:
             line = line.strip()
             if line[0] == '#':
@@ -53,7 +53,7 @@ def loadData(fileName):
     labels = None
     data = {}
 
-    with open(fileName) as file:
+    with open(fileName, encoding='utf-8') as file:
         for line in file:
             line = line.strip()
             if not line:

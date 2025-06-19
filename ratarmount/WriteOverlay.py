@@ -1,6 +1,5 @@
 import errno
 import os
-import re
 import shutil
 import sqlite3
 import stat
@@ -431,7 +430,7 @@ def commitOverlay(writeOverlay: str, tarFile: str, encoding: str = tarfile.ENCOD
 
     try:
         with os.popen('tar --version') as pipe:
-            if not re.search(r'GNU tar', pipe.read()):
+            if 'GNU tar' not in pipe.read():
                 raise RatarmountError("GNU tar is required")
     except Exception as exception:
         raise RatarmountError("Currently, GNU tar must be installed and discoverable as 'tar'.") from exception

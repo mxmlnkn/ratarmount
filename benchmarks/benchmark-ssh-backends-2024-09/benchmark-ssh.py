@@ -442,7 +442,7 @@ class BenchmarkSshfsMaxRequests:
             data_file_path = cls.DATA_FILE_NAME
 
         data = {}
-        with open(data_file_path) as file:
+        with open(data_file_path, encoding='utf-8') as file:
             for line in file:
                 if line.startswith('#'):
                     continue

@@ -437,7 +437,7 @@ def plotSummary(logFiles: List[str]):
         maxy = max(max(line.get_ydata()) for line in ax.lines)
         maxy0 = max(line.get_ydata()[0] for line in ax.lines)
         x = 10 ** np.linspace(np.log10(minx), np.log10(maxx))
-        if key in ['tselectpathstart']:
+        if key == 'tselectpathstart':
             plot(ax, x, x / x[0] * miny, linestyle='--', color='0.5', label='linear scaling')
             # y = x**2 / x[-1] ** 2 * maxy
             # plot(ax, x[y > miny], y[y > miny], linestyle=':', color='0.5', label='quadratic scaling')
@@ -449,7 +449,7 @@ def plotSummary(logFiles: List[str]):
         # if key in ['tselectpath', 'tselecthash', 'tselecttuple']:
         #    plot(ax, x, np.log(x) / np.log(x[0]) * miny, linestyle='-.', color='0.5', label='logarithmic scaling')
 
-        if key in ['tinsert']:
+        if key == 'tinsert':
             if slowOperation:
                 y = x / x[-1] * maxy
                 plot(ax, x[y > miny], y[y > miny], linestyle='--', color='0.5', label='linear scaling')

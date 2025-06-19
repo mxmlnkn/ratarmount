@@ -3,7 +3,7 @@ import re
 import matplotlib.pyplot as plt
 import numpy as np
 
-with open("log") as data:
+with open("log", encoding="utf-8") as data:
     data = [(float(line.split(' ')[1]), float(line.split(' ')[4])) for line in data]
 print(data[:10])
 data = np.array(data).transpose()

@@ -14,7 +14,7 @@ import numpy as np
 def loadMemoryTracingData(fileName):
     labels = None
     pageSize = 4096
-    with open(fileName) as file:
+    with open(fileName, encoding='utf-8') as file:
         for line in file:
             line = line.strip()
             if line[0] == '#':
@@ -101,7 +101,7 @@ def plotPerformanceComparison(fileName, fileNameSizeMiB=64):
     labels = None  # [ 'tarMiB', 'indexCreationTime', ... ]
     backendLabels = []  # [ 'sqlite', 'custom', 'custom.gz', 'custom.lz2', ... ]
     rawData = []
-    with open(fileName) as file:
+    with open(fileName, encoding='utf-8') as file:
         for line in file:
             line = line.strip()
             if line[0] == '#':

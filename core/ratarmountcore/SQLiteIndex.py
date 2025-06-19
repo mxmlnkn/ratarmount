@@ -1510,7 +1510,7 @@ class SQLiteIndex:
             return
 
         # Note that for xz seeking, loading and storing block indexes is unnecessary because it has an index included!
-        if compression in [FileFormatID.XZ]:
+        if compression == FileFormatID.XZ:
             return
 
         raise NotImplementedError(

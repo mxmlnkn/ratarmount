@@ -19,7 +19,9 @@ def byteSizeFormat(size, decimal_places=3):
 
 def memoryUsage():
     statm_labels = ['size', 'resident', 'shared', 'text', 'lib', 'data', 'dirty pages']
-    values = [int(x) * resource.getpagesize() for x in open(f'/proc/{os.getpid()}/statm').read().split(' ')]
+    values = [
+        int(x) * resource.getpagesize() for x in open(f'/proc/{os.getpid()}/statm', encoding='utf-8').read().split(' ')
+    ]
     return dict(zip(statm_labels, values))
 
 
