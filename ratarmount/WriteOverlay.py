@@ -244,8 +244,8 @@ class WritableFolderMountSource(fuse.Operations):
         if not row:
             return fileInfo
 
+        # fmt: off
         return FileInfo(
-            # fmt: off
             size     = fileInfo.size,
             mtime    = row['mtime'] if row['mtime'] is not None else fileInfo.mtime,
             mode     = row['mode'] if row['mode'] is not None else fileInfo.mode,
@@ -253,8 +253,8 @@ class WritableFolderMountSource(fuse.Operations):
             uid      = row['uid'] if row['uid'] is not None else fileInfo.uid,
             gid      = row['gid'] if row['gid'] is not None else fileInfo.gid,
             userdata = fileInfo.userdata,
-            # fmt: on
         )
+        # fmt: on
 
     # Metadata modification
 

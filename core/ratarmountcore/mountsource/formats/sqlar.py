@@ -227,8 +227,8 @@ class SQLARMountSource(MountSource):
 
     @staticmethod
     def _convertToFileInfo(rowid: int, mode: int, mtime: int, size: int, linkname: str) -> FileInfo:
+        # fmt: off
         return FileInfo(
-            # fmt: off
             size     = max(0, int(size)),
             mtime    = int(mtime),
             mode     = mode,
@@ -236,8 +236,8 @@ class SQLARMountSource(MountSource):
             uid      = os.getuid(),
             gid      = os.getgid(),
             userdata = [rowid],
-            # fmt: on
         )
+        # fmt: on
 
     @overrides(MountSource)
     def isImmutable(self) -> bool:

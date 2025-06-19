@@ -81,9 +81,9 @@ except ImportError:
 
 
 class Py7zrMountSource(SQLiteIndexMountSource):
+    # fmt: off
     def __init__(
         self,
-        # fmt: off
         fileOrPath             : Union[str, IO[bytes]],
         writeIndex             : bool                      = False,
         clearIndexCache        : bool                      = False,
@@ -94,9 +94,7 @@ class Py7zrMountSource(SQLiteIndexMountSource):
         printDebug             : int                       = 0,
         indexMinimumFileCount  : int                       = 1000,
         **options
-        # fmt: on
     ) -> None:
-        # fmt: off
         self.archiveFilePath        = fileOrPath if isinstance(fileOrPath, str) else None
         self.encoding               = encoding
         self.verifyModificationTime = verifyModificationTime

@@ -41,8 +41,8 @@ class EXT4MountSource(MountSource):
 
     @staticmethod
     def _convertEXT4DirectoryEntryToFileInfo(inode) -> FileInfo:
+        # fmt: off
         return FileInfo(
-            # fmt: off
             size     = inode.i_size,
             mtime    = inode.i_mtime,
             mode     = inode.i_mode.value,
@@ -50,8 +50,8 @@ class EXT4MountSource(MountSource):
             uid      = inode.i_uid,
             gid      = inode.i_gid,
             userdata = [inode.i_no],
-            # fmt: on
         )
+        # fmt: on
 
     @overrides(MountSource)
     def isImmutable(self) -> bool:

@@ -64,9 +64,9 @@ from ratarmountcore.utils import overrides
 #
 # There are no permissions, symbolic links (but hard links are possible), or file times.
 class ASARMountSource(SQLiteIndexMountSource):
+    # fmt: off
     def __init__(
         self,
-        # fmt: off
         fileOrPath             : Union[str, IO[bytes]],
         writeIndex             : bool                      = False,
         clearIndexCache        : bool                      = False,
@@ -78,9 +78,7 @@ class ASARMountSource(SQLiteIndexMountSource):
         indexMinimumFileCount  : int                       = 1000,
         transform              : Optional[Tuple[str, str]] = None,
         **options
-        # fmt: on
     ) -> None:
-        # fmt: off
         self.isFileObject           = not isinstance(fileOrPath, str)
         self.fileObject             = open(fileOrPath, 'rb') if isinstance(fileOrPath, str) else fileOrPath
         self.archiveFilePath        = fileOrPath if isinstance(fileOrPath, str) else None

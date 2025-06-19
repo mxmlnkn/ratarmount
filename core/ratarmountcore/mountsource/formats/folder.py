@@ -62,8 +62,8 @@ class FolderMountSource(MountSource):
 
     @staticmethod
     def _statsToFileInfo(stats: os.stat_result, path: str, linkname: str):
+        # fmt: off
         return FileInfo(
-            # fmt: off
             size     = stats.st_size,
             mtime    = stats.st_mtime,
             mode     = stats.st_mode,
@@ -71,8 +71,8 @@ class FolderMountSource(MountSource):
             uid      = stats.st_uid,
             gid      = stats.st_gid,
             userdata = [path],
-            # fmt: on
         )
+        # fmt: on
 
     @staticmethod
     def _dirEntryToFileInfo(dirEntry: os.DirEntry, path: str, realpath: str):

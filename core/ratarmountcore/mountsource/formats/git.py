@@ -64,8 +64,8 @@ class GitMountSource(MountSource):
         return 0o555 | (stat.S_IFDIR if isinstance(obj, pygit2.Tree) else stat.S_IFREG)
 
     def _convertToFileInfo(self, obj, path: str):
+        # fmt: off
         return FileInfo(
-            # fmt: off
             size     = obj.size if hasattr(obj, 'size') else 0,
             mtime    = self.commitTime,
             mode     = GitMountSource._convertToFileMode(obj),
@@ -73,8 +73,8 @@ class GitMountSource(MountSource):
             uid      = os.getuid(),
             gid      = os.getgid(),
             userdata = [path],
-            # fmt: on
         )
+        # fmt: on
 
     @overrides(MountSource)
     def isImmutable(self) -> bool:

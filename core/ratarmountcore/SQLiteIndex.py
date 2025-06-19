@@ -839,10 +839,7 @@ class SQLiteIndex:
             isgenerated    = row['isgenerated'] if 'isgenerated' in row.keys() else False,  # noqa: SIM118
             recursiondepth = row['recursiondepth'] if 'recursiondepth' in row.keys() else False,  # noqa: SIM118
         )
-        # fmt: on
-
         return FileInfo(
-            # fmt: off
             size     = row['size'],
             mtime    = row['mtime'],
             mode     = row['mode'],
@@ -850,8 +847,8 @@ class SQLiteIndex:
             uid      = row['uid'],
             gid      = row['gid'],
             userdata = [userData],
-            # fmt: on
         )
+        # fmt: on
 
     @staticmethod
     def normpath(path: str):
@@ -908,8 +905,8 @@ class SQLiteIndex:
             selected_columns += ['recursiondepth']
 
         def rowToFileInfo(cursor, row) -> Tuple[str, FileInfo]:  # pylint: disable=unused-argument
+            # fmt: off
             return row[0], FileInfo(
-                # fmt: off
                 size     = row[1],
                 mtime    = row[2],
                 mode     = row[3],
@@ -924,8 +921,8 @@ class SQLiteIndex:
                     isgenerated    = row[11] if len(row) > 11 else False,
                     recursiondepth = row[12] if len(row) > 12 else False,
                 )],
-                # fmt: on
             )
+            # fmt: on
 
         oldRowFactory = self.getConnection().row_factory
         self.getConnection().row_factory = rowToFileInfo
@@ -1072,16 +1069,16 @@ class SQLiteIndex:
         # Without the parentFolderCache, the additional INSERT statements increase the creation time
         # from 8.5s to 12s, so almost 50% slowdown for the 8MiB test TAR!
         pathParts = path.split("/")
+        # fmt: off
         paths = [
             p
-            # fmt: off
             for p in (
                 ( "/".join( pathParts[:i] ), pathParts[i] )
                 for i in range( 1, len( pathParts ) )
             )
-            # fmt: on
             if p not in self.parentFolderCache
         ]
+        # fmt: on
         if not paths:
             return
 

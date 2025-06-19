@@ -322,8 +322,8 @@ if not comparePrimaryKeys:
         re.sub(r'^varchar,varchar (primary key ?)?', 'tuple key, ', label): schema for label, schema in schemas.items()
     }
 
+# fmt: off
 timeRegexes = {
-    # fmt: off
     'name'              : r'(?:Label: (.*)|(CREATE TABLE .*))',
     'tinsert'           : r'Inserting ([0-9]+) file names with [0-9]+ characters took ([0-9.]+) s '
                            'when excluding PRNG time',
@@ -332,8 +332,8 @@ timeRegexes = {
     'tselecthash'       : r'Selecting ([0-9]+) hashes took ([0-9.]+) s',
     'tselecttuple'      : r'Selecting ([0-9]+) path,hash took ([0-9.]+) s',
     'dbsize'            : r'SQL database size in bytes: ([0-9]+)',
-    # fmt: on
 }
+# fmt: on
 
 keyToLabel = {
     'tinsert': "INSERT",

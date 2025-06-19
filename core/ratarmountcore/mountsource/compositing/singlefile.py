@@ -47,8 +47,8 @@ class SingleFileMountSource(MountSource):
 
     def _createFileInfo(self):
         # This must be a function and cannot be cached into a member in order to avoid userdata being a shared list!
+        # fmt: off
         return FileInfo(
-            # fmt: off
             size     = self.size,
             mtime    = self.mtime,
             mode     = int(0o777 | stat.S_IFREG),
@@ -56,8 +56,8 @@ class SingleFileMountSource(MountSource):
             uid      = 0,
             gid      = 0,
             userdata = [],
-            # fmt: on
         )
+        # fmt: on
 
     @overrides(MountSource)
     def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
@@ -70,8 +70,8 @@ class SingleFileMountSource(MountSource):
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         pathWithSlash = path.rstrip('/') + '/'
         if self.path.startswith(pathWithSlash):
+            # fmt: off
             return FileInfo(
-                # fmt: off
                 size     = 0,
                 mtime    = self.mtime,
                 mode     = int(0o777 | stat.S_IFDIR),
@@ -79,8 +79,8 @@ class SingleFileMountSource(MountSource):
                 uid      = 0,
                 gid      = 0,
                 userdata = [],
-                # fmt: on
             )
+            # fmt: on
 
         return self._createFileInfo() if path == self.path else None
 

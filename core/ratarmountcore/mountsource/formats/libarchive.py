@@ -499,9 +499,9 @@ class LibarchiveFile(io.RawIOBase):
 
 # The implementation is similar to ZipMountSource and SQLiteIndexedTarUserData.
 class LibarchiveMountSource(SQLiteIndexMountSource):
+    # fmt: off
     def __init__(
         self,
-        # fmt: off
         fileOrPath             : Union[str, IO[bytes]],
         writeIndex             : bool                      = False,
         clearIndexCache        : bool                      = False,
@@ -514,9 +514,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
         indexMinimumFileCount  : int                       = 0,
         tarFileName            : Optional[str]             = None,
         **options
-        # fmt: on
     ) -> None:
-        # fmt: off
         self.archiveFilePath        = fileOrPath if isinstance(fileOrPath, str) else None
         self.fileOrPath             = fileOrPath
         self.encoding               = encoding

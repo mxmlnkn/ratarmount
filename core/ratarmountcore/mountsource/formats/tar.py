@@ -104,16 +104,16 @@ class _TarFileMetadataReader:
         and not other bits like set for directory, symbolic links, and other special files.
         """
 
+        # fmt: off
         return (
             tarInfo.mode
-            # fmt: off
             | ( stat.S_IFDIR if tarInfo.isdir () else 0 )
             | ( stat.S_IFREG if tarInfo.isfile() or tarInfo.type == b'D' else 0 )
             | ( stat.S_IFLNK if tarInfo.issym () else 0 )
             | ( stat.S_IFCHR if tarInfo.ischr () else 0 )
             | ( stat.S_IFIFO if tarInfo.isfifo() else 0 )
-            # fmt: on
         )
+        # fmt: on
 
     @staticmethod
     def _fixIncrementalBackupNamePrefixes(fileObject: IO[bytes], tarInfo: tarfile.TarInfo, printDebug: int):
@@ -157,9 +157,9 @@ class _TarFileMetadataReader:
         if fixedPath is not None:
             tarInfo.name = fixedPath
 
+    # fmt: off
     @staticmethod
     def _processTarInfo(
-        # fmt: off
         tarInfo          : tarfile.TarInfo,
         fileObject       : IO[bytes],
         pathPrefix       : str,
@@ -169,8 +169,8 @@ class _TarFileMetadataReader:
         transform        : Callable[[str], str],
         recursionDepth   : int,
         printDebug       : int,
-        # fmt: on
     ) -> Tuple[List[Tuple], List[Tuple], bool, Optional[bool]]:
+        # fmt: on
         """Postprocesses a TarInfo object into one or multiple FileInfo tuples."""
 
         if tarInfo.type == b'D' and not isGnuIncremental:
@@ -312,14 +312,14 @@ class _TarFileMetadataReader:
             # r| might be slower but for compressed files we have to go over all the data once anyways.
             # Note that with ignore_zeros = True, no invalid header issues or similar will be raised even for
             # non TAR files!?
+            # fmt:off
             return tarfile.open(
-                # fmt:off
                 fileobj      = fileObject,
                 mode         = 'r|' if self._parent.compression else 'r:',
                 ignore_zeros = self._parent.ignoreZeros,
                 encoding     = self._parent.encoding,
-                # fmt:on
             )
+            # fmt:on
         except tarfile.ReadError:
             pass
 
@@ -422,8 +422,8 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
     DEFAULT_GZIP_SEEK_POINT_SPACING = 16 * 1024 * 1024
 
+    # fmt: off
     def __init__(
-        # fmt: off
         self,
         tarFileName                  : Optional[str]             = None,
         fileObject                   : Optional[IO[bytes]]       = None,
@@ -449,7 +449,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         recursionDepth               : Optional[int]             = None,
         # pylint: disable=unused-argument
         **kwargs
-        # fmt: on
     ) -> None:
         """
         tarFileName
@@ -512,7 +511,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             Unused. Only for compatibility with generic MountSource interface.
         """
 
-        # fmt: off
         self.encoding                     = encoding
         self.stripRecursiveTarExtension   = stripRecursiveTarExtension
         self.transformRecursiveMountPoint = transformRecursiveMountPoint

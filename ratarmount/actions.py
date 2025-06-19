@@ -525,7 +525,8 @@ def createFuseMount(args) -> None:
         maxSecondsToCache            = args.union_mount_cache_timeout,
         indexMinimumFileCount        = args.index_minimum_file_count,
         logFile                      = args.log_file,
-    ) as fuseOperationsObject:  # fmt: on
+    ) as fuseOperationsObject:
+        # fmt: on
         try:
             # Note that this will not detect threads started in shared libraries, only those started via "threading".
             if not args.foreground and len(threading.enumerate()) > 1:

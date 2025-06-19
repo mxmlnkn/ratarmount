@@ -98,8 +98,8 @@ class RarMountSource(MountSource):
         else:
             mtime = 0
 
+        # fmt: off
         return FileInfo(
-            # fmt: off
             size     = info.file_size,
             mtime    = mtime,
             mode     = RarMountSource._getMode(info),
@@ -108,8 +108,8 @@ class RarMountSource(MountSource):
             uid      = os.getuid(),
             gid      = os.getgid(),
             userdata = [(normalizedPath, info)],
-            # fmt: on
         )
+        # fmt: on
 
     @overrides(MountSource)
     def isImmutable(self) -> bool:
@@ -175,9 +175,9 @@ class RarMountSource(MountSource):
         if not any(info.userdata[-1][0] == pathAsDir for info in infoList) and any(
             normalizedPath.rstrip('/').startswith(pathAsDir) for normalizedPath, info in self.files.items()
         ):
+            # fmt: off
             infoList.append(
                 FileInfo(
-                    # fmt: off
                     size     = 0,
                     mtime    = int(time.time()),
                     mode     = 0o777 | stat.S_IFDIR,
@@ -185,9 +185,9 @@ class RarMountSource(MountSource):
                     uid      = os.getuid(),
                     gid      = os.getgid(),
                     userdata = [None],
-                    # fmt: on
                 )
             )
+            # fmt: on
 
         return infoList
 

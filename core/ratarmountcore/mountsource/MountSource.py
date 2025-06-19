@@ -135,8 +135,8 @@ class MountSource(ABC):
 
 
 def createRootFileInfo(userdata: List[Any]):
+    # fmt: off
     return FileInfo(
-        # fmt: off
         size     = 0,
         mtime    = int(time.time()),
         mode     = 0o777 | stat.S_IFDIR,
@@ -144,8 +144,8 @@ def createRootFileInfo(userdata: List[Any]):
         uid      = os.getuid(),
         gid      = os.getgid(),
         userdata = userdata,
-        # fmt: on
     )
+    # fmt: on
 
 
 def mergeStatfs(values: Iterable[Dict[str, Any]], printDebug: int = 0):

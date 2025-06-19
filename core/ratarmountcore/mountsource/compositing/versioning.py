@@ -208,8 +208,8 @@ class FileVersionLayer(MountSource):
             parentFileInfo = self.mountSource.getFileInfo(path)
             assert parentFileInfo
 
+            # fmt: off
             return FileInfo(
-                # fmt: off
                 size     = 0,
                 mtime    = parentFileInfo.mtime,
                 mode     = 0o777 | stat.S_IFDIR,
@@ -217,8 +217,8 @@ class FileVersionLayer(MountSource):
                 uid      = parentFileInfo.uid,
                 gid      = parentFileInfo.gid,
                 userdata = [FileType.VERSIONS_FOLDER],
-                # fmt: on
             )
+            # fmt: on
 
         # 3.) At this point the request is for an actually older version of a file or folder
         fileInfo = self.mountSource.getFileInfo(path, fileVersion=fileVersion)

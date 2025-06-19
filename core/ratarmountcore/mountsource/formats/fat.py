@@ -68,8 +68,8 @@ class FATMountSource(MountSource):
         # FAT has no file permissions.
         mode = 0o777 | (stat.S_IFDIR if entry.is_directory() else stat.S_IFREG)
 
+        # fmt: off
         return FileInfo(
-            # fmt: off
             size     = entry.filesize,
             mtime    = entry.get_mtime().timestamp(),
             mode     = mode,
@@ -77,8 +77,8 @@ class FATMountSource(MountSource):
             uid      = os.getuid(),
             gid      = os.getgid(),
             userdata = [path],
-            # fmt: on
         )
+        # fmt: on
 
     @overrides(MountSource)
     def isImmutable(self) -> bool:

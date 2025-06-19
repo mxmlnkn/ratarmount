@@ -135,8 +135,8 @@ class FSSpecMountSource(MountSource):
         # https://github.com/fsspec/filesystem_spec/issues/1679
         # https://github.com/fsspec/filesystem_spec/issues/1680
         size = entry.get('size', 0)
+        # fmt: off
         return FileInfo(
-            # fmt: off
             size     = size if size else 0,
             mtime    = FSSpecMountSource._getModificationTime(entry),
             mode     = FSSpecMountSource._getMode(entry),
@@ -144,8 +144,8 @@ class FSSpecMountSource(MountSource):
             uid      = os.getuid(),
             gid      = os.getgid(),
             userdata = [path],
-            # fmt: on
         )
+        # fmt: on
 
     @overrides(MountSource)
     def isImmutable(self) -> bool:

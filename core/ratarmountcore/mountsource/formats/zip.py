@@ -23,9 +23,9 @@ except (ImportError, Exception):
 
 
 class ZipMountSource(SQLiteIndexMountSource):
+    # fmt: off
     def __init__(
         self,
-        # fmt: off
         fileOrPath             : Union[str, IO[bytes]],
         writeIndex             : bool                      = False,
         clearIndexCache        : bool                      = False,
@@ -37,8 +37,8 @@ class ZipMountSource(SQLiteIndexMountSource):
         indexMinimumFileCount  : int                       = 1000,
         transform              : Optional[Tuple[str, str]] = None,
         **options
-        # fmt: on
     ) -> None:
+        # fmt: on
         if 'zipfile' not in sys.modules:
             raise RuntimeError("Did not find the zipfile module. Please use Python 3.7+.")
 

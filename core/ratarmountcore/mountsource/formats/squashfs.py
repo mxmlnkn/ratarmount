@@ -388,9 +388,9 @@ class SquashFSImage(SquashFsImage):
 
 
 class SquashFSMountSource(SQLiteIndexMountSource):
+    # fmt: off
     def __init__(
         self,
-        # fmt: off
         fileOrPath             : Union[str, IO[bytes]],
         writeIndex             : bool                      = False,
         clearIndexCache        : bool                      = False,
@@ -402,8 +402,8 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         indexMinimumFileCount  : int                       = 1000,
         transform              : Optional[Tuple[str, str]] = None,
         **options
-        # fmt: on
     ) -> None:
+        # fmt: on
         if isinstance(fileOrPath, str):
             openedFile = True
             file: IO[bytes] = open(fileOrPath, 'rb')

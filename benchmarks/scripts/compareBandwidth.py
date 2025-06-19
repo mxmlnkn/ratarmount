@@ -208,8 +208,8 @@ def plotStandardTools(labels, data, ax, command, metric, scalingFactor=1, xScali
     if command == 'bandwidth':
         command = 'read'
 
+    # fmt: off
     tools = [
-        # fmt: off
         ( 'tab:brown', 'bzip2'  , '.bz2' ),
         ( 'tab:green', 'lbzip2' , '.bz2' ),
         ( 'tab:brown', 'gzip'   , '.gz'  ),
@@ -217,8 +217,8 @@ def plotStandardTools(labels, data, ax, command, metric, scalingFactor=1, xScali
         ( 'tab:brown', 'xz'     , '.xz'  ),
         ( 'tab:green', 'pixz'   , '.xz'  ),
         ( 'tab:brown', 'zstd'   , '.zst' )
-        # fmt: on
     ]
+    # fmt: on
 
     for color, tool, compression in tools:
         compression = 'tar' + compression
