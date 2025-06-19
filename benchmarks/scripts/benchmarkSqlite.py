@@ -699,8 +699,7 @@ def benchmarkSchemas(nFiles: int, log, plotAllMeasurements: bool) -> None:
 
         if plotAllMeasurements:
             with open(f"{fname} {label} insert.dat", 'w', encoding='utf-8') as dataFile:
-                for t in insertTimes:
-                    dataFile.write(str(t) + '\n')
+                dataFile.writelines(str(t) + '\n' for t in insertTimes)
 
         if axi:
             axi.plot(insertTimes, linestyle='', marker='.', label=f'{label}, total time: {tTotalInsert:.3f}s')

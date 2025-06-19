@@ -167,8 +167,7 @@ def test_password_list(tmpdir, passwords, compression):
     mountPoint = os.path.join(tmpdir, "mountPoint")
 
     with open(passwordFile, 'w', encoding='utf-8') as file:
-        for password in passwords:
-            file.write(password + '\n')
+        file.writelines(password + '\n' for password in passwords)
 
     with copyTestFile("tests/encrypted-nested-tar." + compression) as encryptedFile, RunRatarmount(
         mountPoint, ['--password-file', passwordFile, encryptedFile]
