@@ -396,7 +396,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> int:
     """
 
     # Manually parse --debug argument in case argument parsing with argparse itself goes wrong.
-    tmpArgs = rawArgs if rawArgs else sys.argv
+    tmpArgs = rawArgs or sys.argv
     debug = 1
     for i in range(len(tmpArgs) - 1):
         if tmpArgs[i] in ['-d', '--debug'] and tmpArgs[i + 1].isdecimal():

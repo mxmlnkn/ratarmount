@@ -137,7 +137,7 @@ class FSSpecMountSource(MountSource):
         size = entry.get('size', 0)
         # fmt: off
         return FileInfo(
-            size     = size if size else 0,
+            size     = size or 0,
             mtime    = FSSpecMountSource._getModificationTime(entry),
             mode     = FSSpecMountSource._getMode(entry),
             linkname = "",

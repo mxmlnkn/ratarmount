@@ -61,7 +61,7 @@ class ArchiveEntry:
             result = self.getTimeByName('ctime')
         if result is None:
             result = self.getTimeByName('birthtime')
-        return result if result else 0
+        return result or 0
 
     def path(self) -> str:
         path = laffi.entry_pathname_w(self._entry)
@@ -196,7 +196,7 @@ class IterableArchive:
 
         self._archive = laffi.read_new()
         try:
-            self._setPasswords(passwords if passwords else [])
+            self._setPasswords(passwords or [])
             self._tryToOpen(allowArchives=True)
         except ArchiveError as exception:
             if self.printDebug >= 2:
@@ -206,7 +206,7 @@ class IterableArchive:
                 laffi.read_free(self._archive)
                 self._archive = laffi.read_new()
 
-                self._setPasswords(passwords if passwords else [])
+                self._setPasswords(passwords or [])
                 self._tryToOpen(allowArchives=False)
             except ArchiveError as exception2:
                 raise exception2 from exception

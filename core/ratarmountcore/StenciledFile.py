@@ -157,7 +157,7 @@ class RawStenciledFile(FixedRawIOBase):
             return b''
 
         result = b''
-        with self.fileObjectLock if self.fileObjectLock else _DummyContext():
+        with self.fileObjectLock or _DummyContext():
             while len(result) < size:
                 tmp = self._read1_unlocked(size - len(result))
                 if not tmp:
@@ -288,7 +288,7 @@ class RawJoinedFileFromFactory(io.RawIOBase):
         if i >= len(self.sizes):
             return result
 
-        with self.fileObjectLock if self.fileObjectLock else _DummyContext():
+        with self.fileObjectLock or _DummyContext():
             fileObject = self._getFileObject(i)
 
             # Note that seek and read of the file object itself do not seem to check against this and
@@ -349,7 +349,7 @@ class JoinedFile(io.BufferedReader):
             if size is None:
                 raise ValueError("Failed to query size of file object:", fobj)
 
-        fileStencils = [(fobj, 0, size if size else 0) for fobj, size in zip(file_objects, sizes)]
+        fileStencils = [(fobj, 0, size or 0) for fobj, size in zip(file_objects, sizes)]
         super().__init__(RawStenciledFile(fileStencils=fileStencils, fileObjectLock=file_lock), buffer_size=buffer_size)
 
 

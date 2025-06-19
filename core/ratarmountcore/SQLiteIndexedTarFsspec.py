@@ -69,7 +69,7 @@ class MountSourceFileSystem(fsspec.spec.AbstractFileSystem):
         fileInfo = self.mountSource.getFileInfo(self._stripProtocol(path))
         if fileInfo is None:
             raise FileNotFoundError(path)
-        return self.mountSource.open(fileInfo, buffering=block_size if block_size else -1)
+        return self.mountSource.open(fileInfo, buffering=block_size or -1)
 
 
 class SQLiteIndexedTarFileSystem(MountSourceFileSystem):

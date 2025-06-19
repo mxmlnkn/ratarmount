@@ -322,7 +322,7 @@ def getXdgCacheHome():
     home = os.path.expanduser("~/")
     if path.startswith(home):
         path = "~/" + path[len(home) :]
-    return path if path else os.path.join('~', '.cache')
+    return path or os.path.join('~', '.cache')
 
 
 def decodeUnpaddedBase64(data: str) -> bytes:

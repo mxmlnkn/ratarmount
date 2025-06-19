@@ -313,9 +313,7 @@ class BenchmarkFullRead:
 
     @classmethod
     def plot(cls, data_file_path, **kwargs):
-        cls.plot_bar_comparison(
-            data_file_path if data_file_path else cls.DATA_FILE_NAME, xlabel="Read Bandwidth / (MB/s)"
-        )
+        cls.plot_bar_comparison(data_file_path or cls.DATA_FILE_NAME, xlabel="Read Bandwidth / (MB/s)")
 
 
 class BenchmarkFullWrite(BenchmarkFullRead):
@@ -410,9 +408,7 @@ class BenchmarkFullWrite(BenchmarkFullRead):
 
     @classmethod
     def plot(cls, data_file_path, **kwargs):
-        cls.plot_bar_comparison(
-            data_file_path if data_file_path else cls.DATA_FILE_NAME, xlabel="Write Bandwidth / (MB/s)"
-        )
+        cls.plot_bar_comparison(data_file_path or cls.DATA_FILE_NAME, xlabel="Write Bandwidth / (MB/s)")
 
 
 class BenchmarkSshfsMaxRequests:

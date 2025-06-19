@@ -25,8 +25,8 @@ class GitMountSource(MountSource):
 
     # pylint: disable=unused-argument
     def __init__(self, path: Optional[str] = None, reference: Optional[str] = None, **kwargs):
-        self.repository = pygit2.Repository(path if path else os.getcwd())
-        self.reference = reference if reference else self._getDefaultReference(self.repository)
+        self.repository = pygit2.Repository(path or os.getcwd())
+        self.reference = reference or self._getDefaultReference(self.repository)
         commit, reference = self.repository.resolve_refish(self.reference)  # type: ignore
         self.tree = commit.tree
         self.commitTime = self.repository[self.repository.head.target].commit_time  # type: ignore

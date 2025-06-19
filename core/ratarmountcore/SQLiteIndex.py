@@ -727,7 +727,7 @@ class SQLiteIndex:
 
     @staticmethod
     def _openPath(indexFilePath: Optional[str], printDebug: int = 0) -> Tuple[str, sqlite3.Connection]:
-        indexFilePath = indexFilePath if indexFilePath else ':memory:'
+        indexFilePath = indexFilePath or ':memory:'
 
         if printDebug >= 1:
             print("Creating new SQLite index database at", indexFilePath)
@@ -1277,7 +1277,7 @@ class SQLiteIndex:
 
             with fsspec.open(indexFilePath) as file:
                 decompressedFile = _undoCompression(file)
-                with decompressedFile if decompressedFile else file as fileToCopy:
+                with decompressedFile or file as fileToCopy:
                     _copyToTemp(fileToCopy)
         else:
             if not os.path.isfile(indexFilePath):

@@ -540,7 +540,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         # simple non-TAR gzip/bzip2 stream-compressed files.
         self.tarFileName: str
         if fileObject:
-            self.tarFileName = tarFileName if tarFileName else '<file object>'
+            self.tarFileName = tarFileName or '<file object>'
         else:
             if tarFileName:
                 # Keep the EXACT file path, do not convert to an absolute path, or else we might trigger

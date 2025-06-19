@@ -169,8 +169,7 @@ def plotPerformanceComparison(fileName, fileNameSizeMiB=64):
                 ys = [
                     y
                     for i, y in enumerate(yData)
-                    if backendLabels[i].startswith(backend)
-                    and backendLabels[i].endswith(compression if compression else backend)
+                    if backendLabels[i].startswith(backend) and backendLabels[i].endswith(compression or backend)
                 ]
                 if not ys:
                     continue
@@ -190,7 +189,7 @@ def plotPerformanceComparison(fileName, fileNameSizeMiB=64):
             [0],
             hatch=compressionBackgrounds[compression],
             color='0.9',
-            label=compression if compression else 'uncompressed',
+            label=compression or 'uncompressed',
         )
 
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
