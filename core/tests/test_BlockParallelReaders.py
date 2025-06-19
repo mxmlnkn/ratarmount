@@ -6,8 +6,10 @@ import io
 import lzma
 import os
 import random
+import shutil
 import subprocess
 import sys
+from pathlib import Path
 from typing import IO
 
 import indexed_zstd
@@ -71,16 +73,13 @@ def test_blockSize():
 @pytest.mark.parametrize("parallelization", [1, 2, 3, os.cpu_count()])
 class TestParallelXZReader:
     @staticmethod
-    def _createArchive(archivePath: str, streams: int, blocksPerStream: int, blockSize: int):
-        with open(archivePath, 'wb') as archive:
-            for _ in range(streams):
-                tmpPath = archivePath + '.tmp'
-                with open(tmpPath, 'wb') as file:
-                    size = blockSize * blocksPerStream
-                    file.write(base64.b64encode(os.urandom(size))[:size])
-                subprocess.run(['xz', f'--block-size={blockSize}', '--compress', '--force', tmpPath], check=True)
-                with open(tmpPath + '.xz', 'rb') as file:
-                    archive.write(file.read())
+    def _createArchive(archivePath: Path, streams: int, blocksPerStream: int, blockSize: int):
+        for _ in range(streams):
+            tmpPath = str(archivePath) + '.tmp'
+            size = blockSize * blocksPerStream
+            Path(tmpPath).write_bytes(base64.b64encode(os.urandom(size))[:size])
+            subprocess.run(['xz', f'--block-size={blockSize}', '--compress', '--force', tmpPath], check=True)
+            shutil.copy(tmpPath + '.xz', archivePath)
 
     @staticmethod
     def _testSequentialReading(archivePath: str, bufferSize: int, parallelization: int):
@@ -124,7 +123,7 @@ class TestParallelXZReader:
                 assert serialData == parallelData
 
     def test_empty(self, parallelization, tmp_path):
-        archivePath = os.path.join(str(tmp_path), 'test-archive.xz')
+        archivePath = tmp_path / 'test-archive.xz'
         self._createArchive(archivePath, 1, 1, 0)
         for bufferSize in [1, 2, 100, 1024, 128 * 1000]:
             self._testSequentialReading(archivePath, bufferSize, parallelization)
@@ -194,23 +193,20 @@ class SeekableZstd:
 @pytest.mark.parametrize("parallelization", [1, 2, 3, os.cpu_count()])
 class TestParallelZstdReader:
     @staticmethod
-    def _createArchive(archivePath: str, streams: int, blocksPerStream: int, blockSize: int):
-        with open(archivePath, 'wb') as archive:
-            for _ in range(streams):
-                tmpPath = archivePath + '.tmp'
-                with open(tmpPath, 'wb') as file:
-                    size = blockSize * blocksPerStream
-                    file.write(base64.b64encode(os.urandom(size))[:size])
-                subprocess.run(
-                    ['zstd', '-q', f'--block-size={blockSize}', '--compress', '--force', tmpPath], check=True
-                )
-                with open(tmpPath + '.zst', 'rb') as file:
-                    archive.write(file.read())
+    def _createArchive(archivePath: Path, streams: int, blocksPerStream: int, blockSize: int):
+        for _ in range(streams):
+            tmpPath = str(archivePath) + '.tmp'
+            size = blockSize * blocksPerStream
+            Path(tmpPath).write_bytes(base64.b64encode(os.urandom(size))[:size])
+            subprocess.run(['zstd', '-q', f'--block-size={blockSize}', '--compress', '--force', tmpPath], check=True)
+            shutil.copy(tmpPath + '.zst', archivePath)
 
     @staticmethod
-    def _testSequentialReading(archivePath: str, bufferSize: int, parallelization: int):
+    def _testSequentialReading(archivePathLike: Path, bufferSize: int, parallelization: int):
         if zstandard is None:
             return
+
+        archivePath = str(archivePathLike)
 
         with indexed_zstd.IndexedZstdFile(archivePath) as serialFile, (
             SeekableZstd(archivePath) if parallelization == 1 else ParallelZstdReader(archivePath, parallelization)
@@ -229,9 +225,11 @@ class TestParallelZstdReader:
                 assert bytesRead == parallelFile.blockBoundaries[-1]
 
     @staticmethod
-    def _testRandomReads(archivePath: str, samples: int, parallelization: int):
+    def _testRandomReads(archivePathLike: Path, samples: int, parallelization: int):
         if zstandard is None:
             return
+
+        archivePath = str(archivePathLike)
 
         with indexed_zstd.IndexedZstdFile(archivePath) as serialFile, (
             SeekableZstd(archivePath) if parallelization == 1 else ParallelZstdReader(archivePath, parallelization)
@@ -265,7 +263,7 @@ class TestParallelZstdReader:
                 assert serialData == parallelData
 
     def test_empty(self, parallelization, tmp_path):
-        archivePath = os.path.join(str(tmp_path), 'test-archive.zst')
+        archivePath = tmp_path / 'test-archive.zst'
         self._createArchive(archivePath, 1, 1, 0)
         for bufferSize in [1, 2, 100, 1024, 128 * 1000]:
             self._testSequentialReading(archivePath, bufferSize, parallelization)
@@ -275,7 +273,7 @@ class TestParallelZstdReader:
     @pytest.mark.parametrize("blocksPerStream", [1, 2, 7])
     @pytest.mark.parametrize("blockSize", [1, 2, 7])
     def test_small_multi_stream_block(self, parallelization, streams, blocksPerStream, blockSize, tmp_path):
-        archivePath = os.path.join(str(tmp_path), 'test-archive.zst')
+        archivePath = tmp_path / 'test-archive.zst'
         self._createArchive(archivePath, streams, blocksPerStream, blockSize)
         for bufferSize in [1, 2, 100, 1024]:
             self._testSequentialReading(archivePath, bufferSize, parallelization)
@@ -283,7 +281,7 @@ class TestParallelZstdReader:
 
     @pytest.mark.parametrize("blockSize", [10, 333, 1024, 10 * 1000, 64 * 1024])
     def test_large_multi_stream_block(self, parallelization, blockSize, tmp_path):
-        archivePath = os.path.join(str(tmp_path), 'test-archive.zst')
+        archivePath = tmp_path / 'test-archive.zst'
         self._createArchive(archivePath, 3, 4, blockSize)
         for bufferSize in [37, 1024, 128 * 1000]:
             self._testSequentialReading(archivePath, bufferSize, parallelization)

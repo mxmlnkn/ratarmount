@@ -7,6 +7,7 @@ import os
 import sys
 import tarfile
 import tempfile
+from pathlib import Path
 
 import fsspec
 
@@ -69,8 +70,7 @@ def test_pandas():
         oldPath = os.getcwd()
         os.chdir(folderPath)
         try:
-            with open("test.csv", "wb") as file:
-                file.write(b"1,2\n3,4")
+            Path("test.csv").write_bytes(b"1,2\n3,4")
             with tarfile.open("test-csv.tar", "w") as archive:
                 archive.add("test.csv")
 

@@ -12,6 +12,7 @@ import sys
 import tempfile
 import time
 import zipfile
+from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -47,8 +48,7 @@ def create_encrypted_test_file(path):
         folder = tempfile.TemporaryDirectory()
         os.chdir(folder.name)
         for name, contents in files.items():
-            with open(name, "wb") as file:
-                file.write(contents)
+            Path(name).write_bytes(contents)
 
         if os.path.exists(path):
             os.remove(path)

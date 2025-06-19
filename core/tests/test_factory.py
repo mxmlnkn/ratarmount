@@ -4,6 +4,9 @@
 import bz2
 import os
 import sys
+from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -20,58 +23,49 @@ def findTestFile(relativePathOrName):
     return relativePathOrName
 
 
+@pytest.mark.parametrize("transform_path", [str, Path])
 class TestOpenMountSource:
     @staticmethod
-    def test_joining_archive(tmpdir):
+    def test_joining_archive(tmp_path, transform_path):
         compressed = bz2.compress(b"foobar")
-        with open(os.path.join(tmpdir, "foo.001"), 'wb') as file:
-            file.write(compressed[: len(compressed) // 2])
-        with open(os.path.join(tmpdir, "foo.002"), 'wb') as file:
-            file.write(compressed[len(compressed) // 2 :])
+        (tmp_path / "foo.001").write_bytes(compressed[: len(compressed) // 2])
+        (tmp_path / "foo.002").write_bytes(compressed[len(compressed) // 2 :])
 
-        with openMountSource(os.path.join(tmpdir, "foo.001")) as mountSource:
-            fileInfo = mountSource.getFileInfo("/<file object>")
-            assert fileInfo
-            assert mountSource.open(fileInfo).read() == b"foobar"
-
-        with openMountSource(os.path.join(tmpdir, "foo.002")) as mountSource:
-            fileInfo = mountSource.getFileInfo("/<file object>")
-            assert fileInfo
-            assert mountSource.open(fileInfo).read() == b"foobar"
+        for path in [tmp_path / "foo.001", tmp_path / "foo.002"]:
+            with openMountSource(transform_path(path)) as mountSource:
+                fileInfo = mountSource.getFileInfo("/<file object>")
+                assert fileInfo
+                assert mountSource.open(fileInfo).read() == b"foobar"
 
     @staticmethod
-    def test_joining_file(tmpdir):
-        with open(os.path.join(tmpdir, "foo.001"), 'wb') as file:
-            file.write(b"foo")
-        with open(os.path.join(tmpdir, "foo.002"), 'wb') as file:
-            file.write(b"bar")
+    def test_joining_file(tmp_path, transform_path):
+        (tmp_path / "foo.001").write_bytes(b"foo")
+        (tmp_path / "foo.002").write_bytes(b"bar")
 
-        print(type(openMountSource(os.path.join(tmpdir, "foo.001"))))
-        with openMountSource(os.path.join(tmpdir, "foo.001")) as mountSource:
-            print("mountSource list:", mountSource.listDir("/"))
-            fileInfo = mountSource.getFileInfo("/foo")
-            assert fileInfo
-            assert mountSource.open(fileInfo).read() == b"foobar"
+        for path in [tmp_path / "foo.001", tmp_path / "foo.002"]:
+            with openMountSource(transform_path(path)) as mountSource:
+                fileInfo = mountSource.getFileInfo("/foo")
+                assert fileInfo
+                assert mountSource.open(fileInfo).read() == b"foobar"
 
     @staticmethod
-    def test_joining_files_exceeding_handle_limit(tmpdir):
+    def test_joining_files_exceeding_handle_limit(tmp_path, transform_path):
         result = b''
         for i in range(1100):  # Default on my system is 1024
-            with open(os.path.join(tmpdir, f"foo.{i:03}"), 'wb') as file:
-                file.write(str(i).encode())
-                result += str(i).encode()
+            (tmp_path / f"foo.{i:03}").write_bytes(str(i).encode())
+            result += str(i).encode()
 
-        with openMountSource(os.path.join(tmpdir, "foo.005")) as mountSource:
+        with openMountSource(transform_path(tmp_path / "foo.005")) as mountSource:
             fileInfo = mountSource.getFileInfo("/foo")
             assert fileInfo
             assert mountSource.open(fileInfo).read() == result
 
     @staticmethod
-    def test_chimera_file():
-        chimeraFilePath = findTestFile("chimera-tbz2-zip")
-        indexPath = chimeraFilePath + ".index.sqlite"
-        if os.path.exists(indexPath):
-            os.remove(indexPath)
+    def test_chimera_file(transform_path):
+        chimeraFilePath = transform_path(Path(findTestFile("chimera-tbz2-zip")))
+        indexPath = Path(str(chimeraFilePath) + ".index.sqlite")
+        if indexPath.exists():
+            indexPath.unlink()
 
         # Check simple open and that index files are NOT created because they are too small.
         with openMountSource(
@@ -81,7 +75,7 @@ class TestOpenMountSource:
             files = mountSource.listDir("/")
             assert files
 
-            assert not os.path.exists(indexPath)
+            assert not indexPath.exists()
 
         # Same as above, but force index creation by lowering the file count threshold.
         with openMountSource(
@@ -99,7 +93,7 @@ class TestOpenMountSource:
             with mountSource.open(fileInfo) as file:
                 assert file.read() == b"iriya\n"
 
-            assert os.path.exists(indexPath)
+            assert indexPath.exists()
 
         # Check that everything works fine even if the index exists and the backend order is reversed.
         #
@@ -108,7 +102,7 @@ class TestOpenMountSource:
         # by the first backend after an inconsistency has been noticed. The latter is easier to implement
         # and more consistent. I think, only after implementing storing the backend name into the index,
         # should the next backend be tried instead of it being overwritten and recreated.
-        assert os.path.exists(indexPath)
+        assert indexPath.exists()
         with openMountSource(
             chimeraFilePath,
             writeIndex=True,
@@ -124,9 +118,9 @@ class TestOpenMountSource:
             with mountSource.open(fileInfo) as file:
                 assert file.read() == b"iriya\n"
 
-            assert os.path.exists(indexPath)
+            assert indexPath.exists()
 
-        os.remove(indexPath)
+        indexPath.unlink()
 
         # Index file is always created for compressed files such as .tar.bz2
         with openMountSource(
@@ -141,10 +135,10 @@ class TestOpenMountSource:
             with mountSource.open(fileInfo) as file:
                 assert file.read() == b"foo\n"
 
-            assert os.path.exists(indexPath)
+            assert indexPath.exists()
 
         # Check that everything works fine even if the index exists and the backend order is reversed.
-        assert os.path.exists(indexPath)
+        assert indexPath.exists()
         with openMountSource(
             chimeraFilePath,
             writeIndex=True,
@@ -161,6 +155,6 @@ class TestOpenMountSource:
             with mountSource.open(fileInfo) as file:
                 assert file.read() == b"foo\n"
 
-            assert os.path.exists(indexPath)
+            assert indexPath.exists()
 
-        os.remove(indexPath)
+        indexPath.unlink()

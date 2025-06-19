@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 import time
+from pathlib import Path
 from typing import List, Optional
 
 import asyncssh
@@ -280,12 +281,11 @@ class BenchmarkFullRead:
 
                 subprocess.run(['sshfs', '-p', str(port), f"{hostname}:{source_folder}", 'mounted-sshfs'], check=True)
                 t0 = time.time()
-                file_path = os.path.join('mounted-sshfs', test_file)
+                file_path = Path('mounted-sshfs') / test_file
                 if i == 0:
-                    print("Block size in sshfs mount point:", os.stat(file_path).st_blksize)
-                with open(file_path, 'rb') as file:
-                    size = len(file.read())
-                    assert size == file_size
+                    print("Block size in sshfs mount point:", file_path.stat().st_blksize)
+                size = len(file_path.read_bytes())
+                assert size == file_size
                 t1 = time.time()
                 subprocess.run(['fusermount', '-u', 'mounted-sshfs'], check=False)
                 csv_file.write(','.join(["sshfs", ":memory:", str(size), str(t1 - t0)]).encode() + b'\n')
@@ -367,12 +367,11 @@ class BenchmarkFullWrite(BenchmarkFullRead):
 
                 subprocess.run(['sshfs', '-p', str(port), f"{hostname}:{source_folder}", 'mounted-sshfs'], check=True)
                 t0 = time.time()
-                file_path = os.path.join('mounted-sshfs', test_file)
+                file_path = Path('mounted-sshfs') / test_file
                 if i == 0:
-                    print("Block size in sshfs mount point:", os.stat(file_path).st_blksize)
-                with open(file_path, 'wb') as file:
-                    size = file.write(data_to_upload)
-                    assert size == file_size
+                    print("Block size in sshfs mount point:", file_path.stat().st_blksize)
+                size = file_path.write_bytes(data_to_upload)
+                assert size == file_size
                 t1 = time.time()
                 subprocess.run(['fusermount', '-u', 'mounted-sshfs'], check=False)
                 csv_file.write(','.join(["sshfs", ":memory:", str(size), str(t1 - t0)]).encode() + b'\n')

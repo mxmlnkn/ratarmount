@@ -27,6 +27,9 @@ ignore = [
     "PLW0603",  # Cannot live without global statements, especially for subprocessing.
     "PLW2901",  # Only false positives for constructs such as for data in ...: data = data.clean(); process(data)
     "RUF001",   # Only false positives from tests with Unicode characters.
+    "RUF039",   # https://github.com/astral-sh/ruff/issues/18795
+    "RUF056",   # "options.get('disableUnionMount', False):" Wants me to change False to None,
+                # but it makes no sense semantically (expecting a bool)
     "RUF100",   # BUG: removes necessary noqa: E402 in tests!
 
     "SIM115",   # Too many locations where I do not know how to use context managers for files,

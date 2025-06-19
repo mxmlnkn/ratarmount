@@ -9,6 +9,7 @@ import pathlib
 import platform
 import sys
 import types
+from pathlib import Path
 from typing import Dict, Generic, Iterable, List, Optional, TypeVar, Union, get_type_hints
 
 try:
@@ -289,9 +290,8 @@ def isOnSlowDrive(filePath: str):
     # TODO make it work on Windows: https://devblogs.microsoft.com/oldnewthing/20201023-00/?p=104395
     try:
         device = os.stat(filePath).st_dev
-        with open(f"/sys/dev/block/{os.major(device)}:{os.minor(device)}/queue/rotational", 'rb') as file:
-            if file.read().strip() == b"1":
-                return True
+        if Path(f"/sys/dev/block/{os.major(device)}:{os.minor(device)}/queue/rotational").read_bytes().strip() == b"1":
+            return True
     except Exception:
         pass
     return False

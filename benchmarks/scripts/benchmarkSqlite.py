@@ -6,6 +6,7 @@ import sqlite3
 import sys
 import tempfile
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import matplotlib.pyplot as plt
@@ -371,8 +372,7 @@ def extractValuesFromBlock(block: str) -> Dict[str, Any]:
 
 
 def extractValuesFromLog(path: str):
-    with open(path, encoding='utf-8') as file:
-        return [extractValuesFromBlock(block) for block in file.read().split('\n\n') if block]
+    return [extractValuesFromBlock(block) for block in Path(path).read_text(encoding='utf-8').split('\n\n') if block]
 
 
 def plotSummary(logFiles: List[str]):

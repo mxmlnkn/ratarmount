@@ -238,12 +238,10 @@ class TestJoinedFileFromFactory:
         assert file.tell() == 6
 
     @staticmethod
-    def test_joining_files(tmpdir):
-        files = [os.path.join(tmpdir, name) for name in ["foo.001", "foo.002"]]
-        with open(files[0], 'wb') as file:
-            file.write(b"foo")
-        with open(files[1], 'wb') as file:
-            file.write(b"bar")
+    def test_joining_files(tmp_path):
+        files = [tmp_path / name for name in ["foo.001", "foo.002"]]
+        files[0].write_bytes(b"foo")
+        files[1].write_bytes(b"bar")
 
         factories = [lambda file=file: open(file, 'rb') for file in files]
         assert len(factories) == 2

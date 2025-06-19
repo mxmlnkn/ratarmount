@@ -1,5 +1,6 @@
 import contextlib
 import os
+import shutil
 import tempfile
 
 
@@ -15,6 +16,5 @@ def findTestFile(relativePathOrName):
 def copyTestFile(relativePathOrName):
     with tempfile.TemporaryDirectory() as folder:
         path = os.path.join(folder, os.path.basename(relativePathOrName))
-        with open(findTestFile(relativePathOrName), 'rb') as file, open(path, 'wb') as target:
-            target.write(file.read())
+        shutil.copy(findTestFile(relativePathOrName), path)
         yield path

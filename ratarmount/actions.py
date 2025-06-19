@@ -12,6 +12,7 @@ import threading
 import time
 import urllib.request
 import zipfile
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from ratarmountcore.compressions import stripSuffixFromArchive
@@ -243,10 +244,9 @@ def printOSSAttributions() -> None:
 
         # This is known to happen for system-installed packages :/, and --editable installed packages.
         if not licenses:
-            path = os.path.join(f"/usr/share/doc/python3-{name}/copyright")
-            if os.path.isfile(path):
-                with open(path, encoding='utf-8') as file:
-                    licenses.append(file.read())
+            path = Path(f"/usr/share/doc/python3-{name}/copyright")
+            if path.is_file():
+                licenses.append(path.read_text(encoding='utf-8'))
 
         if licenses:
             for licenseContents in licenses:
@@ -389,8 +389,7 @@ def processParsedArguments(args) -> int:
         args.passwords.append(args.password.encode())
 
     if args.password_file:
-        with open(args.password_file, 'rb') as file:
-            args.passwords += file.read().split(b'\n')
+        args.passwords.extend(Path(args.password_file).read_bytes().split(b'\n'))
 
     args.passwords = removeDuplicatesStable(args.passwords)
 

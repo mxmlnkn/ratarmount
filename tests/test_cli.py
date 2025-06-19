@@ -5,11 +5,13 @@ import contextlib
 import hashlib
 import io
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
 import threading
 import time
+from pathlib import Path
 
 import pytest
 
@@ -43,8 +45,7 @@ def findTestFile(relativePathOrName):
 def copyTestFile(relativePathOrName):
     with tempfile.TemporaryDirectory() as folder:
         path = os.path.join(folder, os.path.basename(relativePathOrName))
-        with open(findTestFile(relativePathOrName), 'rb') as file, open(path, 'wb') as target:
-            target.write(file.read())
+        shutil.copy(findTestFile(relativePathOrName), path)
         yield path
 
 
@@ -361,14 +362,13 @@ def test_file_in_archive(archivePath, pathInArchive, checksum, parallelization):
         for forceIndexCreation in [True, False]:
             testArgs = ["-c", *args] if forceIndexCreation else args
             with RunRatarmount(mountPoint, testArgs) as ratarmountInstance:
-                path = os.path.join(mountPoint, pathInArchive)
-                assert os.path.isfile(path)
-                stats = os.stat(path)  # implicitly tests that this does not throw
+                path = Path(mountPoint) / pathInArchive
+                assert path.is_file()
+                stats = path.stat()  # implicitly tests that this does not throw
                 assert stats.st_size > 0
 
-                with open(path, 'rb') as file:
-                    contents = file.read()  # extra line because it might fail
-                    assert hashlib.md5(contents).hexdigest() == checksum
+                contents = path.read_bytes()  # extra line because it might fail
+                assert hashlib.md5(contents).hexdigest() == checksum
 
                 if '.tar' in tmpArchive and '.7z' not in tmpArchive:
                     output = ratarmountInstance.getStdout() + ratarmountInstance.getStderr()

@@ -9,6 +9,7 @@ import sys
 import tarfile
 import tempfile
 import time
+from pathlib import Path
 
 import pytest
 from helpers import copyTestFile, findTestFile
@@ -187,9 +188,7 @@ class TestLibarchiveMountSource:
 
     @staticmethod
     def test_file_object_reader():
-        memoryFile = io.BytesIO()
-        with open(findTestFile('folder-symlink.zip'), 'rb') as file:
-            memoryFile = io.BytesIO(file.read())
+        memoryFile = io.BytesIO(Path(findTestFile('folder-symlink.zip')).read_bytes())
         with IterableArchive(memoryFile) as archive:
             while True:
                 entry = archive.nextEntry()

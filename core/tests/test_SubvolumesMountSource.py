@@ -6,11 +6,13 @@ import io
 import os
 import sys
 import tarfile
+from pathlib import Path
 from typing import Dict, List
+
+import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-import pytest  # noqa: E402
 from ratarmountcore.mountsource.compositing.subvolumes import SubvolumesMountSource  # noqa: E402
 from ratarmountcore.mountsource.formats.folder import FolderMountSource  # noqa: E402
 from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar  # noqa: E402
@@ -18,7 +20,7 @@ from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar  # noqa: E40
 
 @dataclasses.dataclass
 class SampleArchive:
-    path: str
+    path: Path
     folders: List[str]
     files: Dict[str, bytes]
 
@@ -39,8 +41,7 @@ def _populate_folder(sampleArchive: SampleArchive):
     for folder in sampleArchive.folders:
         os.makedirs(os.path.join(sampleArchive.path, folder.strip('/')), exist_ok=True)
     for path, contents in sampleArchive.files.items():
-        with open(os.path.join(sampleArchive.path, path.strip('/')), "wb") as file:
-            file.write(contents)
+        (sampleArchive.path / path.strip('/')).write_bytes(contents)
 
 
 def _populate_tar(sampleArchive: SampleArchive):
@@ -52,10 +53,9 @@ def _populate_tar(sampleArchive: SampleArchive):
 
 
 @pytest.fixture(name="sample_folder_a")
-def fixture_sample_folder_a(tmpdir):
+def fixture_sample_folder_a(tmp_path):
     sampleArchive = SampleArchive(
-        # original tmpdir is a deprecated py.path.local object
-        path=os.path.join(tmpdir.realpath(), "folderA"),
+        path=tmp_path / "folderA",
         folders=["subfolder"],
         files={"/subfolder/world": b"hello\n", "/ufo": b"iriya in folder 1\n"},
     )
@@ -64,10 +64,9 @@ def fixture_sample_folder_a(tmpdir):
 
 
 @pytest.fixture(name="sample_folder_b")
-def fixture_sample_folder_b(tmpdir):
+def fixture_sample_folder_b(tmp_path):
     sampleArchive = SampleArchive(
-        # original tmpdir is a deprecated py.path.local object
-        path=os.path.join(tmpdir.realpath(), "folderB"),
+        path=tmp_path / "folderB",
         folders=["subfolder"],
         files={"/ufo": b"iriya\n"},
     )
@@ -76,9 +75,9 @@ def fixture_sample_folder_b(tmpdir):
 
 
 @pytest.fixture(name="sample_tar_a")
-def fixture_sample_tar_a(tmpdir):
+def fixture_sample_tar_a(tmp_path):
     sampleArchive = SampleArchive(
-        path=os.path.join(tmpdir.realpath(), "sampleA.tar"),
+        path=tmp_path / "sampleA.tar",
         folders=["subfolder"],
         files={"/ufo": b"inside", "/README.md": b"readme inside", "/subfolder/world": b"HELLO"},
     )
@@ -87,9 +86,9 @@ def fixture_sample_tar_a(tmpdir):
 
 
 @pytest.fixture(name="sample_tar_b")
-def fixture_sample_tar_b(tmpdir):
+def fixture_sample_tar_b(tmp_path):
     sampleArchive = SampleArchive(
-        path=os.path.join(tmpdir.realpath(), "sampleB.tar"),
+        path=tmp_path / "sampleB.tar",
         folders=["/src", "/dist", "/dist/a", "/dist/a/b"],
         files={"/README.md": b"hello world", "/src/test.sh": b"echo hi", "/dist/a/b/test2.sh": "echo two"},
     )
@@ -136,16 +135,12 @@ class TestSubvolumesMountSource:
         )
 
         contents = b"atarashii iriya\n"
-        with open(os.path.join(sample_folder_a.path, "ufo2"), "wb") as file:
-            file.write(contents)
+        (sample_folder_a.path / "ufo2").write_bytes(contents)
         os.mkdir(os.path.join(sample_folder_a.path, "subfolder2"))
-        with open(os.path.join(sample_folder_a.path, "subfolder2/world"), "wb") as file:
-            file.write(contents)
+        (sample_folder_a.path / "subfolder2" / "world").write_bytes(contents)
         os.mkdir(os.path.join(sample_folder_a.path, "subfolder3"))
-        with open(os.path.join(sample_folder_a.path, "subfolder3/world"), "wb") as file:
-            file.write(contents)
-        with open(os.path.join(sample_folder_a.path, "second-world"), "wb") as file:
-            file.write(contents)
+        (sample_folder_a.path / "subfolder3" / "world").write_bytes(contents)
+        (sample_folder_a.path / "second-world").write_bytes(contents)
 
         TestSubvolumesMountSource._check_file(union, "folderA/ufo2", 0, contents)
         TestSubvolumesMountSource._check_file(union, "folderA/subfolder2", 0, None)
@@ -193,14 +188,11 @@ class TestSubvolumesMountSource:
 
         # Create files inside the original folder
         contents = b"atarashii iriya\n"
-        with open(os.path.join(sample_folder_a.path, "ufo2"), "wb") as file:
-            file.write(contents)
+        (sample_folder_a.path / "ufo2").write_bytes(contents)
         os.mkdir(os.path.join(sample_folder_a.path, "subfolder2"))
-        with open(os.path.join(sample_folder_a.path, "subfolder2/world"), "wb") as file:
-            file.write(contents)
+        (sample_folder_a.path / "subfolder2" / "world").write_bytes(contents)
         os.mkdir(os.path.join(sample_folder_a.path, "subfolder3"))
-        with open(os.path.join(sample_folder_a.path, "subfolder3/world"), "wb") as file:
-            file.write(contents)
+        (sample_folder_a.path / "subfolder3" / "world").write_bytes(contents)
 
         # Check for created files in the bind mount
         TestSubvolumesMountSource._check_file(union, "/folder/ufo2", 0, contents)
