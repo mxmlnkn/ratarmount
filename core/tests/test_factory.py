@@ -33,7 +33,7 @@ class TestOpenMountSource:
 
         for path in [tmp_path / "foo.001", tmp_path / "foo.002"]:
             with openMountSource(transform_path(path)) as mountSource:
-                fileInfo = mountSource.getFileInfo("/<file object>")
+                fileInfo = mountSource.lookup("/<file object>")
                 assert fileInfo
                 assert mountSource.open(fileInfo).read() == b"foobar"
 
@@ -44,7 +44,7 @@ class TestOpenMountSource:
 
         for path in [tmp_path / "foo.001", tmp_path / "foo.002"]:
             with openMountSource(transform_path(path)) as mountSource:
-                fileInfo = mountSource.getFileInfo("/foo")
+                fileInfo = mountSource.lookup("/foo")
                 assert fileInfo
                 assert mountSource.open(fileInfo).read() == b"foobar"
 
@@ -56,7 +56,7 @@ class TestOpenMountSource:
             result += str(i).encode()
 
         with openMountSource(transform_path(tmp_path / "foo.005")) as mountSource:
-            fileInfo = mountSource.getFileInfo("/foo")
+            fileInfo = mountSource.lookup("/foo")
             assert fileInfo
             assert mountSource.open(fileInfo).read() == result
 
@@ -88,7 +88,7 @@ class TestOpenMountSource:
             files = mountSource.list("/")
             assert files
 
-            fileInfo = mountSource.getFileInfo("/foo/fighter/ufo")
+            fileInfo = mountSource.lookup("/foo/fighter/ufo")
             assert fileInfo
             with mountSource.open(fileInfo) as file:
                 assert file.read() == b"iriya\n"
@@ -113,7 +113,7 @@ class TestOpenMountSource:
             files = mountSource.list("/")
             assert files
 
-            fileInfo = mountSource.getFileInfo("/foo/fighter/ufo")
+            fileInfo = mountSource.lookup("/foo/fighter/ufo")
             assert fileInfo
             with mountSource.open(fileInfo) as file:
                 assert file.read() == b"iriya\n"
@@ -130,7 +130,7 @@ class TestOpenMountSource:
             files = mountSource.list("/")
             assert files
 
-            fileInfo = mountSource.getFileInfo("/bar")
+            fileInfo = mountSource.lookup("/bar")
             assert fileInfo
             with mountSource.open(fileInfo) as file:
                 assert file.read() == b"foo\n"
@@ -150,7 +150,7 @@ class TestOpenMountSource:
             print("files:", files)
             assert files
 
-            fileInfo = mountSource.getFileInfo("/bar")
+            fileInfo = mountSource.lookup("/bar")
             assert fileInfo
             with mountSource.open(fileInfo) as file:
                 assert file.read() == b"foo\n"

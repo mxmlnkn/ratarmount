@@ -76,11 +76,11 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
             printDebug=3,
         )
 
-        finfo = indexedFile.getFileInfo("/src/test.sh")
+        finfo = indexedFile.lookup("/src/test.sh")
         assert stat.S_ISREG(finfo.mode)
         assert indexedFile.read(finfo, size=finfo.size, offset=0) == b"echo hi"
 
-        finfo = indexedFile.getFileInfo("/dist/a")
+        finfo = indexedFile.lookup("/dist/a")
         assert stat.S_ISDIR(finfo.mode)
         assert indexedFile.list("/dist/a") == {
             'b': FileInfo(
@@ -160,7 +160,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
             ),
         }
 
-        finfo = indexedFile.getFileInfo("/README.md")
+        finfo = indexedFile.lookup("/README.md")
         assert finfo.size == 11
         assert indexedFile.read(finfo, size=11, offset=0) == b"hello world"
         assert indexedFile.read(finfo, size=3, offset=3) == b"lo "

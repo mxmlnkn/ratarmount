@@ -37,7 +37,7 @@ class AutoMountLayer(MountSource):
         self.lazyMounting: bool = self.options.get('lazyMounting', False)
         self.printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
 
-        rootFileInfo = mountSource.getFileInfo('/')
+        rootFileInfo = mountSource.lookup('/')
         assert rootFileInfo
         rootFileInfo.userdata.append('/')
 
@@ -95,7 +95,7 @@ class AutoMountLayer(MountSource):
     def getRecursionDepth(self, path: str) -> int:
         mountPoint, pathInMountPoint = self._simplyFindMounted(path)
         mountInfo = self.mounted[mountPoint]
-        fileInfo = mountInfo.mountSource.getFileInfo(pathInMountPoint)
+        fileInfo = mountInfo.mountSource.lookup(pathInMountPoint)
 
         # +1 because, by definition each mount source adds one recursion.
         # There can be no passthrough MountSource here because they are only created on archives..
@@ -141,7 +141,7 @@ class AutoMountLayer(MountSource):
         parentMountInfo = self.mounted[parentMountPoint]
         parentMountSource = parentMountInfo.mountSource
 
-        archiveFileInfo = parentMountSource.getFileInfo(pathInsideParentMountPoint)
+        archiveFileInfo = parentMountSource.lookup(pathInsideParentMountPoint)
         if archiveFileInfo is None:
             return None
 
@@ -227,7 +227,7 @@ class AutoMountLayer(MountSource):
         return self.mounted['/'].mountSource.is_immutable()
 
     @overrides(MountSource)
-    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+    def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         """
         Return file info for given path. Note that all returned file infos contain MountInfo
         or a file path string at the back of FileInfo.userdata.
@@ -255,13 +255,13 @@ class AutoMountLayer(MountSource):
             return mountInfo.rootFileInfo.clone()
 
         if fileVersions <= 1 or pathInMountPoint != '/' or fileVersion == 0 or fileVersion > originalFileVersions:
-            fileInfo = mountInfo.mountSource.getFileInfo(pathInMountPoint, fileVersion - originalFileVersions)
+            fileInfo = mountInfo.mountSource.lookup(pathInMountPoint, fileVersion - originalFileVersions)
             if fileInfo:
                 fileInfo.userdata.append(mountPoint)
             return fileInfo
 
         # We are here if: fileVersions > 1 and 0 < fileVersion <= originalFileVersions and pathInMountPoint == '/'
-        fileInfo = self.mounted['/'].mountSource.getFileInfo(path, fileVersion % originalFileVersions)
+        fileInfo = self.mounted['/'].mountSource.lookup(path, fileVersion % originalFileVersions)
         if fileInfo:
             fileInfo.userdata.append('/')
         return fileInfo

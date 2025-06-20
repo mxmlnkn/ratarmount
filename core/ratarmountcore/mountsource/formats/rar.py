@@ -159,7 +159,7 @@ class RarMountSource(MountSource):
             if self._getName(path, normalizedPath)
         }
 
-    def _getFileInfos(self, path: str) -> List[FileInfo]:
+    def _lookups(self, path: str) -> List[FileInfo]:
         # If we have a fileInfo for the given directory path, then everything is fine.
         pathAsDir = path.strip('/') + '/'
         if pathAsDir == '/':
@@ -192,13 +192,13 @@ class RarMountSource(MountSource):
         return infoList
 
     @overrides(MountSource)
-    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
-        infos = self._getFileInfos(path)
+    def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+        infos = self._lookups(path)
         return infos[fileVersion] if -len(infos) <= fileVersion < len(infos) else None
 
     @overrides(MountSource)
     def versions(self, path: str) -> int:
-        return len(self._getFileInfos(path))
+        return len(self._lookups(path))
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:

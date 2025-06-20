@@ -264,11 +264,11 @@ class FuseMount(fuse.Operations):
         self.openedFiles[self.lastFileHandle] = (flags, handle)
         return self.lastFileHandle
 
-    def _getFileInfo(self, path: str) -> FileInfo:
+    def _lookup(self, path: str) -> FileInfo:
         if self.writeOverlay and self.writeOverlay.isDeleted(path):
             raise fuse.FuseOSError(errno.ENOENT)
 
-        fileInfo = self.mountSource.getFileInfo(path)
+        fileInfo = self.mountSource.lookup(path)
         if fileInfo is None:
             raise fuse.FuseOSError(errno.ENOENT)
 
@@ -336,7 +336,7 @@ class FuseMount(fuse.Operations):
 
     @overrides(fuse.Operations)
     def getattr(self, path: str, fh=None) -> Dict[str, Any]:
-        return self._fileInfoToDict(self._getFileInfo(path))
+        return self._fileInfoToDict(self._lookup(path))
 
     @overrides(fuse.Operations)
     def readdir(self, path: str, fh):
@@ -373,13 +373,13 @@ class FuseMount(fuse.Operations):
 
     @overrides(fuse.Operations)
     def readlink(self, path: str) -> str:
-        return self._getFileInfo(path).linkname
+        return self._lookup(path).linkname
 
     @overrides(fuse.Operations)
     def open(self, path, flags):
         """Returns file handle of opened path."""
 
-        fileInfo = self._getFileInfo(path)
+        fileInfo = self._lookup(path)
 
         try:
             # If the flags indicate "open for modification", then still open it as read-only through the mount source
@@ -421,7 +421,7 @@ class FuseMount(fuse.Operations):
         if self.printDebug >= 1:
             print("[Warning] Given file handle does not exist. Will open file before reading which might be slow.")
 
-        fileInfo = self._getFileInfo(path)
+        fileInfo = self._lookup(path)
 
         try:
             return self.mountSource.read(fileInfo, size, offset)
@@ -497,7 +497,7 @@ class FuseMount(fuse.Operations):
         # Beware, keys not prefixed with "user." will not be listed by getfattr by default.
         # Use: "getfattr --match=.* mounted/foo" It seems that libfuse and the FUSE kernel module accept
         # all keys, I tried with "key1", "security.key1", "user.key1".
-        return self.mountSource.list_xattr(self._getFileInfo(path))
+        return self.mountSource.list_xattr(self._lookup(path))
 
     @overrides(fuse.Operations)
     def getxattr(self, path, name, position=0):
@@ -508,7 +508,7 @@ class FuseMount(fuse.Operations):
             print("[Warning] Please report this as an issue to the ratarmount project with details to reproduce this.")
             raise fuse.FuseOSError(errno.EOPNOTSUPP)
 
-        value = self.mountSource.get_xattr(self._getFileInfo(path), name)
+        value = self.mountSource.get_xattr(self._lookup(path), name)
         if value is None:
             # My system sometimes tries to request security.selinux without the key actually existing.
             # See https://man7.org/linux/man-pages/man2/getxattr.2.html#ERRORS

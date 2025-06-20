@@ -42,7 +42,7 @@ class ProgressBar
 
 abstract class MountSource {
     +{abstract} list
-    +{abstract} getFileInfo
+    +{abstract} lookup
     +{abstract} versions
     +{abstract} open
 }

@@ -67,7 +67,7 @@ class SingleFileMountSource(MountSource):
         return None
 
     @overrides(MountSource)
-    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+    def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         pathWithSlash = path.rstrip('/') + '/'
         if self.path.startswith(pathWithSlash):
             # fmt: off

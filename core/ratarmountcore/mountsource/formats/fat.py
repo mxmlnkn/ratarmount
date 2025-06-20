@@ -109,7 +109,7 @@ class FATMountSource(MountSource):
         return self._list(path)
 
     @overrides(MountSource)
-    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+    def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         try:
             entry = self.fileSystem.root_dir.get_entry(path)
         except PyFATException as exception:

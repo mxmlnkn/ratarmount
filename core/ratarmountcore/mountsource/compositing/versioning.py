@@ -69,7 +69,7 @@ class FileVersionLayer(MountSource):
 
             # Simply append normal existing folders
             tmpFilePath = filePath + '/' + part
-            if self.mountSource.getFileInfo(tmpFilePath):
+            if self.mountSource.lookup(tmpFilePath):
                 filePath = tmpFilePath
                 fileVersion = 0
                 continue
@@ -99,7 +99,7 @@ class FileVersionLayer(MountSource):
     def _resolveHardLinks(mountSource: MountSource, path: str) -> Optional[FileInfo]:
         """path : Simple path. Should contain no special versioning folders!"""
 
-        fileInfo = mountSource.getFileInfo(path)
+        fileInfo = mountSource.lookup(path)
         if not fileInfo:
             return None
 
@@ -110,7 +110,7 @@ class FileVersionLayer(MountSource):
         while resolvedPath and hardLinkCount < 128:  # For comparison, the maximum symbolic link chain in Linux is 40.
             # Link targets are relative to the mount source. That's why we need the mount point to get the full path
             # in respect to this mount source. And we must a file info object for this mount source, so we have to
-            # get that using the full path instead of calling getFileInfo on the deepest mount source.
+            # get that using the full path instead of calling lookup on the deepest mount source.
             mountPoint, _, _ = mountSource.get_mount_source(fileInfo)
 
             resolvedPath = os.path.join(mountPoint, resolvedPath.lstrip('/'))
@@ -130,11 +130,11 @@ class FileVersionLayer(MountSource):
             else:
                 # If file is referencing itself, try to access earlier version of it.
                 # The check for fileVersion against the total number of available file versions is omitted because
-                # that check is done implicitly inside the mount sources getFileInfo method!
+                # that check is done implicitly inside the mount sources lookup method!
                 fileVersion = fileVersion + 1 if fileVersion >= 0 else fileVersion - 1
 
             path = resolvedPath
-            fileInfo = mountSource.getFileInfo(path, fileVersion)
+            fileInfo = mountSource.lookup(path, fileVersion)
             if not fileInfo:
                 return None
 
@@ -186,7 +186,7 @@ class FileVersionLayer(MountSource):
         return self._listWrapper(self.mountSource.list_mode, path)
 
     @overrides(MountSource)
-    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+    def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         """Resolves special file version specifications in the path."""
 
         assert fileVersion == 0
@@ -205,7 +205,7 @@ class FileVersionLayer(MountSource):
         # 2.) Check if the request was for the special .versions folder and return its contents or stats
         # At this point, path is assured to actually exist!
         if pathIsSpecialVersionsFolder:
-            parentFileInfo = self.mountSource.getFileInfo(path)
+            parentFileInfo = self.mountSource.lookup(path)
             assert parentFileInfo
 
             # fmt: off
@@ -221,7 +221,7 @@ class FileVersionLayer(MountSource):
             # fmt: on
 
         # 3.) At this point the request is for an actually older version of a file or folder
-        fileInfo = self.mountSource.getFileInfo(path, fileVersion=fileVersion)
+        fileInfo = self.mountSource.lookup(path, fileVersion=fileVersion)
         if fileInfo:
             fileInfo.userdata.append(FileType.FILE)
         return fileInfo

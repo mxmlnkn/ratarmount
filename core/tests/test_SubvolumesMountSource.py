@@ -99,7 +99,7 @@ def fixture_sample_tar_b(tmp_path):
 class TestSubvolumesMountSource:
     @staticmethod
     def _check_file(mountSource, path, version, contents=None):
-        fileInfo = mountSource.getFileInfo(path, version)
+        fileInfo = mountSource.lookup(path, version)
         assert fileInfo is not None
         if contents is not None:
             # The MountSource interface only allows to open files in binary mode, which returns bytes not string.

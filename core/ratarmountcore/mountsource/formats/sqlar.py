@@ -266,7 +266,7 @@ class SQLARMountSource(MountSource):
         )
 
     @overrides(MountSource)
-    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+    def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         if path == "/":
             return createRootFileInfo([-1])
 

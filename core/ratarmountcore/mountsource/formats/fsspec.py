@@ -232,7 +232,7 @@ class FSSpecMountSource(MountSource):
     def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
         return self._list(path, onlyMode=True)
 
-    def _getFileInfoHTTP(self, path: str) -> Optional[FileInfo]:
+    def _lookupHTTP(self, path: str) -> Optional[FileInfo]:
         path = self._getPath(path)
 
         # Avoid aiohttp.client_exceptions.ClientResponseError: 404, message='Not Found'
@@ -250,9 +250,9 @@ class FSSpecMountSource(MountSource):
         return FSSpecMountSource._convertToFileInfo(info, path)
 
     @overrides(MountSource)
-    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+    def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         if isinstance(self.fileSystem, fsspec.implementations.http.HTTPFileSystem):
-            return self._getFileInfoHTTP(path)
+            return self._lookupHTTP(path)
 
         path = self._getPath(path)
         if path == '/' or not path:

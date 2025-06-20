@@ -113,7 +113,7 @@ from ratarmountcore.factory import openMountSource
 
 archive = openMountSource("foo.tar", recursive=True)
 print(archive.list("/"))
-info = archive.getFileInfo("/bar")
+info = archive.lookup("/bar")
 
 print("Contents of /bar:")
 with archive.open(info) as file:

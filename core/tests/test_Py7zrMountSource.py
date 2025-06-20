@@ -21,7 +21,7 @@ class TestPy7zrMountSource:
 
         with copyTestFile('encrypted-nested-tar.7z') as path, Py7zrMountSource(path, passwords=[b'foo']) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
-                fileInfo = mountSource.getFileInfo(folder)
+                fileInfo = mountSource.lookup(folder)
                 assert fileInfo
                 assert stat.S_ISDIR(fileInfo.mode)
 
@@ -29,11 +29,11 @@ class TestPy7zrMountSource:
                 assert mountSource.list(folder)
 
             for filePath in ['/foo/fighter/ufo']:
-                fileInfo = mountSource.getFileInfo(filePath)
+                fileInfo = mountSource.lookup(filePath)
                 assert fileInfo
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1
                 assert not mountSource.list(filePath)
-                with mountSource.open(mountSource.getFileInfo(filePath)) as file:
+                with mountSource.open(mountSource.lookup(filePath)) as file:
                     assert file.read() == b'iriya\n'

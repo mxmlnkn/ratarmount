@@ -58,7 +58,7 @@ class WritableFolderMountSource(fuse.Operations):
             self.sqlConnection.executescript(WritableFolderMountSource._overlayMetadataSchema)
 
         # Check that the mount source contains this overlay folder with top priority
-        databaseFileInfo = self.mountSource.getFileInfo('/' + self.hiddenDatabaseName)
+        databaseFileInfo = self.mountSource.lookup('/' + self.hiddenDatabaseName)
         assert databaseFileInfo is not None
         path, databaseMountSource, fileInfo = self.mountSource.get_mount_source(databaseFileInfo)
         assert stat.S_ISREG(fileInfo.mode)
@@ -129,7 +129,7 @@ class WritableFolderMountSource(fuse.Operations):
 
     def _ensureFileIsModifiable(self, path):
         self._ensureParentExists(path)
-        with self.mountSource.open(self.mountSource.getFileInfo(path)) as sourceObject, open(
+        with self.mountSource.open(self.mountSource.lookup(path)) as sourceObject, open(
             self._realpath(path), 'wb'
         ) as targetObject:
             shutil.copyfileobj(sourceObject, targetObject)
@@ -199,7 +199,7 @@ class WritableFolderMountSource(fuse.Operations):
 
     def _initFileMetadata(self, path: str):
         # Note that we do not have to check the overlay folder assuming that it is inside the (union) mount source!
-        sourceFileInfo = self.mountSource.getFileInfo(path)
+        sourceFileInfo = self.mountSource.lookup(path)
         if not sourceFileInfo:
             raise fuse.FuseOSError(errno.ENOENT)
 
@@ -298,7 +298,7 @@ class WritableFolderMountSource(fuse.Operations):
         else:
             self._ensureParentExists(new)
 
-            with self.mountSource.open(self.mountSource.getFileInfo(old)) as sourceObject, open(
+            with self.mountSource.open(self.mountSource.lookup(old)) as sourceObject, open(
                 self._realpath(new), 'wb'
             ) as targetObject:
                 shutil.copyfileobj(sourceObject, targetObject)
@@ -315,7 +315,7 @@ class WritableFolderMountSource(fuse.Operations):
     def link(self, target, source):
         # Can only hardlink to files which are also in the overlay folder.
         overlaySource = self._realpath(source)
-        if not os.path.exists(overlaySource) and self.mountSource.getFileInfo(source):
+        if not os.path.exists(overlaySource) and self.mountSource.lookup(source):
             raise fuse.FuseOSError(errno.EXDEV)
 
         target = self._realpath(target)

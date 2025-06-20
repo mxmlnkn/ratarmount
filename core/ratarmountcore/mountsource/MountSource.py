@@ -57,7 +57,7 @@ class MountSource(ABC):
         return result
 
     @abstractmethod
-    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+    def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         pass
 
     @abstractmethod
@@ -104,10 +104,10 @@ class MountSource(ABC):
         return '/', self, fileInfo
 
     def exists(self, path: str) -> bool:
-        return self.getFileInfo(path) is not None
+        return self.lookup(path) is not None
 
     def is_dir(self, path: str):
-        fileInfo = self.getFileInfo(path)
+        fileInfo = self.lookup(path)
         return fileInfo is not None and stat.S_ISDIR(fileInfo.mode)
 
     # pylint: disable=unused-argument

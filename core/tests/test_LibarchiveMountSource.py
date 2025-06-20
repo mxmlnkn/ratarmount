@@ -25,7 +25,7 @@ class TestLibarchiveMountSource:
     def test_simple_usage(compression):
         with copyTestFile('folder-symlink.' + compression) as path, LibarchiveMountSource(path) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
-                fileInfo = mountSource.getFileInfo(folder)
+                fileInfo = mountSource.lookup(folder)
                 assert fileInfo
                 assert stat.S_ISDIR(fileInfo.mode)
 
@@ -33,22 +33,22 @@ class TestLibarchiveMountSource:
                 assert mountSource.list(folder)
 
             for filePath in ['/foo/fighter/ufo']:
-                fileInfo = mountSource.getFileInfo(filePath)
+                fileInfo = mountSource.lookup(filePath)
                 assert fileInfo
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1
                 assert not mountSource.list(filePath)
-                with mountSource.open(mountSource.getFileInfo(filePath)) as file:
+                with mountSource.open(mountSource.lookup(filePath)) as file:
                     assert file.read() == b'iriya\n'
 
             # Links are not resolved by the mount source but by FUSE, i.e., descending into a link to a folder
             # will not work. This behavior may change in the future.
             for linkPath in ['/foo/jet']:
-                assert mountSource.getFileInfo(linkPath)
+                assert mountSource.lookup(linkPath)
                 assert mountSource.versions(linkPath) == 1
                 assert not mountSource.list(linkPath)
-                fileInfo = mountSource.getFileInfo(linkPath)
+                fileInfo = mountSource.lookup(linkPath)
                 assert fileInfo.linkname == 'fighter'
 
     @staticmethod
@@ -58,19 +58,19 @@ class TestLibarchiveMountSource:
             path, transform=("(.)/(.)", r"\1_\2")
         ) as mountSource:
             for folder in ['/', '/foo', '/foo_fighter']:
-                fileInfo = mountSource.getFileInfo(folder)
+                fileInfo = mountSource.lookup(folder)
                 assert fileInfo
                 assert stat.S_ISDIR(fileInfo.mode)
                 assert mountSource.versions(folder) == 1
 
             for filePath in ['/foo_fighter_ufo']:
-                fileInfo = mountSource.getFileInfo(filePath)
+                fileInfo = mountSource.lookup(filePath)
                 assert fileInfo
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1
                 assert not mountSource.list(filePath)
-                with mountSource.open(mountSource.getFileInfo(filePath)) as file:
+                with mountSource.open(mountSource.lookup(filePath)) as file:
                     assert file.read() == b'iriya\n'
 
     @staticmethod
@@ -87,7 +87,7 @@ class TestLibarchiveMountSource:
             path, passwords=['foo']
         ) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
-                fileInfo = mountSource.getFileInfo(folder)
+                fileInfo = mountSource.lookup(folder)
                 assert fileInfo
                 assert stat.S_ISDIR(fileInfo.mode)
 
@@ -95,13 +95,13 @@ class TestLibarchiveMountSource:
                 assert mountSource.list(folder)
 
             for filePath in ['/foo/fighter/ufo']:
-                fileInfo = mountSource.getFileInfo(filePath)
+                fileInfo = mountSource.lookup(filePath)
                 assert fileInfo
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1
                 assert not mountSource.list(filePath)
-                with mountSource.open(mountSource.getFileInfo(filePath)) as file:
+                with mountSource.open(mountSource.lookup(filePath)) as file:
                     assert file.read() == b'iriya\n'
 
     @staticmethod
@@ -111,7 +111,7 @@ class TestLibarchiveMountSource:
             path, passwords=['foo']
         ) as mountSource:
             for folder in ['/']:
-                fileInfo = mountSource.getFileInfo(folder)
+                fileInfo = mountSource.lookup(folder)
                 assert fileInfo
                 assert stat.S_ISDIR(fileInfo.mode)
 
@@ -119,13 +119,13 @@ class TestLibarchiveMountSource:
                 assert mountSource.list(folder)
 
             for filePath in ['/simple']:
-                fileInfo = mountSource.getFileInfo(filePath)
+                fileInfo = mountSource.lookup(filePath)
                 assert fileInfo
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1
                 assert not mountSource.list(filePath)
-                with mountSource.open(mountSource.getFileInfo(filePath)) as file:
+                with mountSource.open(mountSource.lookup(filePath)) as file:
                     assert file.read() == b'foo fighter\n'
                     assert file.seek(4) == 4
                     assert file.read() == b'fighter\n'
@@ -141,7 +141,7 @@ class TestLibarchiveMountSource:
     )
     def test_file_independence(path, lineSize):
         with copyTestFile(path) as copiedPath, LibarchiveMountSource(copiedPath) as mountSource:
-            with mountSource.open(mountSource.getFileInfo('zeros-32-MiB.txt')) as fileWithZeros:
+            with mountSource.open(mountSource.lookup('zeros-32-MiB.txt')) as fileWithZeros:
                 expectedZeros = b'0' * (lineSize - 1) + b'\n'
                 assert fileWithZeros.read(lineSize) == expectedZeros
                 assert fileWithZeros.tell() == lineSize
@@ -150,8 +150,8 @@ class TestLibarchiveMountSource:
                 assert len(actualZeros) == len(expectedZeros)
                 assert actualZeros == expectedZeros
 
-            with mountSource.open(mountSource.getFileInfo('zeros-32-MiB.txt')) as fileWithZeros, mountSource.open(
-                mountSource.getFileInfo('spaces-32-MiB.txt')
+            with mountSource.open(mountSource.lookup('zeros-32-MiB.txt')) as fileWithZeros, mountSource.open(
+                mountSource.lookup('spaces-32-MiB.txt')
             ) as fileWithSpaces:
                 expectedSpaces = b' ' * (lineSize - 1) + b'\n'
                 expectedZeros = b'0' * (lineSize - 1) + b'\n'

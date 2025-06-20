@@ -36,7 +36,7 @@ class TestEXT4MountSource:
 
             mountSource = EXT4MountSource(tmpFileObject)
             for folder in ['/', '/foo', '/foo/fighter']:
-                fileInfo = mountSource.getFileInfo(folder)
+                fileInfo = mountSource.lookup(folder)
                 assert fileInfo
                 assert stat.S_ISDIR(fileInfo.mode)
 
@@ -44,17 +44,17 @@ class TestEXT4MountSource:
                 assert mountSource.list(folder)
 
             for filePath in ['/foo/fighter/ufo', '/foo/lighter.tar']:
-                fileInfo = mountSource.getFileInfo(filePath)
+                fileInfo = mountSource.lookup(filePath)
                 assert fileInfo
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1
                 assert not mountSource.list(filePath)
 
-            with mountSource.open(mountSource.getFileInfo('/foo/fighter/ufo')) as file:
+            with mountSource.open(mountSource.lookup('/foo/fighter/ufo')) as file:
                 assert file.read() == b'iriya\n'
 
-            with mountSource.open(mountSource.getFileInfo('/foo/lighter.tar')) as file:
+            with mountSource.open(mountSource.lookup('/foo/lighter.tar')) as file:
                 assert hashlib.md5(file.read()).hexdigest() == "2a06cc391128d74e685a6cb7cfe9f94d"
 
     # TODO Does not use SQLiteIndex backend because it is already usably indexed and it would seem redundant.

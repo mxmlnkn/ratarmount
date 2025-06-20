@@ -78,7 +78,7 @@ class TestZipMountSource:
     def test_simple_usage():
         with ZipMountSource(findTestFile('folder-symlink.zip')) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
-                fileInfo = mountSource.getFileInfo(folder)
+                fileInfo = mountSource.lookup(folder)
                 assert fileInfo
                 assert stat.S_ISDIR(fileInfo.mode)
 
@@ -86,24 +86,24 @@ class TestZipMountSource:
                 assert mountSource.list(folder)
 
             for filePath in ['/foo/fighter/ufo']:
-                fileInfo = mountSource.getFileInfo(filePath)
+                fileInfo = mountSource.lookup(filePath)
                 assert fileInfo
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1
                 assert not mountSource.list(filePath)
-                with mountSource.open(mountSource.getFileInfo(filePath)) as file:
+                with mountSource.open(mountSource.lookup(filePath)) as file:
                     assert file.read() == b'iriya\n'
 
             # Links are not resolved by the mount source but by FUSE, i.e., descending into a link to a folder
             # will not work. This behavior may change in the future.
             for linkPath in ['/foo/jet']:
-                assert mountSource.getFileInfo(linkPath)
+                assert mountSource.lookup(linkPath)
                 assert mountSource.versions(linkPath) == 1
                 assert not mountSource.list(linkPath)
-                fileInfo = mountSource.getFileInfo(linkPath)
+                fileInfo = mountSource.lookup(linkPath)
                 assert fileInfo.linkname == 'fighter'
-                with mountSource.open(mountSource.getFileInfo(linkPath)) as file:
+                with mountSource.open(mountSource.lookup(linkPath)) as file:
                     # Contents of symlink is the symlink destination itself.
                     # This behavior is not consistent with other MountSources and therefore subject to change!
                     assert file.read() == b'fighter'
@@ -113,19 +113,19 @@ class TestZipMountSource:
         with ZipMountSource(findTestFile('folder-symlink.zip'), transform=("(.)/(.)", r"\1_\2")) as mountSource:
             print(mountSource.list("/").keys())
             for folder in ['/', '/foo', '/foo_fighter']:
-                fileInfo = mountSource.getFileInfo(folder)
+                fileInfo = mountSource.lookup(folder)
                 assert fileInfo
                 assert stat.S_ISDIR(fileInfo.mode)
                 assert mountSource.versions(folder) == 1
 
             for filePath in ['/foo_fighter_ufo']:
-                fileInfo = mountSource.getFileInfo(filePath)
+                fileInfo = mountSource.lookup(filePath)
                 assert fileInfo
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1
                 assert not mountSource.list(filePath)
-                with mountSource.open(mountSource.getFileInfo(filePath)) as file:
+                with mountSource.open(mountSource.lookup(filePath)) as file:
                     assert file.read() == b'iriya\n'
 
 
@@ -156,7 +156,7 @@ def benchmark_fast_decryption():
         with ZipMountSource(archive_path.name, passwords=[password.encode()]) as mountSource:
             t0 = time.time()
             for name, contents in files.items():
-                with mountSource.open(mountSource.getFileInfo(name)) as file:
+                with mountSource.open(mountSource.lookup(name)) as file:
                     assert file.read() == contents
             t1 = time.time()
             duration = t1 - t0

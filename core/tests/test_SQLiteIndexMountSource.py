@@ -18,14 +18,14 @@ class TestSQLiteIndexMountSource:
     def test_password():
         with copyTestFile("nested-tar.index.sqlite") as path, SQLiteIndexMountSource(path) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
-                fileInfo = mountSource.getFileInfo(folder)
+                fileInfo = mountSource.lookup(folder)
                 assert fileInfo
                 assert stat.S_ISDIR(fileInfo.mode)
                 assert mountSource.versions(folder) == 1
                 assert mountSource.list(folder)
 
             for filePath in ['/foo/fighter/ufo', '/foo/lighter.tar']:
-                fileInfo = mountSource.getFileInfo(filePath)
+                fileInfo = mountSource.lookup(filePath)
                 assert fileInfo
                 assert not stat.S_ISDIR(fileInfo.mode)
 

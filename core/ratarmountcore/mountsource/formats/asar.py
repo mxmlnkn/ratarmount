@@ -257,4 +257,4 @@ class ASARMountSource(SQLiteIndexMountSource):
             )
 
         if 'backendName' not in metadata:
-            self.index.tryToOpenFirstFile(lambda path: self.open(self.getFileInfo(path)))
+            self.index.tryToOpenFirstFile(lambda path: self.open(self.lookup(path)))

@@ -986,7 +986,7 @@ class SQLiteIndex:
         )
         return {str(version + 1): self._rowToFileInfo(row) for version, row in enumerate(rows)}
 
-    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+    def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         """
         Return the FileInfo to given path (directory or file) or None if the path does not exist.
 

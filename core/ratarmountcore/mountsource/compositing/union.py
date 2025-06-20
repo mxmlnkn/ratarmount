@@ -27,7 +27,7 @@ class UnionMountSource(MountSource):
             Even assuming very long file paths like 1000 chars, the cache size
             will be below 100 MB if the maximum number of elements is 100k.
         maxSecondsToCache:
-            Another problem is the setup time, as it might take ~0.001s for each getFileInfo call
+            Another problem is the setup time, as it might take ~0.001s for each lookup call
             and it shouldn't take minutes! Note that there always can be an edge case with hundred
             thousands of files in one folder, which can take an arbitrary amount of time to cache.
         """
@@ -68,7 +68,7 @@ class UnionMountSource(MountSource):
                             return
 
                         fullPath = os.path.join(folder, file)
-                        fileInfo = mountSource.getFileInfo(fullPath)
+                        fileInfo = mountSource.lookup(fullPath)
                         if not fileInfo or not stat.S_ISDIR(fileInfo.mode):
                             continue
 
@@ -99,7 +99,7 @@ class UnionMountSource(MountSource):
         return all(m.is_immutable() for m in self.mountSources)
 
     @overrides(MountSource)
-    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+    def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         if path == '/':
             return self.rootFileInfo.clone()
 
@@ -122,7 +122,7 @@ class UnionMountSource(MountSource):
         # by the amount of versions in that mount source or decrement the initially positive version.
         if fileVersion <= 0:
             for mountSource in reversed(mountSources):
-                fileInfo = mountSource.getFileInfo(path, fileVersion=fileVersion)
+                fileInfo = mountSource.lookup(path, fileVersion=fileVersion)
                 if isinstance(fileInfo, FileInfo):
                     fileInfo.userdata.append(mountSource)
                     return fileInfo
@@ -132,7 +132,7 @@ class UnionMountSource(MountSource):
 
         else:  # fileVersion >= 1
             for mountSource in mountSources:
-                fileInfo = mountSource.getFileInfo(path, fileVersion=fileVersion)
+                fileInfo = mountSource.lookup(path, fileVersion=fileVersion)
                 if isinstance(fileInfo, FileInfo):
                     fileInfo.userdata.append(mountSource)
                     return fileInfo

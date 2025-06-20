@@ -92,7 +92,7 @@ class FolderMountSource(MountSource):
         return os.path.lexists(self._realpath(path))
 
     @overrides(MountSource)
-    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+    def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         """All returned file infos contain a file path string at the back of FileInfo.userdata."""
 
         # This is a bit of problematic design, however, the versions count from 1 for the user.

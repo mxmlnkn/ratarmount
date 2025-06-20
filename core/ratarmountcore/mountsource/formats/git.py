@@ -107,7 +107,7 @@ class GitMountSource(MountSource):
         return self._list(path, onlyMode=True)
 
     @overrides(MountSource)
-    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+    def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         obj = self._lookUpPath(path)
         return None if obj is None else self._convertToFileInfo(obj, path)
 

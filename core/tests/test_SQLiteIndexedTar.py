@@ -42,9 +42,9 @@ class TestSQLiteIndexedTarParallelized:
             path, writeIndex=False, parallelization=parallelization
         ) as indexedTar:
             assert indexedTar.list('/')
-            assert indexedTar.getFileInfo('/')
+            assert indexedTar.lookup('/')
 
-            fileInfo = indexedTar.getFileInfo('/bar')
+            fileInfo = indexedTar.lookup('/bar')
             assert fileInfo
             assert fileInfo.size == 4
             userdata = fileInfo.userdata[-1]
@@ -52,8 +52,8 @@ class TestSQLiteIndexedTarParallelized:
             assert userdata.recursiondepth == 0
             assert not userdata.isgenerated
 
-            assert not indexedTar.getFileInfo('../')
-            assert not indexedTar.getFileInfo('../bar')
+            assert not indexedTar.lookup('../')
+            assert not indexedTar.lookup('../bar')
 
     @staticmethod
     def test_tar_bz2_with_parallelization(parallelization):
@@ -64,16 +64,16 @@ class TestSQLiteIndexedTarParallelized:
             parallelization=parallelization,
         ) as file:
             for folder in ['/', '/mimi']:
-                assert file.getFileInfo(folder)
+                assert file.lookup(folder)
                 assert file.versions(folder) == 1
                 assert file.list(folder)
 
             assert not file.list('/mimi/01995.tar')
-            info = file.getFileInfo('/mimi/01995.tar')
+            info = file.lookup('/mimi/01995.tar')
             assert info.userdata[0].offset == 21440512
 
             assert not file.list('/mimi/00105.tar')
-            info = file.getFileInfo('/mimi/00105.tar')
+            info = file.lookup('/mimi/00105.tar')
             assert info.userdata[0].offset == 1248256
 
     @staticmethod
@@ -88,11 +88,11 @@ class TestSQLiteIndexedTarParallelized:
             assert file.list('/mimi')
 
             assert file.list('/mimi/01995.tar')
-            info = file.getFileInfo('/mimi/01995.tar/foo')
+            info = file.lookup('/mimi/01995.tar/foo')
             assert info.userdata[0].offset == 21441024
 
             assert file.list('/mimi/00105.tar')
-            info = file.getFileInfo('/mimi/00105.tar/foo')
+            info = file.lookup('/mimi/00105.tar/foo')
             assert info.userdata[0].offset == 1248768
 
     @staticmethod
@@ -114,7 +114,7 @@ class TestSQLiteIndexedTarParallelized:
                 recursionDepth = 1
 
             assert mountSource.list('/')
-            assert mountSource.getFileInfo('/').userdata[-1] == SQLiteIndexedTarUserData(0, 0, False, False, True, 0)
+            assert mountSource.lookup('/').userdata[-1] == SQLiteIndexedTarUserData(0, 0, False, False, True, 0)
 
             # Recursion depth:
             # file.tar -> / 0, /bar 0
@@ -124,12 +124,12 @@ class TestSQLiteIndexedTarParallelized:
             # nested-file.tar -> / 0, /bar.tar.version/1 0, /bar/ 1, /bar/foo 1
 
             # The (generated) root has always recursion depth 0 because it will always be shown!
-            assert mountSource.getFileInfo('/').userdata[-1].recursiondepth == 0
+            assert mountSource.lookup('/').userdata[-1].recursiondepth == 0
 
             # Currently there is no way to get to this file when recursively mounted.
             # We would have to enable "/.versions/" to get older versions of the root folder or folders in general.
             if recursionDepth == 0:
-                fileInfo = mountSource.getFileInfo('/packed-5-times.tar')
+                fileInfo = mountSource.lookup('/packed-5-times.tar')
                 assert fileInfo
                 userdata = fileInfo.userdata[-1]
                 assert userdata.recursiondepth == 0
@@ -138,7 +138,7 @@ class TestSQLiteIndexedTarParallelized:
 
             # The recursion depth is 1 because of the gzip compression. Consider ufo_03.tar being inside
             # packaged-5-times.tar (without the .gz), then the recursion depth would have to be one less, i.e., 0!
-            fileInfo = mountSource.getFileInfo('/ufo_03.tar')
+            fileInfo = mountSource.lookup('/ufo_03.tar')
             if recursionDepth == 0:
                 assert fileInfo is None
             elif recursionDepth == 1:
@@ -155,7 +155,7 @@ class TestSQLiteIndexedTarParallelized:
                 assert stat.S_ISDIR(fileInfo.mode)
 
                 # Check that the older version is still reachable.
-                fileInfo = mountSource.getFileInfo('/ufo_03.tar', fileVersion=0 if recursionDepth == 0 else 1)
+                fileInfo = mountSource.lookup('/ufo_03.tar', fileVersion=0 if recursionDepth == 0 else 1)
                 assert fileInfo
                 userdata = fileInfo.userdata[-1]
                 assert userdata.recursiondepth == 1  # Not 0 because gzip compression counts as one layer of recursion.
@@ -164,7 +164,7 @@ class TestSQLiteIndexedTarParallelized:
                 assert fileInfo.size == 40960
 
             def checkRecursiveMountPoint(path, depth):
-                fileInfo = mountSource.getFileInfo(path)
+                fileInfo = mountSource.lookup(path)
                 if depth > recursionDepth:
                     return
 
@@ -182,7 +182,7 @@ class TestSQLiteIndexedTarParallelized:
                 assert userdata.istar
 
                 if depth == maxDepth:
-                    fileInfo = mountSource.getFileInfo(path + '/ufo')
+                    fileInfo = mountSource.lookup(path + '/ufo')
                     assert fileInfo
                     assert mountSource.open(fileInfo).read() == b'iriya\n'
 
@@ -201,8 +201,8 @@ class TestSQLiteIndexedTarParallelized:
             assert mountSource.list('/')
 
             # See test_deep_recursive for recursion depth discussion.
-            assert mountSource.getFileInfo('/').userdata[-1] == SQLiteIndexedTarUserData(0, 0, False, False, True, 0)
-            fileInfo = mountSource.getFileInfo('/ufo_03.tar')
+            assert mountSource.lookup('/').userdata[-1] == SQLiteIndexedTarUserData(0, 0, False, False, True, 0)
+            fileInfo = mountSource.lookup('/ufo_03.tar')
             assert fileInfo
             assert stat.S_ISREG(fileInfo.mode)
             assert fileInfo.userdata[-1].recursiondepth == 1
@@ -310,7 +310,7 @@ class TestSQLiteIndexedTarParallelized:
             assert expectedName in folderList  # pylint: disable=unsupported-membership-test
             assert folderList[expectedName].size == len(contents)  # pylint: disable=unsubscriptable-object
 
-        finfo = indexedFile.getFileInfo("/" + expectedName)
+        finfo = indexedFile.lookup("/" + expectedName)
         assert finfo.size == len(contents)
         assert indexedFile.read(finfo, size=len(contents), offset=0) == contents
         assert indexedFile.read(finfo, size=3, offset=3) == contents[3:6]
@@ -344,7 +344,7 @@ class TestSQLiteIndexedTarParallelized:
                     assert isinstance(folderContents, dict)
                     for name in folderContents:  # pylint: disable=not-an-iterable
                         path = os.path.join(folder, name)
-                        fileInfo = indexedTar.getFileInfo(path)
+                        fileInfo = indexedTar.lookup(path)
                         if not fileInfo:
                             continue
 
@@ -371,8 +371,8 @@ class TestSQLiteIndexedTarParallelized:
                 createFile(tarFile, "decreasing.dat", "".join(["9876543210"] * repeatCount))
 
             with SQLiteIndexedTar(tmpTarFile.name, clearIndexCache=True, parallelization=parallelization) as indexedTar:
-                iFile = indexedTar.open(indexedTar.getFileInfo("/increasing.dat"))
-                dFile = indexedTar.open(indexedTar.getFileInfo("/decreasing.dat"))
+                iFile = indexedTar.open(indexedTar.lookup("/increasing.dat"))
+                dFile = indexedTar.open(indexedTar.lookup("/decreasing.dat"))
 
                 for i in range(repeatCount):
                     try:
@@ -410,7 +410,7 @@ class TestSQLiteIndexedTarParallelized:
                     return True
 
                 files = [
-                    indexedTar.open(indexedTar.getFileInfo(f"/{'in' if i % 2 == 0 else 'de'}creasing.dat"))
+                    indexedTar.open(indexedTar.lookup(f"/{'in' if i % 2 == 0 else 'de'}creasing.dat"))
                     for i in range(parallelism)
                 ]
 

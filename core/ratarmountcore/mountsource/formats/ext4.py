@@ -89,7 +89,7 @@ class EXT4MountSource(MountSource):
         return self._list(path, lambda inode: inode.i_mode.value)
 
     @overrides(MountSource)
-    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+    def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         try:
             return self._convertEXT4DirectoryEntryToFileInfo(self.fileSystem.inode_at(path))
         except FileNotFoundError:

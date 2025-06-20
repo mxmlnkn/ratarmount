@@ -76,8 +76,8 @@ class SQLiteIndexMountSource(MountSource):
         return True
 
     @overrides(MountSource)
-    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
-        return self.index.getFileInfo(path, fileVersion=fileVersion)
+    def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+        return self.index.lookup(path, fileVersion=fileVersion)
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:

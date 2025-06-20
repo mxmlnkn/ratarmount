@@ -85,7 +85,7 @@ def _openGitMountSource(url: str) -> Union[MountSource, IO[bytes], str]:
 
     mountSource = GitMountSource(repositoryPath, reference=reference)
     if pathInsideRepository:
-        fileInfo = mountSource.getFileInfo(pathInsideRepository)
+        fileInfo = mountSource.lookup(pathInsideRepository)
         if not fileInfo:
             raise RatarmountError(
                 f"The path {pathInsideRepository} in the git repository specified via '{url}' does not exist!"

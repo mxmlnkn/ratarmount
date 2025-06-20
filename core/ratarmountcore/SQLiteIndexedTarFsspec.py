@@ -39,7 +39,7 @@ class MountSourceFileSystem(fsspec.spec.AbstractFileSystem):
             if result is None:
                 raise FileNotFoundError(path)
             if not isinstance(result, dict):
-                result = {name: self.mountSource.getFileInfo(name) for name in result}
+                result = {name: self.mountSource.lookup(name) for name in result}
             return [self._fileInfoToDict(name, info) for name, info in result.items() if info is not None]
 
         result = self.mountSource.list_mode(strippedPath)
@@ -49,7 +49,7 @@ class MountSourceFileSystem(fsspec.spec.AbstractFileSystem):
 
     @overrides(fsspec.spec.AbstractFileSystem)
     def info(self, path, **kwargs):
-        result = self.mountSource.getFileInfo(self._stripProtocol(path))
+        result = self.mountSource.lookup(self._stripProtocol(path))
         if result is None:
             raise FileNotFoundError(path)
         return self._fileInfoToDict(path, result)
@@ -66,7 +66,7 @@ class MountSourceFileSystem(fsspec.spec.AbstractFileSystem):
     ):
         if mode != "rb":
             raise ValueError("Only binary reading is supported!")
-        fileInfo = self.mountSource.getFileInfo(self._stripProtocol(path))
+        fileInfo = self.mountSource.lookup(self._stripProtocol(path))
         if fileInfo is None:
             raise FileNotFoundError(path)
         return self.mountSource.open(fileInfo, buffering=block_size or -1)

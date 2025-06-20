@@ -28,7 +28,7 @@ class SubvolumesMountSource(MountSource):
         return all(m.is_immutable() for m in self.mountSources.values())
 
     @overrides(MountSource)
-    def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
+    def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         if path == '/':
             return self.rootFileInfo.clone()
 
@@ -40,7 +40,7 @@ class SubvolumesMountSource(MountSource):
             return None
         subvolume, subpath = result
 
-        fileInfo = self.mountSources[subvolume].getFileInfo(subpath, fileVersion=fileVersion)
+        fileInfo = self.mountSources[subvolume].lookup(subpath, fileVersion=fileVersion)
         if isinstance(fileInfo, FileInfo):
             fileInfo.userdata.append(subvolume)
             return fileInfo

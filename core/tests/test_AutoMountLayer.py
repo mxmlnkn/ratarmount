@@ -33,7 +33,7 @@ class TestAutoMountLayer:
             assert recursivelyMounted.list('/ufo_12')
             assert recursivelyMounted.list('/ufo_00')
             assert list(recursivelyMounted.list('/ufo_00').keys()) == ['ufo']
-            assert recursivelyMounted.open(recursivelyMounted.getFileInfo('/ufo_00/ufo')).read() == b'iriya\n'
+            assert recursivelyMounted.open(recursivelyMounted.lookup('/ufo_00/ufo')).read() == b'iriya\n'
 
     @staticmethod
     def test_regex_mount_point_tar_gz(parallelization):
@@ -56,7 +56,7 @@ class TestAutoMountLayer:
             assert recursivelyMounted.list('/ufo_12')
             assert recursivelyMounted.list('/ufo_00')
             assert list(recursivelyMounted.list('/ufo_00').keys()) == ['ufo']
-            assert recursivelyMounted.open(recursivelyMounted.getFileInfo('/ufo_00/ufo')).read() == b'iriya\n'
+            assert recursivelyMounted.open(recursivelyMounted.lookup('/ufo_00/ufo')).read() == b'iriya\n'
 
     @staticmethod
     def test_regex_mount_point_gz(parallelization):
@@ -113,7 +113,7 @@ class TestAutoMountLayer:
             assert recursivelyMounted.list('/')
             assert recursivelyMounted.list('/ufo_12')
             assert recursivelyMounted.list('/ufo_00')
-            fileInfo = recursivelyMounted.getFileInfo('/ufo_00/ufo')
+            fileInfo = recursivelyMounted.lookup('/ufo_00/ufo')
             assert recursivelyMounted.open(fileInfo).read() == b'iriya\n'
 
     @staticmethod
@@ -130,15 +130,15 @@ class TestAutoMountLayer:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
 
             for folder in ['/', '/nested-tar.tar.gz', '/nested-tar.tar.gz/foo', '/nested-tar.tar.gz/foo/fighter']:
-                assert recursivelyMounted.getFileInfo(folder)
+                assert recursivelyMounted.lookup(folder)
                 assert recursivelyMounted.list(folder)
                 assert recursivelyMounted.versions(folder) > 0
 
             for mountedFile in ['/nested-tar.tar.gz']:
                 assert recursivelyMounted.versions(folder) > 0
-                assert stat.S_ISREG(recursivelyMounted.getFileInfo(mountedFile, fileVersion=1).mode)
+                assert stat.S_ISREG(recursivelyMounted.lookup(mountedFile, fileVersion=1).mode)
 
-            # assert recursivelyMounted.open(recursivelyMounted.getFileInfo('/ufo_00/ufo')).read() == b'iriya\n'
+            # assert recursivelyMounted.open(recursivelyMounted.lookup('/ufo_00/ufo')).read() == b'iriya\n'
 
     @staticmethod
     @pytest.mark.parametrize("recursive", [False])
@@ -225,7 +225,7 @@ class TestAutoMountLayer:
 
             # Check paths up to the allowed recursion depth
             for path, configurations in testPaths.items():
-                fileInfo = recursivelyMounted.getFileInfo(path)
+                fileInfo = recursivelyMounted.lookup(path)
 
                 # Files should not exist when their actual depth is larger than the specified mount depth.
                 if recursionDepth < min(configurations.keys()):
