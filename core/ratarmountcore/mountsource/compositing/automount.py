@@ -328,14 +328,14 @@ class AutoMountLayer(MountSource):
         return mountSource.read(sourceFileInfo, size, offset)
 
     @overrides(MountSource)
-    def listxattr(self, fileInfo: FileInfo) -> List[str]:
+    def list_xattr(self, fileInfo: FileInfo) -> List[str]:
         mountPoint = fileInfo.userdata[-1]
         assert isinstance(mountPoint, str)
         if fileInfo == self.mounted[mountPoint].rootFileInfo:
             return []
 
         _, mountSource, sourceFileInfo = self.get_mount_source(fileInfo)
-        return mountSource.listxattr(sourceFileInfo)
+        return mountSource.list_xattr(sourceFileInfo)
 
     @overrides(MountSource)
     def getxattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:

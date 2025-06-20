@@ -1020,7 +1020,7 @@ class SQLiteIndex:
     def setxattrs(self, rows: List[Tuple[int, str, bytes]]):
         self.getConnection().executemany('INSERT OR REPLACE INTO "xattrs" VALUES (?,?,?)', rows)
 
-    def listxattr(self, fileInfo: FileInfo) -> List[str]:
+    def list_xattr(self, fileInfo: FileInfo) -> List[str]:
         if not fileInfo.userdata:
             return []
         userData = fileInfo.userdata[-1]

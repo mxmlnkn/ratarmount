@@ -97,8 +97,8 @@ class SQLiteIndexMountSource(MountSource):
         return len(versions) if isinstance(versions, dict) else 0
 
     @overrides(MountSource)
-    def listxattr(self, fileInfo: FileInfo) -> List[str]:
-        return self.index.listxattr(fileInfo)
+    def list_xattr(self, fileInfo: FileInfo) -> List[str]:
+        return self.index.list_xattr(fileInfo)
 
     @overrides(MountSource)
     def getxattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:

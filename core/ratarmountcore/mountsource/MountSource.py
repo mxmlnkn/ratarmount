@@ -111,7 +111,7 @@ class MountSource(ABC):
         return fileInfo is not None and stat.S_ISDIR(fileInfo.mode)
 
     # pylint: disable=unused-argument
-    def listxattr(self, fileInfo: FileInfo) -> List[str]:
+    def list_xattr(self, fileInfo: FileInfo) -> List[str]:
         """
         Should return list of extended file attribute keys for the given fileInfo.
         """

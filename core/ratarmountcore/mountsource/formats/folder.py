@@ -168,7 +168,7 @@ class FolderMountSource(MountSource):
         return self._statfs.copy()
 
     @overrides(MountSource)
-    def listxattr(self, fileInfo: FileInfo) -> List[str]:
+    def list_xattr(self, fileInfo: FileInfo) -> List[str]:
         return os.listxattr(self.getFilePath(fileInfo), follow_symlinks=False) if hasattr(os, 'listxattr') else []
 
     @overrides(MountSource)

@@ -261,12 +261,12 @@ class FileVersionLayer(MountSource):
             fileInfo.userdata.append(fileType)
 
     @overrides(MountSource)
-    def listxattr(self, fileInfo: FileInfo) -> List[str]:
+    def list_xattr(self, fileInfo: FileInfo) -> List[str]:
         fileType = fileInfo.userdata.pop()
         try:
             if fileType == FileType.VERSIONS_FOLDER:
                 return []
-            return self.mountSource.listxattr(fileInfo)
+            return self.mountSource.list_xattr(fileInfo)
         finally:
             fileInfo.userdata.append(fileType)
 

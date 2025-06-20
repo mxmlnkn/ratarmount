@@ -497,7 +497,7 @@ class FuseMount(fuse.Operations):
         # Beware, keys not prefixed with "user." will not be listed by getfattr by default.
         # Use: "getfattr --match=.* mounted/foo" It seems that libfuse and the FUSE kernel module accept
         # all keys, I tried with "key1", "security.key1", "user.key1".
-        return self.mountSource.listxattr(self._getFileInfo(path))
+        return self.mountSource.list_xattr(self._getFileInfo(path))
 
     @overrides(fuse.Operations)
     def getxattr(self, path, name, position=0):
