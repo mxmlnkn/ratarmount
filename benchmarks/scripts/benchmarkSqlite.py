@@ -346,7 +346,7 @@ keyToLabel = {
 }
 
 
-def extractValuesFromBlock(block: str) -> Dict[str, Any]:
+def extract_values_from_block(block: str) -> Dict[str, Any]:
     namemap = {schema: label for label, schema in schemas.items()}
 
     values = {}
@@ -371,12 +371,12 @@ def extractValuesFromBlock(block: str) -> Dict[str, Any]:
     return values
 
 
-def extractValuesFromLog(path: str):
-    return [extractValuesFromBlock(block) for block in Path(path).read_text(encoding='utf-8').split('\n\n') if block]
+def extract_values_from_log(path: str):
+    return [extract_values_from_block(block) for block in Path(path).read_text(encoding='utf-8').split('\n\n') if block]
 
 
-def plotSummary(logFiles: List[str]):
-    values = [values for logFile in logFiles for values in extractValuesFromLog(logFile)]
+def plot_summary(logFiles: List[str]):
+    values = [values for logFile in logFiles for values in extract_values_from_log(logFile)]
     names = sorted({x['name'] for x in values if re.sub(', (unique|duplicate) rows$', '', x['name']) in schemas})
     if not names:
         return
@@ -504,7 +504,7 @@ def plotSummary(logFiles: List[str]):
     fig.savefig("sqlite primary key benchmark sizes over row count.png")
 
 
-def getSchemasToBenchmark() -> List[Tuple[str, str, bool]]:
+def get_schemas_to_benchmark() -> List[Tuple[str, str, bool]]:
     schemasToBenchmark = []
     for label, schema in schemas.items():
         schemasToBenchmark.append((label + ', unique rows', schema, False))
@@ -513,7 +513,7 @@ def getSchemasToBenchmark() -> List[Tuple[str, str, bool]]:
     return schemasToBenchmark
 
 
-def plotOperationMeasurements(labelAndPath: List[Tuple[str, str]], targetFileName: str):
+def plot_operation_measurements(labelAndPath: List[Tuple[str, str]], targetFileName: str):
     if not labelAndPath:
         return
 
@@ -589,17 +589,17 @@ if len(sys.argv) > 1 and os.path.isdir(sys.argv[1]):
             singleOperationMeasurements[nFiles][label] = path
 
     for nFiles, measurements in singleOperationMeasurements.items():
-        plotOperationMeasurements(
-            [(label, measurements[label]) for label, schema, _ in getSchemasToBenchmark() if label in measurements],
+        plot_operation_measurements(
+            [(label, measurements[label]) for label, schema, _ in get_schemas_to_benchmark() if label in measurements],
             os.path.join(folder, f"sqlite primary key benchmark {nFiles}k files insert"),
         )
 
-    plotSummary(logFiles)
+    plot_summary(logFiles)
     plt.show()
     sys.exit(0)
 
 
-def benchmarkSchemas(nFiles: int, log, plotAllMeasurements: bool) -> None:
+def benchmark_schemas(nFiles: int, log, plotAllMeasurements: bool) -> None:
     assert nFiles % rowsPerInsert == 0
 
     fname = f"sqlite primary key benchmark {nFiles // 1000}k files"
@@ -615,7 +615,7 @@ def benchmarkSchemas(nFiles: int, log, plotAllMeasurements: bool) -> None:
     log(f"rows per insert: {rowsPerInsert}")
     log(f"number of rows to insert: {nFiles}")
 
-    for label, schema, dataWithDuplicates in getSchemasToBenchmark():
+    for label, schema, dataWithDuplicates in get_schemas_to_benchmark():
         log(f"Label: {label}")
 
         cleanUpDatabase = None
@@ -706,7 +706,7 @@ def benchmarkSchemas(nFiles: int, log, plotAllMeasurements: bool) -> None:
 
         ########### SELECT benchmarks ###########
 
-        def benchmarkSelect(connection, entity, sqlCommand, makeRow, label=label):
+        def benchmark_select(connection, entity, sqlCommand, makeRow, label=label):
             nFilesSelect = (
                 10
                 if 'LIKE' in sqlCommand or entity == 'hashes' or (entity == 'paths' and 'integer primary' in label)
@@ -725,7 +725,7 @@ def benchmarkSchemas(nFiles: int, log, plotAllMeasurements: bool) -> None:
             tTotalSelectTime = sum(selectTimes)
             log(f"Selecting {nFilesSelect} {entity} took {tTotalSelectTime:.3f} s excluding PRNG time")
 
-        benchmarkSelect(
+        benchmark_select(
             db,
             'paths',
             'SELECT hash FROM files WHERE path == (?)',
@@ -735,7 +735,7 @@ def benchmarkSchemas(nFiles: int, log, plotAllMeasurements: bool) -> None:
         # It is now known that this is always expensive (linear search over database is necessary).
         # No need to benchmark this after the (path,name) schema, which avoids LIKE match clauses.
         if comparePrimaryKeys:
-            benchmarkSelect(
+            benchmark_select(
                 db,
                 'paths starting with',
                 'SELECT hash FROM files WHERE path LIKE (?)',
@@ -743,14 +743,14 @@ def benchmarkSchemas(nFiles: int, log, plotAllMeasurements: bool) -> None:
             )
 
             # Normally, selecting only by name is not done! Only selecting by (path,name) tuples.
-            benchmarkSelect(
+            benchmark_select(
                 db,
                 'hashes',
                 'SELECT path FROM files WHERE "hash" == (?);',
                 lambda j: (np.random.randint(0, nFiles),),
             )
         else:
-            benchmarkSelect(
+            benchmark_select(
                 db,
                 'path,hash',
                 'SELECT path FROM files WHERE ("path", "hash") == (?,?);',
@@ -783,9 +783,9 @@ with open(logFilePath, 'w', encoding='utf-8') as logFile:
         logFile.flush()
 
     for nFiles in nFilesToBenchmark:
-        benchmarkSchemas(nFiles, log, plotAllMeasurements=nFiles == max(nFilesToBenchmark))
+        benchmark_schemas(nFiles, log, plotAllMeasurements=nFiles == max(nFilesToBenchmark))
 
-plotSummary([logFilePath])
+plot_summary([logFilePath])
 plt.show()
 
 

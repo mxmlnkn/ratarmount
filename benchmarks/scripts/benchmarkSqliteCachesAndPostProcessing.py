@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 fileNameLength = 256
 
 
-def benchmarkCacheSizes(nFiles):
+def benchmark_cache_sizes(nFiles):
     rowsPerInsert = 1000
     assert nFiles % rowsPerInsert == 0
     fname = f"sqlite cache size benchmark {nFiles // 1000}k files"
@@ -61,7 +61,7 @@ def benchmarkCacheSizes(nFiles):
     fig.savefig(fname + ".png")
 
 
-def benchmarkCacheSizesSortAfter(nFiles):
+def benchmark_cache_sizes_sort_after(nFiles):
     rowsPerInsert = 1000
     assert nFiles % rowsPerInsert == 0
     fname = f"sqlite using intermediary table order by cache size benchmark {nFiles // 1000}k files"
@@ -133,8 +133,8 @@ def benchmarkCacheSizesSortAfter(nFiles):
     fig.savefig(fname + ".png")
 
 
-benchmarkCacheSizes(1_000_000)
-benchmarkCacheSizesSortAfter(1_000_000)
+benchmark_cache_sizes(1_000_000)
+benchmark_cache_sizes_sort_after(1_000_000)
 plt.show()
 
 """

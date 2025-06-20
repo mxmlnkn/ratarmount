@@ -14,7 +14,7 @@ import zstandard
 from ratarmountcore.BlockParallelReaders import ParallelXZReader, ParallelZstdReader
 
 
-def benchmarkReading(fileObject):
+def benchmark_reading(fileObject):
     print(f"== Benchmark {fileObject} file decompression ==")
 
     size = 0
@@ -38,7 +38,7 @@ def benchmarkReading(fileObject):
     print(f"Reading {size} B took: {t1 - t0:.3f}s")
 
 
-def compareReading(file, pfile):
+def compare_reading(file, pfile):
     print("== Test file decompression ==")
 
     size = 0
@@ -64,7 +64,7 @@ def compareReading(file, pfile):
     print(f"Reading {size} B took: {t1 - t0:.3f}s")
 
 
-def testZstdSeeking(filename):
+def test_zstd_seeking(filename):
     file = indexed_zstd.IndexedZstdFile(filename)
     for offset in file.block_offsets():
         file.seek(0)
@@ -76,13 +76,13 @@ def testZstdSeeking(filename):
         print(f"Seeking to {offset} took {t1 - t0:.3f}s")
 
 
-def readBlock(filename, offset, size):
+def read_block(filename, offset, size):
     with indexed_zstd.IndexedZstdFile(filename) as file:
         file.seek(offset)
         return file.read(size)
 
 
-def simpleParallelZstdReading(filename):
+def simple_parallel_zstd_reading(filename):
     parallelization = os.cpu_count()
     with concurrent.futures.ThreadPoolExecutor(parallelization) as pool:
         futures = []
@@ -91,7 +91,7 @@ def simpleParallelZstdReading(filename):
         sizes = offsets[1:] - offsets[:-1]
         t0 = time.time()
         for offset, size in zip(offsets[:-1], sizes):
-            futures.append(pool.submit(readBlock, filename, offset, size))
+            futures.append(pool.submit(read_block, filename, offset, size))
             while len(futures) >= parallelization:
                 futures.pop(0).result()
         t1 = time.time()
@@ -111,18 +111,18 @@ if __name__ == '__main__':
         filename = filename[:-4]
 
     if os.path.isfile(filename + '.xz'):
-        compareReading(xz.open(filename + '.xz', 'rb'), ParallelXZReader(filename + '.xz', os.cpu_count()))
-        benchmarkReading(xz.open(filename + '.xz', 'rb'))
-        benchmarkReading(lzma.open(filename + '.xz', 'rb'))
-        benchmarkReading(ParallelXZReader(filename + '.xz', os.cpu_count()))
+        compare_reading(xz.open(filename + '.xz', 'rb'), ParallelXZReader(filename + '.xz', os.cpu_count()))
+        benchmark_reading(xz.open(filename + '.xz', 'rb'))
+        benchmark_reading(lzma.open(filename + '.xz', 'rb'))
+        benchmark_reading(ParallelXZReader(filename + '.xz', os.cpu_count()))
 
     print()
 
     if os.path.isfile(filename + '.zst'):
-        # simpleParallelZstdReading(filename + '.zst')
-        # testZstdSeeking(filename + '.zst')
+        # simple_parallel_zstd_reading(filename + '.zst')
+        # test_zstd_seeking(filename + '.zst')
 
-        compareReading(zstandard.open(filename + '.zst', 'rb'), ParallelZstdReader(filename + '.zst', os.cpu_count()))
-        benchmarkReading(zstandard.open(filename + '.zst', 'rb'))
-        benchmarkReading(indexed_zstd.IndexedZstdFile(filename + '.zst'))
-        benchmarkReading(ParallelZstdReader(filename + '.zst', os.cpu_count()))
+        compare_reading(zstandard.open(filename + '.zst', 'rb'), ParallelZstdReader(filename + '.zst', os.cpu_count()))
+        benchmark_reading(zstandard.open(filename + '.zst', 'rb'))
+        benchmark_reading(indexed_zstd.IndexedZstdFile(filename + '.zst'))
+        benchmark_reading(ParallelZstdReader(filename + '.zst', os.cpu_count()))

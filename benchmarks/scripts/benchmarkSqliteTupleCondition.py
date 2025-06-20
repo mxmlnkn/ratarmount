@@ -33,7 +33,7 @@ ORDER BY "path","name";
 """
 
 
-def createTable(nRows, fileNameLength, modeProbability):
+def create_table(nRows, fileNameLength, modeProbability):
     db = sqlite3.connect(":memory:")
     db.executescript(schema)
 
@@ -46,8 +46,8 @@ def createTable(nRows, fileNameLength, modeProbability):
     return db
 
 
-def benchmarkQuery(nRows, fileNameLength, modeProbability, query):
-    db = createTable(nRows, fileNameLength, modeProbability)
+def benchmark_query(nRows, fileNameLength, modeProbability, query):
+    db = create_table(nRows, fileNameLength, modeProbability)
 
     t0 = time.time()
     db.execute(query).fetchall()
@@ -61,12 +61,12 @@ if __name__ == '__main__':
         print("Using mode probability:", modeProbability)
         print(" Using Tuples:")
         for nRows in 10 ** np.arange(3, 7):
-            print(" ", nRows, benchmarkQuery(nRows, 128, 0.5, queryUsingTuples))
+            print(" ", nRows, benchmark_query(nRows, 128, 0.5, queryUsingTuples))
 
         print()
         print(" Using Concatenation:")
         for nRows in 10 ** np.arange(3, 7):
-            print(" ", nRows, benchmarkQuery(nRows, 128, 0.5, queryUsingConcatenation))
+            print(" ", nRows, benchmark_query(nRows, 128, 0.5, queryUsingConcatenation))
         print()
 
 

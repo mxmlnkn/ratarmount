@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def loadMemoryTracingData(fileName):
+def load_memory_tracing_data(fileName):
     labels = None
     pageSize = 4096
     with open(fileName, encoding='utf-8') as file:
@@ -34,7 +34,7 @@ def loadMemoryTracingData(fileName):
     return data[iSeconds] - data[iSeconds][0], data[iResident] * pageSize
 
 
-def plotMemoryOverTime(fileNames, plotFileName='memory-over-time', fileNameSizeMiB=64):
+def plot_memory_over_time(fileNames, plotFileName='memory-over-time', fileNameSizeMiB=64):
     fig = plt.figure()
     ax = fig.add_subplot(
         111,
@@ -43,16 +43,16 @@ def plotMemoryOverTime(fileNames, plotFileName='memory-over-time', fileNameSizeM
         ylabel='Resident Memory / MiB',
     )
 
-    def getColorGroup(x):
+    def get_color_group(x):
         return x.split(os.sep)[-1].split('-')[0].split('.')[0]
 
     colorCycler = cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
     groupToColor = {}
-    for key in sorted({getColorGroup(name) for name in fileNames}):
+    for key in sorted({get_color_group(name) for name in fileNames}):
         if key not in groupToColor:
             groupToColor[key] = next(colorCycler)
 
-    def getLineStyleGroup(x):
+    def get_line_style_group(x):
         fileExts = x.split(os.sep)[-1].split('-')[0].split('.')
         if len(fileExts) > 1:
             return fileExts[-1]
@@ -60,20 +60,20 @@ def plotMemoryOverTime(fileNames, plotFileName='memory-over-time', fileNameSizeM
 
     groupToLineStyle = {}
     lineCycler = cycle([":", "--", "-", "-."])
-    for key in sorted({getLineStyleGroup(name) for name in fileNames}):
+    for key in sorted({get_line_style_group(name) for name in fileNames}):
         if key not in groupToLineStyle:
             groupToLineStyle[key] = next(lineCycler)
 
     maxTime = 0
     maxMemory = 0
     for i in range(len(fileNames)):
-        timeSinceStart, memoryInBytes = loadMemoryTracingData(fileNames[i])
+        timeSinceStart, memoryInBytes = load_memory_tracing_data(fileNames[i])
         ax.plot(
             timeSinceStart,
             memoryInBytes / 1024.0**2,
             # label = fileNames[i].split( '/' )[-1].split( '-' )[0],
-            linestyle=groupToLineStyle[getLineStyleGroup(fileNames[i])],
-            color=groupToColor[getColorGroup(fileNames[i])],
+            linestyle=groupToLineStyle[get_line_style_group(fileNames[i])],
+            color=groupToColor[get_color_group(fileNames[i])],
         )
 
         maxTime = np.max([maxTime, np.max(timeSinceStart)])
@@ -93,7 +93,7 @@ def plotMemoryOverTime(fileNames, plotFileName='memory-over-time', fileNameSizeM
     fig.savefig(f'{plotFileName}-{fileNameSizeMiB}-MiB-metadata.png')
 
 
-def plotPerformanceComparison(fileName, fileNameSizeMiB=64):
+def plot_performance_comparison(fileName, fileNameSizeMiB=64):
     widthBetweenBars = 1
     pageSize = 4096
 
@@ -207,9 +207,9 @@ os.chdir(dataFolder)
 for sizeMiB in [1, 8, 64, 256]:
     for benchmark in ['saving', 'loading']:
         files = [f for f in os.listdir('.') if fnmatch.fnmatch(f, '*-' + str(sizeMiB) + '-MiB-' + benchmark + '.dat')]
-        plotMemoryOverTime(files, 'resident-memory-over-time-' + benchmark, sizeMiB)
+        plot_memory_over_time(files, 'resident-memory-over-time-' + benchmark, sizeMiB)
     try:
-        plotPerformanceComparison('serializationBenchmark.dat', sizeMiB)
+        plot_performance_comparison('serializationBenchmark.dat', sizeMiB)
     except Exception as e:
         print("Could not plot performance comparison because:", e)
 

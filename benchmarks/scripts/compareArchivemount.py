@@ -13,7 +13,7 @@ colors = ['tab:blue', 'tab:red', 'tab:purple', 'r']  # https://matplotlib.org/3.
 markers = ['+', 'o', '*', 'x']
 
 
-def axisValueReduction(ax, axis, reduction, init):
+def axis_value_reduction(ax, axis, reduction, init):
     result = init
     # this is bugged when using axvline or axhline, because it doesn't ignore
     # the huge values set by those functions. Workaround: Call autoRange
@@ -39,7 +39,7 @@ def axisValueReduction(ax, axis, reduction, init):
     return result
 
 
-def readLabelsFromFirstComment(fileName):
+def read_labels_from_first_comment(fileName):
     with open(fileName, encoding='utf-8') as file:
         for line in file:
             line = line.strip()
@@ -48,7 +48,7 @@ def readLabelsFromFirstComment(fileName):
         return None
 
 
-def loadData(fileName):
+def load_data(fileName):
     """Returns a nested dict with keys in order of dimension: tool, command, compression"""
     labels = None
     data = {}
@@ -99,7 +99,7 @@ def loadData(fileName):
     return labels[3:], data
 
 
-def plotBenchmark(labels, data, ax, command, metric, tools, scalingFactor=1):
+def plot_benchmark(labels, data, ax, command, metric, tools, scalingFactor=1):
     compressions = None
     fileSizes = None
     xs = np.array([])
@@ -204,8 +204,8 @@ def plotBenchmark(labels, data, ax, command, metric, tools, scalingFactor=1):
         )
 
 
-def plotComparison(fileName):
-    labels, data = loadData(fileName)
+def plot_comparison(fileName):
+    labels, data = load_data(fileName)
 
     availableTools = data.keys()
     tools = [
@@ -224,7 +224,7 @@ def plotComparison(fileName):
         yscale='log',
     )
 
-    plotBenchmark(labels, data, ax, "mount", "peakRssMemory/kiB", tools, scalingFactor=1.0 / 1024)
+    plot_benchmark(labels, data, ax, "mount", "peakRssMemory/kiB", tools, scalingFactor=1.0 / 1024)
 
     ax.legend(loc='best')
 
@@ -237,12 +237,12 @@ def plotComparison(fileName):
         yscale='log',
     )
 
-    plotBenchmark(labels, data, ax, "mount", "duration/s", tools)
+    plot_benchmark(labels, data, ax, "mount", "duration/s", tools)
 
-    xmin = axisValueReduction(ax, 'x', np.nanmin, float('+inf'))
-    xmax = axisValueReduction(ax, 'x', np.nanmax, float('-inf'))
-    ymin = axisValueReduction(ax, 'y', np.nanmin, float('+inf'))
-    ymax = axisValueReduction(ax, 'y', np.nanmax, float('-inf'))
+    xmin = axis_value_reduction(ax, 'x', np.nanmin, float('+inf'))
+    xmax = axis_value_reduction(ax, 'x', np.nanmax, float('-inf'))
+    ymin = axis_value_reduction(ax, 'y', np.nanmin, float('+inf'))
+    ymax = axis_value_reduction(ax, 'y', np.nanmax, float('-inf'))
     x = 10 ** np.linspace(np.log10(xmin), np.log10(xmax))
     y = x**2
     y = y / y[-1] * ymax / 2000
@@ -259,7 +259,7 @@ def plotComparison(fileName):
         yscale='log',
     )
 
-    plotBenchmark(labels, data, ax, "cat", "duration/s", tools)
+    plot_benchmark(labels, data, ax, "cat", "duration/s", tools)
 
     # ax = fig.add_subplot( 224,
     #    title = "Time Required for Getting Metadata of One File",
@@ -269,7 +269,7 @@ def plotComparison(fileName):
     #    yscale = 'log',
     # )
     #
-    # plotBenchmark( fileName, ax, "stat", "duration/s" )
+    # plot_benchmark( fileName, ax, "stat", "duration/s" )
 
     ax = fig.add_subplot(
         224,
@@ -280,7 +280,7 @@ def plotComparison(fileName):
         yscale='log',
     )
 
-    plotBenchmark(labels, data, ax, "find", "duration/s", tools)
+    plot_benchmark(labels, data, ax, "find", "duration/s", tools)
 
     fig.tight_layout()
     fileName = 'archivemount-comparison.png'
@@ -288,7 +288,7 @@ def plotComparison(fileName):
     print("Written out:", fileName)
 
 
-def plotRatarmountParallelComparison(fileName, compression):
+def plot_ratarmount_parallel_comparison(fileName, compression):
     suffix = 'tar.' + compression if compression else 'tar'
 
     fig = plt.figure(figsize=(6, 4))
@@ -306,7 +306,7 @@ def plotRatarmountParallelComparison(fileName, compression):
         yscale='linear',
     )
 
-    df = pd.read_csv(fileName, comment='#', sep=';', names=readLabelsFromFirstComment(fileName))
+    df = pd.read_csv(fileName, comment='#', sep=';', names=read_labels_from_first_comment(fileName))
 
     if df.empty:
         print("[Warning] Did not data for ratarmount tools.")
@@ -330,7 +330,7 @@ def plotRatarmountParallelComparison(fileName, compression):
         if df.empty:
             return False
 
-    def getDurationPerFileCount(df, tool, nBytesPerFile):
+    def get_duration_per_file_count(df, tool, nBytesPerFile):
         sdf = df.loc[(df.loc[:, 'nBytesPerFile'] == nBytesPerFile) & (df.loc[:, 'tool'] == tool)]
         if sdf.empty:
             return None
@@ -348,8 +348,8 @@ def plotRatarmountParallelComparison(fileName, compression):
         )
 
     for k, nBytesPerFile in enumerate(df.loc[:, 'nBytesPerFile'].unique()):
-        resultSerial = getDurationPerFileCount(df, 'ratarmount', nBytesPerFile)
-        resultParallel = getDurationPerFileCount(df, 'ratarmount -P 24', nBytesPerFile)
+        resultSerial = get_duration_per_file_count(df, 'ratarmount', nBytesPerFile)
+        resultParallel = get_duration_per_file_count(df, 'ratarmount -P 24', nBytesPerFile)
         if resultSerial is None or resultParallel is None:
             continue
         nFilesSerial, durationSerial = resultSerial
@@ -385,9 +385,9 @@ def plotRatarmountParallelComparison(fileName, compression):
     return True
 
 
-def plotAccessLatency(fileName):
+def plot_access_latency(fileName):
     fileName = dataFile
-    labels, data = loadData(fileName)
+    labels, data = load_data(fileName)
 
     availableTools = data.keys()
     tools = [
@@ -406,7 +406,7 @@ def plotAccessLatency(fileName):
         yscale='log',
     )
 
-    plotBenchmark(labels, data, ax, "cat", "duration/s", tools)
+    plot_benchmark(labels, data, ax, "cat", "duration/s", tools)
 
     ax.legend(loc='best')
 
@@ -423,7 +423,7 @@ if __name__ == "__main__":
 
     dataFile = sys.argv[1]
 
-    plotAccessLatency(dataFile)
-    plotComparison(dataFile)
+    plot_access_latency(dataFile)
+    plot_comparison(dataFile)
     for compression in ['', 'bz2', 'gz', 'xz', 'find']:
-        plotRatarmountParallelComparison(dataFile, compression)
+        plot_ratarmount_parallel_comparison(dataFile, compression)

@@ -13,7 +13,7 @@ from scipy.optimize import curve_fit
 useNumpyUnique = True
 
 
-def computeEntropy(data: bytes) -> float:
+def compute_entropy(data: bytes) -> float:
     if not data:
         return 0.0
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.entropy.html
@@ -21,7 +21,7 @@ def computeEntropy(data: bytes) -> float:
     return -sum(p * math.log2(p) for p in probabilities)
 
 
-def computeEntropyForEach(data: bytes, ns):
+def compute_entropy_for_each(data: bytes, ns):
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.entropy.html
     result = []
     last = 0
@@ -43,20 +43,20 @@ def computeEntropyForEach(data: bytes, ns):
     return result
 
 
-def convergenceRate(x, m):
+def convergence_rate(x, m):
     # Must behave 1/x for for x -> inf as found empirically and f(1)=8
     # because the entropy of a single character is 0 by definition.
     return 8 * (1 + m) / (np.floor(x) + m)
 
 
-def plotForData(data, saveName: str):
+def plot_for_data(data, saveName: str):
     nStop = len(data)
     stopPower = int(np.log2(nStop))
 
     x = np.floor(2 ** np.linspace(0, stopPower, stopPower * 5, endpoint=True))
-    y = 8 - np.array(computeEntropyForEach(data, [int(n) for n in x]))
+    y = 8 - np.array(compute_entropy_for_each(data, [int(n) for n in x]))
     diffData = np.ediff1d(np.frombuffer(data, dtype=np.uint8)).tobytes()
-    ydiff = 8 - np.array(computeEntropyForEach(diffData, [int(n) for n in x]))
+    ydiff = 8 - np.array(compute_entropy_for_each(diffData, [int(n) for n in x]))
 
     fig = plt.figure(figsize=(8, 6))
 
@@ -64,7 +64,7 @@ def plotForData(data, saveName: str):
     ax.plot(x, y, label='8 - Entropy')
     ax.plot(x, ydiff, label='8 - Consec. Diff. Entropy')
     for m in [16, 24, 32, 40]:
-        ax.plot(x, convergenceRate(x, m), label=f"{8 * (1 + m)}/(n+{m})", linestyle='--', alpha=0.5)
+        ax.plot(x, convergence_rate(x, m), label=f"{8 * (1 + m)}/(n+{m})", linestyle='--', alpha=0.5)
 
     xSmall = np.arange(1, 128)
     ax.plot(xSmall, 8 - np.log2(xSmall), label="8 - log2(n)")
@@ -76,11 +76,11 @@ def plotForData(data, saveName: str):
 
 
 if len(sys.argv) > 1:
-    plotForData(open(sys.argv[1], 'rb').read(), sys.argv[1] + ".entropy")
+    plot_for_data(open(sys.argv[1], 'rb').read(), sys.argv[1] + ".entropy")
     plt.show()
 
 
-def plotRandomDataAnalysis():
+def plot_random_data_analysis():
     # The more often it is repeated, the larger the min,max grow of course.
     # This gives us an estimate to how often the check will fail!
     # I.e., if my estimated function still envelopes the highest (8 - entropy) value,
@@ -107,11 +107,11 @@ def plotRandomDataAnalysis():
         sys.stdout.write(".")
         sys.stdout.flush()
         data = os.urandom(nStop)
-        # ys.append([computeEntropy(data[: int(n)]) for n in x])
-        ys.append(computeEntropyForEach(data, [int(n) for n in ns]))
+        # ys.append([compute_entropy(data[: int(n)]) for n in x])
+        ys.append(compute_entropy_for_each(data, [int(n) for n in ns]))
 
         diffData = np.ediff1d(np.frombuffer(data, dtype=np.uint8)).tobytes()
-        ydiffs.append(computeEntropyForEach(diffData, [int(n) for n in ns]))
+        ydiffs.append(compute_entropy_for_each(diffData, [int(n) for n in ns]))
 
         ymins.append(np.min(ys, axis=0))
         ymaxs.append(np.max(ys, axis=0))
@@ -143,10 +143,10 @@ def plotRandomDataAnalysis():
     ax1.errorbar(ns, ymed, yerr=yDiffTopBottom, capsize=2, label='8 - Consec. Diff. Entropy')
     # plt.plot(x, x**-1)
     for m in [16, 24, 32, 40]:
-        ax1.plot(ns, convergenceRate(ns, m), label=f"{8 * (1 + m)}/(n+{m})", linestyle='--', alpha=0.5)
-    result = curve_fit(convergenceRate, ns, ymed)
+        ax1.plot(ns, convergence_rate(ns, m), label=f"{8 * (1 + m)}/(n+{m})", linestyle='--', alpha=0.5)
+    result = curve_fit(convergence_rate, ns, ymed)
     print("M", result[0], "Cov:", result[1])
-    # ax1.plot(x, convergenceRate(x, mopt), label=f"{8 * (1+mopt)}/(n+{mopt})")
+    # ax1.plot(x, convergence_rate(x, mopt), label=f"{8 * (1+mopt)}/(n+{mopt})")
 
     xSmall = np.arange(1, 128)
     ax1.plot(xSmall, 8 - np.log2(xSmall), label="8 - log2(n)")
@@ -161,7 +161,7 @@ def plotRandomDataAnalysis():
     # lx = np.log2(x)
     # ly = np.log2(ymean)
     # ax2.plot(lx, ly, label = f"{8 * (1+mopt)}/(x+{mopt})")
-    # mopt, mcov = curve_fit(convergenceRate, lx, ly)
+    # mopt, mcov = curve_fit(convergence_rate, lx, ly)
     # print("M", mopt, "Cov:", mcov)
     # ax2.legend(loc='best')
 

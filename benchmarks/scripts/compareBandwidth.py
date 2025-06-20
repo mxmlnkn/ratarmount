@@ -12,7 +12,7 @@ colors = ['tab:blue', 'tab:red', 'tab:purple', 'r']  # https://matplotlib.org/3.
 markers = ['+', 'o', '*', 'x']
 
 
-def axisValueReduction(ax, axis, reduction, init):
+def axis_value_reduction(ax, axis, reduction, init):
     result = init
     # this is bugged when using axvline or axhline, because it doesn't ignore
     # the huge values set by those functions. Workaround: Call autoRange
@@ -38,7 +38,7 @@ def axisValueReduction(ax, axis, reduction, init):
     return result
 
 
-def readLabelsFromFirstComment(fileName):
+def read_labels_from_first_comment(fileName):
     with open(fileName, encoding='utf-8') as file:
         for line in file:
             line = line.strip()
@@ -47,7 +47,7 @@ def readLabelsFromFirstComment(fileName):
         return None
 
 
-def loadData(fileName):
+def load_data(fileName):
     """Returns a nested dict with keys in order of dimension: tool, command, compression"""
     labels = None
     data = {}
@@ -113,7 +113,7 @@ compressionToIndex = {
 }
 
 
-def plotBenchmark(labels, data, ax, command, metric, tools, scalingFactor=1, xScalingFactor=1):
+def plot_benchmark(labels, data, ax, command, metric, tools, scalingFactor=1, xScalingFactor=1):
     fileSizes = None
     xs = np.array([])
     ys = np.array([])
@@ -195,11 +195,11 @@ def plotBenchmark(labels, data, ax, command, metric, tools, scalingFactor=1, xSc
         ax.plot([None], [None], linestyle=lineStyles[j], color='0.5', label=compression)
 
 
-# Copy-paste from plotBenchmark but:
+# Copy-paste from plot_benchmark but:
 #  - color = green
 #  - tools hardcoded
 #  - compression determined by tool
-def plotStandardTools(labels, data, ax, command, metric, scalingFactor=1, xScalingFactor=1):
+def plot_standard_tools(labels, data, ax, command, metric, scalingFactor=1, xScalingFactor=1):
     fileSizes = None
     xs = np.array([])
     ys = np.array([])
@@ -274,8 +274,8 @@ def plotStandardTools(labels, data, ax, command, metric, scalingFactor=1, xScali
         ys = np.append(ys, y)
 
 
-def plotReadingComparison(fileName):
-    labels, data = loadData(fileName)
+def plot_reading_comparison(fileName):
+    labels, data = load_data(fileName)
 
     tools = [
         'archivemount',
@@ -293,7 +293,7 @@ def plotReadingComparison(fileName):
         yscale='log',
     )
 
-    plotBenchmark(
+    plot_benchmark(
         labels, data, ax, "read", "peakRssMemory/kiB", tools, xScalingFactor=1.0 / 1000, scalingFactor=1.0 / 1024
     )
     ax.grid(axis='y')
@@ -309,13 +309,13 @@ def plotReadingComparison(fileName):
         yscale='log',
     )
 
-    plotBenchmark(labels, data, ax, "read", "duration/s", tools, xScalingFactor=1.0 / 1000)
+    plot_benchmark(labels, data, ax, "read", "duration/s", tools, xScalingFactor=1.0 / 1000)
     ax.grid(axis='y')
 
-    xmin = axisValueReduction(ax, 'x', np.nanmin, float('+inf'))
-    xmax = axisValueReduction(ax, 'x', np.nanmax, float('-inf'))
-    ymin = axisValueReduction(ax, 'y', np.nanmin, float('+inf'))
-    ymax = axisValueReduction(ax, 'y', np.nanmax, float('-inf'))
+    xmin = axis_value_reduction(ax, 'x', np.nanmin, float('+inf'))
+    xmax = axis_value_reduction(ax, 'x', np.nanmax, float('-inf'))
+    ymin = axis_value_reduction(ax, 'y', np.nanmin, float('+inf'))
+    ymax = axis_value_reduction(ax, 'y', np.nanmax, float('-inf'))
 
     # add linear scaling
     x = 10 ** np.linspace(np.log10(xmin), np.log10(xmax))
@@ -343,7 +343,7 @@ def plotReadingComparison(fileName):
         yscale='log',
     )
 
-    plotBenchmark(
+    plot_benchmark(
         labels, data, ax, "bandwidth", "duration/s", tools, xScalingFactor=1.0 / 1000, scalingFactor=1.0 / 1000**2
     )
 
@@ -359,7 +359,7 @@ def plotReadingComparison(fileName):
         yscale='log',
     )
 
-    plotStandardTools(
+    plot_standard_tools(
         labels, data, ax, "bandwidth", "duration/s", xScalingFactor=1.0 / 1000, scalingFactor=1.0 / 1000**2
     )
     ax.set_ylim(axBandwidth.get_ylim())
@@ -372,8 +372,8 @@ def plotReadingComparison(fileName):
     print("Written out:", fileName)
 
 
-def plotBandiwdths(fileName):
-    labels, data = loadData(fileName)
+def plot_bandwidths(fileName):
+    labels, data = load_data(fileName)
 
     tools = [
         'archivemount',
@@ -392,7 +392,7 @@ def plotBandiwdths(fileName):
         yscale='log',
     )
 
-    plotBenchmark(
+    plot_benchmark(
         labels, data, ax, "bandwidth", "duration/s", tools, xScalingFactor=1.0 / 1000, scalingFactor=1.0 / 1000**2
     )
     ax.grid(axis='y')
@@ -411,5 +411,5 @@ if __name__ == "__main__":
 
     dataFile = sys.argv[1]
 
-    plotBandiwdths(dataFile)
-    plotReadingComparison(dataFile)
+    plot_bandwidths(dataFile)
+    plot_reading_comparison(dataFile)
