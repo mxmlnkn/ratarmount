@@ -97,7 +97,7 @@ class EXT4MountSource(MountSource):
         return None
 
     @overrides(MountSource)
-    def fileVersions(self, path: str) -> int:
+    def versions(self, path: str) -> int:
         return 1
 
     @overrides(MountSource)

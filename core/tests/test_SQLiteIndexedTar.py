@@ -65,7 +65,7 @@ class TestSQLiteIndexedTarParallelized:
         ) as file:
             for folder in ['/', '/mimi']:
                 assert file.getFileInfo(folder)
-                assert file.fileVersions(folder) == 1
+                assert file.versions(folder) == 1
                 assert file.listDir(folder)
 
             assert not file.listDir('/mimi/01995.tar')
@@ -319,7 +319,7 @@ class TestSQLiteIndexedTarParallelized:
             os.remove(createdIndexFilePath)
 
     @staticmethod
-    def test_listDir_and_fileVersions(parallelization):
+    def test_listDir_and_versions(parallelization):
         with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile:
             with tarfile.open(name=tmpTarFile.name, mode="w:gz") as tarFile:
                 createFile = TestSQLiteIndexedTarParallelized._createFile
@@ -358,7 +358,7 @@ class TestSQLiteIndexedTarParallelized:
                 assert set(files) == {"/dist/a/b/test2.sh", "/src/test.sh", "/README.md"}
 
                 for path in folders + files:
-                    assert indexedTar.fileVersions(path) == 1
+                    assert indexedTar.versions(path) == 1
 
     @staticmethod
     def test_open(parallelization):

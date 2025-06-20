@@ -48,7 +48,7 @@ class SubvolumesMountSource(MountSource):
         return None
 
     @overrides(MountSource)
-    def fileVersions(self, path: str) -> int:
+    def versions(self, path: str) -> int:
         if path == '/':
             return 1
 
@@ -57,7 +57,7 @@ class SubvolumesMountSource(MountSource):
             return 0
         subvolume, subpath = result
 
-        return self.mountSources[subvolume].fileVersions(subpath)
+        return self.mountSources[subvolume].versions(subpath)
 
     def _listDir(self, path: str, onlyMode: bool):
         if path == '/':

@@ -29,7 +29,7 @@ class TestLibarchiveMountSource:
                 assert fileInfo
                 assert stat.S_ISDIR(fileInfo.mode)
 
-                assert mountSource.fileVersions(folder) == 1
+                assert mountSource.versions(folder) == 1
                 assert mountSource.listDir(folder)
 
             for filePath in ['/foo/fighter/ufo']:
@@ -37,7 +37,7 @@ class TestLibarchiveMountSource:
                 assert fileInfo
                 assert not stat.S_ISDIR(fileInfo.mode)
 
-                assert mountSource.fileVersions(filePath) == 1
+                assert mountSource.versions(filePath) == 1
                 assert not mountSource.listDir(filePath)
                 with mountSource.open(mountSource.getFileInfo(filePath)) as file:
                     assert file.read() == b'iriya\n'
@@ -46,7 +46,7 @@ class TestLibarchiveMountSource:
             # will not work. This behavior may change in the future.
             for linkPath in ['/foo/jet']:
                 assert mountSource.getFileInfo(linkPath)
-                assert mountSource.fileVersions(linkPath) == 1
+                assert mountSource.versions(linkPath) == 1
                 assert not mountSource.listDir(linkPath)
                 fileInfo = mountSource.getFileInfo(linkPath)
                 assert fileInfo.linkname == 'fighter'
@@ -61,14 +61,14 @@ class TestLibarchiveMountSource:
                 fileInfo = mountSource.getFileInfo(folder)
                 assert fileInfo
                 assert stat.S_ISDIR(fileInfo.mode)
-                assert mountSource.fileVersions(folder) == 1
+                assert mountSource.versions(folder) == 1
 
             for filePath in ['/foo_fighter_ufo']:
                 fileInfo = mountSource.getFileInfo(filePath)
                 assert fileInfo
                 assert not stat.S_ISDIR(fileInfo.mode)
 
-                assert mountSource.fileVersions(filePath) == 1
+                assert mountSource.versions(filePath) == 1
                 assert not mountSource.listDir(filePath)
                 with mountSource.open(mountSource.getFileInfo(filePath)) as file:
                     assert file.read() == b'iriya\n'
@@ -91,7 +91,7 @@ class TestLibarchiveMountSource:
                 assert fileInfo
                 assert stat.S_ISDIR(fileInfo.mode)
 
-                assert mountSource.fileVersions(folder) == 1
+                assert mountSource.versions(folder) == 1
                 assert mountSource.listDir(folder)
 
             for filePath in ['/foo/fighter/ufo']:
@@ -99,7 +99,7 @@ class TestLibarchiveMountSource:
                 assert fileInfo
                 assert not stat.S_ISDIR(fileInfo.mode)
 
-                assert mountSource.fileVersions(filePath) == 1
+                assert mountSource.versions(filePath) == 1
                 assert not mountSource.listDir(filePath)
                 with mountSource.open(mountSource.getFileInfo(filePath)) as file:
                     assert file.read() == b'iriya\n'
@@ -115,7 +115,7 @@ class TestLibarchiveMountSource:
                 assert fileInfo
                 assert stat.S_ISDIR(fileInfo.mode)
 
-                assert mountSource.fileVersions(folder) == 1
+                assert mountSource.versions(folder) == 1
                 assert mountSource.listDir(folder)
 
             for filePath in ['/simple']:
@@ -123,7 +123,7 @@ class TestLibarchiveMountSource:
                 assert fileInfo
                 assert not stat.S_ISDIR(fileInfo.mode)
 
-                assert mountSource.fileVersions(filePath) == 1
+                assert mountSource.versions(filePath) == 1
                 assert not mountSource.listDir(filePath)
                 with mountSource.open(mountSource.getFileInfo(filePath)) as file:
                     assert file.read() == b'foo fighter\n'

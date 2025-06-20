@@ -21,7 +21,7 @@ class TestSQLiteIndexMountSource:
                 fileInfo = mountSource.getFileInfo(folder)
                 assert fileInfo
                 assert stat.S_ISDIR(fileInfo.mode)
-                assert mountSource.fileVersions(folder) == 1
+                assert mountSource.versions(folder) == 1
                 assert mountSource.listDir(folder)
 
             for filePath in ['/foo/fighter/ufo', '/foo/lighter.tar']:
@@ -29,7 +29,7 @@ class TestSQLiteIndexMountSource:
                 assert fileInfo
                 assert not stat.S_ISDIR(fileInfo.mode)
 
-                assert mountSource.fileVersions(filePath) == 1
+                assert mountSource.versions(filePath) == 1
                 assert not mountSource.listDir(filePath)
 
             # File contents cannot be read from a mounted index alone!

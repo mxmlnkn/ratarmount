@@ -92,9 +92,9 @@ class SQLiteIndexMountSource(MountSource):
         return self.index.listDirModeOnly(path)
 
     @overrides(MountSource)
-    def fileVersions(self, path: str) -> int:
-        fileVersions = self.index.fileVersions(path)
-        return len(fileVersions) if isinstance(fileVersions, dict) else 0
+    def versions(self, path: str) -> int:
+        versions = self.index.versions(path)
+        return len(versions) if isinstance(versions, dict) else 0
 
     @overrides(MountSource)
     def listxattr(self, fileInfo: FileInfo) -> List[str]:

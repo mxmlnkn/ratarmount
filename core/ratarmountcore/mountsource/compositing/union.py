@@ -126,7 +126,7 @@ class UnionMountSource(MountSource):
                 if isinstance(fileInfo, FileInfo):
                     fileInfo.userdata.append(mountSource)
                     return fileInfo
-                fileVersion += mountSource.fileVersions(path)
+                fileVersion += mountSource.versions(path)
                 if fileVersion > 0:
                     break
 
@@ -136,15 +136,15 @@ class UnionMountSource(MountSource):
                 if isinstance(fileInfo, FileInfo):
                     fileInfo.userdata.append(mountSource)
                     return fileInfo
-                fileVersion -= mountSource.fileVersions(path)
+                fileVersion -= mountSource.versions(path)
                 if fileVersion < 1:
                     break
 
         return None
 
     @overrides(MountSource)
-    def fileVersions(self, path: str) -> int:
-        return sum(mountSource.fileVersions(path) for mountSource in self.mountSources)
+    def versions(self, path: str) -> int:
+        return sum(mountSource.versions(path) for mountSource in self.mountSources)
 
     def _listDir(self, path: str, onlyMode: bool):
         files: Optional[Union[Set[str], Dict[str, FileInfo], Dict[str, int]]] = None

@@ -43,7 +43,7 @@ class ProgressBar
 abstract class MountSource {
     +{abstract} listDir
     +{abstract} getFileInfo
-    +{abstract} fileVersions
+    +{abstract} versions
     +{abstract} open
 }
 

@@ -95,7 +95,7 @@ class FolderMountSource(MountSource):
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         """All returned file infos contain a file path string at the back of FileInfo.userdata."""
 
-        # This is a bit of problematic design, however, the fileVersions count from 1 for the user.
+        # This is a bit of problematic design, however, the versions count from 1 for the user.
         # And as -1 means the last version, 0 should also mean the first version ...
         # Basically, I did accidentally mix user-visible versions 1+ versions with API 0+ versions,
         # leading to this problematic clash of 0 and 1.
@@ -152,7 +152,7 @@ class FolderMountSource(MountSource):
         return {os.fsdecode(dirEntry.name): makeMode(dirEntry) for dirEntry in os.scandir(realpath)}
 
     @overrides(MountSource)
-    def fileVersions(self, path: str) -> int:
+    def versions(self, path: str) -> int:
         return 1 if self.exists(path) else 0
 
     @overrides(MountSource)

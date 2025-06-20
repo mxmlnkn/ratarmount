@@ -119,7 +119,7 @@ class FATMountSource(MountSource):
         return self._convertFATDirectoryEntryToFileInfo(entry, path)
 
     @overrides(MountSource)
-    def fileVersions(self, path: str) -> int:
+    def versions(self, path: str) -> int:
         return 1
 
     @overrides(MountSource)

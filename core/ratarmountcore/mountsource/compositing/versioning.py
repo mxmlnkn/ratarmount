@@ -175,7 +175,7 @@ class FileVersionLayer(MountSource):
             return files
 
         # Print all available versions of the file at filePath as the contents of the special '.versions' folder
-        return [str(version + 1) for version in range(self.mountSource.fileVersions(path))]
+        return [str(version + 1) for version in range(self.mountSource.versions(path))]
 
     @overrides(MountSource)
     def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
@@ -227,8 +227,8 @@ class FileVersionLayer(MountSource):
         return fileInfo
 
     @overrides(MountSource)
-    def fileVersions(self, path: str) -> int:
-        return self.mountSource.fileVersions(path)
+    def versions(self, path: str) -> int:
+        return self.mountSource.versions(path)
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:

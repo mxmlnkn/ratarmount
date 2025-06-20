@@ -80,7 +80,7 @@ class MountSource(ABC):
         """
         return {}
 
-    def fileVersions(self, path: str) -> int:
+    def versions(self, path: str) -> int:
         return 1 if self.exists(path) else 0
 
     def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:

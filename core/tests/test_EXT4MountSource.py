@@ -40,7 +40,7 @@ class TestEXT4MountSource:
                 assert fileInfo
                 assert stat.S_ISDIR(fileInfo.mode)
 
-                assert mountSource.fileVersions(folder) == 1
+                assert mountSource.versions(folder) == 1
                 assert mountSource.listDir(folder)
 
             for filePath in ['/foo/fighter/ufo', '/foo/lighter.tar']:
@@ -48,7 +48,7 @@ class TestEXT4MountSource:
                 assert fileInfo
                 assert not stat.S_ISDIR(fileInfo.mode)
 
-                assert mountSource.fileVersions(filePath) == 1
+                assert mountSource.versions(filePath) == 1
                 assert not mountSource.listDir(filePath)
 
             with mountSource.open(mountSource.getFileInfo('/foo/fighter/ufo')) as file:

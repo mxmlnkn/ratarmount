@@ -132,10 +132,10 @@ class TestAutoMountLayer:
             for folder in ['/', '/nested-tar.tar.gz', '/nested-tar.tar.gz/foo', '/nested-tar.tar.gz/foo/fighter']:
                 assert recursivelyMounted.getFileInfo(folder)
                 assert recursivelyMounted.listDir(folder)
-                assert recursivelyMounted.fileVersions(folder) > 0
+                assert recursivelyMounted.versions(folder) > 0
 
             for mountedFile in ['/nested-tar.tar.gz']:
-                assert recursivelyMounted.fileVersions(folder) > 0
+                assert recursivelyMounted.versions(folder) > 0
                 assert stat.S_ISREG(recursivelyMounted.getFileInfo(mountedFile, fileVersion=1).mode)
 
             # assert recursivelyMounted.open(recursivelyMounted.getFileInfo('/ufo_00/ufo')).read() == b'iriya\n'

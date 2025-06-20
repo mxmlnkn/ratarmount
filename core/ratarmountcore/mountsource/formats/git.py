@@ -112,7 +112,7 @@ class GitMountSource(MountSource):
         return None if obj is None else self._convertToFileInfo(obj, path)
 
     @overrides(MountSource)
-    def fileVersions(self, path: str) -> int:
+    def versions(self, path: str) -> int:
         return 1
 
     @overrides(MountSource)

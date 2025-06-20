@@ -286,7 +286,7 @@ class FSSpecMountSource(MountSource):
         return FSSpecMountSource._convertToFileInfo(self.fileSystem.info(path), path)
 
     @overrides(MountSource)
-    def fileVersions(self, path: str) -> int:
+    def versions(self, path: str) -> int:
         return 1
 
     @overrides(MountSource)

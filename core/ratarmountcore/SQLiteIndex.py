@@ -962,7 +962,7 @@ class SQLiteIndex:
         directory.pop('', None)
         return directory if gotResults else None
 
-    def fileVersions(self, path: str) -> Dict[str, FileInfo]:
+    def versions(self, path: str) -> Dict[str, FileInfo]:
         """
         Return metadata for all versions of a file possibly appearing more than once
         in the index as a directory dictionary or an empty dictionary if the path does not exist.

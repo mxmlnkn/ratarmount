@@ -197,7 +197,7 @@ class RarMountSource(MountSource):
         return infos[fileVersion] if -len(infos) <= fileVersion < len(infos) else None
 
     @overrides(MountSource)
-    def fileVersions(self, path: str) -> int:
+    def versions(self, path: str) -> int:
         return len(self._getFileInfos(path))
 
     @overrides(MountSource)

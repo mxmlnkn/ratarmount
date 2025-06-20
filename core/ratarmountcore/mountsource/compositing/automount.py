@@ -242,14 +242,14 @@ class AutoMountLayer(MountSource):
 
         originalFileVersions = 0
         if mountPoint != '/' and pathInMountPoint == '/':
-            originalFileVersions = self.mounted['/'].mountSource.fileVersions(path)
+            originalFileVersions = self.mounted['/'].mountSource.versions(path)
 
         def normalizeFileVersion(version, versions):
             return ((version - 1) % versions + 1) % versions if versions > 1 else version
 
         # fileVersion=0 is the most recent. Version 1..fileVersions number from the first occurrence / oldest
         # version to the most recent, i.e., fileVersion = 0 is equivalent to fileVersion = fileVersions.
-        fileVersions = self.fileVersions(path)
+        fileVersions = self.versions(path)
         fileVersion = normalizeFileVersion(fileVersion, fileVersions)
         if fileVersion == 0 and pathInMountPoint == '/':
             return mountInfo.rootFileInfo.clone()
@@ -310,11 +310,11 @@ class AutoMountLayer(MountSource):
         )
 
     @overrides(MountSource)
-    def fileVersions(self, path: str) -> int:
+    def versions(self, path: str) -> int:
         mountPoint, pathInMountPoint = self._findMounted(path)
-        fileVersions = self.mounted[mountPoint].mountSource.fileVersions(pathInMountPoint)
+        fileVersions = self.mounted[mountPoint].mountSource.versions(pathInMountPoint)
         if mountPoint != '/' and pathInMountPoint == '/':
-            fileVersions += self.mounted['/'].mountSource.fileVersions(path)
+            fileVersions += self.mounted['/'].mountSource.versions(path)
         return fileVersions
 
     @overrides(MountSource)
