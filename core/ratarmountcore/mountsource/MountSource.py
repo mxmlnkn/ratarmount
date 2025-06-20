@@ -96,7 +96,7 @@ class MountSource(ABC):
         Meaning, all interface methods should return the same results given the same arguments at any time.
         """
 
-    def getMountSource(self, fileInfo: FileInfo):
+    def get_mount_source(self, fileInfo: FileInfo):
         """
         Returns the direct mount source to which the fileInfo belongs, a mount source specific file info,
         and the mount point of the returned mount source in respect to this (self) MountSource.

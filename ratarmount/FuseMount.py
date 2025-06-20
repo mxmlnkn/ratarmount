@@ -277,7 +277,7 @@ class FuseMount(fuse.Operations):
 
         # Request exact metadata from write overlay, e.g., if the actual file in the folder
         # does not support permission changes
-        result = self.mountSource.getMountSource(fileInfo)
+        result = self.mountSource.get_mount_source(fileInfo)
         subMountPoint = result[0]
         # TODO Note that if the path contains special .version versioning, then it will most likely fail
         #      to find the path in the write overlay, which is problematic for things like foo.versions/0.

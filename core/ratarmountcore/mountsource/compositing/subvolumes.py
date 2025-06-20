@@ -119,7 +119,7 @@ class SubvolumesMountSource(MountSource):
             fileInfo.userdata.append(subvolume)
 
     @overrides(MountSource)
-    def getMountSource(self, fileInfo: FileInfo) -> Tuple[str, MountSource, FileInfo]:
+    def get_mount_source(self, fileInfo: FileInfo) -> Tuple[str, MountSource, FileInfo]:
         sourceFileInfo = fileInfo.clone()
         subvolume = sourceFileInfo.userdata.pop()
 
@@ -127,7 +127,7 @@ class SubvolumesMountSource(MountSource):
             return '/', self, fileInfo
         mountSource = self.mountSources[subvolume]
 
-        subpath, subMountSource, subFileInfo = mountSource.getMountSource(sourceFileInfo)
+        subpath, subMountSource, subFileInfo = mountSource.get_mount_source(sourceFileInfo)
         return subvolume + '/' + subpath, subMountSource, subFileInfo
 
     @overrides(MountSource)

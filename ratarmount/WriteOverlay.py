@@ -60,7 +60,7 @@ class WritableFolderMountSource(fuse.Operations):
         # Check that the mount source contains this overlay folder with top priority
         databaseFileInfo = self.mountSource.getFileInfo('/' + self.hiddenDatabaseName)
         assert databaseFileInfo is not None
-        path, databaseMountSource, fileInfo = self.mountSource.getMountSource(databaseFileInfo)
+        path, databaseMountSource, fileInfo = self.mountSource.get_mount_source(databaseFileInfo)
         assert stat.S_ISREG(fileInfo.mode)
         assert isinstance(databaseMountSource, FolderMountSource)
         assert databaseMountSource.root == self.root
@@ -204,7 +204,7 @@ class WritableFolderMountSource(fuse.Operations):
             raise fuse.FuseOSError(errno.ENOENT)
 
         # Initialize new metadata entry from existing file
-        sfi = self.mountSource.getMountSource(sourceFileInfo)[2]
+        sfi = self.mountSource.get_mount_source(sourceFileInfo)[2]
         folder, name = self._splitPath(path)
 
         self.sqlConnection.execute(

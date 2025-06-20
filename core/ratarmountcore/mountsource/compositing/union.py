@@ -222,7 +222,7 @@ class UnionMountSource(MountSource):
             fileInfo.userdata.append(mountSource)
 
     @overrides(MountSource)
-    def getMountSource(self, fileInfo: FileInfo) -> Tuple[str, MountSource, FileInfo]:
+    def get_mount_source(self, fileInfo: FileInfo) -> Tuple[str, MountSource, FileInfo]:
         sourceFileInfo = fileInfo.clone()
         mountSource = sourceFileInfo.userdata.pop()
 
@@ -230,8 +230,8 @@ class UnionMountSource(MountSource):
             return '/', self, fileInfo
 
         # Because all mount sources are mounted at '/', we do not have to append
-        # the mount point path returned by getMountSource to the mount point '/'.
-        return mountSource.getMountSource(sourceFileInfo)
+        # the mount point path returned by get_mount_source to the mount point '/'.
+        return mountSource.get_mount_source(sourceFileInfo)
 
     @overrides(MountSource)
     def statfs(self) -> Dict[str, Any]:

@@ -146,7 +146,7 @@ class AutoMountLayer(MountSource):
             return None
 
         # Do not mount uncompressed TARs inside SQLiteIndexedTar when they already were mounted recursively!
-        mountSourceResult = parentMountSource.getMountSource(archiveFileInfo)
+        mountSourceResult = parentMountSource.get_mount_source(archiveFileInfo)
         if mountSourceResult:
             realMountSource = mountSourceResult[1]
             if (
@@ -164,7 +164,7 @@ class AutoMountLayer(MountSource):
             options = self.options.copy()
             options['recursionDepth'] = max(0, self.maxRecursionDepth - recursionDepth)
 
-            _, deepestMountSource, deepestFileInfo = parentMountSource.getMountSource(archiveFileInfo)
+            _, deepestMountSource, deepestFileInfo = parentMountSource.get_mount_source(archiveFileInfo)
             if isinstance(deepestMountSource, FolderMountSource):
                 # Open from file path on host file system in order to write out TAR index files.
                 # Care has to be taken if a folder is bind mounted onto itself because then it can happen that
@@ -319,12 +319,12 @@ class AutoMountLayer(MountSource):
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
-        _, mountSource, sourceFileInfo = self.getMountSource(fileInfo)
+        _, mountSource, sourceFileInfo = self.get_mount_source(fileInfo)
         return mountSource.open(sourceFileInfo, buffering=buffering)
 
     @overrides(MountSource)
     def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
-        _, mountSource, sourceFileInfo = self.getMountSource(fileInfo)
+        _, mountSource, sourceFileInfo = self.get_mount_source(fileInfo)
         return mountSource.read(sourceFileInfo, size, offset)
 
     @overrides(MountSource)
@@ -334,7 +334,7 @@ class AutoMountLayer(MountSource):
         if fileInfo == self.mounted[mountPoint].rootFileInfo:
             return []
 
-        _, mountSource, sourceFileInfo = self.getMountSource(fileInfo)
+        _, mountSource, sourceFileInfo = self.get_mount_source(fileInfo)
         return mountSource.listxattr(sourceFileInfo)
 
     @overrides(MountSource)
@@ -344,11 +344,11 @@ class AutoMountLayer(MountSource):
         if fileInfo == self.mounted[mountPoint].rootFileInfo:
             return None
 
-        _, mountSource, sourceFileInfo = self.getMountSource(fileInfo)
+        _, mountSource, sourceFileInfo = self.get_mount_source(fileInfo)
         return mountSource.getxattr(sourceFileInfo, key)
 
     @overrides(MountSource)
-    def getMountSource(self, fileInfo: FileInfo) -> Tuple[str, MountSource, FileInfo]:
+    def get_mount_source(self, fileInfo: FileInfo) -> Tuple[str, MountSource, FileInfo]:
         mountPoint = fileInfo.userdata[-1]
         assert isinstance(mountPoint, str)
         mountSource = self.mounted[mountPoint].mountSource
@@ -356,7 +356,7 @@ class AutoMountLayer(MountSource):
         sourceFileInfo = fileInfo.clone()
         sourceFileInfo.userdata.pop()
 
-        deeperMountPoint, deeperMountSource, deeperFileInfo = mountSource.getMountSource(sourceFileInfo)
+        deeperMountPoint, deeperMountSource, deeperFileInfo = mountSource.get_mount_source(sourceFileInfo)
         return os.path.join(mountPoint, deeperMountPoint.lstrip('/')), deeperMountSource, deeperFileInfo
 
     @overrides(MountSource)

@@ -111,7 +111,7 @@ class FileVersionLayer(MountSource):
             # Link targets are relative to the mount source. That's why we need the mount point to get the full path
             # in respect to this mount source. And we must a file info object for this mount source, so we have to
             # get that using the full path instead of calling getFileInfo on the deepest mount source.
-            mountPoint, _, _ = mountSource.getMountSource(fileInfo)
+            mountPoint, _, _ = mountSource.get_mount_source(fileInfo)
 
             resolvedPath = os.path.join(mountPoint, resolvedPath.lstrip('/'))
 
@@ -251,12 +251,12 @@ class FileVersionLayer(MountSource):
             fileInfo.userdata.append(fileType)
 
     @overrides(MountSource)
-    def getMountSource(self, fileInfo: FileInfo) -> Tuple[str, MountSource, FileInfo]:
+    def get_mount_source(self, fileInfo: FileInfo) -> Tuple[str, MountSource, FileInfo]:
         fileType = fileInfo.userdata.pop()
         try:
             if fileType == FileType.VERSIONS_FOLDER:
                 return '/', self, fileInfo
-            return self.mountSource.getMountSource(fileInfo)
+            return self.mountSource.get_mount_source(fileInfo)
         finally:
             fileInfo.userdata.append(fileType)
 
