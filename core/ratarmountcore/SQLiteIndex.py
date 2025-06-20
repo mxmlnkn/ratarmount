@@ -45,7 +45,7 @@ def getSqliteTables(connection: sqlite3.Connection):
     return [x[0] for x in connection.execute('SELECT name FROM sqlite_master WHERE type="table" OR type="view"')]
 
 
-def _toVersionTuple(version: str) -> Optional[Tuple[int, int, int]]:
+def _to_version_tuple(version: str) -> Optional[Tuple[int, int, int]]:
     versionNumbers = [re.sub('[^0-9]', '', x) for x in version.split('.')]
     if len(versionNumbers) == 3:
         return (int(versionNumbers[0]), int(versionNumbers[1]), int(versionNumbers[2]))
@@ -123,11 +123,11 @@ class SQLiteIndex:
     #   - Add 'isgenerated' and 'recursiondepth' columns.
     #     From what I can gather, the SQLite index is used in such a way that adding columns does not break anything.
     #     All SELECT statements either explicitly specify columns, or access columns via row[index] or row[columnName],
-    #     e.g., in _rowToFileInfo and SQLiteIndexedTar._checkRowsValidity.
+    #     e.g., in _row_to_file_info and SQLiteIndexedTar._check_rows_validity.
     #     I have also checked for all users of SQLiteIndex: TAR, ZIP, SquashFS, libarchive.
     #     I created the index with the new version and accessed it with an old ratarmount version to test compatibility.
     #     Libarchive (currently) only creates SQLite indexes in memory, ergo has no compatibility issues!
-    #     Unfortunately, the _checkRowsValidity will fail because the loaded vs. generated tuple lengths will differ!
+    #     Unfortunately, the _check_rows_validity will fail because the loaded vs. generated tuple lengths will differ!
     #     This is only called when 'backendName' does not exist, i.e., for indexes with version < 0.5.0 and when
     #     the TAR was detected as having been appended to. So, it's probably negligible. Honestly, who even uses
     #     an older ratarmount version with a newer index. Probably only if the index was distributed somewhere, i.e.,
@@ -390,24 +390,24 @@ class SQLiteIndex:
     def openExisting(self, checkMetadata: Optional[Callable[[Dict[str, Any]], None]] = None, readOnly: bool = False):
         """Tries to find an already existing index."""
         for indexPath in self.possibleIndexFilePaths:
-            if self._tryLoadIndex(indexPath, checkMetadata=checkMetadata, readOnly=readOnly):
+            if self._try_load_index(indexPath, checkMetadata=checkMetadata, readOnly=readOnly):
                 break
 
     def openInMemory(self):
-        self.indexFilePath, self.sqlConnection = SQLiteIndex._openPath(':memory:')
+        self.indexFilePath, self.sqlConnection = SQLiteIndex._open_path(':memory:')
 
     def openWritable(self):
         if self.possibleIndexFilePaths and not self.preferMemory:
             for indexPath in self.possibleIndexFilePaths:
-                if SQLiteIndex._pathIsWritable(
+                if SQLiteIndex._path_is_writable(
                     indexPath, printDebug=self.printDebug
-                ) and SQLiteIndex._pathCanBeUsedForSqlite(indexPath, printDebug=self.printDebug):
-                    self.indexFilePath, self.sqlConnection = SQLiteIndex._openPath(indexPath)
+                ) and SQLiteIndex._path_can_be_used_for_sqlite(indexPath, printDebug=self.printDebug):
+                    self.indexFilePath, self.sqlConnection = SQLiteIndex._open_path(indexPath)
                     break
         else:
             if self.printDebug >= 3 and self.preferMemory:
                 print("[Info] Create new index in memory because memory is to be preferred, e.g., for small archives.")
-            self.indexFilePath, self.sqlConnection = SQLiteIndex._openPath(':memory:')
+            self.indexFilePath, self.sqlConnection = SQLiteIndex._open_path(':memory:')
 
         if not self.indexIsLoaded():
             raise InvalidIndexError(
@@ -438,14 +438,14 @@ class SQLiteIndex:
                 pass
             self.sqlConnection = None
 
-        self._setIndexFilePath(None)
+        self._set_index_file_path(None)
 
     def getConnection(self) -> sqlite3.Connection:
         if self.sqlConnection:
             return self.sqlConnection
         raise IndexNotOpenError("This method can not be called without an opened index database!")
 
-    def _storeVersionsMetadata(self) -> None:
+    def _store_versions_metadata(self) -> None:
         connection = self.getConnection()
 
         try:
@@ -494,7 +494,7 @@ class SQLiteIndex:
             if self.printDebug >= 3:
                 traceback.print_exc()
 
-    def _storeFileMetadata(self, filePath: AnyStr) -> None:
+    def _store_file_metadata(self, filePath: AnyStr) -> None:
         """Adds some consistency meta information to recognize the need to update the cached TAR index"""
         try:
             tarStats = os.stat(filePath)
@@ -525,10 +525,10 @@ class SQLiteIndex:
         connection.commit()
 
     def storeMetadata(self, metadata: AnyStr, filePath: Optional[AnyStr] = None) -> None:
-        self._storeVersionsMetadata()
+        self._store_versions_metadata()
         self.storeMetadataKeyValue('backendName', self.backendName)
         if filePath:
-            self._storeFileMetadata(filePath)
+            self._store_file_metadata(filePath)
         self.storeMetadataKeyValue('arguments', metadata)
         self.storeMetadataKeyValue('backendName', self.backendName)
 
@@ -638,7 +638,7 @@ class SQLiteIndex:
         return self.getConnection().execute("""SELECT version FROM versions WHERE name == 'index';""").fetchone()[0]
 
     @staticmethod
-    def _pathIsWritable(path: str, printDebug: int = 0) -> bool:
+    def _path_is_writable(path: str, printDebug: int = 0) -> bool:
         # Writing indexes to remote filesystems currently not supported and we need to take care that URLs
         # are not interpreted as local file paths, i.e., creating an ftp: folder with a user:password@host subfolder.
         if '://' in path:
@@ -667,8 +667,8 @@ class SQLiteIndex:
         return False
 
     @staticmethod
-    def _pathCanBeUsedForSqlite(path: str, printDebug: int = 0) -> bool:
-        if not SQLiteIndex._pathIsWritable(path, printDebug):
+    def _path_can_be_used_for_sqlite(path: str, printDebug: int = 0) -> bool:
+        if not SQLiteIndex._path_is_writable(path, printDebug):
             return False
 
         fileExisted = os.path.isfile(path)
@@ -677,7 +677,7 @@ class SQLiteIndex:
             if folder:
                 os.makedirs(folder, exist_ok=True)
 
-            connection = SQLiteIndex._openSqlDb(path)
+            connection = SQLiteIndex._open_sql_db(path)
             connection.executescript('CREATE TABLE "files" ( "path" VARCHAR(65535) NOT NULL );')
             connection.commit()
             connection.close()
@@ -688,12 +688,12 @@ class SQLiteIndex:
                 print("Could not create SQLite database at:", path)
         finally:
             if not fileExisted and os.path.isfile(path):
-                SQLiteIndex._uncheckedRemove(path)
+                SQLiteIndex._unchecked_remove(path)
 
         return False
 
     @staticmethod
-    def _uncheckedRemove(path: Optional[AnyStr]):
+    def _unchecked_remove(path: Optional[AnyStr]):
         """
         Often cleanup is good manners but it would only be obnoxious if ratarmount crashed on unnecessary cleanup.
         """
@@ -706,7 +706,7 @@ class SQLiteIndex:
             print("[Warning] Could not remove:", path)
 
     @staticmethod
-    def _openSqlDb(path: AnyStr, **kwargs) -> sqlite3.Connection:
+    def _open_sql_db(path: AnyStr, **kwargs) -> sqlite3.Connection:
         # Even when given a relative path, sqlite3.connect seems to access the path absolute instead of from the
         # current working directory! This will lead to hangs for self-bind mounts because of a recursive FUSE call.
         # I don't know how to circumvent this here. The caller must ensure that the possible index file paths
@@ -727,13 +727,13 @@ class SQLiteIndex:
         return sqlConnection
 
     @staticmethod
-    def _openPath(indexFilePath: Optional[str], printDebug: int = 0) -> Tuple[str, sqlite3.Connection]:
+    def _open_path(indexFilePath: Optional[str], printDebug: int = 0) -> Tuple[str, sqlite3.Connection]:
         indexFilePath = indexFilePath or ':memory:'
 
         if printDebug >= 1:
             print("Creating new SQLite index database at", indexFilePath)
 
-        sqlConnection = SQLiteIndex._openSqlDb(indexFilePath)
+        sqlConnection = SQLiteIndex._open_sql_db(indexFilePath)
         tables = getSqliteTables(sqlConnection)
         if {"files", "filestmp", "parentfolders"}.intersection(tables):
             raise InvalidIndexError(
@@ -753,9 +753,9 @@ class SQLiteIndex:
 
         uriPath = urllib.parse.quote(self.indexFilePath)
         # check_same_thread=False can be used because it is read-only anyway and it allows to enable FUSE multithreading
-        self.sqlConnection = SQLiteIndex._openSqlDb(f"file:{uriPath}?mode=ro", uri=True, check_same_thread=False)
+        self.sqlConnection = SQLiteIndex._open_sql_db(f"file:{uriPath}?mode=ro", uri=True, check_same_thread=False)
 
-    def _reloadIndexOnDisk(self):
+    def _reload_index_on_disk(self):
         if self.printDebug >= 2:
             print("[Info] Try to reopen SQLite database on disk at:", self.indexFilePath)
             print("other index paths:", self.possibleIndexFilePaths)
@@ -830,7 +830,7 @@ class SQLiteIndex:
         return self.getConnection().execute('SELECT COUNT(*) FROM "files";').fetchone()[0]
 
     @staticmethod
-    def _rowToFileInfo(row: Dict[str, Any]) -> FileInfo:
+    def _row_to_file_info(row: Dict[str, Any]) -> FileInfo:
         # fmt: off
         userData = SQLiteIndexedTarUserData(
             offset         = row['offset'],
@@ -862,7 +862,7 @@ class SQLiteIndex:
         return '/' + os.path.normpath('/' + path).lstrip('/')
 
     @staticmethod
-    def _queryNormpath(path: str):
+    def _query_normpath(path: str):
         # os.path.normpath also collapses /../ into / and, because we prepend /, ../ gets collapsed to /.
         # This effect is good to have for inserting rows but not for querying rows.
         return '/' + os.path.normpath(path if path.startswith('../') else '/' + path).lstrip('/')
@@ -937,7 +937,7 @@ class SQLiteIndex:
         directory: Dict[str, FileInfo] = dict(
             self.getConnection().execute(
                 'SELECT ' + ','.join(selected_columns) + ' FROM "files" WHERE "path" == (?) ORDER BY "offsetheader"',
-                (self._queryNormpath(path).rstrip('/'),),
+                (self._query_normpath(path).rstrip('/'),),
             )
         )
         self.getConnection().row_factory = oldRowFactory
@@ -960,7 +960,7 @@ class SQLiteIndex:
         self.getConnection().row_factory = None
         rows = self.getConnection().execute(
             'SELECT name,mode FROM "files" WHERE "path" == (?) ORDER BY "offsetheader"',
-            (self._queryNormpath(path).rstrip('/'),),
+            (self._query_normpath(path).rstrip('/'),),
         )
         self.getConnection().row_factory = oldRowFactory
 
@@ -980,11 +980,11 @@ class SQLiteIndex:
         if path == '/':
             return {'/': createRootFileInfo(userdata=[SQLiteIndexedTarUserData(0, 0, False, False, True, 0)])}
 
-        path, name = self._queryNormpath(path).rsplit('/', 1)
+        path, name = self._query_normpath(path).rsplit('/', 1)
         rows = self.getConnection().execute(
             'SELECT * FROM "files" WHERE "path" == (?) AND "name" == (?) ORDER BY "offsetheader" ASC', (path, name)
         )
-        return {str(version + 1): self._rowToFileInfo(row) for version, row in enumerate(rows)}
+        return {str(version + 1): self._row_to_file_info(row) for version, row in enumerate(rows)}
 
     def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         """
@@ -1002,7 +1002,7 @@ class SQLiteIndex:
         if path == '/':
             return createRootFileInfo(userdata=[SQLiteIndexedTarUserData(0, 0, False, False, True, 0)])
 
-        path, name = self._queryNormpath(path).rsplit('/', 1)
+        path, name = self._query_normpath(path).rsplit('/', 1)
         row = (
             self.getConnection()
             .execute(
@@ -1016,7 +1016,7 @@ class SQLiteIndex:
             )
             .fetchone()
         )
-        return self._rowToFileInfo(row) if row else None
+        return self._row_to_file_info(row) if row else None
 
     def setxattrs(self, rows: List[Tuple[int, str, bytes]]):
         self.getConnection().executemany('INSERT OR REPLACE INTO "xattrs" VALUES (?,?,?)', rows)
@@ -1065,7 +1065,7 @@ class SQLiteIndex:
             pass
         return None
 
-    def _tryAddParentFolders(self, path: str, offsetheader: int, offset: int) -> None:
+    def _try_add_parent_folders(self, path: str, offsetheader: int, offset: int) -> None:
         # Add parent folders if they do not exist.
         # E.g.: path = '/a/b/c' -> paths = [('', 'a'), ('/a', 'b'), ('/a/b', 'c')]
         # Without the parentFolderCache, the additional INSERT statements increase the creation time
@@ -1123,7 +1123,7 @@ class SQLiteIndex:
                     "for metadata held in memory. Will try to reopen the database on disk."
                 )
             self.preferMemory = False
-            self._reloadIndexOnDisk()
+            self._reload_index_on_disk()
 
         try:
             self.getConnection().executemany(
@@ -1136,10 +1136,10 @@ class SQLiteIndex:
             return
 
         for row in rows:
-            self._tryAddParentFolders(row[0], row[2], row[3])
+            self._try_add_parent_folders(row[0], row[2], row[3])
 
     @staticmethod
-    def _escapeInvalidCharacters(toEscape: str, encoding: str):
+    def _escape_invalid_characters(toEscape: str, encoding: str):
         try:
             toEscape.encode()
             return toEscape
@@ -1162,7 +1162,7 @@ class SQLiteIndex:
             checkedRow = []
             for x in list(row):  # check strings
                 if isinstance(x, str):
-                    checkedRow += [self._escapeInvalidCharacters(x, self.encoding)]
+                    checkedRow += [self._escape_invalid_characters(x, self.encoding)]
                 else:
                     checkedRow += [x]
 
@@ -1172,10 +1172,10 @@ class SQLiteIndex:
             print("[Warning] The escaped inserted row is now:", row)
             print()
 
-            self._tryAddParentFolders(self._escapeInvalidCharacters(row[0], self.encoding), row[2], row[3])
+            self._try_add_parent_folders(self._escape_invalid_characters(row[0], self.encoding), row[2], row[3])
             return
 
-        self._tryAddParentFolders(row[0], row[2], row[3])
+        self._try_add_parent_folders(row[0], row[2], row[3])
 
     def indexIsLoaded(self) -> bool:
         """Returns true if the SQLite database has been opened for reading and a "files" table exists."""
@@ -1190,7 +1190,7 @@ class SQLiteIndex:
 
         return True
 
-    def _setIndexFilePath(self, indexFilePath: Optional[str], deleteOnClose: bool = False):
+    def _set_index_file_path(self, indexFilePath: Optional[str], deleteOnClose: bool = False):
         # This is called from __del__, so we need to account for this being called when something
         # in the constructor raises an exception and not all members of self exist.
         if (
@@ -1214,7 +1214,7 @@ class SQLiteIndex:
             self.indexFilePath = indexFilePath
             self.indexFilePathDeleteOnClose = deleteOnClose
 
-    def _loadIndex(
+    def _load_index(
         self, indexFilePath: str, checkMetadata: Optional[Callable[[Dict[str, Any]], None]], readOnly: bool = False
     ) -> None:
         """
@@ -1239,7 +1239,7 @@ class SQLiteIndex:
 
         temporaryFolder = os.environ.get("RATARMOUNT_INDEX_TMPDIR", None)
 
-        def _undoCompression(file):
+        def _undo_compression(file):
             compression = detectCompression(file, printDebug=self.printDebug)
             if not compression or not any(
                 (compression in backend.formats) for backend in COMPRESSION_BACKENDS.values()
@@ -1264,7 +1264,7 @@ class SQLiteIndex:
 
             return backend.open(file)
 
-        def _copyToTemp(file):
+        def _copy_to_temp(file):
             self._temporaryIndexFile = tempfile.NamedTemporaryFile(suffix=".tmp.sqlite.index", dir=temporaryFolder)
             # TODO add progress bar / output?
             with open(self._temporaryIndexFile.name, 'wb') as targetFile:
@@ -1278,18 +1278,18 @@ class SQLiteIndex:
                 )
 
             with fsspec.open(indexFilePath) as file:
-                decompressedFile = _undoCompression(file)
+                decompressedFile = _undo_compression(file)
                 with decompressedFile or file as fileToCopy:
-                    _copyToTemp(fileToCopy)
+                    _copy_to_temp(fileToCopy)
         else:
             if not os.path.isfile(indexFilePath):
                 return
 
             with open(indexFilePath, 'rb') as file:
-                decompressedFile = _undoCompression(file)
+                decompressedFile = _undo_compression(file)
                 if decompressedFile:
                     with decompressedFile:
-                        _copyToTemp(decompressedFile)
+                        _copy_to_temp(decompressedFile)
                 else:
                     temporaryIndexFilePath = indexFilePath
 
@@ -1300,9 +1300,9 @@ class SQLiteIndex:
         if readOnly:
             uriPath = urllib.parse.quote(temporaryIndexFilePath)
             # check_same_thread=False can be used because it is read-only and it allows to enable FUSE multithreading
-            self.sqlConnection = SQLiteIndex._openSqlDb(f"file:{uriPath}?mode=ro", uri=True, check_same_thread=False)
+            self.sqlConnection = SQLiteIndex._open_sql_db(f"file:{uriPath}?mode=ro", uri=True, check_same_thread=False)
         else:
-            self.sqlConnection = SQLiteIndex._openSqlDb(temporaryIndexFilePath)
+            self.sqlConnection = SQLiteIndex._open_sql_db(temporaryIndexFilePath)
         tables = getSqliteTables(self.sqlConnection)
         versions = None
         try:
@@ -1362,8 +1362,8 @@ class SQLiteIndex:
                 ).fetchone()
 
                 if indexVersion:
-                    indexVersionTuple = _toVersionTuple(indexVersion)
-                    indexAPIVersionTuple = _toVersionTuple(SQLiteIndex.__version__)
+                    indexVersionTuple = _to_version_tuple(indexVersion)
+                    indexAPIVersionTuple = _to_version_tuple(SQLiteIndex.__version__)
                     if indexVersionTuple and indexAPIVersionTuple and indexVersionTuple > indexAPIVersionTuple:
                         print("[Warning] The loaded index was created with a newer version of ratarmount.")
                         print("[Warning] If there are any problems, please update ratarmount or recreate the index")
@@ -1377,9 +1377,9 @@ class SQLiteIndex:
                 message += " temporarily downloaded/decompressed into: " + str(temporaryIndexFilePath)
             print(message)
 
-        self._setIndexFilePath(temporaryIndexFilePath)
+        self._set_index_file_path(temporaryIndexFilePath)
 
-    def _tryLoadIndex(
+    def _try_load_index(
         self,
         indexFilePath: str,
         checkMetadata: Optional[Callable[[Dict[str, Any]], None]] = None,
@@ -1391,7 +1391,7 @@ class SQLiteIndex:
             return True
 
         try:
-            self._loadIndex(indexFilePath, checkMetadata=checkMetadata, readOnly=readOnly)
+            self._load_index(indexFilePath, checkMetadata=checkMetadata, readOnly=readOnly)
         except MismatchingIndexError as e:
             raise e
         except Exception as exception:
@@ -1439,7 +1439,7 @@ class SQLiteIndex:
                     f"({self.indexMinimumFileCount}) might not be exceeded ({self._insertedRowCount}) because "
                     f"the archive is compressed."
                 )
-            self._reloadIndexOnDisk()
+            self._reload_index_on_disk()
 
         if not self.indexFilePath or self.indexFilePath == ':memory:':
             if self.printDebug >= 2:
@@ -1499,7 +1499,7 @@ class SQLiteIndex:
             tables = getSqliteTables(db)
 
             if 'gzipindex' in tables or 'gzipindexes' in tables:
-                if self._loadGzipIndex(fileObject, 'gzipindexes' if 'gzipindexes' in tables else 'gzipindex'):
+                if self._load_gzip_index(fileObject, 'gzipindexes' if 'gzipindexes' in tables else 'gzipindex'):
                     return
 
                 if self.printDebug >= 2:
@@ -1508,7 +1508,7 @@ class SQLiteIndex:
                 if self.printDebug >= 2:
                     print("[Info] The index does not yet contain gzip block offset data. Will write it out.")
 
-            self._storeGzipIndex(fileObject)
+            self._store_gzip_index(fileObject)
             return
 
         # Note that for xz seeking, loading and storing block indexes is unnecessary because it has an index included!
@@ -1519,7 +1519,7 @@ class SQLiteIndex:
             f"Could not load or store block offsets for {compression} probably because adding support was forgotten!"
         )
 
-    def _loadGzipIndex(self, fileObject: IO[bytes], table: str) -> bool:
+    def _load_gzip_index(self, fileObject: IO[bytes], table: str) -> bool:
         importIndex = getattr(fileObject, 'import_index', None)
         if not importIndex:
             return False
@@ -1567,7 +1567,7 @@ class SQLiteIndex:
 
         return False
 
-    def _storeGzipIndex(self, fileObject: IO[bytes]):
+    def _store_gzip_index(self, fileObject: IO[bytes]):
         exportIndex = getattr(fileObject, 'export_index', None)
         if not exportIndex:
             print("[Warning] The given file object misses the expected methods for getting/setting")

@@ -65,7 +65,7 @@ except ImportError:
     FixedDropboxDriveFileSystem = None  # type: ignore
 
 
-def _openGitMountSource(url: str) -> Union[MountSource, IO[bytes], str]:
+def _open_git_mount_source(url: str) -> Union[MountSource, IO[bytes], str]:
     splitURI = url.split('://', 1)
     if len(splitURI) <= 1 or splitURI[0] != 'git':
         raise RatarmountError("Expected URL starting with git://")
@@ -101,7 +101,7 @@ def _openGitMountSource(url: str) -> Union[MountSource, IO[bytes], str]:
     return mountSource
 
 
-def _openSSHFSMountSource(url: str) -> Union[MountSource, IO[bytes], str]:
+def _open_sshfs_mount_source(url: str) -> Union[MountSource, IO[bytes], str]:
     if FixedSSHFileSystem is None:
         raise RatarmountError("Cannot open with sshfs module because it seems to not be installed!")
 
@@ -137,10 +137,10 @@ def tryOpenURL(url, printDebug: int) -> Union[MountSource, IO[bytes], str]:
         return splitURI[1]
 
     if protocol == 'git':
-        return _openGitMountSource(url)
+        return _open_git_mount_source(url)
 
     if FixedSSHFileSystem is not None and protocol in FixedSSHFileSystem.protocols:
-        return _openSSHFSMountSource(url)
+        return _open_sshfs_mount_source(url)
 
     if not fsspec:
         raise RatarmountError(
@@ -256,7 +256,7 @@ def tryOpenURL(url, printDebug: int) -> Union[MountSource, IO[bytes], str]:
     return result
 
 
-def _matchesExtension(fileName: str, formats: Iterable[FileFormatID]) -> bool:
+def _matches_extension(fileName: str, formats: Iterable[FileFormatID]) -> bool:
     return any(
         fileName.lower().endswith('.' + extension.lower())
         for formatId in formats
@@ -265,10 +265,10 @@ def _matchesExtension(fileName: str, formats: Iterable[FileFormatID]) -> bool:
 
 
 def findBackendsByExtension(fileName: str) -> List[str]:
-    return [backend for backend, info in ARCHIVE_BACKENDS.items() if _matchesExtension(fileName, info.formats)] + [
+    return [backend for backend, info in ARCHIVE_BACKENDS.items() if _matches_extension(fileName, info.formats)] + [
         info.delegatedArchiveBackend
         for _, info in COMPRESSION_BACKENDS.items()
-        if _matchesExtension(fileName, info.formats)
+        if _matches_extension(fileName, info.formats)
     ]
 
 

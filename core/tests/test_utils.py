@@ -21,7 +21,7 @@ from ratarmountcore.utils import (  # noqa: E402
 )
 
 
-def test_ceilDiv():
+def test_ceil_div():
     assert ceilDiv(0, 1) == 0
     assert ceilDiv(0, 1000) == 0
     assert ceilDiv(0, -1000) == 0
@@ -125,7 +125,7 @@ def test_LRUCache():
     assert not cache.keys()
 
 
-def test_isLatinAlpha():
+def test_is_latin_alpha():
     assert ALPHA == 'abcdefghijklmnopqrstuvwxyz'
     assert isLatinAlpha(ALPHA)
 
@@ -146,7 +146,7 @@ def test_isLatinAlpha():
     assert not isLatinAlpha("𝒻")
 
 
-def test_isLatinDigit():
+def test_is_latin_digit():
     assert DIGITS == '0123456789'
     assert isLatinDigit(DIGITS)
 
@@ -166,7 +166,7 @@ def test_isLatinDigit():
     assert not isLatinDigit("߂")
 
 
-def test_isLatinHexAlpha():
+def test_is_latin_hex_alpha():
     assert HEX == '0123456789abcdef'
     assert isLatinHexAlpha(HEX)
 
@@ -188,7 +188,7 @@ def test_isLatinHexAlpha():
     assert not isLatinHexAlpha("߂")
 
 
-def test_formatNumber():
+def test_format_number():
     assert formatNumber(0, ALPHA) == 'a'
     assert formatNumber(1, ALPHA) == 'b'
     assert formatNumber(25, ALPHA) == 'z'
@@ -224,7 +224,7 @@ def test_formatNumber():
     assert formatNumber(357641610, DIGITS) == '357641610'
 
 
-def test_isRandom():
+def test_is_random():
     data = os.urandom(1 << 20)
     for size in [1024, 1280, 2048, 3333, 4096, len(data) // 100, len(data) // 10, len(data) // 2, len(data)]:
         assert isRandom(data[:size])

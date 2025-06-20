@@ -196,8 +196,8 @@ class IterableArchive:
 
         self._archive = laffi.read_new()
         try:
-            self._setPasswords(passwords or [])
-            self._tryToOpen(allowArchives=True)
+            self._set_passwords(passwords or [])
+            self._try_to_open(allowArchives=True)
         except ArchiveError as exception:
             if self.printDebug >= 2:
                 print(f"[Info] Was not able to open {self._file} as given archive. Try to undo compressions next.")
@@ -206,8 +206,8 @@ class IterableArchive:
                 laffi.read_free(self._archive)
                 self._archive = laffi.read_new()
 
-                self._setPasswords(passwords or [])
-                self._tryToOpen(allowArchives=False)
+                self._set_passwords(passwords or [])
+                self._try_to_open(allowArchives=False)
             except ArchiveError as exception2:
                 raise exception2 from exception
 
@@ -218,7 +218,7 @@ class IterableArchive:
         allNames = [laffi.filter_name(self._archive, i) for i in range(laffi.filter_count(self._archive))]
         return [name for name in allNames if name != b'none']
 
-    def _tryToOpen(self, allowArchives: bool):
+    def _try_to_open(self, allowArchives: bool):
         laffi.get_read_filter_function('all')(self._archive)
 
         for formatToEnable in IterableArchive.ENABLED_FORMATS if allowArchives else ['raw']:
@@ -234,7 +234,7 @@ class IterableArchive:
         elif isinstance(self._file, int):
             laffi.read_open_fd(self._archive, self._file, os.fstat(self._file).st_blksize)
         elif hasattr(self._file, 'readinto'):
-            self._openWithFileObject()
+            self._open_with_file_object()
         else:
             raise ValueError(
                 "Libarchive backend currently only works with file path, descriptor, or a file object, "
@@ -244,7 +244,7 @@ class IterableArchive:
         if not allowArchives and not self.filterNames():
             raise ArchiveError("When not looking for archives, there must be at least one filter!")
 
-    def _setPasswords(self, passwords: List[Union[str, bytes]]):
+    def _set_passwords(self, passwords: List[Union[str, bytes]]):
         try:
             for password in passwords:
                 laffi.read_add_passphrase(self._archive, password.encode() if isinstance(password, str) else password)
@@ -254,7 +254,7 @@ class IterableArchive:
                 f"{laffi.libarchive_path}) does not support encryption!"
             ) from exception
 
-    def _openWithFileObject(self):
+    def _open_with_file_object(self):
         if not hasattr(self._file, 'readinto'):
             return
         self._buffer = ctypes.create_string_buffer(self.bufferSize)
@@ -380,13 +380,13 @@ class LibarchiveFile(io.RawIOBase):
             if self._entry is None:
                 break
             if self._entry.entryIndex == self.entryIndex:
-                self._refillBuffer()
+                self._refill_buffer()
                 break
 
         if self._entry is None and self._bufferIO is None:
             raise ValueError(f"Failed to find archive entry {self.entryIndex}.")
 
-    def _refillBuffer(self):
+    def _refill_buffer(self):
         bufferedSize = len(self._buffer) if self._buffer else 0
         if self._bufferOffset + bufferedSize >= self.fileSize:
             return
@@ -442,7 +442,7 @@ class LibarchiveFile(io.RawIOBase):
         result = self._bufferIO.read(size)
         if result:
             return result
-        self._refillBuffer()
+        self._refill_buffer()
         return self._bufferIO.read(size)
 
     @overrides(io.RawIOBase)
@@ -559,7 +559,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                 backendName='LibarchiveMountSource',
             ),
             clearIndexCache=clearIndexCache,
-            checkMetadata=self._checkMetadata,
+            checkMetadata=self._check_metadata,
         )
 
         isFileObject = False  # Not supported yet
@@ -580,12 +580,12 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
             else:
                 self.index.openInMemory()
 
-            self._createIndex()
+            self._create_index()
             if self.index.indexIsLoaded():
-                self._storeMetadata()
+                self._store_metadata()
                 self.index.reloadIndexReadOnly()
 
-    def _createIndex(self) -> None:
+    def _create_index(self) -> None:
         if self.printDebug >= 1:
             print(f"Creating offset dictionary for {self.archiveFilePath} ...")
         t0 = timer()
@@ -650,7 +650,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
         if self.printDebug >= 1:
             print(f"Creating offset dictionary for {self.archiveFilePath} took {t1 - t0:.2f}s")
 
-    def _storeMetadata(self) -> None:
+    def _store_metadata(self) -> None:
         argumentsToSave = ['encoding', 'transformPattern']
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
         self.index.storeMetadata(argumentsMetadata, self.archiveFilePath)
@@ -677,7 +677,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
             ),
         )
 
-    def _checkMetadata(self, metadata: Dict[str, Any]) -> None:
+    def _check_metadata(self, metadata: Dict[str, Any]) -> None:
         """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
         SQLiteIndex.checkArchiveStats(self.archiveFilePath, metadata, self.verifyModificationTime)
 

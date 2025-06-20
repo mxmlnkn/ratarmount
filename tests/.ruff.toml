@@ -2,7 +2,6 @@ line-length = 120
 target-version = "py37"
 
 [lint]
-# TODO enable PTH (use-pathlib)
 select = [
     "A", "B", "E", "F", "G", "I", "W", "N", "ASYNC", "C4", "COM", "FLY", "FURB", "ICN", "INT", "ISC", "LOG",
     "PERF", "PIE", "PLW", "PT", "PYI", "RET", "RSE", "RUF", "SIM", "TID", "TC", "UP", "YTT"
@@ -17,8 +16,8 @@ ignore = [
     "N803",     # Argument names are camelCase instead of snake_case (400+ errors).
     "N806",     # Variable names are camelCase instead of snake_case (1100+ errors).
     "N815",     # Class-scope variable names are camelCase instead of snake_case (10 errors).
-    "N816",     # Global variable names are camelCase instead of snake_case (10 errors).
-    "N999",     # Module names are CamelCase like the classes they provide instead of snake_case (30 errors).
+    "N816",     # Global variable names are camelCase instead of snake_case (73 errors).
+    "N999",     # Module names are CamelCase like the classes they provide instead of snake_case (11 errors).
     "COM812",   # Do not force trailing commas where it makes no sense, e.g., function calls for which I'll
                 # never add more arguments.
     "PERF203",  # Some code parts HAVE to try-except inside loops because only the element should be skipped,

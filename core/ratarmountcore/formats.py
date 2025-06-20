@@ -195,7 +195,7 @@ def findSquashFSOffset(fileobj: IO[bytes], maxSkip=1024 * 1024) -> int:
     return -1
 
 
-def _isCpio(fileobj: IO[bytes]) -> bool:
+def _is_cpio(fileobj: IO[bytes]) -> bool:
     # http://justsolve.archiveteam.org/wiki/Cpio
     # https://github.com/libarchive/libarchive/blob/6110e9c82d8ba830c3440f36b990483ceaaea52c/libarchive/
     #   archive_read_support_format_cpio.c#L272
@@ -203,7 +203,7 @@ def _isCpio(fileobj: IO[bytes]) -> bool:
     return firstBytes == b'07070' or firstBytes[:2] in [b'\x71\xc7', b'\xc7\x71']
 
 
-def _isISO9660(fileobj: IO[bytes]) -> bool:
+def _is_iso9660(fileobj: IO[bytes]) -> bool:
     # https://www.iso.org/obp/ui/#iso:std:iso:9660:ed-1:v1:en
     # http://www.brankin.com/main/technotes/Notes_ISO9660.htm
     # https://en.wikipedia.org/wiki/ISO_9660
@@ -214,7 +214,7 @@ def _isISO9660(fileobj: IO[bytes]) -> bool:
     return buffer[offset : offset + 5] == b'CD001' or buffer[udfOffset : udfOffset + 4] == b'NSR0'
 
 
-def _checkZlibHeader(fileobj: IO[bytes]) -> bool:
+def _check_zlib_header(fileobj: IO[bytes]) -> bool:
     header = fileobj.read(2)
     cmf = header[0]
     if cmf & 0xF != 8:
@@ -228,7 +228,7 @@ def _checkZlibHeader(fileobj: IO[bytes]) -> bool:
     return not usesDictionary
 
 
-def _isBZIP2(fileobj: IO[bytes]) -> bool:
+def _is_bzip2(fileobj: IO[bytes]) -> bool:
     return fileobj.read(4)[:3] == b'BZh' and fileobj.read(6) == (0x314159265359).to_bytes(6, 'big')
 
 
@@ -268,13 +268,13 @@ ARCHIVE_FORMATS: Dict[FileFormatID, FileFormatInfo] = {
     # https://en.wikipedia.org/wiki/Ar_(Unix)
     FID.AR: FileFormatInfo(['a', 'ar', 'lib'], b'!<arch>\n'),
     FID.XAR: FileFormatInfo(['xar'], b'xar!'),
-    FID.CPIO: FileFormatInfo(['cpio'], None, _isCpio),
+    FID.CPIO: FileFormatInfo(['cpio'], None, _is_cpio),
     # "TAR"-like compression formats without compression
     FID.TAR: FileFormatInfo(['tar'], None, isTAR),
     FID.ASAR: FileFormatInfo(['asar'], b'\x04\x00\x00\x00', isASAR),
     # Read-Only File systems
     FID.SQUASHFS: FileFormatInfo(['squashfs', 'AppImage', 'snap'], None, lambda x: findSquashFSOffset(x) >= 0),
-    FID.ISO9660: FileFormatInfo(['iso'], None, _isISO9660),
+    FID.ISO9660: FileFormatInfo(['iso'], None, _is_iso9660),
     # Fully-fledged file systems
     FID.FAT: FileFormatInfo(['fat', 'img', 'dd', 'fat12', 'fat16', 'fat32', 'raw'], None),
     FID.EXT4: FileFormatInfo(['ext4', 'img', 'dd', 'raw'], None),
@@ -286,11 +286,11 @@ ARCHIVE_FORMATS: Dict[FileFormatID, FileFormatInfo] = {
 }
 
 COMPRESSION_FORMATS: Dict[FileFormatID, FileFormatInfo] = {
-    FID.BZIP2: FileFormatInfo(['bz2', 'bzip2'], b'BZh', _isBZIP2),
+    FID.BZIP2: FileFormatInfo(['bz2', 'bzip2'], b'BZh', _is_bzip2),
     FID.GZIP: FileFormatInfo(['gz', 'gzip'], b'\x1f\x8b'),
     FID.XZ: FileFormatInfo(['xz'], b"\xfd7zXZ\x00"),
     FID.ZSTANDARD: FileFormatInfo(['zst', 'zstd'], (0xFD2FB528).to_bytes(4, 'little')),
-    FID.ZLIB: FileFormatInfo(['zz', 'zlib'], None, _checkZlibHeader),
+    FID.ZLIB: FileFormatInfo(['zz', 'zlib'], None, _check_zlib_header),
     # https://github.com/libarchive/libarchive/blob/6110e9c82d8ba830c3440f36b990483ceaaea52c/libarchive/
     # archive_read_support_filter_grzip.c#L46
     # It is almost impossible to find the original sources or a specification:

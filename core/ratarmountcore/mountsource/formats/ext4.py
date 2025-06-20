@@ -40,7 +40,7 @@ class EXT4MountSource(MountSource):
         self.options = options
 
     @staticmethod
-    def _convertEXT4DirectoryEntryToFileInfo(inode) -> FileInfo:
+    def _convert_ext4_directory_entry_to_file_info(inode) -> FileInfo:
         # fmt: off
         return FileInfo(
             size     = inode.i_size,
@@ -82,7 +82,7 @@ class EXT4MountSource(MountSource):
 
     @overrides(MountSource)
     def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
-        return self._list(path, EXT4MountSource._convertEXT4DirectoryEntryToFileInfo)
+        return self._list(path, EXT4MountSource._convert_ext4_directory_entry_to_file_info)
 
     @overrides(MountSource)
     def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
@@ -91,7 +91,7 @@ class EXT4MountSource(MountSource):
     @overrides(MountSource)
     def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         try:
-            return self._convertEXT4DirectoryEntryToFileInfo(self.fileSystem.inode_at(path))
+            return self._convert_ext4_directory_entry_to_file_info(self.fileSystem.inode_at(path))
         except FileNotFoundError:
             pass
         return None

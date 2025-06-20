@@ -29,7 +29,7 @@ class FolderMountSource(MountSource):
 
     def __init__(self, path: Union[str, os.PathLike]) -> None:
         self.root = str(path)
-        self._statfs = FolderMountSource._getStatfsForFolder(self.root)
+        self._statfs = FolderMountSource._get_statfs_for_folder(self.root)
 
     def setFolderDescriptor(self, fd: int) -> None:
         """
@@ -39,10 +39,10 @@ class FolderMountSource(MountSource):
         """
         os.fchdir(fd)
         self.root = '.'
-        self._statfs = FolderMountSource._getStatfsForFolder(self.root)
+        self._statfs = FolderMountSource._get_statfs_for_folder(self.root)
 
     @staticmethod
-    def _getStatfsForFolder(path: str):
+    def _get_statfs_for_folder(path: str):
         result = os.statvfs(path)
         return {
             'f_bsize': result.f_bsize,
@@ -61,7 +61,7 @@ class FolderMountSource(MountSource):
         return os.path.join(self.root, path.lstrip(os.path.sep))
 
     @staticmethod
-    def _statsToFileInfo(stats: os.stat_result, path: str, linkname: str):
+    def _stats_to_file_info(stats: os.stat_result, path: str, linkname: str):
         # fmt: off
         return FileInfo(
             size     = stats.st_size,
@@ -75,13 +75,13 @@ class FolderMountSource(MountSource):
         # fmt: on
 
     @staticmethod
-    def _dirEntryToFileInfo(dirEntry: os.DirEntry, path: str, realpath: str):
+    def _dir_entry_to_file_info(dirEntry: os.DirEntry, path: str, realpath: str):
         try:
             linkname = os.readlink(realpath) if dirEntry.is_symlink() else ""
         except OSError:
             linkname = ""
 
-        return FolderMountSource._statsToFileInfo(dirEntry.stat(follow_symlinks=False), linkname, path)
+        return FolderMountSource._stats_to_file_info(dirEntry.stat(follow_symlinks=False), linkname, path)
 
     @overrides(MountSource)
     def is_immutable(self) -> bool:
@@ -117,8 +117,8 @@ class FolderMountSource(MountSource):
                 and os.path.exists(realpath)
             ):
                 realpath = os.path.realpath(realpath)
-                return self._statsToFileInfo(os.stat(realpath), realpath, "")
-        return self._statsToFileInfo(os.lstat(realpath), path.lstrip('/'), linkname)
+                return self._stats_to_file_info(os.stat(realpath), realpath, "")
+        return self._stats_to_file_info(os.lstat(realpath), path.lstrip('/'), linkname)
 
     @overrides(MountSource)
     def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
@@ -127,7 +127,7 @@ class FolderMountSource(MountSource):
             return None
 
         return {
-            os.fsdecode(dirEntry.name): FolderMountSource._dirEntryToFileInfo(dirEntry, path, realpath)
+            os.fsdecode(dirEntry.name): FolderMountSource._dir_entry_to_file_info(dirEntry, path, realpath)
             for dirEntry in os.scandir(realpath)
         }
 

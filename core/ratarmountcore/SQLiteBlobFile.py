@@ -60,7 +60,7 @@ class WriteSQLiteBlobs(io.RawIOBase):
         self.blob = io.BytesIO()
         self._size = 0
 
-    def _flushBlob(self):
+    def _flush_blob(self):
         if self.blob.tell() > 0:
             self.connection.execute(f'INSERT INTO {self.table} VALUES (?)', (self.blob.getbuffer(),))
         self.blob = io.BytesIO()
@@ -69,11 +69,11 @@ class WriteSQLiteBlobs(io.RawIOBase):
         return self
 
     def __exit__(self, exception_type, exception_value, exception_traceback):
-        self._flushBlob()
+        self._flush_blob()
 
     @overrides(io.RawIOBase)
     def close(self) -> None:
-        self._flushBlob()
+        self._flush_blob()
 
     @overrides(io.RawIOBase)
     def fileno(self) -> int:
@@ -101,7 +101,7 @@ class WriteSQLiteBlobs(io.RawIOBase):
             writtenCount += self.blob.write(buffer)
         else:
             writtenCount += self.blob.write(buffer[:freeBytesInBlob])
-            self._flushBlob()
+            self._flush_blob()
             writtenCount += self.blob.write(buffer[freeBytesInBlob:])
 
         self._size += writtenCount

@@ -50,7 +50,7 @@ class PrintOSSAttributionShortAction(argparse.Action):
         parser.exit()
 
 
-def _parseArgs(rawArgs: Optional[List[str]] = None):
+def _parse_args(rawArgs: Optional[List[str]] = None):
     parser = argparse.ArgumentParser(
         prog='ratarmount',
         formatter_class=_CustomFormatter,
@@ -406,7 +406,7 @@ def cli(rawArgs: Optional[List[str]] = None) -> int:
                 continue
 
     try:
-        args = _parseArgs(rawArgs)
+        args = _parse_args(rawArgs)
         from .actions import processParsedArguments
 
         return processParsedArguments(args)

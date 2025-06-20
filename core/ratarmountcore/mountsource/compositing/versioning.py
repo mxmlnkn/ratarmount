@@ -27,7 +27,7 @@ class FileVersionLayer(MountSource):
     def __init__(self, mountSource: MountSource):
         self.mountSource: MountSource = mountSource
 
-    def _decodeVersionsPathAPI(self, filePath: str) -> Optional[Tuple[str, bool, int]]:
+    def _decode_versions_path_api(self, filePath: str) -> Optional[Tuple[str, bool, int]]:
         """
         Do a loop over the parent path parts to resolve possible versions in parent folders.
         Note that multiple versions of a folder always are union mounted. So, for the path to a file
@@ -90,20 +90,20 @@ class FileVersionLayer(MountSource):
         return filePath, pathIsSpecialVersionsFolder, (0 if pathIsSpecialVersionsFolder else fileVersion)
 
     @staticmethod
-    def _isHardLink(fileInfo: FileInfo) -> bool:
+    def _is_hard_link(fileInfo: FileInfo) -> bool:
         # Note that S_ISLNK checks for symbolic links. Hardlinks (at least from tarfile)
         # return false for S_ISLNK but still have a linkname!
         return bool(not stat.S_ISREG(fileInfo.mode) and not stat.S_ISLNK(fileInfo.mode) and fileInfo.linkname)
 
     @staticmethod
-    def _resolveHardLinks(mountSource: MountSource, path: str) -> Optional[FileInfo]:
+    def _resolve_hard_links(mountSource: MountSource, path: str) -> Optional[FileInfo]:
         """path : Simple path. Should contain no special versioning folders!"""
 
         fileInfo = mountSource.lookup(path)
         if not fileInfo:
             return None
 
-        resolvedPath = '/' + fileInfo.linkname.lstrip('/') if FileVersionLayer._isHardLink(fileInfo) else None
+        resolvedPath = '/' + fileInfo.linkname.lstrip('/') if FileVersionLayer._is_hard_link(fileInfo) else None
         fileVersion = 0
         hardLinkCount = 0
 
@@ -138,7 +138,7 @@ class FileVersionLayer(MountSource):
             if not fileInfo:
                 return None
 
-            resolvedPath = '/' + fileInfo.linkname.lstrip('/') if FileVersionLayer._isHardLink(fileInfo) else None
+            resolvedPath = '/' + fileInfo.linkname.lstrip('/') if FileVersionLayer._is_hard_link(fileInfo) else None
             hardLinkCount += 1
 
         return fileInfo
@@ -147,7 +147,7 @@ class FileVersionLayer(MountSource):
     def is_immutable(self) -> bool:
         return self.mountSource.is_immutable()
 
-    def _listWrapper(self, list_function, path: str):
+    def _list_wrapper(self, list_function, path: str):
         files = list_function(path)
         if files is not None:
             if isinstance(files, dict):
@@ -158,7 +158,7 @@ class FileVersionLayer(MountSource):
 
         # If no folder was found, check whether the special .versions folder was requested
         try:
-            result = self._decodeVersionsPathAPI(path)
+            result = self._decode_versions_path_api(path)
         except Exception:
             return None
 
@@ -179,11 +179,11 @@ class FileVersionLayer(MountSource):
 
     @overrides(MountSource)
     def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
-        return self._listWrapper(self.mountSource.list, path)
+        return self._list_wrapper(self.mountSource.list, path)
 
     @overrides(MountSource)
     def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
-        return self._listWrapper(self.mountSource.list_mode, path)
+        return self._list_wrapper(self.mountSource.list_mode, path)
 
     @overrides(MountSource)
     def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
@@ -191,13 +191,13 @@ class FileVersionLayer(MountSource):
 
         assert fileVersion == 0
 
-        fileInfo = FileVersionLayer._resolveHardLinks(self.mountSource, path)
+        fileInfo = FileVersionLayer._resolve_hard_links(self.mountSource, path)
         if fileInfo:
             fileInfo.userdata.append(FileType.FILE)
             return fileInfo
 
         # If no file was found, check if a special .versions folder to an existing file/folder was queried.
-        versionsInfo = self._decodeVersionsPathAPI(path)
+        versionsInfo = self._decode_versions_path_api(path)
         if not versionsInfo:
             return None
         path, pathIsSpecialVersionsFolder, fileVersion = versionsInfo

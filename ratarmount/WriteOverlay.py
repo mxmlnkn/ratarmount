@@ -49,8 +49,8 @@ class WritableFolderMountSource(fuse.Operations):
 
         self.root: str = path
         self.mountSource = mountSource
-        self.sqlConnection = self._openSqlDb(os.path.join(path, self.hiddenDatabaseName))
-        self._statfs = self._getStatfsForFolder(self.root)
+        self.sqlConnection = self._open_sql_db(os.path.join(path, self.hiddenDatabaseName))
+        self._statfs = self._get_statfs_for_folder(self.root)
 
         # Add table if necessary
         tables = [row[0] for row in self.sqlConnection.execute('SELECT name FROM sqlite_master WHERE type = "table";')]
@@ -66,7 +66,7 @@ class WritableFolderMountSource(fuse.Operations):
         assert databaseMountSource.root == self.root
 
     @staticmethod
-    def _getStatfsForFolder(path: str) -> Dict[str, Any]:
+    def _get_statfs_for_folder(path: str) -> Dict[str, Any]:
         result = os.statvfs(path)
         return {
             key: getattr(result, key)
@@ -85,7 +85,7 @@ class WritableFolderMountSource(fuse.Operations):
         }
 
     @staticmethod
-    def _openSqlDb(path: str, **kwargs) -> sqlite3.Connection:
+    def _open_sql_db(path: str, **kwargs) -> sqlite3.Connection:
         # isolation_level None is important so that changes are autocommitted because there is no manual commit call.
         sqlConnection = sqlite3.connect(path, isolation_level=None, **kwargs)
         sqlConnection.row_factory = sqlite3.Row
@@ -107,10 +107,10 @@ class WritableFolderMountSource(fuse.Operations):
         """
         os.fchdir(fd)
         self.root = '.'
-        self._statfs = self._getStatfsForFolder(self.root)
+        self._statfs = self._get_statfs_for_folder(self.root)
 
     @staticmethod
-    def _splitPath(path: str) -> Tuple[str, str]:
+    def _split_path(path: str) -> Tuple[str, str]:
         result = ('/' + os.path.normpath(path).lstrip('/')).rsplit('/', 1)
         assert len(result) == 2
         return result[0], result[1]
@@ -119,24 +119,24 @@ class WritableFolderMountSource(fuse.Operations):
         """Path given relative to folder root. Leading '/' is acceptable"""
         return os.path.join(self.root, path.lstrip(os.path.sep))
 
-    def _ensureParentExists(self, path):
+    def _ensure_parent_exists(self, path):
         """
         Creates parent folders for given path inside overlay folder if and only if they exist in the mount source.
         """
-        parentPath = self._splitPath(path)[0]
+        parentPath = self._split_path(path)[0]
         if not os.path.exists(self._realpath(parentPath)) and self.mountSource.is_dir(parentPath):
             os.makedirs(self._realpath(parentPath), exist_ok=True)
 
-    def _ensureFileIsModifiable(self, path):
-        self._ensureParentExists(path)
+    def _ensure_file_is_modifiable(self, path):
+        self._ensure_parent_exists(path)
         with self.mountSource.open(self.mountSource.lookup(path)) as sourceObject, open(
             self._realpath(path), 'wb'
         ) as targetObject:
             shutil.copyfileobj(sourceObject, targetObject)
 
     def _open(self, path: str, mode):
-        self._ensureParentExists(path)
-        folder, name = self._splitPath(path)
+        self._ensure_parent_exists(path)
+        folder, name = self._split_path(path)
 
         self.sqlConnection.execute(
             'INSERT OR IGNORE INTO "files" (path,name,mode,deleted) VALUES (?,?,?,?)', (folder, name, mode, False)
@@ -146,9 +146,9 @@ class WritableFolderMountSource(fuse.Operations):
             (folder, name),
         )
 
-    def _markAsDeleted(self, path: str):
+    def _mark_as_deleted(self, path: str):
         """Hides the given path if it exists in the underlying mount source."""
-        folder, name = self._splitPath(path)
+        folder, name = self._split_path(path)
 
         if self.mountSource.exists(path):
             self.sqlConnection.execute(
@@ -168,13 +168,13 @@ class WritableFolderMountSource(fuse.Operations):
         return [x[0] for x in result] + [self.hiddenDatabaseName + suffix for suffix in suffixes]
 
     def isDeleted(self, path: str) -> bool:
-        folder, name = self._splitPath(path)
+        folder, name = self._split_path(path)
         result = self.sqlConnection.execute(
             'SELECT COUNT(*) > 0 FROM "files" WHERE path == (?) AND name == (?) AND deleted == 1', (folder, name)
         )
         return bool(result.fetchone()[0])
 
-    def _setMetadata(self, path: str, metadata: Dict[str, Any]):
+    def _set_metadata(self, path: str, metadata: Dict[str, Any]):
         if not metadata:
             raise ValueError("Need arguments to know what to update.")
 
@@ -183,7 +183,7 @@ class WritableFolderMountSource(fuse.Operations):
             if key not in allowedKeys:
                 raise ValueError(f"Invalid metadata key ({key}) specified")
 
-        folder, name = self._splitPath(path)
+        folder, name = self._split_path(path)
 
         # https://stackoverflow.com/questions/31277027/using-placeholder-in-sqlite3-statements
         assignments = []
@@ -197,7 +197,7 @@ class WritableFolderMountSource(fuse.Operations):
             (*values, folder, name),
         )
 
-    def _initFileMetadata(self, path: str):
+    def _init_file_metadata(self, path: str):
         # Note that we do not have to check the overlay folder assuming that it is inside the (union) mount source!
         sourceFileInfo = self.mountSource.lookup(path)
         if not sourceFileInfo:
@@ -205,23 +205,23 @@ class WritableFolderMountSource(fuse.Operations):
 
         # Initialize new metadata entry from existing file
         sfi = self.mountSource.get_mount_source(sourceFileInfo)[2]
-        folder, name = self._splitPath(path)
+        folder, name = self._split_path(path)
 
         self.sqlConnection.execute(
             f'INSERT OR REPLACE INTO "files" VALUES ({",".join(["?"] * 7)})',
             (folder, name, sfi.mtime, sfi.mode, sfi.uid, sfi.gid, False),
         )
 
-    def _setFileMetadata(self, path: str, applyMetadataToFile: Callable[[str], None], metadata: Dict[str, Any]):
-        folder, name = self._splitPath(path)
+    def _set_file_metadata(self, path: str, applyMetadataToFile: Callable[[str], None], metadata: Dict[str, Any]):
+        folder, name = self._split_path(path)
 
         existsInMetadata = self.sqlConnection.execute(
             'SELECT COUNT(*) > 0 FROM "files" WHERE "path" == (?) and "name" == (?)', (folder, name)
         ).fetchone()[0]
 
         if not existsInMetadata:
-            self._initFileMetadata(path)
-        self._setMetadata(path, metadata)
+            self._init_file_metadata(path)
+        self._set_metadata(path, metadata)
 
         # Apply the metadata change for the file in the overlay folder if it exists there.
         # This is only because it might be confusing for the user else but in general, the metadata in the SQLite
@@ -235,7 +235,7 @@ class WritableFolderMountSource(fuse.Operations):
             print("[Info] It was applied in the metadata database!")
 
     def updateFileInfo(self, path: str, fileInfo: FileInfo):
-        folder, name = self._splitPath(path)
+        folder, name = self._split_path(path)
         row = self.sqlConnection.execute(
             """SELECT * FROM "files" WHERE "path" == (?) AND "name" == (?);""", (folder, name)
         ).fetchone()
@@ -259,7 +259,7 @@ class WritableFolderMountSource(fuse.Operations):
 
     @overrides(fuse.Operations)
     def chmod(self, path, mode):
-        self._setFileMetadata(path, lambda p: os.chmod(p, mode), {'mode': mode})
+        self._set_file_metadata(path, lambda p: os.chmod(p, mode), {'mode': mode})
 
     @overrides(fuse.Operations)
     def chown(self, path, uid, gid):
@@ -272,7 +272,7 @@ class WritableFolderMountSource(fuse.Operations):
         # > Change the owner and group id of path to the numeric uid and gid. To leave one of the ids unchanged,
         # > set it to -1.
         # No reason to change the file owner in the overlay folder, which may often not even be possible.
-        self._setFileMetadata(path, lambda p: None, data)
+        self._set_file_metadata(path, lambda p: None, data)
 
     @overrides(fuse.Operations)
     def utimens(self, path, times=None):
@@ -280,30 +280,30 @@ class WritableFolderMountSource(fuse.Operations):
 
         mtime = time.time() if times is None else times[1]
 
-        self._setFileMetadata(path, lambda p: os.utime(p, times), {'mtime': mtime})
+        self._set_file_metadata(path, lambda p: os.utime(p, times), {'mtime': mtime})
 
     @overrides(fuse.Operations)
     def rename(self, old, new):
         if not self.mountSource.exists(old) or self.isDeleted(old):
             raise fuse.FuseOSError(errno.ENOENT)
 
-        folder, name = self._splitPath(new)
+        folder, name = self._split_path(new)
 
         # Delete target path from metadata database to avoid uniqueness restraint being invalidated
         self.sqlConnection.execute('DELETE FROM "files" WHERE "path" == (?) and "name" == (?)', (folder, name))
-        self._setFileMetadata(old, lambda p: None, {'path': folder, 'name': name})
+        self._set_file_metadata(old, lambda p: None, {'path': folder, 'name': name})
 
         if os.path.exists(self._realpath(old)):
             os.rename(self._realpath(old), self._realpath(new))
         else:
-            self._ensureParentExists(new)
+            self._ensure_parent_exists(new)
 
             with self.mountSource.open(self.mountSource.lookup(old)) as sourceObject, open(
                 self._realpath(new), 'wb'
             ) as targetObject:
                 shutil.copyfileobj(sourceObject, targetObject)
 
-            self._markAsDeleted(old)
+            self._mark_as_deleted(old)
 
     # Links
 
@@ -345,7 +345,7 @@ class WritableFolderMountSource(fuse.Operations):
             traceback.print_exc()
             raise fuse.FuseOSError(errno.EIO) from exception
         finally:
-            self._markAsDeleted(path)
+            self._mark_as_deleted(path)
 
     # Files
 
@@ -358,7 +358,7 @@ class WritableFolderMountSource(fuse.Operations):
                 raise fuse.FuseOSError(errno.ENOENT)
 
             if flags & (os.O_WRONLY | os.O_RDWR):
-                self._ensureFileIsModifiable(path)
+                self._ensure_file_is_modifiable(path)
 
         return os.open(self._realpath(path), flags)
 
@@ -373,7 +373,7 @@ class WritableFolderMountSource(fuse.Operations):
 
         if not self.mountSource.exists(path) or self.isDeleted(path):
             # This is for the rare case that the file only exists in the overlay metadata database.
-            self._markAsDeleted(path)
+            self._mark_as_deleted(path)
             raise fuse.FuseOSError(errno.ENOENT)
 
         try:
@@ -383,16 +383,16 @@ class WritableFolderMountSource(fuse.Operations):
             traceback.print_exc()
             raise fuse.FuseOSError(errno.EIO) from exception
         finally:
-            self._markAsDeleted(path)
+            self._mark_as_deleted(path)
 
     @overrides(fuse.Operations)
     def mknod(self, path, mode, dev):
-        self._ensureParentExists(path)
+        self._ensure_parent_exists(path)
         os.mknod(self._realpath(path), mode, dev)
 
     @overrides(fuse.Operations)
     def truncate(self, path, length, fh=None):
-        self._ensureFileIsModifiable(path)
+        self._ensure_file_is_modifiable(path)
         os.truncate(self._realpath(path), length)
 
     # Actual writing

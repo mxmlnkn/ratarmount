@@ -58,7 +58,7 @@ class ZipMountSource(SQLiteIndexMountSource):
             else (lambda x: x)
         )
 
-        ZipMountSource._findPassword(self.fileObject, options.get("passwords", []))
+        ZipMountSource._find_password(self.fileObject, options.get("passwords", []))
         self.files = {info.header_offset: info for info in self.fileObject.infolist()}
 
         super().__init__(
@@ -72,7 +72,7 @@ class ZipMountSource(SQLiteIndexMountSource):
                 backendName='ZipMountSource',
             ),
             clearIndexCache=clearIndexCache,
-            checkMetadata=self._checkMetadata,
+            checkMetadata=self._check_metadata,
         )
 
         isFileObject = not isinstance(fileOrPath, str)
@@ -88,17 +88,17 @@ class ZipMountSource(SQLiteIndexMountSource):
             else:
                 self.index.openInMemory()
 
-            self._createIndex()
+            self._create_index()
             if self.index.indexIsLoaded():
-                self._storeMetadata()
+                self._store_metadata()
                 self.index.reloadIndexReadOnly()
 
-    def _storeMetadata(self) -> None:
+    def _store_metadata(self) -> None:
         argumentsToSave = ['encoding', 'transformPattern']
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
         self.index.storeMetadata(argumentsMetadata, self.archiveFilePath)
 
-    def _convertToRow(self, info: "zipfile.ZipInfo") -> Tuple:
+    def _convert_to_row(self, info: "zipfile.ZipInfo") -> Tuple:
         mtime = datetime.datetime(*info.date_time, tzinfo=datetime.timezone.utc).timestamp() if info.date_time else 0
 
         # According to section 4.5.7 in the .ZIP file format specification, links are supported:
@@ -153,13 +153,13 @@ class ZipMountSource(SQLiteIndexMountSource):
 
         return fileInfo
 
-    def _createIndex(self) -> None:
+    def _create_index(self) -> None:
         if self.printDebug >= 1:
             print(f"Creating offset dictionary for {self.archiveFilePath} ...")
         t0 = timer()
 
         self.index.ensureIntermediaryTables()
-        self.index.setFileInfos([self._convertToRow(info) for info in self.fileObject.infolist()])
+        self.index.setFileInfos([self._convert_to_row(info) for info in self.fileObject.infolist()])
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
         if self.printDebug >= 2:
@@ -172,7 +172,7 @@ class ZipMountSource(SQLiteIndexMountSource):
             print(f"Creating offset dictionary for {self.archiveFilePath} took {t1 - t0:.2f}s")
 
     @staticmethod
-    def _findPassword(fileobj: "zipfile.ZipFile", passwords):
+    def _find_password(fileobj: "zipfile.ZipFile", passwords):
         # If headers are encrypted, then infolist will simply return an empty list!
         files = fileobj.infolist()
         if not files:
@@ -217,7 +217,7 @@ class ZipMountSource(SQLiteIndexMountSource):
         # https://github.com/python/cpython/blob/a87c46eab3c306b1c5b8a072b7b30ac2c50651c0/Lib/zipfile/__init__.py#L1569
         return self.fileObject.open(info, 'r')  # https://github.com/pauldmccarthy/indexed_gzip/issues/85
 
-    def _checkMetadata(self, metadata: Dict[str, Any]) -> None:
+    def _check_metadata(self, metadata: Dict[str, Any]) -> None:
         """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
         SQLiteIndex.checkArchiveStats(self.archiveFilePath, metadata, self.verifyModificationTime)
 

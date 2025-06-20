@@ -44,20 +44,20 @@ class RarMountSource(MountSource):
             raise RuntimeError("Did not find the rarfile module. Try: pip install rarfile")
 
         self.fileObject = rarfile.RarFile(fileOrPath, 'r')
-        RarMountSource._findPassword(self.fileObject, options.get("passwords", []))
+        RarMountSource._find_password(self.fileObject, options.get("passwords", []))
 
-        self.files = {RarMountSource._cleanPath(info.filename): info for info in self.fileObject.infolist()}
+        self.files = {RarMountSource._clean_path(info.filename): info for info in self.fileObject.infolist()}
         self.options = options
 
     @staticmethod
-    def _cleanPath(path):
+    def _clean_path(path):
         result = os.path.normpath(path) + ('/' if path.endswith('/') else '')
         while result.startswith('../'):
             result = result[3:]
         return result
 
     @staticmethod
-    def _findPassword(fileobj: "rarfile.RarFile", passwords):
+    def _find_password(fileobj: "rarfile.RarFile", passwords):
         if not fileobj.needs_password():
             return None
 
@@ -86,11 +86,11 @@ class RarMountSource(MountSource):
         raise rarfile.PasswordRequired("Could not find a matching password!")
 
     @staticmethod
-    def _getMode(info: "rarfile.RarInfo") -> int:
+    def _get_mode(info: "rarfile.RarInfo") -> int:
         return info.mode | (stat.S_IFLNK if info.file_redir else (stat.S_IFDIR if info.is_dir() else stat.S_IFREG))
 
     @staticmethod
-    def _convertToFileInfo(normalizedPath: str, info: "rarfile.RarInfo") -> FileInfo:
+    def _convert_to_file_info(normalizedPath: str, info: "rarfile.RarInfo") -> FileInfo:
         if info.date_time:
             dtime = datetime.datetime(*info.date_time)
             dtime = dtime.replace(tzinfo=datetime.timezone.utc)
@@ -102,7 +102,7 @@ class RarMountSource(MountSource):
         return FileInfo(
             size     = info.file_size,
             mtime    = mtime,
-            mode     = RarMountSource._getMode(info),
+            mode     = RarMountSource._get_mode(info),
             # file_redir is (type, flags, target) or None. Only tested for type == RAR5_XREDIR_UNIX_SYMLINK.
             linkname = info.file_redir[2] if info.file_redir else "",
             uid      = os.getuid(),
@@ -117,7 +117,7 @@ class RarMountSource(MountSource):
 
     # TODO How to behave with files in archive with absolute paths? Currently, they would never be shown.
     @staticmethod
-    def _getName(folderPath, filePath):
+    def _get_name(folderPath, filePath):
         if not filePath.startswith(folderPath):
             return None
 
@@ -141,9 +141,9 @@ class RarMountSource(MountSource):
 
         # The "filename" member is wrongly named as it returns the full path inside the archive not just the name part.
         return {
-            self._getName(path, normalizedPath): self._convertToFileInfo(normalizedPath, info)
+            self._get_name(path, normalizedPath): self._convert_to_file_info(normalizedPath, info)
             for normalizedPath, info in self.files.items()
-            if self._getName(path, normalizedPath)
+            if self._get_name(path, normalizedPath)
         }
 
     @overrides(MountSource)
@@ -154,9 +154,9 @@ class RarMountSource(MountSource):
 
         # The "filename" member is wrongly named as it returns the full path inside the archive not just the name part.
         return {
-            self._getName(path, normalizedPath): RarMountSource._getMode(info)
+            self._get_name(path, normalizedPath): RarMountSource._get_mode(info)
             for normalizedPath, info in self.files.items()
-            if self._getName(path, normalizedPath)
+            if self._get_name(path, normalizedPath)
         }
 
     def _lookups(self, path: str) -> List[FileInfo]:
@@ -166,7 +166,7 @@ class RarMountSource(MountSource):
             return [createRootFileInfo(userdata=[None])]
 
         infoList = [
-            RarMountSource._convertToFileInfo(normalizedPath, info)
+            RarMountSource._convert_to_file_info(normalizedPath, info)
             for normalizedPath, info in self.files.items()
             if normalizedPath.rstrip('/') == path.lstrip('/')
         ]

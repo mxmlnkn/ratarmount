@@ -198,7 +198,7 @@ class TestLibarchiveMountSource:
                 assert fileInfo
 
     @staticmethod
-    def _createFile(tarArchive, name, contents):
+    def _create_file(tarArchive, name, contents):
         tinfo = tarfile.TarInfo(name)
         tinfo.size = len(contents)
         tarArchive.addfile(tinfo, io.BytesIO(contents.encode()))
@@ -207,7 +207,7 @@ class TestLibarchiveMountSource:
     def create_large_file(tarPath, compression, fileCount):
         # I have committed the resulting bz2 file to save test time.
         t0 = time.time()
-        createFile = TestLibarchiveMountSource._createFile
+        createFile = TestLibarchiveMountSource._create_file
         with tarfile.open(name=tarPath, mode='w:' + compression) as tarFile:
             for i in range(fileCount):
                 createFile(tarFile, name=str(i), contents=str(i % 10))

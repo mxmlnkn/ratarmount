@@ -24,13 +24,13 @@ class SampleArchive:
     files: Dict[str, bytes]
 
 
-def _createFile(tarArchive, name, contents):
+def _create_file(tarArchive, name, contents):
     tinfo = tarfile.TarInfo(name)
     tinfo.size = len(contents)
     tarArchive.addfile(tinfo, io.BytesIO(contents if isinstance(contents, bytes) else contents.encode()))
 
 
-def _makeFolder(tarArchive, name):
+def _make_folder(tarArchive, name):
     tinfo = tarfile.TarInfo(name)
     tinfo.type = tarfile.DIRTYPE
     tarArchive.addfile(tinfo, io.BytesIO())
@@ -46,9 +46,9 @@ def _populate_folder(sampleArchive: SampleArchive):
 def _populate_tar(sampleArchive: SampleArchive):
     with tarfile.open(name=sampleArchive.path, mode="w:bz2") as tarFile:
         for folder in sampleArchive.folders:
-            _makeFolder(tarFile, folder)
+            _make_folder(tarFile, folder)
         for path, contents in sampleArchive.files.items():
-            _createFile(tarFile, path, contents)
+            _create_file(tarFile, path, contents)
 
 
 @pytest.fixture(name="sample_folder_a")

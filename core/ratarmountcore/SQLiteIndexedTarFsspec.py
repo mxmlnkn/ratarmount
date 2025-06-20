@@ -19,11 +19,11 @@ class MountSourceFileSystem(fsspec.spec.AbstractFileSystem):
         self.mountSource = mountSource
 
     @classmethod
-    def _stripProtocol(cls, path):
+    def _stripProtocol(cls, path):  # noqa # Overwrites fsspec.spec.AbstractFileSystem._stripProtocol!
         return path[-len(cls.protocol) - 3] if path.startswith(cls.protocol + '://') else path
 
     @staticmethod
-    def _fileInfoToDict(name, fileInfo):
+    def _file_info_to_dict(name, fileInfo):
         return {
             "type": "directory" if stat.S_ISDIR(fileInfo.mode) else "file",
             "name": name,
@@ -40,7 +40,7 @@ class MountSourceFileSystem(fsspec.spec.AbstractFileSystem):
                 raise FileNotFoundError(path)
             if not isinstance(result, dict):
                 result = {name: self.mountSource.lookup(name) for name in result}
-            return [self._fileInfoToDict(name, info) for name, info in result.items() if info is not None]
+            return [self._file_info_to_dict(name, info) for name, info in result.items() if info is not None]
 
         result = self.mountSource.list_mode(strippedPath)
         if result is None:
@@ -52,7 +52,7 @@ class MountSourceFileSystem(fsspec.spec.AbstractFileSystem):
         result = self.mountSource.lookup(self._stripProtocol(path))
         if result is None:
             raise FileNotFoundError(path)
-        return self._fileInfoToDict(path, result)
+        return self._file_info_to_dict(path, result)
 
     @overrides(fsspec.spec.AbstractFileSystem)
     def _open(

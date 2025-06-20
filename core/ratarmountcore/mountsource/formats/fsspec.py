@@ -97,7 +97,7 @@ class FSSpecMountSource(MountSource):
         self.prefix = prefix.rstrip("/") if prefix and prefix.strip("/") and self.fileSystem.isdir(prefix) else None
         self._pathsWithoutLeadingSlash = GithubFileSystem is not None and isinstance(self.fileSystem, GithubFileSystem)
 
-    def _getPath(self, path: str) -> str:
+    def _get_path(self, path: str) -> str:
         if self._pathsRequireQuoting:
             path = urllib.parse.quote(path)
         if self.prefix:
@@ -109,11 +109,11 @@ class FSSpecMountSource(MountSource):
         return path
 
     @staticmethod
-    def _getMode(entry) -> int:
+    def _get_mode(entry) -> int:
         return 0o555 | (stat.S_IFDIR if entry.get('type', '') == 'directory' else stat.S_IFREG)
 
     @staticmethod
-    def _getModificationTime(entry) -> Union[int, float]:
+    def _get_modification_time(entry) -> Union[int, float]:
         # There is no standardized API for the modification time:
         # https://github.com/fsspec/filesystem_spec/issues/1680#issuecomment-2368750882
         #
@@ -129,7 +129,7 @@ class FSSpecMountSource(MountSource):
         return 0
 
     @staticmethod
-    def _convertToFileInfo(entry, path) -> FileInfo:
+    def _convert_to_file_info(entry, path) -> FileInfo:
         # TODO fsspec does not have an API to get symbolic link targets!
         #      They kinda work only like hardlinks.
         # https://github.com/fsspec/filesystem_spec/issues/1679
@@ -138,8 +138,8 @@ class FSSpecMountSource(MountSource):
         # fmt: off
         return FileInfo(
             size     = size or 0,
-            mtime    = FSSpecMountSource._getModificationTime(entry),
-            mode     = FSSpecMountSource._getMode(entry),
+            mtime    = FSSpecMountSource._get_modification_time(entry),
+            mode     = FSSpecMountSource._get_mode(entry),
             linkname = "",
             uid      = os.getuid(),
             gid      = os.getgid(),
@@ -153,10 +153,10 @@ class FSSpecMountSource(MountSource):
 
     @overrides(MountSource)
     def exists(self, path: str) -> bool:
-        return self.fileSystem.lexists(self._getPath(path))
+        return self.fileSystem.lexists(self._get_path(path))
 
     def _list(self, path: str, onlyMode: bool) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
-        path = self._getPath(path)
+        path = self._get_path(path)
 
         if path == '/' and DropboxDriveFileSystem and isinstance(self.fileSystem, DropboxDriveFileSystem):
             # We need to work around this obnoxious error:
@@ -208,9 +208,9 @@ class FSSpecMountSource(MountSource):
                 if entry['name'].strip('/').startswith(prefixToStrip)
                 else entry['name']
             ): (
-                FSSpecMountSource._getMode(entry)
+                FSSpecMountSource._get_mode(entry)
                 if onlyMode
-                else FSSpecMountSource._convertToFileInfo(entry, entry['name'])
+                else FSSpecMountSource._convert_to_file_info(entry, entry['name'])
             )
             for entry in result
         }
@@ -232,8 +232,8 @@ class FSSpecMountSource(MountSource):
     def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
         return self._list(path, onlyMode=True)
 
-    def _lookupHTTP(self, path: str) -> Optional[FileInfo]:
-        path = self._getPath(path)
+    def _lookup_http(self, path: str) -> Optional[FileInfo]:
+        path = self._get_path(path)
 
         # Avoid aiohttp.client_exceptions.ClientResponseError: 404, message='Not Found'
         if not self.fileSystem.lexists(path):
@@ -246,15 +246,15 @@ class FSSpecMountSource(MountSource):
         # In the future it might be best to call listdir on the parent path to detect whether it is a folder or file.
         info = self.fileSystem.info(path)
         if info.get('mimetype', None) == 'text/html' and self.fileSystem.isdir(path):
-            return FSSpecMountSource._convertToFileInfo({'type': 'directory'}, path)
-        return FSSpecMountSource._convertToFileInfo(info, path)
+            return FSSpecMountSource._convert_to_file_info({'type': 'directory'}, path)
+        return FSSpecMountSource._convert_to_file_info(info, path)
 
     @overrides(MountSource)
     def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         if isinstance(self.fileSystem, fsspec.implementations.http.HTTPFileSystem):
-            return self._lookupHTTP(path)
+            return self._lookup_http(path)
 
-        path = self._getPath(path)
+        path = self._get_path(path)
         if path == '/' or not path:
             # We need to handle this specially because some filesystems, at least ssshfs.SSHFileSystem,
             # do not support 'info' on '/' and will cause an exception:
@@ -283,7 +283,7 @@ class FSSpecMountSource(MountSource):
 
         if not self.fileSystem.lexists(path):
             return None
-        return FSSpecMountSource._convertToFileInfo(self.fileSystem.info(path), path)
+        return FSSpecMountSource._convert_to_file_info(self.fileSystem.info(path), path)
 
     @overrides(MountSource)
     def versions(self, path: str) -> int:

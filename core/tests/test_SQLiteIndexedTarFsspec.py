@@ -30,7 +30,7 @@ def findTestFile(relativePathOrName):
     return relativePathOrName
 
 
-def test_fileSystem():
+def test_file_system():
     fs = RatarFS(findTestFile('single-file.tar'))
 
     assert 'bar' in fs.ls("/", detail=False)

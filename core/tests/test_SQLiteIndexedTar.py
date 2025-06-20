@@ -25,13 +25,13 @@ from ratarmountcore.utils import RatarmountError  # noqa: E402
 @pytest.mark.parametrize("parallelization", [1, 2, 4])
 class TestSQLiteIndexedTarParallelized:
     @staticmethod
-    def _createFile(tarArchive, name, contents):
+    def _create_file(tarArchive, name, contents):
         tinfo = tarfile.TarInfo(name)
         tinfo.size = len(contents)
         tarArchive.addfile(tinfo, io.BytesIO(contents.encode()))
 
     @staticmethod
-    def _makeFolder(tarArchive, name):
+    def _make_folder(tarArchive, name):
         tinfo = tarfile.TarInfo(name)
         tinfo.type = tarfile.DIRTYPE
         tarArchive.addfile(tinfo, io.BytesIO())
@@ -322,8 +322,8 @@ class TestSQLiteIndexedTarParallelized:
     def test_list_and_versions(parallelization):
         with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile:
             with tarfile.open(name=tmpTarFile.name, mode="w:gz") as tarFile:
-                createFile = TestSQLiteIndexedTarParallelized._createFile
-                makeFolder = TestSQLiteIndexedTarParallelized._makeFolder
+                createFile = TestSQLiteIndexedTarParallelized._create_file
+                makeFolder = TestSQLiteIndexedTarParallelized._make_folder
 
                 createFile(tarFile, "./README.md", "hello world")
                 makeFolder(tarFile, "./src")
@@ -366,7 +366,7 @@ class TestSQLiteIndexedTarParallelized:
             repeatCount = 10000
 
             with tarfile.open(name=tmpTarFile.name, mode="w:gz") as tarFile:
-                createFile = TestSQLiteIndexedTarParallelized._createFile
+                createFile = TestSQLiteIndexedTarParallelized._create_file
                 createFile(tarFile, "increasing.dat", "".join(["0123456789"] * repeatCount))
                 createFile(tarFile, "decreasing.dat", "".join(["9876543210"] * repeatCount))
 
@@ -391,7 +391,7 @@ class TestSQLiteIndexedTarParallelized:
             repeatCount = 10000
 
             with tarfile.open(name=tmpTarFile.name, mode="w:gz") as tarFile:
-                createFile = TestSQLiteIndexedTarParallelized._createFile
+                createFile = TestSQLiteIndexedTarParallelized._create_file
                 createFile(tarFile, "increasing.dat", "".join(["0123456789"] * repeatCount))
                 createFile(tarFile, "decreasing.dat", "".join(["9876543210"] * repeatCount))
 
@@ -423,8 +423,8 @@ class TestSQLiteIndexedTarParallelized:
 
     @staticmethod
     def test_appending_to_small_archive(parallelization, tmpdir):
-        createFile = TestSQLiteIndexedTarParallelized._createFile
-        makeFolder = TestSQLiteIndexedTarParallelized._makeFolder
+        createFile = TestSQLiteIndexedTarParallelized._create_file
+        makeFolder = TestSQLiteIndexedTarParallelized._make_folder
 
         # Create a simple small TAR
         tarPath = os.path.join(tmpdir, "foo.tar")
@@ -530,8 +530,8 @@ class TestSQLiteIndexedTarParallelized:
 
     @staticmethod
     def test_appending_to_large_archive(parallelization, tmpdir):
-        createFile = TestSQLiteIndexedTarParallelized._createFile
-        makeFolder = TestSQLiteIndexedTarParallelized._makeFolder
+        createFile = TestSQLiteIndexedTarParallelized._create_file
+        makeFolder = TestSQLiteIndexedTarParallelized._make_folder
 
         # Create a TAR large in size as well as file count
         tarPath = os.path.join(tmpdir, "foo.tar")

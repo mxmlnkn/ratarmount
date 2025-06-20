@@ -113,7 +113,7 @@ class Py7zrMountSource(SQLiteIndexMountSource):
                 password=None if password is None else (password if isinstance(password, str) else password.decode()),
             )
 
-        self.fileObject = Py7zrMountSource._findPassword(openFile, options.get("passwords", []))
+        self.fileObject = Py7zrMountSource._find_password(openFile, options.get("passwords", []))
 
         # Force indexes in memory because:
         #  - I have no idea what ID to write into offset or offsetheader. The "ID" for the py7zr interface
@@ -131,7 +131,7 @@ class Py7zrMountSource(SQLiteIndexMountSource):
                 backendName='Py7zrMountSource',
             ),
             clearIndexCache=clearIndexCache,
-            checkMetadata=self._checkMetadata,
+            checkMetadata=self._check_metadata,
         )
 
         isFileObject = not isinstance(fileOrPath, str)
@@ -147,17 +147,17 @@ class Py7zrMountSource(SQLiteIndexMountSource):
             else:
                 self.index.openInMemory()
 
-            self._createIndex()
+            self._create_index()
             if self.index.indexIsLoaded():
-                self._storeMetadata()
+                self._store_metadata()
                 self.index.reloadIndexReadOnly()
 
-    def _storeMetadata(self) -> None:
+    def _store_metadata(self) -> None:
         argumentsToSave = ['encoding']
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
         self.index.storeMetadata(argumentsMetadata, self.archiveFilePath)
 
-    def _convertToRow(self, info) -> Tuple:
+    def _convert_to_row(self, info) -> Tuple:
         mode = 0o777 | (stat.S_IFDIR if info.is_directory else stat.S_IFREG)
         mtime = info.creationtime.timestamp()
         path, name = SQLiteIndex.normpath(info.filename).rsplit("/", 1)
@@ -185,13 +185,13 @@ class Py7zrMountSource(SQLiteIndexMountSource):
 
         return fileInfo
 
-    def _createIndex(self) -> None:
+    def _create_index(self) -> None:
         if self.printDebug >= 1:
             print(f"Creating offset dictionary for {self.archiveFilePath} ...")
         t0 = timer()
 
         self.index.ensureIntermediaryTables()
-        self.index.setFileInfos([self._convertToRow(info) for info in self.fileObject.list()])
+        self.index.setFileInfos([self._convert_to_row(info) for info in self.fileObject.list()])
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
         if self.printDebug >= 2:
@@ -204,7 +204,7 @@ class Py7zrMountSource(SQLiteIndexMountSource):
             print(f"Creating offset dictionary for {self.archiveFilePath} took {t1 - t0:.2f}s")
 
     @staticmethod
-    def _findPassword(openFile, passwords):
+    def _find_password(openFile, passwords):
         fileobj = openFile()
 
         # If headers are encrypted, then infolist will simply return an empty list!
@@ -240,7 +240,7 @@ class Py7zrMountSource(SQLiteIndexMountSource):
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
         return openInMemory(self.fileObject, fileInfo.linkname)
 
-    def _checkMetadata(self, metadata: Dict[str, Any]) -> None:
+    def _check_metadata(self, metadata: Dict[str, Any]) -> None:
         """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
         SQLiteIndex.checkArchiveStats(self.archiveFilePath, metadata, self.verifyModificationTime)
 

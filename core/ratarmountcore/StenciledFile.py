@@ -76,7 +76,7 @@ class RawStenciledFile(FixedRawIOBase):
         # Seek to the first stencil offset in the underlying file so that "read" will work out-of-the-box
         self.seek(0)
 
-    def _findStencil(self, offset: int) -> int:
+    def _find_stencil(self, offset: int) -> int:
         """
         Return index to stencil where offset belongs to. E.g., for stencils [(3,5),(8,2)], offsets 0 to
         and including 4 will still be inside stencil (3,5), i.e., index 0 will be returned. For offset 6,
@@ -129,7 +129,7 @@ class RawStenciledFile(FixedRawIOBase):
     def _read1_unlocked(self, size):
         assert size >= 0
 
-        i = self._findStencil(self.offset)
+        i = self._find_stencil(self.offset)
         if i >= len(self.sizes):
             return b''
 
@@ -223,15 +223,15 @@ class RawJoinedFileFromFactory(io.RawIOBase):
                     self.factories.append(factory)
                     self.cumsizes.append(self.cumsizes[-1] + size)
 
-    def _findStencil(self, offset: int) -> int:
-        # See StenciledFile._findStencil
+    def _find_stencil(self, offset: int) -> int:
+        # See StenciledFile._find_stencil
         assert offset >= 0
         i = bisect.bisect_left(self.cumsizes, offset + 1) - 1
         # i might be 0 when self.cumsizes is empty but even for no fileStencils, it is initialized with [0]
         assert i >= 0
         return i
 
-    def _getFileObject(self, index: int) -> IO[bytes]:
+    def _get_file_object(self, index: int) -> IO[bytes]:
         if self.fileObject and self.fileObject[0] == index:
             return self.fileObject[1]
 
@@ -284,12 +284,12 @@ class RawJoinedFileFromFactory(io.RawIOBase):
         # This loop works in a kind of leapfrog fashion. On each even loop iteration it seeks to the next stencil
         # and on each odd iteration it reads the data and increments the offset inside the stencil!
         result = b''
-        i = self._findStencil(self.offset)
+        i = self._find_stencil(self.offset)
         if i >= len(self.sizes):
             return result
 
         with self.fileObjectLock or _DummyContext():
-            fileObject = self._getFileObject(i)
+            fileObject = self._get_file_object(i)
 
             # Note that seek and read of the file object itself do not seem to check against this and
             # instead lead to a segmentation fault in the multithreading tests.

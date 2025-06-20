@@ -61,7 +61,7 @@ class FATMountSource(MountSource):
         self.options = options
 
     @staticmethod
-    def _convertFATDirectoryEntryToFileInfo(entry, path) -> FileInfo:
+    def _convert_fatdirectory_entry_to_file_info(entry, path) -> FileInfo:
         """
         entry: of type pyfatfs.FATDirectoryEntry.FATDirectoryEntry.
         """
@@ -116,7 +116,7 @@ class FATMountSource(MountSource):
             if exception.errno in [errno.ENOTDIR, errno.ENOENT]:
                 return None
             raise exception
-        return self._convertFATDirectoryEntryToFileInfo(entry, path)
+        return self._convert_fatdirectory_entry_to_file_info(entry, path)
 
     @overrides(MountSource)
     def versions(self, path: str) -> int:

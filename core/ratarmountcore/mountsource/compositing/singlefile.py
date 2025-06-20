@@ -45,7 +45,7 @@ class SingleFileMountSource(MountSource):
                 'f_favail': 0,
             }
 
-    def _createFileInfo(self):
+    def _create_file_info(self):
         # This must be a function and cannot be cached into a member in order to avoid userdata being a shared list!
         # fmt: off
         return FileInfo(
@@ -82,11 +82,11 @@ class SingleFileMountSource(MountSource):
             )
             # fmt: on
 
-        return self._createFileInfo() if path == self.path else None
+        return self._create_file_info() if path == self.path else None
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
-        if fileInfo != self._createFileInfo():
+        if fileInfo != self._create_file_info():
             raise ValueError("Only files may be opened!")
 
         # Use StenciledFile so that the returned file objects can be independently seeked!

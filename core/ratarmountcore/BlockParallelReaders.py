@@ -51,7 +51,7 @@ class BlockParallelReader(io.BufferedIOBase):
         self.filename = filename
         self.fileobj = fileobj
         self.blockBoundaries: List[int] = blockBoundaries
-        self.initWorker = BlockParallelReader._initWorker if initWorker is None else initWorker
+        self.initWorker = BlockParallelReader._init_worker if initWorker is None else initWorker
         self.initArgs = initArgs
 
         self._pool = None
@@ -73,13 +73,13 @@ class BlockParallelReader(io.BufferedIOBase):
         self._pool.join()
         self._pool = None
 
-    def _getPool(self):
+    def _get_pool(self):
         if not self._pool:
             self._pool = multiprocessing.pool.Pool(self.parallelization, self.initWorker, self.initArgs)
         return self._pool
 
     @staticmethod
-    def _initWorker():
+    def _init_worker():
         """
         Ignore the interrupt signal inside the child worker processes to avoid Python backtraces for each of them.
         Aborting with Ctrl+C will still work as the main process still accepts the signal.
@@ -87,7 +87,7 @@ class BlockParallelReader(io.BufferedIOBase):
         signal.signal(signal.SIGINT, signal.SIG_IGN)
 
     @staticmethod
-    def _findBlock(blockBoundaries: List[int], offset: int) -> Optional[int]:
+    def _find_block(blockBoundaries: List[int], offset: int) -> Optional[int]:
         """
         Returns the blockNumber such that the requested offset is inside the block starting at
         self.blockBoundaries[blockNumber].
@@ -97,7 +97,7 @@ class BlockParallelReader(io.BufferedIOBase):
         return blockNumber if blockNumber >= 0 and blockNumber + 1 < len(blockBoundaries) else None
 
     @staticmethod
-    def _blockSize(blockBoundaries: List[int], blockNumber) -> int:
+    def _block_size(blockBoundaries: List[int], blockNumber) -> int:
         if blockNumber + 1 >= len(blockBoundaries) or blockNumber < 0:
             return 0
         return blockBoundaries[blockNumber + 1] - blockBoundaries[blockNumber]
@@ -151,13 +151,13 @@ class BlockParallelReader(io.BufferedIOBase):
 
     def _read(self, size: int, decodeBlock) -> bytes:
         blocks = []
-        blockNumber = self._findBlock(self.blockBoundaries, self._offset)
+        blockNumber = self._find_block(self.blockBoundaries, self._offset)
         if blockNumber is None:
             return b""
 
         self.requestCount += 1
         firstBlockOffset = self._offset - self.blockBoundaries[blockNumber]
-        blockSize = self._blockSize(self.blockBoundaries, blockNumber)
+        blockSize = self._block_size(self.blockBoundaries, blockNumber)
         availableSize = blockSize - firstBlockOffset
 
         # Shortcut to improve performance for many small reads inside the same block
@@ -170,7 +170,7 @@ class BlockParallelReader(io.BufferedIOBase):
             return result
 
         pendingBlocks: int = sum(0 if block.ready() else 1 for block in self._blockCache.values())
-        pool = self._getPool()
+        pool = self._get_pool()
 
         # TODO do not fetch blocks which do not fit into memory and instead seek directly to them!
         #      Note that this only makes sense if less than the block size has been requested else we would run out
@@ -188,7 +188,7 @@ class BlockParallelReader(io.BufferedIOBase):
                     (
                         self.filename,
                         self.blockBoundaries[blockNumber],
-                        self._blockSize(self.blockBoundaries, blockNumber),
+                        self._block_size(self.blockBoundaries, blockNumber),
                     ),
                 )
                 self._blockCache[blockNumber] = fetchedBlock
@@ -208,14 +208,14 @@ class BlockParallelReader(io.BufferedIOBase):
             size -= availableSize
 
             # Get block data for next iteration
-            blockSize = self._blockSize(self.blockBoundaries, blockNumber)
+            blockSize = self._block_size(self.blockBoundaries, blockNumber)
             offsetInBlock = self._offset - self.blockBoundaries[blockNumber]
             availableSize = blockSize - offsetInBlock
 
         # Prefetch blocks
         toPrefetch = self._prefetcher.prefetch(self.parallelization)
         for blockToPrefetch in toPrefetch:
-            blockSize = self._blockSize(self.blockBoundaries, blockToPrefetch)
+            blockSize = self._block_size(self.blockBoundaries, blockToPrefetch)
             if blockSize > 0 and blockToPrefetch not in self._blockCache and pendingBlocks < self.parallelization:
                 self.cachePrefetchCount += 1
                 fetchedBlock = pool.apply_async(
@@ -299,26 +299,26 @@ class ParallelXZReader(BlockParallelReader):
                 self.approximateCompressedBlockBoundaries = []
 
         super().__init__(
-            filename, fileObject, blockBoundaries, parallelization, ParallelXZReader._initWorker2, (filename,)
+            filename, fileObject, blockBoundaries, parallelization, ParallelXZReader._init_worker2, (filename,)
         )
-        self._openFiles()
+        self._open_files()
 
-    def _openFiles(self):
+    def _open_files(self):
         # Opening the pool and and the files on each worker at this point might be a point to discuss
         # but it leads to uniform latencies for the subsequent read calls.
-        pool = self._getPool()
-        # will trigger worker initialization, i.e., _tryOpenGlobalFile
+        pool = self._get_pool()
+        # will trigger worker initialization, i.e., _try_open_global_file
         results = [pool.apply_async(os.getpid) for _ in range(self.parallelization * 4)]
         for result in results:
             result.get()
 
     @staticmethod
-    def _initWorker2(filename):
-        BlockParallelReader._initWorker()
-        ParallelXZReader._tryOpenGlobalFile(filename)
+    def _init_worker2(filename):
+        BlockParallelReader._init_worker()
+        ParallelXZReader._try_open_global_file(filename)
 
     @staticmethod
-    def _tryOpenGlobalFile(filename):
+    def _try_open_global_file(filename):
         # This is not thread-safe! But it will be executed in a process pool, in which each worker has its own
         # global variable set. Using a global variable for this is safe because we know that there is one process pool
         # per BlockParallelReader, meaning the filename is a constant for each worker.
@@ -328,20 +328,20 @@ class ParallelXZReader(BlockParallelReader):
             _parallelXzReaderFile = xz.open(filename, 'rb')
 
     @staticmethod
-    def _decodeBlock(filename, offset, size):
-        ParallelXZReader._tryOpenGlobalFile(filename)
+    def _decode_block(filename, offset, size):
+        ParallelXZReader._try_open_global_file(filename)
         _parallelXzReaderFile.seek(offset)
         return _parallelXzReaderFile.read(size)
 
     @overrides(io.BufferedIOBase)
     def read(self, size: int = -1) -> bytes:
-        return super()._read(size, ParallelXZReader._decodeBlock)
+        return super()._read(size, ParallelXZReader._decode_block)
 
     def findBlock(self, offset) -> Optional[int]:
         """
         Returns the block number corresponding to the specified offset in the decompressed stream.
         """
-        return self._findBlock(self.blockBoundaries, self._offset)
+        return self._find_block(self.blockBoundaries, self._offset)
 
 
 # This one is actually mostly slower than serial decoding. Even the command line tool zstd is often slower with
@@ -355,7 +355,7 @@ class ParallelZstdReader(BlockParallelReader):
         super().__init__(filename, fileObject, blockBoundaries, parallelization)
 
     @staticmethod
-    def _decodeBlock(filename, offset, size):
+    def _decode_block(filename, offset, size):
         # This is not thread-safe! But it will be executed in a process pool, in which each worker has its own
         # global variable set. Using a global variable for this is safe because we know that there is one process pool
         # per BlockParallelReader, meaning the filename is a constant for each worker.
@@ -369,4 +369,4 @@ class ParallelZstdReader(BlockParallelReader):
 
     @overrides(io.BufferedIOBase)
     def read(self, size: int = -1) -> bytes:
-        return super()._read(size, ParallelZstdReader._decodeBlock)
+        return super()._read(size, ParallelZstdReader._decode_block)

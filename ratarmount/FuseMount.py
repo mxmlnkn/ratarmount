@@ -257,7 +257,7 @@ class FuseMount(fuse.Operations):
     def __del__(self) -> None:
         self._close()
 
-    def _addNewHandle(self, handle, flags):
+    def _add_new_handle(self, handle, flags):
         # Note that fh in fuse_common.h is 64-bit and Python also supports 64-bit (long integers) out of the box.
         # So, there should practically be no overflow and file handle reuse possible.
         self.lastFileHandle += 1
@@ -285,7 +285,7 @@ class FuseMount(fuse.Operations):
         return self.writeOverlay.updateFileInfo(path[len(subMountPoint) :], fileInfo)
 
     @staticmethod
-    def _redirectOutput(name: str, file: IO[str]):
+    def _redirect_output(name: str, file: IO[str]):
         with contextlib.suppress(OSError, ValueError):
             libc = ctypes.CDLL('libc.so.6')
             cstdptr = ctypes.c_void_p.in_dll(libc, name)
@@ -309,8 +309,8 @@ class FuseMount(fuse.Operations):
     @overrides(fuse.Operations)
     def init(self, path) -> None:
         if self.logFile:
-            self._redirectOutput('stdout', self.logFile)
-            self._redirectOutput('stderr', self.logFile)
+            self._redirect_output('stdout', self.logFile)
+            self._redirect_output('stderr', self.logFile)
 
         if self.selfBindMount is not None and self.mountPointFd is not None:
             self.selfBindMount.setFolderDescriptor(self.mountPointFd)
@@ -318,7 +318,7 @@ class FuseMount(fuse.Operations):
                 self.writeOverlay.setFolderDescriptor(self.mountPointFd)
 
     @staticmethod
-    def _fileInfoToDict(fileInfo: FileInfo):
+    def _file_info_to_dict(fileInfo: FileInfo):
         # dictionary keys: https://pubs.opengroup.org/onlinepubs/007904875/basedefs/sys/stat.h.html
         statDict = {"st_" + key: getattr(fileInfo, key) for key in ('size', 'mtime', 'mode', 'uid', 'gid')}
         statDict['st_mtime'] = int(statDict['st_mtime'])
@@ -336,7 +336,7 @@ class FuseMount(fuse.Operations):
 
     @overrides(fuse.Operations)
     def getattr(self, path: str, fh=None) -> Dict[str, Any]:
-        return self._fileInfoToDict(self._lookup(path))
+        return self._file_info_to_dict(self._lookup(path))
 
     @overrides(fuse.Operations)
     def readdir(self, path: str, fh):
@@ -386,7 +386,7 @@ class FuseMount(fuse.Operations):
             # but store information to reopen it for write access on write calls.
             # @see https://man7.org/linux/man-pages/man2/open.2.html
             # > The argument flags must include one of the following access modes: O_RDONLY, O_WRONLY, or O_RDWR.
-            return self._addNewHandle(self.mountSource.open(fileInfo, buffering=0), flags)
+            return self._add_new_handle(self.mountSource.open(fileInfo, buffering=0), flags)
         except Exception as exception:
             traceback.print_exc()
             print("Caught exception when trying to open file.", fileInfo)
@@ -397,7 +397,7 @@ class FuseMount(fuse.Operations):
         if fh not in self.openedFiles:
             raise fuse.FuseOSError(errno.ESTALE)
 
-        openedFile = self._resolveFileHandle(fh)
+        openedFile = self._resolve_file_handle(fh)
         if isinstance(openedFile, int):
             os.close(openedFile)
         else:
@@ -409,7 +409,7 @@ class FuseMount(fuse.Operations):
     @overrides(fuse.Operations)
     def read(self, path: str, size: int, offset: int, fh: int) -> bytes:
         if fh in self.openedFiles:
-            openedFile = self._resolveFileHandle(fh)
+            openedFile = self._resolve_file_handle(fh)
             if isinstance(openedFile, int):
                 os.lseek(openedFile, offset, os.SEEK_SET)
                 return os.read(openedFile, size)
@@ -432,40 +432,40 @@ class FuseMount(fuse.Operations):
 
     # Methods for the write overlay which require file handle translations
 
-    def _isWriteOverlayHandle(self, fh):
-        return self.writeOverlay and fh in self.openedFiles and isinstance(self._resolveFileHandle(fh), int)
+    def _is_write_overlay_handle(self, fh):
+        return self.writeOverlay and fh in self.openedFiles and isinstance(self._resolve_file_handle(fh), int)
 
-    def _resolveFileHandle(self, fh):
+    def _resolve_file_handle(self, fh):
         return self.openedFiles[fh][1]
 
     @overrides(fuse.Operations)
     def create(self, path, mode, fi=None):
         if self.writeOverlay:
-            return self._addNewHandle(self.writeOverlay.create(path, mode, fi), 0)
+            return self._add_new_handle(self.writeOverlay.create(path, mode, fi), 0)
         raise fuse.FuseOSError(errno.EROFS)
 
     @overrides(fuse.Operations)
     def write(self, path, data, offset, fh):
-        if not self._isWriteOverlayHandle(fh):
+        if not self._is_write_overlay_handle(fh):
             flags, openedFile = self.openedFiles[fh]
             if self.writeOverlay and not isinstance(openedFile, int) and (flags & (os.O_WRONLY | os.O_RDWR)):
                 openedFile.close()
                 self.openedFiles[fh] = (flags, self.writeOverlay.open(path, flags))
 
-        if self._isWriteOverlayHandle(fh):
-            return self.writeOverlay.write(path, data, offset, self._resolveFileHandle(fh))
+        if self._is_write_overlay_handle(fh):
+            return self.writeOverlay.write(path, data, offset, self._resolve_file_handle(fh))
         raise fuse.FuseOSError(errno.EROFS)
 
     @overrides(fuse.Operations)
     def flush(self, path, fh):
-        if self._isWriteOverlayHandle(fh):
-            self.writeOverlay.flush(path, self._resolveFileHandle(fh))
+        if self._is_write_overlay_handle(fh):
+            self.writeOverlay.flush(path, self._resolve_file_handle(fh))
         return 0  # Nothing to flush, so return success
 
     @overrides(fuse.Operations)
     def fsync(self, path, datasync, fh):
-        if self._isWriteOverlayHandle(fh):
-            self.writeOverlay.fsync(path, datasync, self._resolveFileHandle(fh))
+        if self._is_write_overlay_handle(fh):
+            self.writeOverlay.fsync(path, datasync, self._resolve_file_handle(fh))
         return 0  # Nothing to flush, so return success
 
     @overrides(fuse.Operations)

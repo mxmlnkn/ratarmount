@@ -38,9 +38,9 @@ class UnionMountSource(MountSource):
         self.rootFileInfo = createRootFileInfo(userdata=[None])
 
         if len(self.mountSources) > 1:
-            self._buildFolderCache(maxCacheDepth, maxCacheEntries, maxSecondsToCache)
+            self._build_folder_cache(maxCacheDepth, maxCacheEntries, maxSecondsToCache)
 
-    def _buildFolderCache(self, maxCacheDepth: int, maxCacheEntries: int, maxSecondsToCache: float) -> None:
+    def _build_folder_cache(self, maxCacheDepth: int, maxCacheEntries: int, maxSecondsToCache: float) -> None:
         t0 = time.time()
 
         if self.printDebug >= 1:

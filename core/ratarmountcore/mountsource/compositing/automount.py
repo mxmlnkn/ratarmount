@@ -70,14 +70,14 @@ class AutoMountLayer(MountSource):
                     if self.is_dir(filePath):
                         newFoldersToWalk.append(filePath)
                     else:
-                        mountPoint = self._tryToMountFile(filePath)
+                        mountPoint = self._try_to_mount_file(filePath)
                         if mountPoint:
                             newFoldersToWalk.append(mountPoint)
 
             foldersToWalk = newFoldersToWalk
 
-    def _simplyFindMounted(self, path: str) -> Tuple[str, str]:
-        """See _findMounted. This is split off to avoid convoluted recursions during lazy mounting."""
+    def _simply_find_mounted(self, path: str) -> Tuple[str, str]:
+        """See _find_mounted. This is split off to avoid convoluted recursions during lazy mounting."""
 
         leftPart = path
         rightParts: List[str] = []
@@ -93,7 +93,7 @@ class AutoMountLayer(MountSource):
         return '/', path
 
     def getRecursionDepth(self, path: str) -> int:
-        mountPoint, pathInMountPoint = self._simplyFindMounted(path)
+        mountPoint, pathInMountPoint = self._simply_find_mounted(path)
         mountInfo = self.mounted[mountPoint]
         fileInfo = mountInfo.mountSource.lookup(pathInMountPoint)
 
@@ -110,7 +110,7 @@ class AutoMountLayer(MountSource):
             else 0
         )
 
-    def _tryToMountFile(self, path: str) -> Optional[str]:
+    def _try_to_mount_file(self, path: str) -> Optional[str]:
         """
         Returns the mount point path if it has been successfully mounted.
         path: Path inside this mount source. May include recursively mounted mount points.
@@ -136,8 +136,8 @@ class AutoMountLayer(MountSource):
         if mountPoint in self.mounted:
             return None
 
-        # Use _simplyFindMounted instead of _findMounted or self.open to avoid recursions caused by lazy mounting!
-        parentMountPoint, pathInsideParentMountPoint = self._simplyFindMounted(path)
+        # Use _simply_find_mounted instead of _find_mounted or self.open to avoid recursions caused by lazy mounting!
+        parentMountPoint, pathInsideParentMountPoint = self._simply_find_mounted(path)
         parentMountInfo = self.mounted[parentMountPoint]
         parentMountSource = parentMountInfo.mountSource
 
@@ -200,7 +200,7 @@ class AutoMountLayer(MountSource):
 
         return mountPoint
 
-    def _findMounted(self, path: str) -> Tuple[str, str]:
+    def _find_mounted(self, path: str) -> Tuple[str, str]:
         """
         Returns the mount point, which can be found in self.mounted, and the rest of the path.
         Basically, it splits path at the appropriate mount point boundary.
@@ -218,9 +218,9 @@ class AutoMountLayer(MountSource):
                     break
 
                 if subPath not in self.mounted:
-                    self._tryToMountFile(subPath)
+                    self._try_to_mount_file(subPath)
 
-        return self._simplyFindMounted(path)
+        return self._simply_find_mounted(path)
 
     @overrides(MountSource)
     def is_immutable(self) -> bool:
@@ -237,7 +237,7 @@ class AutoMountLayer(MountSource):
 
         # It might be arguably that we could simply let the mount source handle returning file infos for the root
         # directory but only we know the permissions of the parent folder and can apply them to the root directory.
-        mountPoint, pathInMountPoint = self._findMounted(path)
+        mountPoint, pathInMountPoint = self._find_mounted(path)
         mountInfo = self.mounted[mountPoint]
 
         originalFileVersions = 0
@@ -266,7 +266,7 @@ class AutoMountLayer(MountSource):
             fileInfo.userdata.append('/')
         return fileInfo
 
-    def _appendMountPoints(self, path: str, files, onlyMode: bool):
+    def _append_mount_points(self, path: str, files, onlyMode: bool):
         if not files:
             return None
 
@@ -297,21 +297,21 @@ class AutoMountLayer(MountSource):
 
     @overrides(MountSource)
     def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
-        mountPoint, pathInMountPoint = self._findMounted(path)
-        return self._appendMountPoints(
+        mountPoint, pathInMountPoint = self._find_mounted(path)
+        return self._append_mount_points(
             path, self.mounted[mountPoint].mountSource.list(pathInMountPoint), onlyMode=False
         )
 
     @overrides(MountSource)
     def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
-        mountPoint, pathInMountPoint = self._findMounted(path)
-        return self._appendMountPoints(
+        mountPoint, pathInMountPoint = self._find_mounted(path)
+        return self._append_mount_points(
             path, self.mounted[mountPoint].mountSource.list_mode(pathInMountPoint), onlyMode=True
         )
 
     @overrides(MountSource)
     def versions(self, path: str) -> int:
-        mountPoint, pathInMountPoint = self._findMounted(path)
+        mountPoint, pathInMountPoint = self._find_mounted(path)
         fileVersions = self.mounted[mountPoint].mountSource.versions(pathInMountPoint)
         if mountPoint != '/' and pathInMountPoint == '/':
             fileVersions += self.mounted['/'].mountSource.versions(path)

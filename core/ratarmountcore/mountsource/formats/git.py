@@ -26,14 +26,14 @@ class GitMountSource(MountSource):
     # pylint: disable=unused-argument
     def __init__(self, path: Optional[str] = None, reference: Optional[str] = None, **kwargs):
         self.repository = pygit2.Repository(path or os.getcwd())
-        self.reference = reference or self._getDefaultReference(self.repository)
+        self.reference = reference or self._get_default_reference(self.repository)
         commit, reference = self.repository.resolve_refish(self.reference)  # type: ignore
         self.tree = commit.tree
         self.commitTime = self.repository[self.repository.head.target].commit_time  # type: ignore
         self.prefix = ""
 
     @staticmethod
-    def _getDefaultReference(repository):
+    def _get_default_reference(repository):
         if 'init.defaultBranch' in repository.config:
             return repository.config['init.defaultBranch']
 
@@ -48,7 +48,7 @@ class GitMountSource(MountSource):
 
         return 'master'
 
-    def _lookUpPath(self, path: str):
+    def _look_up_path(self, path: str):
         tree = self.tree
         for name in self.prefix.split("/") + path.split("/"):
             if name and isinstance(tree, pygit2.Tree):
@@ -58,17 +58,17 @@ class GitMountSource(MountSource):
         return tree
 
     @staticmethod
-    def _convertToFileMode(obj):
+    def _convert_to_file_mode(obj):
         if obj.filemode == pygit2.enums.FileMode.LINK:
             return 0o555 | stat.S_IFLNK
         return 0o555 | (stat.S_IFDIR if isinstance(obj, pygit2.Tree) else stat.S_IFREG)
 
-    def _convertToFileInfo(self, obj, path: str):
+    def _convert_to_file_info(self, obj, path: str):
         # fmt: off
         return FileInfo(
             size     = obj.size if hasattr(obj, 'size') else 0,
             mtime    = self.commitTime,
-            mode     = GitMountSource._convertToFileMode(obj),
+            mode     = GitMountSource._convert_to_file_mode(obj),
             linkname = obj.data.decode() if obj.filemode == pygit2.enums.FileMode.LINK else "",
             uid      = os.getuid(),
             gid      = os.getgid(),
@@ -82,17 +82,17 @@ class GitMountSource(MountSource):
 
     @overrides(MountSource)
     def exists(self, path: str) -> bool:
-        return self._lookUpPath(path) is not None
+        return self._look_up_path(path) is not None
 
     def _list(self, path: str, onlyMode: bool) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
-        tree = self._lookUpPath(path)
+        tree = self._look_up_path(path)
         if not isinstance(tree, pygit2.Tree):
             return None
         return {
             obj.name: (
-                GitMountSource._convertToFileMode(obj)
+                GitMountSource._convert_to_file_mode(obj)
                 if onlyMode
-                else self._convertToFileInfo(obj, path + '/' + obj.name)
+                else self._convert_to_file_info(obj, path + '/' + obj.name)
             )
             for obj in tree
             if obj.name
@@ -108,8 +108,8 @@ class GitMountSource(MountSource):
 
     @overrides(MountSource)
     def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
-        obj = self._lookUpPath(path)
-        return None if obj is None else self._convertToFileInfo(obj, path)
+        obj = self._look_up_path(path)
+        return None if obj is None else self._convert_to_file_info(obj, path)
 
     @overrides(MountSource)
     def versions(self, path: str) -> int:
@@ -121,7 +121,7 @@ class GitMountSource(MountSource):
         assert isinstance(path, str)
         # TODO Avoid high memory usage for very large files.
         #      Check whether pygit2 even has a kind of streaming API for file contents.
-        return io.BytesIO(self._lookUpPath(path).data)
+        return io.BytesIO(self._look_up_path(path).data)
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):

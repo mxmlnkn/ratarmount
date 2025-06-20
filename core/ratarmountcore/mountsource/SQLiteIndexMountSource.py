@@ -29,10 +29,10 @@ class SQLiteIndexMountSource(MountSource):
             # Open existing index without any corresponding archive, i.e., file open will not work!
             if isinstance(index, str):
                 with open(index, 'rb') as file:
-                    SQLiteIndexMountSource._quickCheckFile(file, index)
+                    SQLiteIndexMountSource._quick_check_file(file, index)
                 self.indexFilePath = index
             else:
-                SQLiteIndexMountSource._quickCheckFile(index, "File object")
+                SQLiteIndexMountSource._quick_check_file(index, "File object")
 
                 # Copy to a temporary file because sqlite cannot work with Python file objects. This can be wasteful!
                 index.seek(0)
@@ -49,7 +49,7 @@ class SQLiteIndexMountSource(MountSource):
                 raise RatarmountError(f"Specified file {self.indexFilePath} is not a valid Ratarmount index.")
 
     @staticmethod
-    def _quickCheckFile(fileObject: IO[bytes], name: str) -> None:
+    def _quick_check_file(fileObject: IO[bytes], name: str) -> None:
         try:
             if fileObject.read(len(SQLiteIndex.MAGIC_BYTES)) == SQLiteIndex.MAGIC_BYTES:
                 return
@@ -59,7 +59,7 @@ class SQLiteIndexMountSource(MountSource):
         raise RatarmountError(name + " is not an ratarmount index file.")
 
     @staticmethod
-    def _checkDatabase(connection) -> bool:
+    def _check_database(connection) -> bool:
         # May throw when sqlar does not exist or it is encrypted without the correct key being specified.
         result = connection.execute("SELECT name FROM sqlar LIMIT 1;").fetchone()
         return result and result[0]

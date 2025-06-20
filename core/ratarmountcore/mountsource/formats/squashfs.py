@@ -111,7 +111,7 @@ class LZMACompressor(Compressor):
     name = "lzma"
 
     def __init__(self, blockSize):
-        self._blockSize = blockSize
+        self._block_size = blockSize
         try:
             import lzma
         except ImportError:
@@ -134,7 +134,7 @@ class LZMACompressor(Compressor):
         return self._lib.decompress(
             src[LZMA_HEADER_SIZE:],
             format=self._lib.FORMAT_RAW,
-            filters=[{"id": self._lib.FILTER_LZMA1, 'lc': 3, 'lp': 0, 'pb': 2, 'dict_size': self._blockSize}],
+            filters=[{"id": self._lib.FILTER_LZMA1, 'lc': 3, 'lp': 0, 'pb': 2, 'dict_size': self._block_size}],
         )
 
 
@@ -145,8 +145,8 @@ class SquashFSFile(io.RawIOBase):
 
         self._offset = 0
         self._size = inode.data
-        self._blockSize = image._sblk.block_size
-        self._lastBlockIndex = inode.data // self._blockSize
+        self._block_size = image._sblk.block_size
+        self._lastBlockIndex = inode.data // self._block_size
 
         self._blockList = []
         self._dataToBlockOffset: Dict[int, int] = {}  # block offset may be negative (-size) for sparse blocks
@@ -160,7 +160,7 @@ class SquashFSFile(io.RawIOBase):
 
             compressedBlockOffset = inode.start
             for i, block in enumerate(self._blockList):
-                blockSize = self._size % self._blockSize if i == self._lastBlockIndex else self._blockSize
+                blockSize = self._size % self._block_size if i == self._lastBlockIndex else self._block_size
                 assert blockSize > 0
                 if block:
                     self._compressedBlockOffsets.append(compressedBlockOffset)
@@ -177,9 +177,9 @@ class SquashFSFile(io.RawIOBase):
         self._bufferIO: Optional[IO[bytes]] = None
         self._blockIndex = 0
         self._buffer = b''
-        self._refillBuffer(self._blockIndex)  # Requires self._blockList to be initialized
+        self._refill_buffer(self._blockIndex)  # Requires self._blockList to be initialized
 
-    def _refillBuffer(self, blockIndex: int) -> None:
+    def _refill_buffer(self, blockIndex: int) -> None:
         self._blockIndex = blockIndex
         self._buffer = b''
 
@@ -190,10 +190,10 @@ class SquashFSFile(io.RawIOBase):
                 start = self._compressedBlockOffsets[self._blockIndex]
                 self._buffer = self._image._read_data_block(start, block)
             else:
-                if (self._blockIndex + 1) * self._blockSize >= self._size:
-                    blockSize = max(0, self._size - self._blockIndex * self._blockSize)
+                if (self._blockIndex + 1) * self._block_size >= self._size:
+                    blockSize = max(0, self._size - self._blockIndex * self._block_size)
                 else:
-                    blockSize = self._blockSize
+                    blockSize = self._block_size
                 self._buffer = b'\0' * blockSize
         elif self._fragment and self._blockIndex == len(self._blockList):
             fragment = self._image._read_data_block(*self._fragment)
@@ -218,7 +218,7 @@ class SquashFSFile(io.RawIOBase):
             return result
 
         self._blockIndex += 1
-        self._refillBuffer(self._blockIndex)
+        self._refill_buffer(self._blockIndex)
         return self._bufferIO.read(size)
 
     @overrides(io.RawIOBase)
@@ -260,16 +260,16 @@ class SquashFSFile(io.RawIOBase):
             offset += self._size
 
         self._offset = max(0, min(offset, self._size))
-        bufferOffset = self._blockIndex * self._blockSize
+        bufferOffset = self._blockIndex * self._block_size
         if offset < bufferOffset or offset >= bufferOffset + len(self._buffer):
-            self._refillBuffer(offset // self._blockSize)  # Updates self._blockIndex!
-        self._bufferIO.seek(offset - self._blockIndex * self._blockSize)
+            self._refill_buffer(offset // self._block_size)  # Updates self._blockIndex!
+        self._bufferIO.seek(offset - self._blockIndex * self._block_size)
 
         return self.tell()
 
     @overrides(io.RawIOBase)
     def tell(self) -> int:
-        # Returning self._blockIndex * self._blockSize + self._bufferIO.tell() will not work when we have
+        # Returning self._blockIndex * self._block_size + self._bufferIO.tell() will not work when we have
         # an empty buffer after trying to read past the end of the file.
         return self._offset
 
@@ -446,13 +446,13 @@ class SquashFSMountSource(SQLiteIndexMountSource):
                 backendName='SquashFSMountSource',
             ),
             clearIndexCache=clearIndexCache,
-            checkMetadata=self._checkMetadata,
+            checkMetadata=self._check_metadata,
         )
 
         isFileObject = not isinstance(fileOrPath, str)
 
         if self.index.indexIsLoaded():
-            # self._loadOrStoreCompressionOffsets()  # load
+            # self._load_or_store_compression_offsets()  # load
             self.index.reloadIndexReadOnly()
         else:
             # Open new database when we didn't find an existing one.
@@ -463,18 +463,18 @@ class SquashFSMountSource(SQLiteIndexMountSource):
             else:
                 self.index.openInMemory()
 
-            self._createIndex()
-            # self._loadOrStoreCompressionOffsets()  # store
+            self._create_index()
+            # self._load_or_store_compression_offsets()  # store
             if self.index.indexIsLoaded():
-                self._storeMetadata()
+                self._store_metadata()
                 self.index.reloadIndexReadOnly()
 
-    def _storeMetadata(self) -> None:
+    def _store_metadata(self) -> None:
         argumentsToSave = ['encoding', 'transformPattern']
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
         self.index.storeMetadata(argumentsMetadata, self.archiveFilePath)
 
-    def _convertToRow(self, inodeOffset: int, info: "PySquashfsImage.file.File") -> Tuple:  # type: ignore
+    def _convert_to_row(self, inodeOffset: int, info: "PySquashfsImage.file.File") -> Tuple:  # type: ignore
         mode = info.mode
         linkname = ""
         if info.is_symlink:
@@ -514,7 +514,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
 
         return fileInfo
 
-    def _createIndex(self) -> None:
+    def _create_index(self) -> None:
         if self.printDebug >= 1:
             print(f"Creating offset dictionary for {self.archiveFilePath} ...")
         t0 = timer()
@@ -524,7 +524,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         # TODO Doing this in a chunked manner with generators would make it work better for large archives.
         fileInfos = []
         for inodeOffset, info in self.image:
-            fileInfos.append(self._convertToRow(inodeOffset, info))
+            fileInfos.append(self._convert_to_row(inodeOffset, info))
         self.index.setFileInfos(fileInfos)
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
@@ -587,7 +587,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
             'f_namemax': 256,
         }
 
-    def _checkMetadata(self, metadata: Dict[str, Any]) -> None:
+    def _check_metadata(self, metadata: Dict[str, Any]) -> None:
         """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
         SQLiteIndex.checkArchiveStats(self.archiveFilePath, metadata, self.verifyModificationTime)
 

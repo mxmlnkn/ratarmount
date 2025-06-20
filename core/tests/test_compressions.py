@@ -15,7 +15,7 @@ from ratarmountcore.compressions import (  # noqa: E402
 from ratarmountcore.utils import ALPHA, DIGITS, HEX, formatNumber  # noqa: E402
 
 
-def test_stripSuffixFromCompressedFile():
+def test_strip_suffix_from_compressed_file():
     ssc = stripSuffixFromCompressedFile
 
     assert ssc('a.tar.bz2') == 'a.tar'
@@ -29,7 +29,7 @@ def test_stripSuffixFromCompressedFile():
     assert ssc('a.mp3') == 'a.mp3'
 
 
-def test_stripSuffixFromArchive():
+def test_strip_suffix_from_archive():
     sst = stripSuffixFromArchive
 
     assert sst('a.tar.bz2') == 'a'
@@ -49,7 +49,7 @@ def test_stripSuffixFromArchive():
     assert sst('a.tzst') == 'a'
 
 
-def test_hasMatchingAlphabets():
+def test_has_matching_alphabets():
     matches = hasMatchingAlphabets
 
     assert matches('a', 'b')
@@ -65,7 +65,7 @@ def test_hasMatchingAlphabets():
     assert not matches('ag', 'b0')
 
 
-def test_checkForSequence():
+def test_check_for_sequence():
     def toAlpha1(i):
         return formatNumber(i, ALPHA, 1)
 

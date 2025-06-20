@@ -114,7 +114,7 @@ class ASARMountSource(SQLiteIndexMountSource):
                 backendName='ASARMountSource',
             ),
             clearIndexCache=clearIndexCache,
-            checkMetadata=self._checkMetadata,
+            checkMetadata=self._check_metadata,
         )
 
         # Try to get block size from the real opened file.
@@ -137,17 +137,17 @@ class ASARMountSource(SQLiteIndexMountSource):
             else:
                 self.index.openInMemory()
 
-            self._createIndex()
+            self._create_index()
             if self.index.indexIsLoaded():
-                self._storeMetadata()
+                self._store_metadata()
                 self.index.reloadIndexReadOnly()
 
-    def _storeMetadata(self) -> None:
+    def _store_metadata(self) -> None:
         argumentsToSave = ['encoding', 'transformPattern']
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
         self.index.storeMetadata(argumentsMetadata, self.archiveFilePath)
 
-    def _convertToRow(self, fullPath, entry: Dict[str, Any], dataOffset: int) -> Tuple:
+    def _convert_to_row(self, fullPath, entry: Dict[str, Any], dataOffset: int) -> Tuple:
         path, name = SQLiteIndex.normpath(self.transform(fullPath)).rsplit("/", 1)
 
         isFile = 'offset' in entry and 'size' in entry
@@ -180,7 +180,7 @@ class ASARMountSource(SQLiteIndexMountSource):
 
         return fileInfo
 
-    def _createIndex(self) -> None:
+    def _create_index(self) -> None:
         if self.printDebug >= 1:
             print(f"Creating offset dictionary for {self.archiveFilePath} ...")
         t0 = timer()
@@ -194,12 +194,12 @@ class ASARMountSource(SQLiteIndexMountSource):
 
         # This code is complex to avoid recursion.
         toProcess = [("/", header)]
-        fileInfos = [self._convertToRow("/", header, self._dataOffset)]
+        fileInfos = [self._convert_to_row("/", header, self._dataOffset)]
         while toProcess:
             prefix, entry = toProcess.pop()
             children = [(prefix + "/" + path, nestedEntry) for path, nestedEntry in entry['files'].items()]
             # toProcess must only contain folder entries, which have a 'files' key mapping to a dictionary.
-            fileInfos += [self._convertToRow(path, nestedEntry, self._dataOffset) for path, nestedEntry in children]
+            fileInfos += [self._convert_to_row(path, nestedEntry, self._dataOffset) for path, nestedEntry in children]
             # Appending leads to depth-first traversal, while prepending leads to breadth-first traversal.
             # Depth-first should be slightly less memory intensive. Note that the dictionary should only store
             # a pointer to the shared mutable Python object, but the path strings will use up memory.
@@ -228,7 +228,7 @@ class ASARMountSource(SQLiteIndexMountSource):
         if not self.isFileObject:
             self.fileObject.close()
 
-    def _openStencil(self, offset: int, size: int, buffering: int) -> IO[bytes]:
+    def _open_stencil(self, offset: int, size: int, buffering: int) -> IO[bytes]:
         if buffering == 0:
             return cast(IO[bytes], RawStenciledFile([(self.fileObject, offset, size)], self.fileObjectLock))
         return cast(
@@ -245,9 +245,9 @@ class ASARMountSource(SQLiteIndexMountSource):
         assert fileInfo.userdata
         extendedFileInfo = fileInfo.userdata[-1]
         assert isinstance(extendedFileInfo, SQLiteIndexedTarUserData)
-        return self._openStencil(extendedFileInfo.offset, fileInfo.size, buffering)
+        return self._open_stencil(extendedFileInfo.offset, fileInfo.size, buffering)
 
-    def _checkMetadata(self, metadata: Dict[str, Any]) -> None:
+    def _check_metadata(self, metadata: Dict[str, Any]) -> None:
         """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
         SQLiteIndex.checkArchiveStats(self.archiveFilePath, metadata, self.verifyModificationTime)
 

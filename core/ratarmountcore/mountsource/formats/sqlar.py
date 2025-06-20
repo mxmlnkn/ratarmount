@@ -135,10 +135,10 @@ class SQLARMountSource(MountSource):
         magicBytes = b""
         if isinstance(fileOrPath, str):
             with open(fileOrPath, 'rb') as file:
-                magicBytes = SQLARMountSource._quickCheckFile(file, fileOrPath, passwords)
+                magicBytes = SQLARMountSource._quick_check_file(file, fileOrPath, passwords)
             self.indexFilePath = fileOrPath
         else:
-            magicBytes = SQLARMountSource._quickCheckFile(fileOrPath, "File object", passwords)
+            magicBytes = SQLARMountSource._quick_check_file(fileOrPath, "File object", passwords)
 
             # Copy to a temporary file because sqlite cannot work with Python file objects. This can be wasteful!
             fileOrPath.seek(0)
@@ -153,13 +153,13 @@ class SQLARMountSource(MountSource):
         try:
             # check_same_thread=False can be used because it is read-only and allows to enable FUSE multithreading.
             connection = sqlite3.connect(uriPath, uri=True, check_same_thread=False)
-            SQLARMountSource._checkDatabase(connection)
+            SQLARMountSource._check_database(connection)
         except sqlite3.DatabaseError:
             if connection:
                 connection.close()
                 connection = None
             if passwords and sqlcipher3 is not None and PBKDF2HMAC is not None and len(magicBytes) >= 16:
-                connection = self._findPassword(uriPath, passwords, salt=magicBytes[:16])
+                connection = self._find_password(uriPath, passwords, salt=magicBytes[:16])
             if not connection:
                 raise
         assert connection
@@ -168,7 +168,7 @@ class SQLARMountSource(MountSource):
         self.options = options
 
     @staticmethod
-    def _quickCheckFile(fileObject: IO[bytes], name: str, passwords: Optional[List[bytes]]) -> bytes:
+    def _quick_check_file(fileObject: IO[bytes], name: str, passwords: Optional[List[bytes]]) -> bytes:
         try:
             magicBytes = fileObject.read(len(SQLARMountSource._MAGIC_BYTES))
         finally:
@@ -185,13 +185,13 @@ class SQLARMountSource(MountSource):
         raise ValueError(message)
 
     @staticmethod
-    def _checkDatabase(connection) -> bool:
+    def _check_database(connection) -> bool:
         # May throw when sqlar does not exist or it is encrypted without the correct key being specified.
         result = connection.execute("SELECT name FROM sqlar LIMIT 1;").fetchone()
         return result and result[0]
 
     @staticmethod
-    def _findPassword(uriPath: str, passwords: List[bytes], salt: bytes):
+    def _find_password(uriPath: str, passwords: List[bytes], salt: bytes):
         for password in passwords:
             # Do the key derivation manually in order to support all characters in passwords, even " and ;.
             # https://stackoverflow.com/a/79657272
@@ -219,14 +219,14 @@ class SQLARMountSource(MountSource):
                 #   2025-06-07 20:42:22.736: ERROR CORE sqlcipher_page_cipher: hmac check failed for pgno=1
                 #   2025-06-07 20:42:22.736: ERROR CORE sqlite3Codec: error decrypting page 1 data: 1
                 #   2025-06-07 20:42:22.736: ERROR CORE sqlcipher_codec_ctx_set_error 1
-                SQLARMountSource._checkDatabase(connection)
+                SQLARMountSource._check_database(connection)
                 return connection
             except sqlcipher3.DatabaseError:  # pylint:disable=no-member
                 pass
         return None
 
     @staticmethod
-    def _convertToFileInfo(rowid: int, mode: int, mtime: int, size: int, linkname: str) -> FileInfo:
+    def _convert_to_file_info(rowid: int, mode: int, mtime: int, size: int, linkname: str) -> FileInfo:
         # fmt: off
         return FileInfo(
             size     = max(0, int(size)),
@@ -247,7 +247,7 @@ class SQLARMountSource(MountSource):
     def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         pathGlob = "*" if path == "/" else path.strip("/") + "/*"
         return {
-            name: SQLARMountSource._convertToFileInfo(rowid, mode, mtime, size, linkname)
+            name: SQLARMountSource._convert_to_file_info(rowid, mode, mtime, size, linkname)
             for name, rowid, mode, mtime, size, linkname in self.connection.execute(
                 f"SELECT substr(name,(?)),{SQLARMountSource._SQLITE_FILEINFO_COLUMNS} FROM sqlar "
                 "WHERE name GLOB (?) AND substr(name,(?)) NOT GLOB '*/*'",
@@ -273,7 +273,7 @@ class SQLARMountSource(MountSource):
         result = self.connection.execute(
             f"SELECT {SQLARMountSource._SQLITE_FILEINFO_COLUMNS} FROM sqlar WHERE name=(?)", (path.strip("/"),)
         ).fetchone()
-        return self._convertToFileInfo(*result) if result else None
+        return self._convert_to_file_info(*result) if result else None
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:

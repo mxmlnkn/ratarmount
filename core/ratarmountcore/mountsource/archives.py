@@ -25,7 +25,7 @@ except (ImportError, AttributeError):
 FID = FileFormatID
 
 
-def _openTarMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource:
+def _open_tar_mount_source(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource:
     if isinstance(fileOrPath, str):
         if 'tarFileName' in options:
             copiedOptions = options.copy()
@@ -35,7 +35,7 @@ def _openTarMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> MountSo
     return SQLiteIndexedTar(fileObject=fileOrPath, **options)
 
 
-def _openLibarchiveMountSource(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
+def _open_libarchive_mount_source(fileOrPath: Union[str, IO[bytes]], **options) -> Optional[MountSource]:
     if libarchive is None:
         return None
 
@@ -83,7 +83,7 @@ class ArchiveBackendInfo:
 ARCHIVE_BACKENDS: Dict[str, ArchiveBackendInfo] = {
     "rarfile": ArchiveBackendInfo(RarMountSource, {FID.RAR}, [('rarfile', 'rarfile')]),
     "tarfile": ArchiveBackendInfo(
-        _openTarMountSource, {FID.TAR, FID.GZIP, FID.BZIP2, FID.XZ, FID.ZSTANDARD}, [('tarfile', '')]
+        _open_tar_mount_source, {FID.TAR, FID.GZIP, FID.BZIP2, FID.XZ, FID.ZSTANDARD}, [('tarfile', '')]
     ),
     "zipfile": ArchiveBackendInfo(ZipMountSource, {FID.ZIP}, [('zipfile', '')]),
     "PySquashfsImage": ArchiveBackendInfo(
@@ -101,7 +101,7 @@ ARCHIVE_BACKENDS: Dict[str, ArchiveBackendInfo] = {
     # > LHA can be identified with high accuracy, but doing so can be laborious,
     # > due to the lack of a signature, and other complicating factors.
     "libarchive": ArchiveBackendInfo(
-        _openLibarchiveMountSource,
+        _open_libarchive_mount_source,
         {
             FID.AR,
             FID.CAB,
