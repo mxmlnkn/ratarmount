@@ -150,7 +150,7 @@ class UnionMountSource(MountSource):
         files: Optional[Union[Set[str], Dict[str, FileInfo], Dict[str, int]]] = None
 
         for mountSource in reversed(self.mountSources):
-            result = mountSource.listDirModeOnly(path) if onlyMode else mountSource.listDir(path)
+            result = mountSource.list_mode(path) if onlyMode else mountSource.listDir(path)
 
             if files is None:
                 if isinstance(result, dict):
@@ -181,7 +181,7 @@ class UnionMountSource(MountSource):
         return self._listDir(path, onlyMode=False)
 
     @overrides(MountSource)
-    def listDirModeOnly(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+    def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
         """
         Returns the set of all folder contents over all mount sources or None if the path was found in none of them.
         """

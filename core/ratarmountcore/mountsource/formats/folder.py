@@ -132,7 +132,7 @@ class FolderMountSource(MountSource):
         }
 
     @overrides(MountSource)
-    def listDirModeOnly(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+    def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
         realpath = self._realpath(path)
         if not os.path.isdir(realpath):
             return None

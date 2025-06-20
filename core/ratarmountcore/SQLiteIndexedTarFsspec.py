@@ -42,7 +42,7 @@ class MountSourceFileSystem(fsspec.spec.AbstractFileSystem):
                 result = {name: self.mountSource.getFileInfo(name) for name in result}
             return [self._fileInfoToDict(name, info) for name, info in result.items() if info is not None]
 
-        result = self.mountSource.listDirModeOnly(strippedPath)
+        result = self.mountSource.list_mode(strippedPath)
         if result is None:
             raise FileNotFoundError(path)
         return list(result.keys()) if isinstance(result, dict) else result

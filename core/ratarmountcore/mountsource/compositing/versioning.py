@@ -182,8 +182,8 @@ class FileVersionLayer(MountSource):
         return self._listDirWrapper(self.mountSource.listDir, path)
 
     @overrides(MountSource)
-    def listDirModeOnly(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
-        return self._listDirWrapper(self.mountSource.listDirModeOnly, path)
+    def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+        return self._listDirWrapper(self.mountSource.list_mode, path)
 
     @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:

@@ -345,7 +345,7 @@ class FuseMount(fuse.Operations):
         tuples. attrs is a dict as in getattr.
         '''
 
-        files = self.mountSource.listDirModeOnly(path)
+        files = self.mountSource.list_mode(path)
 
         # we only need to return these special directories. FUSE automatically expands these and will not ask
         # for paths like /../foo/./../bar, so we don't need to worry about cleaning such paths

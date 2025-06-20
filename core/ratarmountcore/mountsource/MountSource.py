@@ -43,7 +43,7 @@ class MountSource(ABC):
     def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         pass
 
-    def listDirModeOnly(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+    def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
         """
         This function can and should be overwritten with something that is faster than listDir
         because only a simple path -> mode mapping needs to be returned, not all file metadata.

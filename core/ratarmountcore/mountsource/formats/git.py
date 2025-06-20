@@ -103,7 +103,7 @@ class GitMountSource(MountSource):
         return self._listDir(path, onlyMode=False)
 
     @overrides(MountSource)
-    def listDirModeOnly(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+    def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
         return self._listDir(path, onlyMode=True)
 
     @overrides(MountSource)

@@ -85,7 +85,7 @@ class EXT4MountSource(MountSource):
         return self._listDir(path, EXT4MountSource._convertEXT4DirectoryEntryToFileInfo)
 
     @overrides(MountSource)
-    def listDirModeOnly(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+    def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
         return self._listDir(path, lambda inode: inode.i_mode.value)
 
     @overrides(MountSource)

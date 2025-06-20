@@ -256,7 +256,7 @@ class SQLARMountSource(MountSource):
         }
 
     @overrides(MountSource)
-    def listDirModeOnly(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+    def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
         pathGlob = "*" if path == "/" else path.strip("/") + "/*"
         return dict(
             self.connection.execute(

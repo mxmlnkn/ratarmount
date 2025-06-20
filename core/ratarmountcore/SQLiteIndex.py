@@ -939,7 +939,7 @@ class SQLiteIndex:
         directory.pop('', None)
         return directory if gotResults else None
 
-    def listDirModeOnly(self, path: str) -> Optional[Dict[str, int]]:
+    def list_mode(self, path: str) -> Optional[Dict[str, int]]:
         """
         Return a dictionary mapping file names to file modes for the given directory path or None
         if the path does not exist.
