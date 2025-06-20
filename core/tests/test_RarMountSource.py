@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from ratarmountcore.mountsource.formats.rar import RarMountSource  # noqa: E402
 
 
-def findTestFile(relativePathOrName):
+def find_test_file(relativePathOrName):
     for i in range(3):
         path = os.path.sep.join([".."] * i + ["tests", relativePathOrName])
         if os.path.exists(path):
@@ -22,7 +22,7 @@ def findTestFile(relativePathOrName):
 class TestRarMountSource:
     @staticmethod
     def test_simple_usage():
-        with RarMountSource(findTestFile('folder-symlink.rar')) as mountSource:
+        with RarMountSource(find_test_file('folder-symlink.rar')) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
                 fileInfo = mountSource.lookup(folder)
                 assert fileInfo

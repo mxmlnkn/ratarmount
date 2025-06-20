@@ -6,7 +6,7 @@ import os
 import stat
 import sys
 
-from helpers import copyTestFile
+from helpers import copy_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -16,7 +16,7 @@ from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSo
 class TestSQLiteIndexMountSource:
     @staticmethod
     def test_password():
-        with copyTestFile("nested-tar.index.sqlite") as path, SQLiteIndexMountSource(path) as mountSource:
+        with copy_test_file("nested-tar.index.sqlite") as path, SQLiteIndexMountSource(path) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
                 fileInfo = mountSource.lookup(folder)
                 assert fileInfo

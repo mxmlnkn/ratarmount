@@ -5,7 +5,7 @@
 import os
 import sys
 
-from helpers import findTestFile
+from helpers import find_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -22,7 +22,7 @@ from ratarmountcore.formats import (  # noqa: E402
 
 def test_format_detection():
     # This test assumes that we use correct extensions for all files in the tests folder.
-    folder = os.path.dirname(findTestFile("tests/single-file.tar"))
+    folder = os.path.dirname(find_test_file("tests/single-file.tar"))
     for name in os.listdir(folder):
         path = os.path.join(folder, name)
         if not os.path.isfile(path):

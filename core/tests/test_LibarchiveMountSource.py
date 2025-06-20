@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 
 import pytest
-from helpers import copyTestFile, findTestFile
+from helpers import copy_test_file, find_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -23,7 +23,7 @@ class TestLibarchiveMountSource:
     @staticmethod
     @pytest.mark.parametrize('compression', ['7z', 'rar', 'zip'])
     def test_simple_usage(compression):
-        with copyTestFile('folder-symlink.' + compression) as path, LibarchiveMountSource(path) as mountSource:
+        with copy_test_file('folder-symlink.' + compression) as path, LibarchiveMountSource(path) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
                 fileInfo = mountSource.lookup(folder)
                 assert fileInfo
@@ -54,7 +54,7 @@ class TestLibarchiveMountSource:
     @staticmethod
     @pytest.mark.parametrize('compression', ['7z', 'rar', 'zip'])
     def test_transform(compression):
-        with copyTestFile('folder-symlink.' + compression) as path, LibarchiveMountSource(
+        with copy_test_file('folder-symlink.' + compression) as path, LibarchiveMountSource(
             path, transform=("(.)/(.)", r"\1_\2")
         ) as mountSource:
             for folder in ['/', '/foo', '/foo_fighter']:
@@ -83,7 +83,7 @@ class TestLibarchiveMountSource:
     # @pytest.mark.parametrize("compression", ["7z", "rar", "zip"])
     @pytest.mark.parametrize('compression', ['zip'])
     def test_password(compression):
-        with copyTestFile('encrypted-nested-tar.' + compression) as path, LibarchiveMountSource(
+        with copy_test_file('encrypted-nested-tar.' + compression) as path, LibarchiveMountSource(
             path, passwords=['foo']
         ) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
@@ -107,7 +107,7 @@ class TestLibarchiveMountSource:
     @staticmethod
     @pytest.mark.parametrize('compression', ['bz2', 'gz', 'lrz', 'lz4', 'lzip', 'lzma', 'lzo', 'xz', 'Z', 'zst'])
     def test_stream_compressed(compression):
-        with copyTestFile('simple.' + compression) as path, LibarchiveMountSource(
+        with copy_test_file('simple.' + compression) as path, LibarchiveMountSource(
             path, passwords=['foo']
         ) as mountSource:
             for folder in ['/']:
@@ -140,7 +140,7 @@ class TestLibarchiveMountSource:
         ],
     )
     def test_file_independence(path, lineSize):
-        with copyTestFile(path) as copiedPath, LibarchiveMountSource(copiedPath) as mountSource:
+        with copy_test_file(path) as copiedPath, LibarchiveMountSource(copiedPath) as mountSource:
             with mountSource.open(mountSource.lookup('zeros-32-MiB.txt')) as fileWithZeros:
                 expectedZeros = b'0' * (lineSize - 1) + b'\n'
                 assert fileWithZeros.read(lineSize) == expectedZeros
@@ -188,7 +188,7 @@ class TestLibarchiveMountSource:
 
     @staticmethod
     def test_file_object_reader():
-        memoryFile = io.BytesIO(Path(findTestFile('folder-symlink.zip')).read_bytes())
+        memoryFile = io.BytesIO(Path(find_test_file('folder-symlink.zip')).read_bytes())
         with IterableArchive(memoryFile) as archive:
             while True:
                 entry = archive.nextEntry()
@@ -207,10 +207,10 @@ class TestLibarchiveMountSource:
     def create_large_file(tarPath, compression, fileCount):
         # I have committed the resulting bz2 file to save test time.
         t0 = time.time()
-        createFile = TestLibarchiveMountSource._create_file
+        create_file = TestLibarchiveMountSource._create_file
         with tarfile.open(name=tarPath, mode='w:' + compression) as tarFile:
             for i in range(fileCount):
-                createFile(tarFile, name=str(i), contents=str(i % 10))
+                create_file(tarFile, name=str(i), contents=str(i % 10))
                 if i % 50_000 == 0:
                     print(f"Added {i} out of {fileCount} files to .tar.{compression} in {time.time() - t0:.3f} s")
 

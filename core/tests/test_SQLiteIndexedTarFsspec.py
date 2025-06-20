@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from ratarmountcore.SQLiteIndexedTarFsspec import SQLiteIndexedTarFileSystem as RatarFS  # noqa: E402
 
 
-def findTestFile(relativePathOrName):
+def find_test_file(relativePathOrName):
     for i in range(3):
         path = os.path.sep.join([".."] * i + ["tests", relativePathOrName])
         if os.path.exists(path):
@@ -31,7 +31,7 @@ def findTestFile(relativePathOrName):
 
 
 def test_file_system():
-    fs = RatarFS(findTestFile('single-file.tar'))
+    fs = RatarFS(find_test_file('single-file.tar'))
 
     assert 'bar' in fs.ls("/", detail=False)
     assert 'bar' in [info['name'] for info in fs.ls("/", detail=True)]
@@ -51,13 +51,13 @@ def test_file_system():
         assert file.read() == b"foo\n"
 
 
-def test_URLContextManager():
-    with fsspec.open("ratar://bar::file://" + findTestFile('single-file.tar')) as file:
+def test_url_context_manager():
+    with fsspec.open("ratar://bar::file://" + find_test_file('single-file.tar')) as file:
         assert file.read() == b"foo\n"
 
 
-def test_URL():
-    openedFile = fsspec.open("ratar://bar::file://" + findTestFile('single-file.tar'))
+def test_url():
+    openedFile = fsspec.open("ratar://bar::file://" + find_test_file('single-file.tar'))
     with openedFile as file:
         assert file.read() == b"foo\n"
 

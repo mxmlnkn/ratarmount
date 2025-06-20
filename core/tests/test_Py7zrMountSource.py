@@ -6,7 +6,7 @@ import os
 import stat
 import sys
 
-from helpers import copyTestFile
+from helpers import copy_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -19,7 +19,9 @@ class TestPy7zrMountSource:
         if py7zr is None or not py7zr.__version__.startswith("1.0"):
             return
 
-        with copyTestFile('encrypted-nested-tar.7z') as path, Py7zrMountSource(path, passwords=[b'foo']) as mountSource:
+        with copy_test_file('encrypted-nested-tar.7z') as path, Py7zrMountSource(
+            path, passwords=[b'foo']
+        ) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
                 fileInfo = mountSource.lookup(folder)
                 assert fileInfo

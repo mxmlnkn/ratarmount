@@ -5,7 +5,7 @@ import os
 import stat
 import sys
 
-from helpers import copyTestFile
+from helpers import copy_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -26,7 +26,7 @@ class TestAutoMountLayer:
             'transformRecursiveMountPoint': ('.*/([^/]*).tar', r'\1'),
         }
 
-        with copyTestFile("packed-100-times.tar.gz") as path, openMountSource(path, **options) as mountSource:
+        with copy_test_file("packed-100-times.tar.gz") as path, openMountSource(path, **options) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
 
             assert recursivelyMounted.list('/')
@@ -49,7 +49,7 @@ class TestAutoMountLayer:
         #      other files and those other files will actually take 10x or more longer than without this test running
         #      before! It might be that the memory usage makes Python's garbage collector a bottleneck because of too
         #      many small objects?!
-        with copyTestFile("compressed-100-times.tar.gz") as path, openMountSource(path, **options) as mountSource:
+        with copy_test_file("compressed-100-times.tar.gz") as path, openMountSource(path, **options) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
 
             assert recursivelyMounted.list('/')
@@ -107,7 +107,7 @@ class TestAutoMountLayer:
         if sys.platform.startswith('darwin'):
             return
 
-        with copyTestFile("compressed-100-times.gz") as path, openMountSource(path, **options) as mountSource:
+        with copy_test_file("compressed-100-times.gz") as path, openMountSource(path, **options) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
 
             assert recursivelyMounted.list('/')
@@ -124,7 +124,7 @@ class TestAutoMountLayer:
             'parallelization': parallelization,
         }
 
-        with copyTestFile("tests/double-compressed-nested-tar.tgz.tgz") as path, openMountSource(
+        with copy_test_file("tests/double-compressed-nested-tar.tgz.tgz") as path, openMountSource(
             path, **options
         ) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
@@ -152,24 +152,24 @@ class TestAutoMountLayer:
             'recursionDepth': maxRecursionDepth,
             'parallelization': parallelization,
         }
-        with copyTestFile(archivePath) as path, openMountSource(path, **options) as mountSource:
+        with copy_test_file(archivePath) as path, openMountSource(path, **options) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
             assert recursivelyMounted.list('/')
 
             maxDepth = 6
             recursionDepth = maxDepth if maxRecursionDepth is None else maxRecursionDepth
 
-            def checkDirectory(fileInfo):
+            def check_directory(fileInfo):
                 assert fileInfo
                 assert stat.S_ISDIR(fileInfo.mode)
 
-            def checkFile(fileInfo, size=None):
+            def check_file(fileInfo, size=None):
                 assert fileInfo
                 assert fileInfo.size == size
                 assert not stat.S_ISDIR(fileInfo.mode)
                 assert stat.S_ISREG(fileInfo.mode)
 
-            def checkNonExisting(fileInfo):
+            def check_non_existing(fileInfo):
                 assert not fileInfo
 
             # This was insane brainfuck... Off by one errors everywhere.
@@ -177,49 +177,49 @@ class TestAutoMountLayer:
             nestedRoot = f"/{name}.tgz.tgz/nested-tar.tar.gz"
             testPaths = {
                 f"/{name}.tgz.tgz": {
-                    0: lambda path: checkFile(path, size=436),
-                    1: lambda path: checkDirectory,
+                    0: lambda path: check_file(path, size=436),
+                    1: lambda path: check_directory,
                 },
                 f"/{name}.tgz.tgz/{name}.tgz.tgz": {
-                    1: lambda path: checkFile(path, size=10240),
-                    2: lambda path: checkDirectory,
+                    1: lambda path: check_file(path, size=10240),
+                    2: lambda path: check_directory,
                 },
                 nestedRoot: {
-                    2: lambda path: checkFile(path, size=291),
-                    3: lambda path: checkDirectory,
+                    2: lambda path: check_file(path, size=291),
+                    3: lambda path: check_directory,
                 },
                 # This file is only visible when only the gzip compression has been undone.
                 # And the name is probably the one stored in gzip itself. It has support for that!
                 # For the next recursion, this virtual file will be replaced by the actual contents.
                 nestedRoot
                 + "/nested-tar.tar": {
-                    3: lambda path: checkFile(path, size=20480),
-                    4: checkNonExisting,
+                    3: lambda path: check_file(path, size=20480),
+                    4: check_non_existing,
                 },
                 nestedRoot
                 + "/foo": {
-                    4: lambda path: checkDirectory,
+                    4: lambda path: check_directory,
                 },
                 nestedRoot
                 + "/foo/fighter": {
-                    4: lambda path: checkDirectory,
+                    4: lambda path: check_directory,
                 },
                 nestedRoot
                 + "/foo/fighter/ufo": {
-                    4: lambda path: checkFile(path, size=6),
+                    4: lambda path: check_file(path, size=6),
                 },
                 nestedRoot
                 + "/foo/lighter.tar": {
-                    4: lambda path: checkFile(path, size=10240),
-                    5: lambda path: checkDirectory,
+                    4: lambda path: check_file(path, size=10240),
+                    5: lambda path: check_directory,
                 },
                 nestedRoot
                 + "/foo/lighter.tar/fighter": {
-                    5: lambda path: checkDirectory,
+                    5: lambda path: check_directory,
                 },
                 nestedRoot
                 + "/foo/lighter.tar/fighter/bar": {
-                    5: lambda path: checkFile(path, size=10),
+                    5: lambda path: check_file(path, size=10),
                 },
             }
 

@@ -37,7 +37,7 @@ def test_ceil_div():
     assert ceilDiv(5, 2) == 3
 
 
-def test_Prefetcher():
+def test_prefetcher():
     memorySize = 4
     prefetcher = Prefetcher(memorySize)
 
@@ -81,7 +81,7 @@ def test_Prefetcher():
     assert list(prefetcher.prefetch(8)) == [1]
 
 
-def test_LRUCache():
+def test_lru_cache():
     cache = LRUCache(3)
 
     assert not cache

@@ -33,7 +33,7 @@ except ImportError:
     sqlcipher3 = None  # type:ignore
 
 
-def findTestFile(relativePathOrName):
+def find_test_file(relativePathOrName):
     for i in range(3):
         path = os.path.sep.join([".."] * i + ["tests", relativePathOrName])
         if os.path.exists(path):
@@ -42,10 +42,10 @@ def findTestFile(relativePathOrName):
 
 
 @contextlib.contextmanager
-def copyTestFile(relativePathOrName):
+def copy_test_file(relativePathOrName):
     with tempfile.TemporaryDirectory() as folder:
         path = os.path.join(folder, os.path.basename(relativePathOrName))
-        shutil.copy(findTestFile(relativePathOrName), path)
+        shutil.copy(find_test_file(relativePathOrName), path)
         yield path
 
 
@@ -67,7 +67,7 @@ class RunRatarmount:
         sys.stderr = io.StringIO()
 
         self.thread.start()
-        self.waitForMountPoint()
+        self.wait_for_mount_point()
 
         return self
 
@@ -92,7 +92,7 @@ class RunRatarmount:
             self.unmount()
             self.thread.join(self.timeout)
 
-    def getStdout(self):
+    def get_stdout(self):
         oldPosition = sys.stdout.tell()
         try:
             sys.stdout.seek(0)
@@ -100,7 +100,7 @@ class RunRatarmount:
         finally:
             sys.stdout.seek(oldPosition)
 
-    def getStderr(self):
+    def get_stderr(self):
         oldPosition = sys.stderr.tell()
         try:
             sys.stderr.seek(0)
@@ -108,7 +108,7 @@ class RunRatarmount:
         finally:
             sys.stderr.seek(oldPosition)
 
-    def waitForMountPoint(self):
+    def wait_for_mount_point(self):
         t0 = time.time()
         while True:
             if os.path.ismount(self.mountPoint):
@@ -122,16 +122,16 @@ class RunRatarmount:
                 raise RuntimeError(
                     "Expected mount point but it isn't one!"
                     "\n===== stderr =====\n"
-                    + self.getStderr()
+                    + self.get_stderr()
                     + "\n===== stdout =====\n"
-                    + self.getStdout()
+                    + self.get_stdout()
                     + "\n===== mount =====\n"
                     + mount_list
                 )
             time.sleep(0.1)
 
     def unmount(self):
-        self.waitForMountPoint()
+        self.wait_for_mount_point()
 
         ratarmountcli(['-u', self.mountPoint])
 
@@ -150,7 +150,7 @@ class RunRatarmount:
 def test_password(tmpdir, compression):
     password = 'foo'
     mountPoint = str(tmpdir)
-    with copyTestFile("encrypted-nested-tar." + compression) as encryptedFile, RunRatarmount(
+    with copy_test_file("encrypted-nested-tar." + compression) as encryptedFile, RunRatarmount(
         mountPoint, ['--password', password, encryptedFile]
     ):
         assert os.path.isdir(os.path.join(mountPoint, "foo"))
@@ -170,7 +170,7 @@ def test_password_list(tmpdir, passwords, compression):
     with open(passwordFile, 'w', encoding='utf-8') as file:
         file.writelines(password + '\n' for password in passwords)
 
-    with copyTestFile("tests/encrypted-nested-tar." + compression) as encryptedFile, RunRatarmount(
+    with copy_test_file("tests/encrypted-nested-tar." + compression) as encryptedFile, RunRatarmount(
         mountPoint, ['--password-file', passwordFile, encryptedFile]
     ):
         assert os.path.isdir(os.path.join(mountPoint, "foo"))
@@ -338,7 +338,7 @@ if ext4:
 @pytest.mark.parametrize("parallelization", [1, 2, 0])
 @pytest.mark.parametrize(("checksum", "archivePath", "pathInArchive"), ARCHIVES_TO_TEST)
 def test_file_in_archive(archivePath, pathInArchive, checksum, parallelization):
-    with copyTestFile(archivePath) as tmpArchive:
+    with copy_test_file(archivePath) as tmpArchive:
         assert os.path.isfile(tmpArchive)
         mountPoint = os.path.join(os.path.dirname(tmpArchive), "mountPoint")
         args = [
@@ -371,7 +371,7 @@ def test_file_in_archive(archivePath, pathInArchive, checksum, parallelization):
                 assert hashlib.md5(contents).hexdigest() == checksum
 
                 if '.tar' in tmpArchive and '.7z' not in tmpArchive:
-                    output = ratarmountInstance.getStdout() + ratarmountInstance.getStderr()
+                    output = ratarmountInstance.get_stdout() + ratarmountInstance.get_stderr()
                     if forceIndexCreation:
                         if "Creating offset dictionary" not in output:
                             print(

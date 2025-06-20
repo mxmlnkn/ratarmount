@@ -15,7 +15,7 @@ from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar  # noqa: E40
 from ratarmountcore.mountsource.formats.zip import ZipMountSource  # noqa: E402
 
 
-def findTestFile(relativePathOrName):
+def find_test_file(relativePathOrName):
     for i in range(3):
         path = os.path.sep.join([".."] * i + ["tests", relativePathOrName])
         if os.path.exists(path):
@@ -62,7 +62,7 @@ class TestOpenMountSource:
 
     @staticmethod
     def test_chimera_file(transform_path):
-        chimeraFilePath = transform_path(Path(findTestFile("chimera-tbz2-zip")))
+        chimeraFilePath = transform_path(Path(find_test_file("chimera-tbz2-zip")))
         indexPath = Path(str(chimeraFilePath) + ".index.sqlite")
         if indexPath.exists():
             indexPath.unlink()

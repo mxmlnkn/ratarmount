@@ -14,7 +14,7 @@ try:
 except ImportError:
     sqlcipher3 = None  # type:ignore
 
-from helpers import copyTestFile
+from helpers import copy_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -28,7 +28,7 @@ class TestSQLARMountSource:
     def test_password(path, passwords):
         if 'encrypted' in path and (not sqlcipher3 or not passwords):
             return
-        with copyTestFile(path) as tmpPath, SQLARMountSource(tmpPath, passwords=passwords) as mountSource:
+        with copy_test_file(path) as tmpPath, SQLARMountSource(tmpPath, passwords=passwords) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
                 fileInfo = mountSource.lookup(folder)
                 assert fileInfo

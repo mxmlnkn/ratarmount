@@ -62,7 +62,7 @@ class TestStenciledFile:
         assert StenciledFile([(tmpFile, 0, len(testData))]).read() == testData
 
     @staticmethod
-    def test_1B_stencils():
+    def test_1_byte_stencils():
         assert TestStenciledFile._create_stenciled_file(tmpFile, [(0, 1), (1, 1)]).read() == b"12"
         assert TestStenciledFile._create_stenciled_file(tmpFile, [(0, 1), (2, 1)]).read() == b"13"
         assert TestStenciledFile._create_stenciled_file(tmpFile, [(1, 1), (0, 1)]).read() == b"21"
@@ -70,7 +70,7 @@ class TestStenciledFile:
         assert TestStenciledFile._create_stenciled_file(tmpFile, [(1, 1), (2, 1), (0, 1)]).read() == b"231"
 
     @staticmethod
-    def test_2B_stencils():
+    def test_2_byte_stencils():
         assert TestStenciledFile._create_stenciled_file(tmpFile, [(0, 2), (1, 2)]).read() == b"1223"
         assert TestStenciledFile._create_stenciled_file(tmpFile, [(0, 2), (2, 2)]).read() == b"1234"
         assert TestStenciledFile._create_stenciled_file(tmpFile, [(1, 2), (0, 2)]).read() == b"2312"

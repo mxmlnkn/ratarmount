@@ -10,7 +10,7 @@ import struct
 import sys
 
 import pytest
-from helpers import copyTestFile
+from helpers import copy_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -47,7 +47,7 @@ class TestSquashfsMountSource:
     @staticmethod
     @pytest.mark.parametrize('compression', compressionsToTest)
     def test_simple_usage(compression):
-        with copyTestFile(f'folder-symlink.{compression}.squashfs') as path, SquashFSMountSource(path) as mountSource:
+        with copy_test_file(f'folder-symlink.{compression}.squashfs') as path, SquashFSMountSource(path) as mountSource:
             with open(path, 'rb') as file:
                 assert findSquashFSOffset(file) == 0
 
@@ -98,7 +98,7 @@ class TestSquashfsMountSource:
     @staticmethod
     @pytest.mark.parametrize('compression', compressionsToTest)
     def test_transform(compression):
-        with copyTestFile(f'folder-symlink.{compression}.squashfs') as path, SquashFSMountSource(
+        with copy_test_file(f'folder-symlink.{compression}.squashfs') as path, SquashFSMountSource(
             path, transform=("(.)/(.)", r"\1_\2")
         ) as mountSource:
             for folder in ['/', '/foo', '/foo_fighter']:

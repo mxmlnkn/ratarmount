@@ -24,7 +24,7 @@ except ImportError:
     pyminizip = None  # type: ignore
 
 
-def findTestFile(relativePathOrName):
+def find_test_file(relativePathOrName):
     for i in range(3):
         path = os.path.sep.join([".."] * i + ["tests", relativePathOrName])
         if os.path.exists(path):
@@ -76,7 +76,7 @@ def create_encrypted_test_file(path):
 class TestZipMountSource:
     @staticmethod
     def test_simple_usage():
-        with ZipMountSource(findTestFile('folder-symlink.zip')) as mountSource:
+        with ZipMountSource(find_test_file('folder-symlink.zip')) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
                 fileInfo = mountSource.lookup(folder)
                 assert fileInfo
@@ -110,7 +110,7 @@ class TestZipMountSource:
 
     @staticmethod
     def test_transform():
-        with ZipMountSource(findTestFile('folder-symlink.zip'), transform=("(.)/(.)", r"\1_\2")) as mountSource:
+        with ZipMountSource(find_test_file('folder-symlink.zip'), transform=("(.)/(.)", r"\1_\2")) as mountSource:
             print(mountSource.list("/").keys())
             for folder in ['/', '/foo', '/foo_fighter']:
                 fileInfo = mountSource.lookup(folder)

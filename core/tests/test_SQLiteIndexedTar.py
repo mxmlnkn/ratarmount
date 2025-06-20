@@ -14,7 +14,7 @@ import tempfile
 
 import pytest
 import rapidgzip
-from helpers import copyTestFile
+from helpers import copy_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -38,7 +38,7 @@ class TestSQLiteIndexedTarParallelized:
 
     @staticmethod
     def test_context_manager(parallelization):
-        with copyTestFile("single-file.tar") as path, SQLiteIndexedTar(
+        with copy_test_file("single-file.tar") as path, SQLiteIndexedTar(
             path, writeIndex=False, parallelization=parallelization
         ) as indexedTar:
             assert indexedTar.list('/')
@@ -57,7 +57,7 @@ class TestSQLiteIndexedTarParallelized:
 
     @staticmethod
     def test_tar_bz2_with_parallelization(parallelization):
-        with copyTestFile("2k-recursive-tars.tar.bz2") as path, SQLiteIndexedTar(
+        with copy_test_file("2k-recursive-tars.tar.bz2") as path, SQLiteIndexedTar(
             path,
             clearIndexCache=True,
             recursive=False,
@@ -78,7 +78,7 @@ class TestSQLiteIndexedTarParallelized:
 
     @staticmethod
     def test_recursive_tar_bz2_with_parallelization(parallelization):
-        with copyTestFile("2k-recursive-tars.tar.bz2") as path, SQLiteIndexedTar(
+        with copy_test_file("2k-recursive-tars.tar.bz2") as path, SQLiteIndexedTar(
             path,
             clearIndexCache=True,
             recursive=True,
@@ -99,7 +99,7 @@ class TestSQLiteIndexedTarParallelized:
     @pytest.mark.parametrize("recursive", [False, True])
     @pytest.mark.parametrize("maxRecursionDepth", [None, 0, 1, 2, 3, 4, 5])
     def test_deep_recursive(parallelization, recursive, maxRecursionDepth):
-        with copyTestFile("packed-5-times.tar.gz") as path, SQLiteIndexedTar(
+        with copy_test_file("packed-5-times.tar.gz") as path, SQLiteIndexedTar(
             path,
             clearIndexCache=True,
             recursive=recursive,
@@ -163,7 +163,7 @@ class TestSQLiteIndexedTarParallelized:
                 assert not stat.S_ISDIR(fileInfo.mode)
                 assert fileInfo.size == 40960
 
-            def checkRecursiveMountPoint(path, depth):
+            def check_recursive_mount_point(path, depth):
                 fileInfo = mountSource.lookup(path)
                 if depth > recursionDepth:
                     return
@@ -186,14 +186,14 @@ class TestSQLiteIndexedTarParallelized:
                     assert fileInfo
                     assert mountSource.open(fileInfo).read() == b'iriya\n'
 
-            checkRecursiveMountPoint('/ufo_03.tar', 2)
-            checkRecursiveMountPoint('/ufo_03.tar/ufo_02.tar', 3)
-            checkRecursiveMountPoint('/ufo_03.tar/ufo_02.tar/ufo_01.tar', 4)
-            checkRecursiveMountPoint('/ufo_03.tar/ufo_02.tar/ufo_01.tar/ufo_00.tar', 5)
+            check_recursive_mount_point('/ufo_03.tar', 2)
+            check_recursive_mount_point('/ufo_03.tar/ufo_02.tar', 3)
+            check_recursive_mount_point('/ufo_03.tar/ufo_02.tar/ufo_01.tar', 4)
+            check_recursive_mount_point('/ufo_03.tar/ufo_02.tar/ufo_01.tar/ufo_00.tar', 5)
 
     @staticmethod
     def test_compressed_tar(parallelization):
-        with copyTestFile("packed-5-times.tar.gz") as path, SQLiteIndexedTar(
+        with copy_test_file("packed-5-times.tar.gz") as path, SQLiteIndexedTar(
             path,
             clearIndexCache=True,
             parallelization=parallelization,
@@ -227,7 +227,7 @@ class TestSQLiteIndexedTarParallelized:
                     with bz2.open(archiveName, "wb") as bz2File:
                         bz2File.write(contents)
 
-                    def testIndex(tarFileName, fileObject, indexFilePath, contents=contents):
+                    def test_index(tarFileName, fileObject, indexFilePath, contents=contents):
                         TestSQLiteIndexedTarParallelized._test_index_creation_and_loading(
                             tarFileName, fileObject, indexFilePath, contents, parallelization
                         )
@@ -239,24 +239,24 @@ class TestSQLiteIndexedTarParallelized:
                     # => 3*2*2 = 12 cases
 
                     with pytest.raises(RatarmountError):
-                        testIndex(None, None, ':memory:')
+                        test_index(None, None, ':memory:')
                     with pytest.raises(RatarmountError):
-                        testIndex(None, None, indexPath)
+                        test_index(None, None, indexPath)
                     with pytest.raises(RatarmountError):
-                        testIndex(None, None, None)
+                        test_index(None, None, None)
 
-                    testIndex(archiveName, None, ':memory:')
-                    testIndex(archiveName, None, indexPath)
-                    testIndex(archiveName, None, None)
+                    test_index(archiveName, None, ':memory:')
+                    test_index(archiveName, None, indexPath)
+                    test_index(archiveName, None, None)
 
                     with open(archiveName, "rb") as file:
-                        testIndex("tarFileName", file, ':memory:')
-                        testIndex("tarFileName", file, indexPath)
-                        testIndex("tarFileName", file, None)
+                        test_index("tarFileName", file, ':memory:')
+                        test_index("tarFileName", file, indexPath)
+                        test_index("tarFileName", file, None)
 
-                        testIndex(None, file, ':memory:')
-                        testIndex(None, file, indexPath)
-                        testIndex(None, file, None)
+                        test_index(None, file, ':memory:')
+                        test_index(None, file, indexPath)
+                        test_index(None, file, None)
 
                 finally:
                     os.chdir(oldCurrentWorkingDirectory)
@@ -322,16 +322,16 @@ class TestSQLiteIndexedTarParallelized:
     def test_list_and_versions(parallelization):
         with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile:
             with tarfile.open(name=tmpTarFile.name, mode="w:gz") as tarFile:
-                createFile = TestSQLiteIndexedTarParallelized._create_file
-                makeFolder = TestSQLiteIndexedTarParallelized._make_folder
+                create_file = TestSQLiteIndexedTarParallelized._create_file
+                make_folder = TestSQLiteIndexedTarParallelized._make_folder
 
-                createFile(tarFile, "./README.md", "hello world")
-                makeFolder(tarFile, "./src")
-                createFile(tarFile, "./src/test.sh", "echo hi")
-                makeFolder(tarFile, "./dist")
-                makeFolder(tarFile, "./dist/a")
-                makeFolder(tarFile, "./dist/a/b")
-                createFile(tarFile, "./dist/a/b/test2.sh", "echo two")
+                create_file(tarFile, "./README.md", "hello world")
+                make_folder(tarFile, "./src")
+                create_file(tarFile, "./src/test.sh", "echo hi")
+                make_folder(tarFile, "./dist")
+                make_folder(tarFile, "./dist/a")
+                make_folder(tarFile, "./dist/a/b")
+                create_file(tarFile, "./dist/a/b/test2.sh", "echo two")
 
             with SQLiteIndexedTar(tmpTarFile.name, clearIndexCache=True, parallelization=parallelization) as indexedTar:
                 folders = []
@@ -366,9 +366,9 @@ class TestSQLiteIndexedTarParallelized:
             repeatCount = 10000
 
             with tarfile.open(name=tmpTarFile.name, mode="w:gz") as tarFile:
-                createFile = TestSQLiteIndexedTarParallelized._create_file
-                createFile(tarFile, "increasing.dat", "".join(["0123456789"] * repeatCount))
-                createFile(tarFile, "decreasing.dat", "".join(["9876543210"] * repeatCount))
+                create_file = TestSQLiteIndexedTarParallelized._create_file
+                create_file(tarFile, "increasing.dat", "".join(["0123456789"] * repeatCount))
+                create_file(tarFile, "decreasing.dat", "".join(["9876543210"] * repeatCount))
 
             with SQLiteIndexedTar(tmpTarFile.name, clearIndexCache=True, parallelization=parallelization) as indexedTar:
                 iFile = indexedTar.open(indexedTar.lookup("/increasing.dat"))
@@ -391,9 +391,9 @@ class TestSQLiteIndexedTarParallelized:
             repeatCount = 10000
 
             with tarfile.open(name=tmpTarFile.name, mode="w:gz") as tarFile:
-                createFile = TestSQLiteIndexedTarParallelized._create_file
-                createFile(tarFile, "increasing.dat", "".join(["0123456789"] * repeatCount))
-                createFile(tarFile, "decreasing.dat", "".join(["9876543210"] * repeatCount))
+                create_file = TestSQLiteIndexedTarParallelized._create_file
+                create_file(tarFile, "increasing.dat", "".join(["0123456789"] * repeatCount))
+                create_file(tarFile, "decreasing.dat", "".join(["9876543210"] * repeatCount))
 
             with SQLiteIndexedTar(tmpTarFile.name, clearIndexCache=True, parallelization=parallelization) as indexedTar:
 
@@ -423,13 +423,13 @@ class TestSQLiteIndexedTarParallelized:
 
     @staticmethod
     def test_appending_to_small_archive(parallelization, tmpdir):
-        createFile = TestSQLiteIndexedTarParallelized._create_file
-        makeFolder = TestSQLiteIndexedTarParallelized._make_folder
+        create_file = TestSQLiteIndexedTarParallelized._create_file
+        make_folder = TestSQLiteIndexedTarParallelized._make_folder
 
         # Create a simple small TAR
         tarPath = os.path.join(tmpdir, "foo.tar")
         with tarfile.open(name=tarPath, mode="w:") as tarFile:
-            createFile(tarFile, "foo", "bar")
+            create_file(tarFile, "foo", "bar")
 
         # Create index
         indexFilePath = os.path.join(tmpdir, "foo.tar.index")
@@ -448,7 +448,7 @@ class TestSQLiteIndexedTarParallelized:
 
         # Append small file to TAR
         with tarfile.open(name=tarPath, mode="a:") as tarFile:
-            createFile(tarFile, "bar", "foo")
+            create_file(tarFile, "bar", "foo")
 
         # Create index but only go over new files
         indexFilePath = os.path.join(tmpdir, "foo.tar.index")
@@ -467,7 +467,7 @@ class TestSQLiteIndexedTarParallelized:
 
         # Append empty folder to TAR
         with tarfile.open(name=tarPath, mode="a:") as tarFile:
-            makeFolder(tarFile, "folder")
+            make_folder(tarFile, "folder")
 
         # Create index but only go over new files
         indexFilePath = os.path.join(tmpdir, "foo.tar.index")
@@ -509,7 +509,7 @@ class TestSQLiteIndexedTarParallelized:
 
         # Append small file to TAR after sparse file!
         with tarfile.open(name=tarPath, mode="a:") as tarFile:
-            createFile(tarFile, "bar2", "foo")
+            create_file(tarFile, "bar2", "foo")
 
         # Create index but only go over new files
         print("=== Update Index With New File After Sparse File ===")
@@ -530,14 +530,14 @@ class TestSQLiteIndexedTarParallelized:
 
     @staticmethod
     def test_appending_to_large_archive(parallelization, tmpdir):
-        createFile = TestSQLiteIndexedTarParallelized._create_file
-        makeFolder = TestSQLiteIndexedTarParallelized._make_folder
+        create_file = TestSQLiteIndexedTarParallelized._create_file
+        make_folder = TestSQLiteIndexedTarParallelized._make_folder
 
         # Create a TAR large in size as well as file count
         tarPath = os.path.join(tmpdir, "foo.tar")
-        with copyTestFile("tar-with-300-folders-with-1000-files-0B-files.tar.bz2") as path, rapidgzip.IndexedBzip2File(
-            path
-        ) as file, open(tarPath, 'wb') as extracted:
+        with copy_test_file(
+            "tar-with-300-folders-with-1000-files-0B-files.tar.bz2"
+        ) as path, rapidgzip.IndexedBzip2File(path) as file, open(tarPath, 'wb') as extracted:
             while True:
                 data = file.read(1024 * 1024)
                 if not data:
@@ -562,7 +562,7 @@ class TestSQLiteIndexedTarParallelized:
 
         # Append small file to TAR
         with tarfile.open(name=tarPath, mode="a:") as tarFile:
-            createFile(tarFile, "bar", "foo")
+            create_file(tarFile, "bar", "foo")
 
         # Create index but only go over new files
         print("\n=== Update Index With New File ===")
@@ -582,7 +582,7 @@ class TestSQLiteIndexedTarParallelized:
 
         # Append empty folder to TAR
         with tarfile.open(name=tarPath, mode="a:") as tarFile:
-            makeFolder(tarFile, "folder")
+            make_folder(tarFile, "folder")
 
         # Create index but only go over new files
         print("\n=== Update Index With New Folder ===")
@@ -626,7 +626,7 @@ class TestSQLiteIndexedTarParallelized:
 
         # Append small file to TAR after sparse file!
         with tarfile.open(name=tarPath, mode="a:") as tarFile:
-            createFile(tarFile, "bar2", "foo")
+            create_file(tarFile, "bar2", "foo")
 
         # Create index but only go over new files
         print("\n=== Update Index With New File After Sparse File ===")

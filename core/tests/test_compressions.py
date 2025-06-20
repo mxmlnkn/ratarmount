@@ -66,38 +66,38 @@ def test_has_matching_alphabets():
 
 
 def test_check_for_sequence():
-    def toAlpha1(i):
+    def to_alpha1(i):
         return formatNumber(i, ALPHA, 1)
 
-    assert checkForSequence(['a'], toAlpha1) == ['a']
-    assert checkForSequence(['a', 'b'], toAlpha1) == ['a', 'b']
-    assert checkForSequence(['b', 'a'], toAlpha1) == ['a', 'b']
-    assert checkForSequence(['b', 'a', 'd'], toAlpha1) == ['a', 'b']
-    assert checkForSequence(['a', 'd'], toAlpha1) == ['a']
-    assert checkForSequence(['a', 'd', 'e'], toAlpha1) == ['a']
-    assert not checkForSequence(['aa'], toAlpha1)
-    assert not checkForSequence(['0'], toAlpha1)
+    assert checkForSequence(['a'], to_alpha1) == ['a']
+    assert checkForSequence(['a', 'b'], to_alpha1) == ['a', 'b']
+    assert checkForSequence(['b', 'a'], to_alpha1) == ['a', 'b']
+    assert checkForSequence(['b', 'a', 'd'], to_alpha1) == ['a', 'b']
+    assert checkForSequence(['a', 'd'], to_alpha1) == ['a']
+    assert checkForSequence(['a', 'd', 'e'], to_alpha1) == ['a']
+    assert not checkForSequence(['aa'], to_alpha1)
+    assert not checkForSequence(['0'], to_alpha1)
 
-    def toAlpha2(i):
+    def to_alpha2(i):
         return formatNumber(i, ALPHA, 2)
 
-    assert checkForSequence(['aa'], toAlpha2) == ['aa']
-    assert checkForSequence(['aa', 'ab'], toAlpha2) == ['aa', 'ab']
-    assert checkForSequence(['ab', 'aa'], toAlpha2) == ['aa', 'ab']
-    assert checkForSequence(['ab', 'aa', 'ad'], toAlpha2) == ['aa', 'ab']
-    assert checkForSequence(['aa', 'ad'], toAlpha2) == ['aa']
-    assert checkForSequence(['aa', 'ad', 'ae'], toAlpha2) == ['aa']
-    assert not checkForSequence(['aaa'], toAlpha2)
-    assert not checkForSequence(['0'], toAlpha2)
-    assert not checkForSequence(['00'], toAlpha2)
+    assert checkForSequence(['aa'], to_alpha2) == ['aa']
+    assert checkForSequence(['aa', 'ab'], to_alpha2) == ['aa', 'ab']
+    assert checkForSequence(['ab', 'aa'], to_alpha2) == ['aa', 'ab']
+    assert checkForSequence(['ab', 'aa', 'ad'], to_alpha2) == ['aa', 'ab']
+    assert checkForSequence(['aa', 'ad'], to_alpha2) == ['aa']
+    assert checkForSequence(['aa', 'ad', 'ae'], to_alpha2) == ['aa']
+    assert not checkForSequence(['aaa'], to_alpha2)
+    assert not checkForSequence(['0'], to_alpha2)
+    assert not checkForSequence(['00'], to_alpha2)
 
-    def toDigit3(i):
+    def to_digit3(i):
         return formatNumber(i, DIGITS, 3)
 
-    assert checkForSequence(['000'], toDigit3) == ['000']
-    assert checkForSequence(['000', '001'], toDigit3) == ['000', '001']
-    assert checkForSequence(['001', '000'], toDigit3) == ['000', '001']
-    assert checkForSequence(['001', '000', '003'], toDigit3) == ['000', '001']
-    assert checkForSequence(['000', '003'], toDigit3) == ['000']
-    assert checkForSequence(['000', '003', '004'], toDigit3) == ['000']
-    assert not checkForSequence(['0001'], toDigit3)
+    assert checkForSequence(['000'], to_digit3) == ['000']
+    assert checkForSequence(['000', '001'], to_digit3) == ['000', '001']
+    assert checkForSequence(['001', '000'], to_digit3) == ['000', '001']
+    assert checkForSequence(['001', '000', '003'], to_digit3) == ['000', '001']
+    assert checkForSequence(['000', '003'], to_digit3) == ['000']
+    assert checkForSequence(['000', '003', '004'], to_digit3) == ['000']
+    assert not checkForSequence(['0001'], to_digit3)

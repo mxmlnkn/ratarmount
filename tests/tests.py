@@ -20,13 +20,13 @@ from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar, SQLiteIndex
 print("\nTest creating and using an index with .tar.gz files with SQLiteIndexedTar")
 
 
-def createFile(tarArchive, fileName, contents):
+def create_file(tarArchive, fileName, contents):
     tinfo = tarfile.TarInfo(fileName)
     tinfo.size = len(contents)
     tarArchive.addfile(tinfo, io.BytesIO(contents.encode()))
 
 
-def makeFolder(tarArchive, folderName):
+def make_folder(tarArchive, folderName):
     tinfo = tarfile.TarInfo(folderName)
     tinfo.type = tarfile.DIRTYPE
     tarArchive.addfile(tinfo, io.BytesIO())
@@ -36,13 +36,13 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
     suffix=".sqlite"
 ) as tmpIndexFile:
     with tarfile.open(name=tmpTarFile.name, mode="w:gz") as tarFile:
-        createFile(tarFile, "./README.md", "hello world")
-        makeFolder(tarFile, "./src")
-        createFile(tarFile, "./src/test.sh", "echo hi")
-        makeFolder(tarFile, "./dist")
-        makeFolder(tarFile, "./dist/a")
-        makeFolder(tarFile, "./dist/a/b")
-        createFile(tarFile, "./dist/a/b/test2.sh", "echo two")
+        create_file(tarFile, "./README.md", "hello world")
+        make_folder(tarFile, "./src")
+        create_file(tarFile, "./src/test.sh", "echo hi")
+        make_folder(tarFile, "./dist")
+        make_folder(tarFile, "./dist/a")
+        make_folder(tarFile, "./dist/a/b")
+        create_file(tarFile, "./dist/a/b/test2.sh", "echo two")
 
     print("Created temp tar:", tmpTarFile.name)
 

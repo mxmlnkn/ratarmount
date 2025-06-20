@@ -16,7 +16,7 @@ try:
 except ImportError:
     ext4 = None  # type:ignore
 
-from helpers import copyTestFile
+from helpers import copy_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -29,7 +29,7 @@ class TestEXT4MountSource:
     def test_password(path):
         if not ext4:
             return
-        with copyTestFile(path) as tmpPath, bz2.open(tmpPath, 'rb') as bz2File:
+        with copy_test_file(path) as tmpPath, bz2.open(tmpPath, 'rb') as bz2File:
             tmpFileObject = io.BytesIO()
             tmpFileObject.write(bz2File.read())
             tmpFileObject.seek(0)
