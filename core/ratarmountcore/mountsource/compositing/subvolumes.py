@@ -30,10 +30,10 @@ class SubvolumesMountSource(MountSource):
     @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         if path == '/':
-            return self.rootFileInfo
+            return self.rootFileInfo.clone()
 
         if '/' not in path.lstrip('/'):
-            return self.rootFileInfo if path.lstrip('/') in self.mountSources else None
+            return self.rootFileInfo.clone() if path.lstrip('/') in self.mountSources else None
 
         result = self._findMountSource(path)
         if result is None:

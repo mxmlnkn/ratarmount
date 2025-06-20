@@ -289,7 +289,9 @@ class AutoMountLayer(MountSource):
                     if isinstance(files, set):
                         files.add(folderName)
                     else:
-                        files.update({folderName: mountInfo.rootFileInfo.mode if onlyMode else mountInfo.rootFileInfo})
+                        files.update(
+                            {folderName: mountInfo.rootFileInfo.mode if onlyMode else mountInfo.rootFileInfo.clone()}
+                        )
 
         return files
 
