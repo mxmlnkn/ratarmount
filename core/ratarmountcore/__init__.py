@@ -13,7 +13,7 @@ Example:
     from ratarmountcore.mountsources.factory import openMountSource
 
     archive = openMountSource("foo.tar", recursive=True)
-    archive.listDir("/")
+    archive.list("/")
     info = archive.getFileInfo("/bar")
 
     print("Contents of /bar:")

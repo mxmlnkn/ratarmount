@@ -41,7 +41,7 @@ class StenciledFile
 class ProgressBar
 
 abstract class MountSource {
-    +{abstract} listDir
+    +{abstract} list
     +{abstract} getFileInfo
     +{abstract} versions
     +{abstract} open

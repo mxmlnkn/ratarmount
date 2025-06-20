@@ -29,7 +29,7 @@ class TestRarMountSource:
                 assert stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(folder) == 1
-                assert mountSource.listDir(folder)
+                assert mountSource.list(folder)
 
             for filePath in ['/foo/fighter/ufo']:
                 fileInfo = mountSource.getFileInfo(filePath)
@@ -37,7 +37,7 @@ class TestRarMountSource:
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1
-                assert not mountSource.listDir(filePath)
+                assert not mountSource.list(filePath)
                 with mountSource.open(mountSource.getFileInfo(filePath)) as file:
                     assert file.read() == b'iriya\n'
 
@@ -46,7 +46,7 @@ class TestRarMountSource:
             for linkPath in ['/foo/jet']:
                 assert mountSource.getFileInfo(linkPath)
                 assert mountSource.versions(linkPath) == 1
-                assert not mountSource.listDir(linkPath)
+                assert not mountSource.list(linkPath)
                 with mountSource.open(mountSource.getFileInfo(linkPath)) as file:
                     # Contents of symlink is the symlink destination itself.
                     assert file.read() == b'fighter'

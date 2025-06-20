@@ -29,10 +29,10 @@ class TestAutoMountLayer:
         with copyTestFile("packed-100-times.tar.gz") as path, openMountSource(path, **options) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
 
-            assert recursivelyMounted.listDir('/')
-            assert recursivelyMounted.listDir('/ufo_12')
-            assert recursivelyMounted.listDir('/ufo_00')
-            assert list(recursivelyMounted.listDir('/ufo_00').keys()) == ['ufo']
+            assert recursivelyMounted.list('/')
+            assert recursivelyMounted.list('/ufo_12')
+            assert recursivelyMounted.list('/ufo_00')
+            assert list(recursivelyMounted.list('/ufo_00').keys()) == ['ufo']
             assert recursivelyMounted.open(recursivelyMounted.getFileInfo('/ufo_00/ufo')).read() == b'iriya\n'
 
     @staticmethod
@@ -52,10 +52,10 @@ class TestAutoMountLayer:
         with copyTestFile("compressed-100-times.tar.gz") as path, openMountSource(path, **options) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
 
-            assert recursivelyMounted.listDir('/')
-            assert recursivelyMounted.listDir('/ufo_12')
-            assert recursivelyMounted.listDir('/ufo_00')
-            assert list(recursivelyMounted.listDir('/ufo_00').keys()) == ['ufo']
+            assert recursivelyMounted.list('/')
+            assert recursivelyMounted.list('/ufo_12')
+            assert recursivelyMounted.list('/ufo_00')
+            assert list(recursivelyMounted.list('/ufo_00').keys()) == ['ufo']
             assert recursivelyMounted.open(recursivelyMounted.getFileInfo('/ufo_00/ufo')).read() == b'iriya\n'
 
     @staticmethod
@@ -110,9 +110,9 @@ class TestAutoMountLayer:
         with copyTestFile("compressed-100-times.gz") as path, openMountSource(path, **options) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
 
-            assert recursivelyMounted.listDir('/')
-            assert recursivelyMounted.listDir('/ufo_12')
-            assert recursivelyMounted.listDir('/ufo_00')
+            assert recursivelyMounted.list('/')
+            assert recursivelyMounted.list('/ufo_12')
+            assert recursivelyMounted.list('/ufo_00')
             fileInfo = recursivelyMounted.getFileInfo('/ufo_00/ufo')
             assert recursivelyMounted.open(fileInfo).read() == b'iriya\n'
 
@@ -131,7 +131,7 @@ class TestAutoMountLayer:
 
             for folder in ['/', '/nested-tar.tar.gz', '/nested-tar.tar.gz/foo', '/nested-tar.tar.gz/foo/fighter']:
                 assert recursivelyMounted.getFileInfo(folder)
-                assert recursivelyMounted.listDir(folder)
+                assert recursivelyMounted.list(folder)
                 assert recursivelyMounted.versions(folder) > 0
 
             for mountedFile in ['/nested-tar.tar.gz']:
@@ -154,7 +154,7 @@ class TestAutoMountLayer:
         }
         with copyTestFile(archivePath) as path, openMountSource(path, **options) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
-            assert recursivelyMounted.listDir('/')
+            assert recursivelyMounted.list('/')
 
             maxDepth = 6
             recursionDepth = maxDepth if maxRecursionDepth is None else maxRecursionDepth

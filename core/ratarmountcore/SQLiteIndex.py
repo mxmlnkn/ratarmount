@@ -867,10 +867,17 @@ class SQLiteIndex:
         # This effect is good to have for inserting rows but not for querying rows.
         return '/' + os.path.normpath(path if path.startswith('../') else '/' + path).lstrip('/')
 
-    def listDir(self, path: str) -> Optional[Dict[str, FileInfo]]:
+    def list(self, path: str) -> Optional[Dict[str, FileInfo]]:
         """
         Return a dictionary for the given directory path: { fileName : FileInfo, ... } or None
         if the path does not exist.
+
+        There is no file version argument because it is hard to apply correctl.y
+        Even if a folder was overwritten by a file, which is already not well supported by tar,
+        then list for that path will still list all contents of the overwritten folder or folders,
+        no matter the specified version. The file system layer has to take care that a directory
+        listing is not even requested in the first place if it is not a directory.
+        FUSE already does this by calling getattr for all parent folders in the specified path first.
 
         path : full path to file where '/' denotes TAR's root, e.g., '/', or '/foo'
         """
@@ -947,7 +954,7 @@ class SQLiteIndex:
         path : full path to file where '/' denotes TAR's root, e.g., '/', or '/foo'
         """
 
-        # See comments in listDir.
+        # See comments in list.
         # The only difference here is that we do not request all columns, but only two in a tuple.
         oldRowFactory = self.getConnection().row_factory
         self.getConnection().row_factory = None
@@ -987,12 +994,6 @@ class SQLiteIndex:
                       But with this argument other versions can be queried. Version 1 is the oldest one.
                       Version 0 translates to the most recent one for compatibility with tar --occurrence=<number>.
                       Version -1 translates to the second most recent, and so on.
-                      For listDir=True, the file version makes no sense and is ignored!
-                      So, even if a folder was overwritten by a file, which is already not well supported by tar,
-                      then listDir for that path will still list all contents of the overwritten folder or folders,
-                      no matter the specified version. The file system layer has to take care that a directory
-                      listing is not even requested in the first place if it is not a directory.
-                      FUSE already does this by calling getattr for all parent folders in the specified path first.
         """
 
         if not isinstance(fileVersion, int):

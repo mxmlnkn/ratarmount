@@ -11,7 +11,7 @@ Example:
     from ratarmountcore.factory as openMountSource
 
     archive = openMountSource("foo.tar", recursive=True)
-    archive.listDir("/")
+    archive.list("/")
     info = archive.getFileInfo("/bar")
 
     print "Contents of /bar:"

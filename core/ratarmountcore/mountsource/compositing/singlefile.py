@@ -60,7 +60,7 @@ class SingleFileMountSource(MountSource):
         # fmt: on
 
     @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         pathWithSlash = path.rstrip('/') + '/'
         if self.path.startswith(pathWithSlash):
             return [self.path[len(pathWithSlash) :].split('/', maxsplit=1)[0]]

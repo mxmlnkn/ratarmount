@@ -41,7 +41,7 @@ class TestEXT4MountSource:
                 assert stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(folder) == 1
-                assert mountSource.listDir(folder)
+                assert mountSource.list(folder)
 
             for filePath in ['/foo/fighter/ufo', '/foo/lighter.tar']:
                 fileInfo = mountSource.getFileInfo(filePath)
@@ -49,7 +49,7 @@ class TestEXT4MountSource:
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1
-                assert not mountSource.listDir(filePath)
+                assert not mountSource.list(filePath)
 
             with mountSource.open(mountSource.getFileInfo('/foo/fighter/ufo')) as file:
                 assert file.read() == b'iriya\n'

@@ -40,18 +40,18 @@ class MountSource(ABC):
     """
 
     @abstractmethod
-    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         pass
 
     def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
         """
-        This function can and should be overwritten with something that is faster than listDir
+        This function can and should be overwritten with something that is faster than list
         because only a simple path -> mode mapping needs to be returned, not all file metadata.
         This method is custom-tailored for FUSE readdir, i.e., the returned mode is not guaranteed
         to include file permissions, only the S_IFREG, S_IFLINK, S_IFDIR flags, maybe all S_IFMT flags
         in the future.
         """
-        result = self.listDir(path)
+        result = self.list(path)
         if isinstance(result, dict):
             return {path: fileInfo.mode for path, fileInfo in result.items()}
         return result

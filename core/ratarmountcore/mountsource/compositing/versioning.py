@@ -147,8 +147,8 @@ class FileVersionLayer(MountSource):
     def is_immutable(self) -> bool:
         return self.mountSource.is_immutable()
 
-    def _listDirWrapper(self, listDir, path: str):
-        files = listDir(path)
+    def _listWrapper(self, list_function, path: str):
+        files = list_function(path)
         if files is not None:
             if isinstance(files, dict):
                 for fileInfo in files.values():
@@ -167,7 +167,7 @@ class FileVersionLayer(MountSource):
         path, pathIsSpecialVersionsFolder, _ = result
 
         if not pathIsSpecialVersionsFolder:
-            files = listDir(path)
+            files = list_function(path)
             if isinstance(files, dict):
                 for fileInfo in files.values():
                     if isinstance(fileInfo, FileInfo):
@@ -178,12 +178,12 @@ class FileVersionLayer(MountSource):
         return [str(version + 1) for version in range(self.mountSource.versions(path))]
 
     @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
-        return self._listDirWrapper(self.mountSource.listDir, path)
+    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+        return self._listWrapper(self.mountSource.list, path)
 
     @overrides(MountSource)
     def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
-        return self._listDirWrapper(self.mountSource.list_mode, path)
+        return self._listWrapper(self.mountSource.list_mode, path)
 
     @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:

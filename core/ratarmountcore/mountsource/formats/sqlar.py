@@ -244,7 +244,7 @@ class SQLARMountSource(MountSource):
         return True
 
     @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         pathGlob = "*" if path == "/" else path.strip("/") + "/*"
         return {
             name: SQLARMountSource._convertToFileInfo(rowid, mode, mtime, size, linkname)

@@ -41,7 +41,7 @@ class TestSQLiteIndexedTarParallelized:
         with copyTestFile("single-file.tar") as path, SQLiteIndexedTar(
             path, writeIndex=False, parallelization=parallelization
         ) as indexedTar:
-            assert indexedTar.listDir('/')
+            assert indexedTar.list('/')
             assert indexedTar.getFileInfo('/')
 
             fileInfo = indexedTar.getFileInfo('/bar')
@@ -66,13 +66,13 @@ class TestSQLiteIndexedTarParallelized:
             for folder in ['/', '/mimi']:
                 assert file.getFileInfo(folder)
                 assert file.versions(folder) == 1
-                assert file.listDir(folder)
+                assert file.list(folder)
 
-            assert not file.listDir('/mimi/01995.tar')
+            assert not file.list('/mimi/01995.tar')
             info = file.getFileInfo('/mimi/01995.tar')
             assert info.userdata[0].offset == 21440512
 
-            assert not file.listDir('/mimi/00105.tar')
+            assert not file.list('/mimi/00105.tar')
             info = file.getFileInfo('/mimi/00105.tar')
             assert info.userdata[0].offset == 1248256
 
@@ -84,14 +84,14 @@ class TestSQLiteIndexedTarParallelized:
             recursive=True,
             parallelization=parallelization,
         ) as file:
-            assert file.listDir('/')
-            assert file.listDir('/mimi')
+            assert file.list('/')
+            assert file.list('/mimi')
 
-            assert file.listDir('/mimi/01995.tar')
+            assert file.list('/mimi/01995.tar')
             info = file.getFileInfo('/mimi/01995.tar/foo')
             assert info.userdata[0].offset == 21441024
 
-            assert file.listDir('/mimi/00105.tar')
+            assert file.list('/mimi/00105.tar')
             info = file.getFileInfo('/mimi/00105.tar/foo')
             assert info.userdata[0].offset == 1248768
 
@@ -113,7 +113,7 @@ class TestSQLiteIndexedTarParallelized:
             if not recursive and maxRecursionDepth is None:
                 recursionDepth = 1
 
-            assert mountSource.listDir('/')
+            assert mountSource.list('/')
             assert mountSource.getFileInfo('/').userdata[-1] == SQLiteIndexedTarUserData(0, 0, False, False, True, 0)
 
             # Recursion depth:
@@ -173,7 +173,7 @@ class TestSQLiteIndexedTarParallelized:
                 assert isinstance(userdata, SQLiteIndexedTarUserData)
                 if depth <= recursionDepth:
                     assert stat.S_ISDIR(fileInfo.mode)
-                    assert mountSource.listDir(path)
+                    assert mountSource.list(path)
                 else:
                     assert not stat.S_ISDIR(fileInfo.mode)
 
@@ -198,7 +198,7 @@ class TestSQLiteIndexedTarParallelized:
             clearIndexCache=True,
             parallelization=parallelization,
         ) as mountSource:
-            assert mountSource.listDir('/')
+            assert mountSource.list('/')
 
             # See test_deep_recursive for recursion depth discussion.
             assert mountSource.getFileInfo('/').userdata[-1] == SQLiteIndexedTarUserData(0, 0, False, False, True, 0)
@@ -303,7 +303,7 @@ class TestSQLiteIndexedTarParallelized:
         objectName = '<file object>' if tarFileName is None else tarFileName
         expectedName = os.path.basename(tarFileName).rsplit('.', 1)[0] if fileObject is None else objectName
 
-        folderList = indexedFile.listDir("/")
+        folderList = indexedFile.list("/")
         assert isinstance(folderList, dict)
         if isinstance(folderList, dict):
             # https://github.com/PyCQA/pylint/issues/1162
@@ -319,7 +319,7 @@ class TestSQLiteIndexedTarParallelized:
             os.remove(createdIndexFilePath)
 
     @staticmethod
-    def test_listDir_and_versions(parallelization):
+    def test_list_and_versions(parallelization):
         with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile:
             with tarfile.open(name=tmpTarFile.name, mode="w:gz") as tarFile:
                 createFile = TestSQLiteIndexedTarParallelized._createFile
@@ -340,7 +340,7 @@ class TestSQLiteIndexedTarParallelized:
                 foldersToRecurse = ["/"]
                 while foldersToRecurse:
                     folder = foldersToRecurse.pop()
-                    folderContents = indexedTar.listDir(folder)
+                    folderContents = indexedTar.list(folder)
                     assert isinstance(folderContents, dict)
                     for name in folderContents:  # pylint: disable=not-an-iterable
                         path = os.path.join(folder, name)

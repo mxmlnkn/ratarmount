@@ -82,7 +82,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
 
         finfo = indexedFile.getFileInfo("/dist/a")
         assert stat.S_ISDIR(finfo.mode)
-        assert indexedFile.listDir("/dist/a") == {
+        assert indexedFile.list("/dist/a") == {
             'b': FileInfo(
                 size=0,
                 mtime=0,
@@ -103,7 +103,7 @@ with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.Named
             )
         }
 
-        assert indexedFile.listDir("/") == {
+        assert indexedFile.list("/") == {
             'README.md': FileInfo(
                 size=11,
                 mtime=0,

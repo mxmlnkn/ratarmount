@@ -30,7 +30,7 @@ class TestLibarchiveMountSource:
                 assert stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(folder) == 1
-                assert mountSource.listDir(folder)
+                assert mountSource.list(folder)
 
             for filePath in ['/foo/fighter/ufo']:
                 fileInfo = mountSource.getFileInfo(filePath)
@@ -38,7 +38,7 @@ class TestLibarchiveMountSource:
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1
-                assert not mountSource.listDir(filePath)
+                assert not mountSource.list(filePath)
                 with mountSource.open(mountSource.getFileInfo(filePath)) as file:
                     assert file.read() == b'iriya\n'
 
@@ -47,7 +47,7 @@ class TestLibarchiveMountSource:
             for linkPath in ['/foo/jet']:
                 assert mountSource.getFileInfo(linkPath)
                 assert mountSource.versions(linkPath) == 1
-                assert not mountSource.listDir(linkPath)
+                assert not mountSource.list(linkPath)
                 fileInfo = mountSource.getFileInfo(linkPath)
                 assert fileInfo.linkname == 'fighter'
 
@@ -69,7 +69,7 @@ class TestLibarchiveMountSource:
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1
-                assert not mountSource.listDir(filePath)
+                assert not mountSource.list(filePath)
                 with mountSource.open(mountSource.getFileInfo(filePath)) as file:
                     assert file.read() == b'iriya\n'
 
@@ -92,7 +92,7 @@ class TestLibarchiveMountSource:
                 assert stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(folder) == 1
-                assert mountSource.listDir(folder)
+                assert mountSource.list(folder)
 
             for filePath in ['/foo/fighter/ufo']:
                 fileInfo = mountSource.getFileInfo(filePath)
@@ -100,7 +100,7 @@ class TestLibarchiveMountSource:
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1
-                assert not mountSource.listDir(filePath)
+                assert not mountSource.list(filePath)
                 with mountSource.open(mountSource.getFileInfo(filePath)) as file:
                     assert file.read() == b'iriya\n'
 
@@ -116,7 +116,7 @@ class TestLibarchiveMountSource:
                 assert stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(folder) == 1
-                assert mountSource.listDir(folder)
+                assert mountSource.list(folder)
 
             for filePath in ['/simple']:
                 fileInfo = mountSource.getFileInfo(filePath)
@@ -124,7 +124,7 @@ class TestLibarchiveMountSource:
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1
-                assert not mountSource.listDir(filePath)
+                assert not mountSource.list(filePath)
                 with mountSource.open(mountSource.getFileInfo(filePath)) as file:
                     assert file.read() == b'foo fighter\n'
                     assert file.seek(4) == 4
@@ -235,10 +235,10 @@ class TestLibarchiveMountSource:
             # In the worst case, reading all files can take 300k * 5s / 2 = ~9 days.
             # In the best case, it should take roughly 5s, same as when iterating over the archive in order.
             # The worst case happens if:
-            #  - The returned order by listDir is messed up, e.g., random in the worst case, or even this is bad:
+            #  - The returned order by list is messed up, e.g., random in the worst case, or even this is bad:
             #    0, 1, 10, 100, 1000, 10000, 100000, 100001, 100002, ...
             #  - Each file open reads the archive from the beginning instead of reusing the current libarchive handle.
-            entries = mountSource.listDir('/')
+            entries = mountSource.list('/')
             assert isinstance(entries, dict)
             t2 = time.time()
             print(f"Listing all {len(entries)} files took {t2 - t1:.3f} s")  # ~2 s

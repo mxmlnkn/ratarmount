@@ -112,7 +112,7 @@ The factory function `open` opens one of the archive `MountSource` implementatio
 from ratarmountcore.factory import openMountSource
 
 archive = openMountSource("foo.tar", recursive=True)
-print(archive.listDir("/"))
+print(archive.list("/"))
 info = archive.getFileInfo("/bar")
 
 print("Contents of /bar:")

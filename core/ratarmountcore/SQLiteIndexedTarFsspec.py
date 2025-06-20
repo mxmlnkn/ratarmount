@@ -35,7 +35,7 @@ class MountSourceFileSystem(fsspec.spec.AbstractFileSystem):
     def ls(self, path, detail=True, **kwargs):
         strippedPath = self._stripProtocol(path)
         if detail:
-            result = self.mountSource.listDir(strippedPath)
+            result = self.mountSource.list(strippedPath)
             if result is None:
                 raise FileNotFoundError(path)
             if not isinstance(result, dict):

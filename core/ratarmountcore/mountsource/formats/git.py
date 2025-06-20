@@ -84,7 +84,7 @@ class GitMountSource(MountSource):
     def exists(self, path: str) -> bool:
         return self._lookUpPath(path) is not None
 
-    def _listDir(self, path: str, onlyMode: bool) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def _list(self, path: str, onlyMode: bool) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         tree = self._lookUpPath(path)
         if not isinstance(tree, pygit2.Tree):
             return None
@@ -99,12 +99,12 @@ class GitMountSource(MountSource):
         }
 
     @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
-        return self._listDir(path, onlyMode=False)
+    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+        return self._list(path, onlyMode=False)
 
     @overrides(MountSource)
     def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
-        return self._listDir(path, onlyMode=True)
+        return self._list(path, onlyMode=True)
 
     @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:

@@ -61,7 +61,7 @@ class AutoMountLayer(MountSource):
                 if self.getRecursionDepth(folder) > self.maxRecursionDepth:
                     continue
 
-                fileNames = self.listDir(folder)
+                fileNames = self.list(folder)
                 if not fileNames:
                     continue
 
@@ -296,10 +296,10 @@ class AutoMountLayer(MountSource):
         return files
 
     @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         mountPoint, pathInMountPoint = self._findMounted(path)
         return self._appendMountPoints(
-            path, self.mounted[mountPoint].mountSource.listDir(pathInMountPoint), onlyMode=False
+            path, self.mounted[mountPoint].mountSource.list(pathInMountPoint), onlyMode=False
         )
 
     @overrides(MountSource)

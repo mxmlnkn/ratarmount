@@ -26,7 +26,7 @@ class TestPy7zrMountSource:
                 assert stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(folder) == 1
-                assert mountSource.listDir(folder)
+                assert mountSource.list(folder)
 
             for filePath in ['/foo/fighter/ufo']:
                 fileInfo = mountSource.getFileInfo(filePath)
@@ -34,6 +34,6 @@ class TestPy7zrMountSource:
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1
-                assert not mountSource.listDir(filePath)
+                assert not mountSource.list(filePath)
                 with mountSource.open(mountSource.getFileInfo(filePath)) as file:
                     assert file.read() == b'iriya\n'

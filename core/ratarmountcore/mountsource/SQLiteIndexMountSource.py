@@ -84,8 +84,8 @@ class SQLiteIndexMountSource(MountSource):
         raise NotImplementedError
 
     @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
-        return self.index.listDir(path)
+    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+        return self.index.list(path)
 
     @overrides(MountSource)
     def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:

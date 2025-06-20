@@ -83,7 +83,7 @@ class TestZipMountSource:
                 assert stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(folder) == 1
-                assert mountSource.listDir(folder)
+                assert mountSource.list(folder)
 
             for filePath in ['/foo/fighter/ufo']:
                 fileInfo = mountSource.getFileInfo(filePath)
@@ -91,7 +91,7 @@ class TestZipMountSource:
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1
-                assert not mountSource.listDir(filePath)
+                assert not mountSource.list(filePath)
                 with mountSource.open(mountSource.getFileInfo(filePath)) as file:
                     assert file.read() == b'iriya\n'
 
@@ -100,7 +100,7 @@ class TestZipMountSource:
             for linkPath in ['/foo/jet']:
                 assert mountSource.getFileInfo(linkPath)
                 assert mountSource.versions(linkPath) == 1
-                assert not mountSource.listDir(linkPath)
+                assert not mountSource.list(linkPath)
                 fileInfo = mountSource.getFileInfo(linkPath)
                 assert fileInfo.linkname == 'fighter'
                 with mountSource.open(mountSource.getFileInfo(linkPath)) as file:
@@ -111,7 +111,7 @@ class TestZipMountSource:
     @staticmethod
     def test_transform():
         with ZipMountSource(findTestFile('folder-symlink.zip'), transform=("(.)/(.)", r"\1_\2")) as mountSource:
-            print(mountSource.listDir("/").keys())
+            print(mountSource.list("/").keys())
             for folder in ['/', '/foo', '/foo_fighter']:
                 fileInfo = mountSource.getFileInfo(folder)
                 assert fileInfo
@@ -124,7 +124,7 @@ class TestZipMountSource:
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1
-                assert not mountSource.listDir(filePath)
+                assert not mountSource.list(filePath)
                 with mountSource.open(mountSource.getFileInfo(filePath)) as file:
                     assert file.read() == b'iriya\n'
 

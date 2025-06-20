@@ -94,7 +94,7 @@ class FATMountSource(MountSource):
             raise exception
         return True
 
-    def _listDir(self, path: str) -> Optional[Iterable]:
+    def _list(self, path: str) -> Optional[Iterable]:
         try:
             directories, files, _ = self.fileSystem.root_dir.get_entry(os.path.normpath(path)).get_entries()
         except PyFATException as exception:
@@ -104,9 +104,9 @@ class FATMountSource(MountSource):
         return [str(entry) for entry in directories + files]
 
     @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         # TODO I think with the low-level API, we could also get the FileInfos
-        return self._listDir(path)
+        return self._list(path)
 
     @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:

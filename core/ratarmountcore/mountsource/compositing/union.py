@@ -59,7 +59,7 @@ class UnionMountSource(MountSource):
 
             for folder, mountSources in lastFolderCache.items():
                 for mountSource in mountSources:
-                    filesInFolder = mountSource.listDir(folder)
+                    filesInFolder = mountSource.list(folder)
                     if not filesInFolder:
                         continue
 
@@ -146,11 +146,11 @@ class UnionMountSource(MountSource):
     def versions(self, path: str) -> int:
         return sum(mountSource.versions(path) for mountSource in self.mountSources)
 
-    def _listDir(self, path: str, onlyMode: bool):
+    def _list(self, path: str, onlyMode: bool):
         files: Optional[Union[Set[str], Dict[str, FileInfo], Dict[str, int]]] = None
 
         for mountSource in reversed(self.mountSources):
-            result = mountSource.list_mode(path) if onlyMode else mountSource.listDir(path)
+            result = mountSource.list_mode(path) if onlyMode else mountSource.list(path)
 
             if files is None:
                 if isinstance(result, dict):
@@ -174,18 +174,18 @@ class UnionMountSource(MountSource):
         return files
 
     @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         """
         Returns the set of all folder contents over all mount sources or None if the path was found in none of them.
         """
-        return self._listDir(path, onlyMode=False)
+        return self._list(path, onlyMode=False)
 
     @overrides(MountSource)
     def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
         """
         Returns the set of all folder contents over all mount sources or None if the path was found in none of them.
         """
-        return self._listDir(path, onlyMode=True)
+        return self._list(path, onlyMode=True)
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:

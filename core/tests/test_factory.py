@@ -72,7 +72,7 @@ class TestOpenMountSource:
             chimeraFilePath, writeIndex=True, prioritizedBackends=['zipfile', 'rapidgzip']
         ) as mountSource:
             assert isinstance(mountSource, ZipMountSource)
-            files = mountSource.listDir("/")
+            files = mountSource.list("/")
             assert files
 
             assert not indexPath.exists()
@@ -85,7 +85,7 @@ class TestOpenMountSource:
             indexMinimumFileCount=0,
         ) as mountSource:
             assert isinstance(mountSource, ZipMountSource)
-            files = mountSource.listDir("/")
+            files = mountSource.list("/")
             assert files
 
             fileInfo = mountSource.getFileInfo("/foo/fighter/ufo")
@@ -110,7 +110,7 @@ class TestOpenMountSource:
             indexMinimumFileCount=0,
         ) as mountSource:
             assert isinstance(mountSource, ZipMountSource)
-            files = mountSource.listDir("/")
+            files = mountSource.list("/")
             assert files
 
             fileInfo = mountSource.getFileInfo("/foo/fighter/ufo")
@@ -127,7 +127,7 @@ class TestOpenMountSource:
             chimeraFilePath, writeIndex=True, prioritizedBackends=['rapidgzip', 'zipfile']
         ) as mountSource:
             assert isinstance(mountSource, SQLiteIndexedTar)
-            files = mountSource.listDir("/")
+            files = mountSource.list("/")
             assert files
 
             fileInfo = mountSource.getFileInfo("/bar")
@@ -146,7 +146,7 @@ class TestOpenMountSource:
             indexMinimumFileCount=0,
         ) as mountSource:
             assert isinstance(mountSource, SQLiteIndexedTar)
-            files = mountSource.listDir("/")
+            files = mountSource.list("/")
             print("files:", files)
             assert files
 

@@ -65,7 +65,7 @@ class EXT4MountSource(MountSource):
             return False
         return True
 
-    def _listDir(self, path: str, getValue) -> Optional[Dict[str, Any]]:
+    def _list(self, path: str, getValue) -> Optional[Dict[str, Any]]:
         try:
             inode = self.fileSystem.inode_at(path)
         except FileNotFoundError:
@@ -81,12 +81,12 @@ class EXT4MountSource(MountSource):
         }
 
     @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
-        return self._listDir(path, EXT4MountSource._convertEXT4DirectoryEntryToFileInfo)
+    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+        return self._list(path, EXT4MountSource._convertEXT4DirectoryEntryToFileInfo)
 
     @overrides(MountSource)
     def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
-        return self._listDir(path, lambda inode: inode.i_mode.value)
+        return self._list(path, lambda inode: inode.i_mode.value)
 
     @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:

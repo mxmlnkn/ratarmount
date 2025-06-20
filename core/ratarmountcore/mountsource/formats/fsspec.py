@@ -155,7 +155,7 @@ class FSSpecMountSource(MountSource):
     def exists(self, path: str) -> bool:
         return self.fileSystem.lexists(self._getPath(path))
 
-    def _listDir(self, path: str, onlyMode: bool) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def _list(self, path: str, onlyMode: bool) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
         path = self._getPath(path)
 
         if path == '/' and DropboxDriveFileSystem and isinstance(self.fileSystem, DropboxDriveFileSystem):
@@ -225,12 +225,12 @@ class FSSpecMountSource(MountSource):
         return result
 
     @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
-        return self._listDir(path, onlyMode=False)
+    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+        return self._list(path, onlyMode=False)
 
     @overrides(MountSource)
     def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
-        return self._listDir(path, onlyMode=True)
+        return self._list(path, onlyMode=True)
 
     def _getFileInfoHTTP(self, path: str) -> Optional[FileInfo]:
         path = self._getPath(path)

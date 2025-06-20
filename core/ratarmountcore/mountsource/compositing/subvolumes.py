@@ -59,7 +59,7 @@ class SubvolumesMountSource(MountSource):
 
         return self.mountSources[subvolume].versions(subpath)
 
-    def _listDir(self, path: str, onlyMode: bool):
+    def _list(self, path: str, onlyMode: bool):
         if path == '/':
             return dict.fromkeys(self.mountSources.keys(), self.rootFileInfo.mode if onlyMode else self.rootFileInfo)
 
@@ -69,18 +69,16 @@ class SubvolumesMountSource(MountSource):
         subvolume, subpath = result
 
         return (
-            self.mountSources[subvolume].list_mode(subpath)
-            if onlyMode
-            else self.mountSources[subvolume].listDir(subpath)
+            self.mountSources[subvolume].list_mode(subpath) if onlyMode else self.mountSources[subvolume].list(subpath)
         )
 
     @overrides(MountSource)
-    def listDir(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
-        return self._listDir(path, onlyMode=False)
+    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+        return self._list(path, onlyMode=False)
 
     @overrides(MountSource)
     def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
-        return self._listDir(path, onlyMode=True)
+        return self._list(path, onlyMode=True)
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
