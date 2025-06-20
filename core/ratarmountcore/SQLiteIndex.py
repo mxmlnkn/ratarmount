@@ -1043,7 +1043,7 @@ class SQLiteIndex:
             pass
         return []
 
-    def getxattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
+    def get_xattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
         if not fileInfo.userdata:
             return None
         userData = fileInfo.userdata[-1]

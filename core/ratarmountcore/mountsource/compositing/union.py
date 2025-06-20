@@ -214,10 +214,10 @@ class UnionMountSource(MountSource):
             fileInfo.userdata.append(mountSource)
 
     @overrides(MountSource)
-    def getxattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
+    def get_xattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
         mountSource = fileInfo.userdata.pop()
         try:
-            return mountSource.getxattr(fileInfo, key) if isinstance(mountSource, MountSource) else None
+            return mountSource.get_xattr(fileInfo, key) if isinstance(mountSource, MountSource) else None
         finally:
             fileInfo.userdata.append(mountSource)
 

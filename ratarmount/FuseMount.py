@@ -508,7 +508,7 @@ class FuseMount(fuse.Operations):
             print("[Warning] Please report this as an issue to the ratarmount project with details to reproduce this.")
             raise fuse.FuseOSError(errno.EOPNOTSUPP)
 
-        value = self.mountSource.getxattr(self._getFileInfo(path), name)
+        value = self.mountSource.get_xattr(self._getFileInfo(path), name)
         if value is None:
             # My system sometimes tries to request security.selinux without the key actually existing.
             # See https://man7.org/linux/man-pages/man2/getxattr.2.html#ERRORS

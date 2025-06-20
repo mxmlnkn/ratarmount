@@ -172,7 +172,7 @@ class FolderMountSource(MountSource):
         return os.listxattr(self.getFilePath(fileInfo), follow_symlinks=False) if hasattr(os, 'listxattr') else []
 
     @overrides(MountSource)
-    def getxattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
+    def get_xattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
         return os.getxattr(self.getFilePath(fileInfo), key, follow_symlinks=False) if hasattr(os, 'getxattr') else None
 
     @overrides(MountSource)

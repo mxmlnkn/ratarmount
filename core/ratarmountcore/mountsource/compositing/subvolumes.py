@@ -111,10 +111,10 @@ class SubvolumesMountSource(MountSource):
             fileInfo.userdata.append(subvolume)
 
     @overrides(MountSource)
-    def getxattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
+    def get_xattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
         subvolume = fileInfo.userdata.pop()
         try:
-            return None if subvolume is None else self.mountSources[subvolume].getxattr(fileInfo, key)
+            return None if subvolume is None else self.mountSources[subvolume].get_xattr(fileInfo, key)
         finally:
             fileInfo.userdata.append(subvolume)
 

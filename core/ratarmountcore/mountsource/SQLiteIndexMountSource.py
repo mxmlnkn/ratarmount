@@ -101,5 +101,5 @@ class SQLiteIndexMountSource(MountSource):
         return self.index.list_xattr(fileInfo)
 
     @overrides(MountSource)
-    def getxattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
-        return self.index.getxattr(fileInfo, key)
+    def get_xattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
+        return self.index.get_xattr(fileInfo, key)

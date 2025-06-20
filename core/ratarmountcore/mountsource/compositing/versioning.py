@@ -271,12 +271,12 @@ class FileVersionLayer(MountSource):
             fileInfo.userdata.append(fileType)
 
     @overrides(MountSource)
-    def getxattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
+    def get_xattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
         fileType = fileInfo.userdata.pop()
         try:
             if fileType == FileType.VERSIONS_FOLDER:
                 return None
-            return self.mountSource.getxattr(fileInfo, key)
+            return self.mountSource.get_xattr(fileInfo, key)
         finally:
             fileInfo.userdata.append(fileType)
 

@@ -118,7 +118,7 @@ class MountSource(ABC):
         return []
 
     # pylint: disable=unused-argument
-    def getxattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
+    def get_xattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
         """
         Should return value for given fileInfo and extended file attribute key.
         """
