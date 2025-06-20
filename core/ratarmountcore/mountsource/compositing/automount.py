@@ -67,7 +67,7 @@ class AutoMountLayer(MountSource):
 
                 for fileName in fileNames:
                     filePath = os.path.join(folder, fileName)
-                    if self.isdir(filePath):
+                    if self.is_dir(filePath):
                         newFoldersToWalk.append(filePath)
                     else:
                         mountPoint = self._tryToMountFile(filePath)

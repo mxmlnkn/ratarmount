@@ -106,7 +106,7 @@ class MountSource(ABC):
     def exists(self, path: str) -> bool:
         return self.getFileInfo(path) is not None
 
-    def isdir(self, path: str):
+    def is_dir(self, path: str):
         fileInfo = self.getFileInfo(path)
         return fileInfo is not None and stat.S_ISDIR(fileInfo.mode)
 

@@ -124,7 +124,7 @@ class WritableFolderMountSource(fuse.Operations):
         Creates parent folders for given path inside overlay folder if and only if they exist in the mount source.
         """
         parentPath = self._splitPath(path)[0]
-        if not os.path.exists(self._realpath(parentPath)) and self.mountSource.isdir(parentPath):
+        if not os.path.exists(self._realpath(parentPath)) and self.mountSource.is_dir(parentPath):
             os.makedirs(self._realpath(parentPath), exist_ok=True)
 
     def _ensureFileIsModifiable(self, path):
