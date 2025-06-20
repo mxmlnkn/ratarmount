@@ -46,7 +46,7 @@ class UnionMountSource(MountSource):
         if self.printDebug >= 1:
             print(f"Building cache for union mount (timeout after {maxSecondsToCache}s)...")
 
-        self.folderCache = {"/": [m for m in self.mountSources if m.isImmutable()]}
+        self.folderCache = {"/": [m for m in self.mountSources if m.is_immutable()]}
 
         lastFolderCache: Dict[str, List[MountSource]] = self.folderCache.copy()
 
@@ -95,8 +95,8 @@ class UnionMountSource(MountSource):
             )
 
     @overrides(MountSource)
-    def isImmutable(self) -> bool:
-        return all(m.isImmutable() for m in self.mountSources)
+    def is_immutable(self) -> bool:
+        return all(m.is_immutable() for m in self.mountSources)
 
     @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
@@ -115,7 +115,7 @@ class UnionMountSource(MountSource):
         else:
             cachedMountSources = self.mountSources
 
-        mountSources = [m for m in self.mountSources if not m.isImmutable() or m in cachedMountSources]
+        mountSources = [m for m in self.mountSources if not m.is_immutable() or m in cachedMountSources]
 
         # We need to keep the sign of the fileVersion in order to forward it to SQLiteIndexedTar.
         # When the requested version can't be found in a mount source, increment negative specified versions

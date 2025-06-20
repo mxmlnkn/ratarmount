@@ -223,8 +223,8 @@ class AutoMountLayer(MountSource):
         return self._simplyFindMounted(path)
 
     @overrides(MountSource)
-    def isImmutable(self) -> bool:
-        return self.mounted['/'].mountSource.isImmutable()
+    def is_immutable(self) -> bool:
+        return self.mounted['/'].mountSource.is_immutable()
 
     @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:

@@ -144,8 +144,8 @@ class FileVersionLayer(MountSource):
         return fileInfo
 
     @overrides(MountSource)
-    def isImmutable(self) -> bool:
-        return self.mountSource.isImmutable()
+    def is_immutable(self) -> bool:
+        return self.mountSource.is_immutable()
 
     def _listDirWrapper(self, listDir, path: str):
         files = listDir(path)

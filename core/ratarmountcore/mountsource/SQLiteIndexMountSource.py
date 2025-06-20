@@ -72,7 +72,7 @@ class SQLiteIndexMountSource(MountSource):
         self.index.close()
 
     @overrides(MountSource)
-    def isImmutable(self) -> bool:
+    def is_immutable(self) -> bool:
         return True
 
     @overrides(MountSource)

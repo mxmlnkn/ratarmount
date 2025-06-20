@@ -84,7 +84,7 @@ class FolderMountSource(MountSource):
         return FolderMountSource._statsToFileInfo(dirEntry.stat(follow_symlinks=False), linkname, path)
 
     @overrides(MountSource)
-    def isImmutable(self) -> bool:
+    def is_immutable(self) -> bool:
         return False
 
     @overrides(MountSource)

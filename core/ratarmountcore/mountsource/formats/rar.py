@@ -112,7 +112,7 @@ class RarMountSource(MountSource):
         # fmt: on
 
     @overrides(MountSource)
-    def isImmutable(self) -> bool:
+    def is_immutable(self) -> bool:
         return True
 
     # TODO How to behave with files in archive with absolute paths? Currently, they would never be shown.

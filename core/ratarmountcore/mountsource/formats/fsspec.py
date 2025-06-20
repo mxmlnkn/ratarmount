@@ -148,7 +148,7 @@ class FSSpecMountSource(MountSource):
         # fmt: on
 
     @overrides(MountSource)
-    def isImmutable(self) -> bool:
+    def is_immutable(self) -> bool:
         return True
 
     @overrides(MountSource)

@@ -24,8 +24,8 @@ class SubvolumesMountSource(MountSource):
         return (subvolume, '/' + subpath) if subvolume in self.mountSources else None
 
     @overrides(MountSource)
-    def isImmutable(self) -> bool:
-        return all(m.isImmutable() for m in self.mountSources.values())
+    def is_immutable(self) -> bool:
+        return all(m.is_immutable() for m in self.mountSources.values())
 
     @overrides(MountSource)
     def getFileInfo(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
