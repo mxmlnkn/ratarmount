@@ -15,15 +15,15 @@ import zipfile
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-from ratarmountcore.compressions import stripSuffixFromArchive
-from ratarmountcore.utils import RatarmountError, determineRecursionDepth, imeta, removeDuplicatesStable
+from ratarmountcore.compressions import strip_suffix_from_archive
+from ratarmountcore.utils import RatarmountError, determine_recursion_depth, imeta, remove_duplicates_stable
 
 with contextlib.suppress(ImportError):
     import rarfile
 
-from .CLIHelpers import checkInputFileType
+from .CLIHelpers import check_input_file_type
 from .fuse import fuse
-from .WriteOverlay import commitOverlay
+from .WriteOverlay import commit_overlay
 
 
 def has_fuse_non_empty_support() -> bool:
@@ -108,8 +108,8 @@ def print_metadata_recursively(
     print_metadata_recursively(requirements, doWithDistribution, doOnNewLevel, level + 1, processedPackages)
 
 
-def printVersions() -> None:
-    def doForDistribution(distribution):
+def print_versions() -> None:
+    def do_for_distribution(distribution):
         if 'Name' not in distribution.metadata:
             return
         print(distribution.metadata['Name'] + " " + distribution.version)
@@ -125,11 +125,11 @@ def printVersions() -> None:
                     with contextlib.suppress(Exception):
                         importlib.import_module(module)
 
-    def printOnNewLevel(level):
+    def print_on_new_level(level):
         if level > 1:
             print(f"\nLevel {level} Dependencies:\n")
 
-    print_metadata_recursively({"ratarmount": {"full"}}, doForDistribution, printOnNewLevel)
+    print_metadata_recursively({"ratarmount": {"full"}}, do_for_distribution, print_on_new_level)
 
     print()
     print("System Software:")
@@ -195,19 +195,19 @@ def find_short_license(distribution) -> str:
 
 
 def print_oss_attributions_short() -> None:
-    def doForDistribution(distribution):
+    def do_for_distribution(distribution):
         if 'Name' in distribution.metadata:
             print(f"{distribution.metadata['Name']:20} {distribution.version:12} {find_short_license(distribution)}")
 
-    def printOnNewLevel(level):
+    def print_on_new_level(level):
         if level > 1:
             print(f"\nLevel {level} Dependencies:\n")
 
-    print_metadata_recursively({"ratarmount": {"full"}}, doForDistribution, printOnNewLevel)
+    print_metadata_recursively({"ratarmount": {"full"}}, do_for_distribution, print_on_new_level)
 
 
 def print_oss_attributions() -> None:
-    def doForDistribution(distribution):
+    def do_for_distribution(distribution):
         if 'Name' not in distribution.metadata:
             return
         name = distribution.metadata['Name']
@@ -255,7 +255,7 @@ def print_oss_attributions() -> None:
             print(name, "License:", find_short_license(distribution))
         print()
 
-    print_metadata_recursively({"ratarmount": {"full"}}, doForDistribution)
+    print_metadata_recursively({"ratarmount": {"full"}}, do_for_distribution)
 
     # Licenses for non-Python libraries
     licenses = [
@@ -329,7 +329,7 @@ def unmount(mountPoint: str, printDebug: int = 0) -> None:
                 print(f"[Warning] umount {mountPoint} failed with: {exception}")
 
 
-def processParsedArguments(args) -> int:
+def process_parsed_arguments(args) -> int:
     if args.unmount:
         # args.mount_source suffices because it eats all arguments and args.mount_point is always empty by default.
         mountPoints = [mountPoint for mountPoint in args.mount_source if mountPoint] if args.mount_source else []
@@ -361,7 +361,7 @@ def processParsedArguments(args) -> int:
 
     args.gzipSeekPointSpacing = int(args.gzip_seek_point_spacing * 1024 * 1024)
 
-    if (args.strip_recursive_tar_extension or args.transform_recursive_mount_point) and determineRecursionDepth(
+    if (args.strip_recursive_tar_extension or args.transform_recursive_mount_point) and determine_recursion_depth(
         recursive=args.recursive, recursion_depth=args.recursion_depth
     ) <= 0:
         print("[Warning] The options --strip-recursive-tar-extension and --transform-recursive-mount-point")
@@ -383,7 +383,7 @@ def processParsedArguments(args) -> int:
         )
 
     # Sanitize different ways to specify passwords into a simple list
-    # Better initialize it before calling checkMountSource, which might use args.passwords in the future.
+    # Better initialize it before calling check_mount_source, which might use args.passwords in the future.
     args.passwords = []
     if args.password:
         args.passwords.append(args.password.encode())
@@ -391,12 +391,12 @@ def processParsedArguments(args) -> int:
     if args.password_file:
         args.passwords.extend(Path(args.password_file).read_bytes().split(b'\n'))
 
-    args.passwords = removeDuplicatesStable(args.passwords)
+    args.passwords = remove_duplicates_stable(args.passwords)
 
     # Manually check that all specified TARs and folders exist
-    def checkMountSource(path):
+    def check_mount_source(path):
         try:
-            return checkInputFileType(path, printDebug=args.debug)
+            return check_input_file_type(path, printDebug=args.debug)
         except argparse.ArgumentTypeError as e:
             if (
                 os.path.isdir(path)
@@ -408,7 +408,7 @@ def processParsedArguments(args) -> int:
 
     mountSources: List[str] = []
     for path in args.mount_source:
-        fixedPath = checkMountSource(path)
+        fixedPath = check_mount_source(path)
         # Skip neighboring duplicates
         if mountSources and mountSources[-1] == fixedPath:
             if args.debug >= 2:
@@ -423,7 +423,7 @@ def processParsedArguments(args) -> int:
 
     # Automatically generate a default mount path
     if not args.mount_point:
-        autoMountPoint = stripSuffixFromArchive(args.mount_source[0])
+        autoMountPoint = strip_suffix_from_archive(args.mount_source[0])
         if args.mount_point == autoMountPoint:
             args.mount_point = os.path.splitext(args.mount_source[0])[0]
         else:
@@ -472,7 +472,7 @@ def processParsedArguments(args) -> int:
         if len(args.mount_source) != 1:
             raise RatarmountError("Currently, only modifications to a single TAR may be committed.")
 
-        commitOverlay(args.write_overlay, args.mount_source[0], encoding=args.encoding, printDebug=args.debug)
+        commit_overlay(args.write_overlay, args.mount_source[0], encoding=args.encoding, printDebug=args.debug)
         return 0
 
     create_fuse_mount(args)  # Throws on errors.

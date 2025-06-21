@@ -85,7 +85,7 @@ This `MountSource` interface has methods for listing paths and getting file meta
 
 The ratarmountcore library offers multiple implementations of `MountSource` for different archive formats:
 
- - `SQLiteIndexedTar`: 
+ - `SQLiteIndexedTar`:
     This is the oldest and most powerful implementation.
     It supports fast access to files inside (compressed) TARs.
  - `RarMountSource`: An implementation for RARs using rarfile.
@@ -98,7 +98,7 @@ There also are these functional implementations of `MountSource`:
  - `FileVersionLayer`:
     Takes a MountSource as input, decodes the requested paths, also accepting `<file>.version/<number>` paths,
     and calls the methods of the `MountSource` with the given file version.
- - `AutoMountLayer`: 
+ - `AutoMountLayer`:
     Takes one `MountSource`, goes over all its files and mounts archives recursively in a similar manner to `UnionMountSource`.
 
 The factory function `open` opens one of the archive `MountSource` implementations according to the file type.
@@ -109,9 +109,9 @@ The factory function `open` opens one of the archive `MountSource` implementatio
 ## Example
 
 ```Python3
-from ratarmountcore.factory import openMountSource
+from ratarmountcore.factory import open_mount_source
 
-archive = openMountSource("foo.tar", recursive=True)
+archive = open_mount_source("foo.tar", recursive=True)
 print(archive.list("/"))
 info = archive.lookup("/bar")
 

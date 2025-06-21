@@ -5,12 +5,12 @@ import traceback
 from dataclasses import dataclass
 from typing import IO, Any, Dict, Iterable, List, Optional, Tuple, Union
 
-from ratarmountcore.compressions import stripSuffixFromArchive
-from ratarmountcore.mountsource import FileInfo, MountSource, mergeStatfs
-from ratarmountcore.mountsource.factory import openMountSource
+from ratarmountcore.compressions import strip_suffix_from_archive
+from ratarmountcore.mountsource import FileInfo, MountSource, merge_statfs
+from ratarmountcore.mountsource.factory import open_mount_source
 from ratarmountcore.mountsource.formats.folder import FolderMountSource
 from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar, SQLiteIndexedTarUserData
-from ratarmountcore.utils import RatarmountError, determineRecursionDepth, overrides
+from ratarmountcore.utils import RatarmountError, determine_recursion_depth, overrides
 
 
 class AutoMountLayer(MountSource):
@@ -33,7 +33,7 @@ class AutoMountLayer(MountSource):
             raise RatarmountError("AutoMountLayer must not be stacked directly onto each other.")
 
         self.options = options
-        self.maxRecursionDepth: int = determineRecursionDepth(**options)
+        self.maxRecursionDepth: int = determine_recursion_depth(**options)
         self.lazyMounting: bool = self.options.get('lazyMounting', False)
         self.printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
 
@@ -118,7 +118,7 @@ class AutoMountLayer(MountSource):
         """
 
         # For better performance, only look at the suffix not at the magic bytes.
-        strippedFilePath = stripSuffixFromArchive(path)
+        strippedFilePath = strip_suffix_from_archive(path)
         if strippedFilePath == path:
             return None
 
@@ -169,11 +169,11 @@ class AutoMountLayer(MountSource):
                 # Open from file path on host file system in order to write out TAR index files.
                 # Care has to be taken if a folder is bind mounted onto itself because then it can happen that
                 # the file open triggers a recursive FUSE call, which then hangs up everything.
-                mountSource = openMountSource(deepestMountSource.get_file_path(deepestFileInfo), **options)
+                mountSource = open_mount_source(deepestMountSource.get_file_path(deepestFileInfo), **options)
             else:
                 # This will fail with StenciledFile objects as returned by SQLiteIndexedTar mount sources and when
                 # given to backends like indexed_zstd, which do expect the file object to have a valid fileno.
-                mountSource = openMountSource(
+                mountSource = open_mount_source(
                     parentMountSource.open(archiveFileInfo),
                     tarFileName=pathInsideParentMountPoint.rsplit('/', 1)[-1],
                     **options,
@@ -361,7 +361,7 @@ class AutoMountLayer(MountSource):
 
     @overrides(MountSource)
     def statfs(self) -> Dict[str, Any]:
-        return mergeStatfs(
+        return merge_statfs(
             [mountInfo.mountSource.statfs() for _, mountInfo in self.mounted.items()], printDebug=self.printDebug
         )
 
@@ -370,7 +370,7 @@ class AutoMountLayer(MountSource):
         for mountInfo in self.mounted.values():
             mountInfo.mountSource.__exit__(exception_type, exception_value, exception_traceback)
 
-    def joinThreads(self):
+    def join_threads(self):
         for mountInfo in self.mounted.values():
-            if hasattr(mountInfo.mountSource, 'joinThreads'):
-                mountInfo.mountSource.joinThreads()
+            if hasattr(mountInfo.mountSource, 'join_threads'):
+                mountInfo.mountSource.join_threads()

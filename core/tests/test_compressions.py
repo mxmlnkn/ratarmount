@@ -7,16 +7,16 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from ratarmountcore.compressions import (  # noqa: E402
-    checkForSequence,
-    hasMatchingAlphabets,
-    stripSuffixFromArchive,
-    stripSuffixFromCompressedFile,
+    check_for_sequence,
+    has_matching_alphabets,
+    strip_suffix_from_archive,
+    strip_suffix_from_compressed_file,
 )
-from ratarmountcore.utils import ALPHA, DIGITS, HEX, formatNumber  # noqa: E402
+from ratarmountcore.utils import ALPHA, DIGITS, HEX, format_number  # noqa: E402
 
 
 def test_strip_suffix_from_compressed_file():
-    ssc = stripSuffixFromCompressedFile
+    ssc = strip_suffix_from_compressed_file
 
     assert ssc('a.tar.bz2') == 'a.tar'
     assert ssc('a.tar.BZ2') == 'a.tar'
@@ -30,7 +30,7 @@ def test_strip_suffix_from_compressed_file():
 
 
 def test_strip_suffix_from_archive():
-    sst = stripSuffixFromArchive
+    sst = strip_suffix_from_archive
 
     assert sst('a.tar.bz2') == 'a'
     assert sst('a.tar.BZ2') == 'a'
@@ -50,7 +50,7 @@ def test_strip_suffix_from_archive():
 
 
 def test_has_matching_alphabets():
-    matches = hasMatchingAlphabets
+    matches = has_matching_alphabets
 
     assert matches('a', 'b')
     assert matches('0', '1')
@@ -67,37 +67,37 @@ def test_has_matching_alphabets():
 
 def test_check_for_sequence():
     def to_alpha1(i):
-        return formatNumber(i, ALPHA, 1)
+        return format_number(i, ALPHA, 1)
 
-    assert checkForSequence(['a'], to_alpha1) == ['a']
-    assert checkForSequence(['a', 'b'], to_alpha1) == ['a', 'b']
-    assert checkForSequence(['b', 'a'], to_alpha1) == ['a', 'b']
-    assert checkForSequence(['b', 'a', 'd'], to_alpha1) == ['a', 'b']
-    assert checkForSequence(['a', 'd'], to_alpha1) == ['a']
-    assert checkForSequence(['a', 'd', 'e'], to_alpha1) == ['a']
-    assert not checkForSequence(['aa'], to_alpha1)
-    assert not checkForSequence(['0'], to_alpha1)
+    assert check_for_sequence(['a'], to_alpha1) == ['a']
+    assert check_for_sequence(['a', 'b'], to_alpha1) == ['a', 'b']
+    assert check_for_sequence(['b', 'a'], to_alpha1) == ['a', 'b']
+    assert check_for_sequence(['b', 'a', 'd'], to_alpha1) == ['a', 'b']
+    assert check_for_sequence(['a', 'd'], to_alpha1) == ['a']
+    assert check_for_sequence(['a', 'd', 'e'], to_alpha1) == ['a']
+    assert not check_for_sequence(['aa'], to_alpha1)
+    assert not check_for_sequence(['0'], to_alpha1)
 
     def to_alpha2(i):
-        return formatNumber(i, ALPHA, 2)
+        return format_number(i, ALPHA, 2)
 
-    assert checkForSequence(['aa'], to_alpha2) == ['aa']
-    assert checkForSequence(['aa', 'ab'], to_alpha2) == ['aa', 'ab']
-    assert checkForSequence(['ab', 'aa'], to_alpha2) == ['aa', 'ab']
-    assert checkForSequence(['ab', 'aa', 'ad'], to_alpha2) == ['aa', 'ab']
-    assert checkForSequence(['aa', 'ad'], to_alpha2) == ['aa']
-    assert checkForSequence(['aa', 'ad', 'ae'], to_alpha2) == ['aa']
-    assert not checkForSequence(['aaa'], to_alpha2)
-    assert not checkForSequence(['0'], to_alpha2)
-    assert not checkForSequence(['00'], to_alpha2)
+    assert check_for_sequence(['aa'], to_alpha2) == ['aa']
+    assert check_for_sequence(['aa', 'ab'], to_alpha2) == ['aa', 'ab']
+    assert check_for_sequence(['ab', 'aa'], to_alpha2) == ['aa', 'ab']
+    assert check_for_sequence(['ab', 'aa', 'ad'], to_alpha2) == ['aa', 'ab']
+    assert check_for_sequence(['aa', 'ad'], to_alpha2) == ['aa']
+    assert check_for_sequence(['aa', 'ad', 'ae'], to_alpha2) == ['aa']
+    assert not check_for_sequence(['aaa'], to_alpha2)
+    assert not check_for_sequence(['0'], to_alpha2)
+    assert not check_for_sequence(['00'], to_alpha2)
 
     def to_digit3(i):
-        return formatNumber(i, DIGITS, 3)
+        return format_number(i, DIGITS, 3)
 
-    assert checkForSequence(['000'], to_digit3) == ['000']
-    assert checkForSequence(['000', '001'], to_digit3) == ['000', '001']
-    assert checkForSequence(['001', '000'], to_digit3) == ['000', '001']
-    assert checkForSequence(['001', '000', '003'], to_digit3) == ['000', '001']
-    assert checkForSequence(['000', '003'], to_digit3) == ['000']
-    assert checkForSequence(['000', '003', '004'], to_digit3) == ['000']
-    assert not checkForSequence(['0001'], to_digit3)
+    assert check_for_sequence(['000'], to_digit3) == ['000']
+    assert check_for_sequence(['000', '001'], to_digit3) == ['000', '001']
+    assert check_for_sequence(['001', '000'], to_digit3) == ['000', '001']
+    assert check_for_sequence(['001', '000', '003'], to_digit3) == ['000', '001']
+    assert check_for_sequence(['000', '003'], to_digit3) == ['000']
+    assert check_for_sequence(['000', '003', '004'], to_digit3) == ['000']
+    assert not check_for_sequence(['0001'], to_digit3)

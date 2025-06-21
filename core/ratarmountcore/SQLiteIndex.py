@@ -26,9 +26,9 @@ with contextlib.suppress(ImportError):
 with contextlib.suppress(ImportError):
     import rapidgzip
 
-from .compressions import COMPRESSION_BACKENDS, detectCompression, findAvailableBackend
+from .compressions import COMPRESSION_BACKENDS, detect_compression, find_available_backend
 from .formats import FILE_FORMATS, FileFormatID
-from .mountsource import FileInfo, createRootFileInfo
+from .mountsource import FileInfo, create_root_file_info
 from .SQLiteBlobFile import SQLiteBlobsFile, WriteSQLiteBlobs
 from .utils import (
     CompressionError,
@@ -36,7 +36,7 @@ from .utils import (
     InvalidIndexError,
     MismatchingIndexError,
     RatarmountError,
-    findModuleVersion,
+    find_module_version,
 )
 from .version import __version__
 
@@ -409,7 +409,7 @@ class SQLiteIndex:
                 print("[Info] Create new index in memory because memory is to be preferred, e.g., for small archives.")
             self.indexFilePath, self.sqlConnection = SQLiteIndex._open_path(':memory:')
 
-        if not self.indexIsLoaded():
+        if not self.index_is_loaded():
             raise InvalidIndexError(
                 "Could not find any existing index or writable location for an index in "
                 + str(self.possibleIndexFilePaths)
@@ -482,7 +482,7 @@ class SQLiteIndex:
                 for module, _ in info.requiredModules
                 if module in sys.modules
             }:
-                moduleVersion = findModuleVersion(sys.modules[moduleName])
+                moduleVersion = find_module_version(sys.modules[moduleName])
                 if moduleVersion:
                     versions += [make_version_row(moduleName, moduleVersion)]
 
@@ -826,7 +826,7 @@ class SQLiteIndex:
 
         self.get_connection().executescript(cleanUpDatabase)
 
-    def fileCount(self) -> int:
+    def file_count(self) -> int:
         return self.get_connection().execute('SELECT COUNT(*) FROM "files";').fetchone()[0]
 
     @staticmethod
@@ -912,7 +912,7 @@ class SQLiteIndex:
         if 'recursiondepth' in columns:
             selected_columns += ['recursiondepth']
 
-        def rowToFileInfo(cursor, row) -> Tuple[str, FileInfo]:  # pylint: disable=unused-argument
+        def row_to_file_info(cursor, row) -> Tuple[str, FileInfo]:  # pylint: disable=unused-argument
             # fmt: off
             return row[0], FileInfo(
                 size     = row[1],
@@ -933,7 +933,7 @@ class SQLiteIndex:
             # fmt: on
 
         oldRowFactory = self.get_connection().row_factory
-        self.get_connection().row_factory = rowToFileInfo
+        self.get_connection().row_factory = row_to_file_info
         directory: Dict[str, FileInfo] = dict(
             self.get_connection().execute(
                 'SELECT ' + ','.join(selected_columns) + ' FROM "files" WHERE "path" == (?) ORDER BY "offsetheader"',
@@ -978,7 +978,7 @@ class SQLiteIndex:
         """
 
         if path == '/':
-            return {'/': createRootFileInfo(userdata=[SQLiteIndexedTarUserData(0, 0, False, False, True, 0)])}
+            return {'/': create_root_file_info(userdata=[SQLiteIndexedTarUserData(0, 0, False, False, True, 0)])}
 
         path, name = self._query_normpath(path).rsplit('/', 1)
         rows = self.get_connection().execute(
@@ -1000,7 +1000,7 @@ class SQLiteIndex:
             raise RatarmountError("The specified file version must be an integer!")
 
         if path == '/':
-            return createRootFileInfo(userdata=[SQLiteIndexedTarUserData(0, 0, False, False, True, 0)])
+            return create_root_file_info(userdata=[SQLiteIndexedTarUserData(0, 0, False, False, True, 0)])
 
         path, name = self._query_normpath(path).rsplit('/', 1)
         row = (
@@ -1107,7 +1107,7 @@ class SQLiteIndex:
             [(p[0], p[1], offsetheader, offset) for p in paths],
         )
 
-    def setFileInfos(self, rows: List[Tuple]) -> None:
+    def set_file_infos(self, rows: List[Tuple]) -> None:
         if not rows:
             return
 
@@ -1132,7 +1132,7 @@ class SQLiteIndex:
         except UnicodeEncodeError:
             # Fall back to separately inserting each row to find those in need of string cleaning.
             for row in rows:
-                self.setFileInfo(row)
+                self.set_file_info(row)
             return
 
         for row in rows:
@@ -1146,7 +1146,7 @@ class SQLiteIndex:
         except UnicodeEncodeError:
             return toEscape.encode(encoding, 'surrogateescape').decode(encoding, 'backslashreplace')
 
-    def setFileInfo(self, row: tuple) -> None:
+    def set_file_info(self, row: tuple) -> None:
         connection = self.get_connection()
 
         try:
@@ -1177,7 +1177,7 @@ class SQLiteIndex:
 
         self._try_add_parent_folders(row[0], row[2], row[3])
 
-    def indexIsLoaded(self) -> bool:
+    def index_is_loaded(self) -> bool:
         """Returns true if the SQLite database has been opened for reading and a "files" table exists."""
         if not self.sqlConnection:
             return False
@@ -1225,7 +1225,7 @@ class SQLiteIndex:
             the dictionary of metadata in the index and should thrown an exception when the index
             should not be used, e.g., because the version is incompatible.
         """
-        if self.indexIsLoaded():
+        if self.index_is_loaded():
             return
 
         # Download and/or extract the file to a temporary file if necessary.
@@ -1240,7 +1240,7 @@ class SQLiteIndex:
         temporaryFolder = os.environ.get("RATARMOUNT_INDEX_TMPDIR", None)
 
         def _undo_compression(file):
-            compression = detectCompression(file, printDebug=self.printDebug)
+            compression = detect_compression(file, printDebug=self.printDebug)
             if not compression or not any(
                 (compression in backend.formats) for backend in COMPRESSION_BACKENDS.values()
             ):
@@ -1249,7 +1249,7 @@ class SQLiteIndex:
             if self.printDebug >= 2:
                 print(f"[Info] Detected {compression}-compressed index.")
 
-            backend = findAvailableBackend(compression)
+            backend = find_available_backend(compression)
             if not backend:
                 packages = [
                     x[1]
@@ -1348,14 +1348,14 @@ class SQLiteIndex:
                     checkMetadata(metadata)
 
         except Exception as e:
-            # indexIsLoaded checks self.sqlConnection, so close it before returning because it was found to be faulty
+            # index_is_loaded checks self.sqlConnection, so close it before returning because it was found to be faulty
             with contextlib.suppress(sqlite3.Error):
                 self.sqlConnection.close()
             self.sqlConnection = None
 
             raise e
 
-        if self.indexIsLoaded() and self.sqlConnection:
+        if self.index_is_loaded() and self.sqlConnection:
             try:
                 indexVersion = self.sqlConnection.execute(
                     "SELECT major,minor FROM versions WHERE name == 'index';"
@@ -1387,7 +1387,7 @@ class SQLiteIndex:
     ) -> bool:
         """Calls loadIndex if index is not loaded already and provides extensive error handling."""
 
-        if self.indexIsLoaded():
+        if self.index_is_loaded():
             return True
 
         try:
@@ -1421,7 +1421,7 @@ class SQLiteIndex:
             except OSError:
                 print("[Warning] Failed to remove corrupted old cached index file:", indexFilePath)
 
-        return self.indexIsLoaded()
+        return self.index_is_loaded()
 
     def clear_compression_offsets(self):
         for table in ['bzip2blocks', 'gzipindex', 'gzipindexes', 'zstdblocks']:

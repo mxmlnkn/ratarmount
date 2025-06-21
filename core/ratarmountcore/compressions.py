@@ -9,17 +9,17 @@ import traceback
 from typing import IO, Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, cast
 
 from .BlockParallelReaders import ParallelXZReader
-from .formats import ARCHIVE_FORMATS, COMPRESSION_FORMATS, FID, FileFormatID, mightBeFormat
+from .formats import ARCHIVE_FORMATS, COMPRESSION_FORMATS, FID, FileFormatID, might_be_format
 from .utils import (
     ALPHA,
     DIGITS,
     HEX,
     CompressionError,
-    formatNumber,
-    isLatinAlpha,
-    isLatinDigit,
-    isLatinHexAlpha,
-    isOnSlowDrive,
+    format_number,
+    is_latin_alpha,
+    is_latin_digit,
+    is_latin_hex_alpha,
+    is_on_slow_drive,
 )
 
 try:
@@ -57,7 +57,7 @@ except ImportError:
 
 
 try:
-    # Must be imported because findAvailableBackend checks for it to be in sys.modules!
+    # Must be imported because find_available_backend checks for it to be in sys.modules!
     # Although, I'm unsure whether it gets implicitly added to sys.modules below when importing file_reader.
     # OSError can happen when dependencies are missing, e.g., libicuuc.so.74.
     import libarchive  # pylint: disable=unused-import
@@ -150,7 +150,7 @@ COMPRESSION_BACKENDS: Dict[str, CompressionBackendInfo] = {
 }
 
 
-def findAvailableBackend(
+def find_available_backend(
     compression: FileFormatID,
     enabledBackends: Optional[List[str]] = None,
     prioritizedBackends: Optional[List[str]] = None,
@@ -181,7 +181,7 @@ def findAvailableBackend(
     return None
 
 
-def stripSuffixFromCompressedFile(path: str) -> str:
+def strip_suffix_from_compressed_file(path: str) -> str:
     """Strips compression suffixes like .bz2, .gz, ..."""
     for formatInfo in COMPRESSION_FORMATS.values():
         for extension in formatInfo.extensions:
@@ -190,7 +190,7 @@ def stripSuffixFromCompressedFile(path: str) -> str:
     return path
 
 
-def stripSuffixFromArchive(path: str) -> str:
+def strip_suffix_from_archive(path: str) -> str:
     """Strips extensions like .tar.gz or .gz or .tgz, .rar, .zip ..."""
     extensions = itertools.chain(
         (e for extensions in TAR_CONTRACTED_EXTENSIONS.values() for e in extensions),
@@ -205,15 +205,15 @@ def stripSuffixFromArchive(path: str) -> str:
     return path
 
 
-def hasMatchingAlphabets(a: str, b: str):
+def has_matching_alphabets(a: str, b: str):
     return (
-        (isLatinAlpha(a) and isLatinAlpha(b))
-        or (isLatinDigit(a) and isLatinDigit(b))
-        or (isLatinHexAlpha(a) and isLatinHexAlpha(b))
+        (is_latin_alpha(a) and is_latin_alpha(b))
+        or (is_latin_digit(a) and is_latin_digit(b))
+        or (is_latin_hex_alpha(a) and is_latin_hex_alpha(b))
     )
 
 
-def checkForSequence(extensions: Iterable[str], numberFormatter: Callable[[int], str]) -> List[str]:
+def check_for_sequence(extensions: Iterable[str], numberFormatter: Callable[[int], str]) -> List[str]:
     suffixSequence: List[str] = []
     i = 0
     suffixLength = len(numberFormatter(0))
@@ -231,7 +231,7 @@ def checkForSequence(extensions: Iterable[str], numberFormatter: Callable[[int],
     return suffixSequence
 
 
-def checkForSplitFile(path: str) -> Optional[Tuple[List[str], str]]:
+def check_for_split_file(path: str) -> Optional[Tuple[List[str], str]]:
     """
     Returns the paths to all files belonging to the split and a string identifying the format.
     The latter is one of: '', 'x', 'a' to specify the numbering system: decimal, hexadecimal, alphabetical.
@@ -267,7 +267,7 @@ def checkForSplitFile(path: str) -> Optional[Tuple[List[str], str]]:
 
     # Collect all other files in the folder that might belong to the same split.
     extensions = [name[len(basename) + 1 :] for name in os.listdir(folder) if name.startswith(basename + '.')]
-    extensions = [e for e in extensions if hasMatchingAlphabets(e, extension)]
+    extensions = [e for e in extensions if has_matching_alphabets(e, extension)]
     if not extensions:
         return None
     assert extension in extensions
@@ -276,8 +276,8 @@ def checkForSplitFile(path: str) -> Optional[Tuple[List[str], str]]:
     maxFormatSpecifier = ''
     maxExtensions: List[str] = []
     for formatSpecifier, baseDigits in [('a', ALPHA), ('0', DIGITS), ('x', HEX)]:
-        extensionSequence = checkForSequence(
-            extensions, lambda i, baseDigits=baseDigits: formatNumber(i, baseDigits, len(extension))  # type: ignore
+        extensionSequence = check_for_sequence(
+            extensions, lambda i, baseDigits=baseDigits: format_number(i, baseDigits, len(extension))  # type: ignore
         )
         if len(extensionSequence) > len(maxExtensions):
             maxFormatSpecifier = formatSpecifier
@@ -319,7 +319,7 @@ def compress_zstd(filePath: str, outputFilePath: str, frameSize: int, paralleliz
             compressedFile.write(results.pop(0).result())
 
 
-def getGzipInfo(fileobj: IO[bytes]) -> Optional[Tuple[str, int]]:
+def get_gzip_info(fileobj: IO[bytes]) -> Optional[Tuple[str, int]]:
     id1, id2, compression, flags, mtime, _, _ = struct.unpack('<BBBBLBB', fileobj.read(10))
     if id1 != 0x1F or id2 != 0x8B or compression != 0x08:
         return None
@@ -338,7 +338,7 @@ def getGzipInfo(fileobj: IO[bytes]) -> Optional[Tuple[str, int]]:
     return None
 
 
-def detectCompression(
+def detect_compression(
     fileobj: IO[bytes],
     prioritizedBackends: Optional[List[str]] = None,
     printDebug: int = 0,
@@ -365,10 +365,10 @@ def detectCompression(
 
     oldOffset = fileobj.tell()
     for compressionId in COMPRESSION_FORMATS:
-        if not mightBeFormat(fileobj, compressionId):
+        if not might_be_format(fileobj, compressionId):
             continue
 
-        backend = findAvailableBackend(compressionId, prioritizedBackends=prioritizedBackends)
+        backend = find_available_backend(compressionId, prioritizedBackends=prioritizedBackends)
         # If no appropriate module exists, then don't do any further checks.
         if not backend:
             if printDebug >= 1:
@@ -451,7 +451,7 @@ def use_rapidgzip(
     return True
 
 
-def openCompressedFile(
+def open_compressed_file(
     fileobj: IO[bytes],
     gzipSeekPointSpacing: int,
     parallelizations: Dict[str, int],
@@ -464,7 +464,7 @@ def openCompressedFile(
     Returns (tar_file_obj, raw_file_obj, compression).
     raw_file_obj will be none if compression is None.
     """
-    compression = detectCompression(fileobj, prioritizedBackends=prioritizedBackends, printDebug=printDebug)
+    compression = detect_compression(fileobj, prioritizedBackends=prioritizedBackends, printDebug=printDebug)
     if printDebug >= 3:
         print(f"[Info] Detected compression {compression} for file object:", fileobj)
     if not compression:
@@ -478,7 +478,7 @@ def openCompressedFile(
     if not matchingBackends:
         return fileobj, None, compression
 
-    backend = findAvailableBackend(
+    backend = find_available_backend(
         compression, enabledBackends=enabledBackends, prioritizedBackends=prioritizedBackends
     )
     if not backend:
@@ -502,7 +502,7 @@ def openCompressedFile(
             isRealFile = hasattr(fileobj, 'name') and fileobj.name and os.path.isfile(fileobj.name)
             parallelization = (
                 1
-                if isRealFile and isOnSlowDrive(fileobj.name)
+                if isRealFile and is_on_slow_drive(fileobj.name)
                 else parallelizations.get(
                     'rapidgzip-gzip', parallelizations.get('rapidgzip', parallelizations.get('', 1))
                 )
@@ -510,7 +510,7 @@ def openCompressedFile(
             if printDebug >= 3:
                 print(
                     f"[Info] Parallelization to use for rapidgzip backend: {parallelization}, "
-                    f"slow drive detected: {isOnSlowDrive(fileobj.name)}"
+                    f"slow drive detected: {is_on_slow_drive(fileobj.name)}"
                 )
             decompressedFileObject = rapidgzip.RapidgzipFile(
                 fileobj, parallelization=parallelization, verbose=printDebug >= 2, chunk_size=gzipSeekPointSpacing

@@ -15,8 +15,8 @@ from ratarmountcore.formats import (  # noqa: E402
     COMPRESSION_FORMATS,
     FILE_FORMATS,
     FileFormatID,
-    detectFormats,
-    mightBeFormat,
+    detect_formats,
+    might_be_format,
 )
 
 
@@ -30,9 +30,9 @@ def test_format_detection():
 
         with open(path, 'rb') as file:
             # The caching should not change the results!
-            formats = detectFormats(file)
-            assert formats == {fid for fid, info in FILE_FORMATS.items() if mightBeFormat(file, info)}, name
-            assert formats == {fid for fid in FILE_FORMATS if mightBeFormat(file, fid)}, name
+            formats = detect_formats(file)
+            assert formats == {fid for fid, info in FILE_FORMATS.items() if might_be_format(file, info)}, name
+            assert formats == {fid for fid in FILE_FORMATS if might_be_format(file, fid)}, name
 
             splitName = name.rsplit('.', 1)
             if len(splitName) > 1 and name and name[0] != '.':

@@ -126,7 +126,7 @@ class ASARMountSource(SQLiteIndexMountSource):
 
         # Load or create index (copy-paste)
 
-        if self.index.indexIsLoaded():
+        if self.index.index_is_loaded():
             self.index.reload_index_read_only()
         else:
             # Open new database when we didn't find an existing one.
@@ -138,7 +138,7 @@ class ASARMountSource(SQLiteIndexMountSource):
                 self.index.open_in_memory()
 
             self._create_index()
-            if self.index.indexIsLoaded():
+            if self.index.index_is_loaded():
                 self._store_metadata()
                 self.index.reload_index_read_only()
 
@@ -206,11 +206,11 @@ class ASARMountSource(SQLiteIndexMountSource):
             toProcess += [(path, nestedEntry) for path, nestedEntry in children if 'files' in nestedEntry]
 
             if len(fileInfos) > 1000:
-                self.index.setFileInfos(fileInfos)
+                self.index.set_file_infos(fileInfos)
                 fileInfos = []
 
         if fileInfos:
-            self.index.setFileInfos(fileInfos)
+            self.index.set_file_infos(fileInfos)
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
         if self.printDebug >= 2:

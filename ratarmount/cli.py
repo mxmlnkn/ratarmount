@@ -14,7 +14,7 @@ import tempfile
 import traceback
 from typing import List, Optional
 
-from ratarmountcore.utils import RatarmountError, getXdgCacheHome
+from ratarmountcore.utils import RatarmountError, get_xdg_cache_home
 
 with contextlib.suppress(ImportError):
     import argcomplete
@@ -28,9 +28,9 @@ class _CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescr
 
 class PrintVersionAction(argparse.Action):
     def __call__(self, parser, args, values, option_string=None):
-        from .actions import printVersions
+        from .actions import print_versions
 
-        printVersions()
+        print_versions()
         parser.exit()
 
 
@@ -169,7 +169,7 @@ For further information, see the ReadMe on the project's homepage:
              'as described in the Python tempfile standard library documentation.')
 
     indexFolders = ['', os.path.join( "~", ".ratarmount")]
-    xdgCacheHome = getXdgCacheHome()
+    xdgCacheHome = get_xdg_cache_home()
     if xdgCacheHome and os.path.isdir(os.path.expanduser(xdgCacheHome)):
         indexFolders.insert(1, os.path.join(xdgCacheHome, 'ratarmount'))
     containsComma = any(',' in folder for folder in indexFolders)
@@ -407,9 +407,9 @@ def cli(rawArgs: Optional[List[str]] = None) -> int:
 
     try:
         args = _parse_args(rawArgs)
-        from .actions import processParsedArguments
+        from .actions import process_parsed_arguments
 
-        return processParsedArguments(args)
+        return process_parsed_arguments(args)
     except (FileNotFoundError, RatarmountError, argparse.ArgumentTypeError, ValueError) as exception:
         print("[Error]", exception)
         if debug >= 3:

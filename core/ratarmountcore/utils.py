@@ -79,7 +79,7 @@ class _DummyContext:
         pass
 
 
-def ceilDiv(dividend, divisor):
+def ceil_div(dividend, divisor):
     return -(dividend // -divisor)
 
 
@@ -195,19 +195,19 @@ DIGITS = ''.join(chr(ord('0') + i) for i in range(ord('9') - ord('0') + 1))
 HEX = DIGITS + ALPHA[:6]
 
 
-def isLatinAlpha(text: str):
+def is_latin_alpha(text: str):
     return text and all(ord('a') <= ord(c) <= ord('z') for c in text)
 
 
-def isLatinDigit(text: str):
+def is_latin_digit(text: str):
     return text and all(ord('0') <= ord(c) <= ord('9') for c in text)
 
 
-def isLatinHexAlpha(text: str):
+def is_latin_hex_alpha(text: str):
     return text and all(ord('0') <= ord(c) <= ord('9') or ord('a') <= ord(c) <= ord('f') for c in text)
 
 
-def formatNumber(i: int, base: str, length: int = 0):
+def format_number(i: int, base: str, length: int = 0):
     if len(base) <= 1:
         raise ValueError("Base alphabet must contain more than one letter!")
 
@@ -245,7 +245,7 @@ def get_module(module: Union[str, types.ModuleType]) -> Optional[types.ModuleTyp
     return sys.modules.get(module, None)
 
 
-def findModuleVersion(moduleOrName: Union[str, types.ModuleType]) -> Optional[str]:
+def find_module_version(moduleOrName: Union[str, types.ModuleType]) -> Optional[str]:
     module = get_module(moduleOrName)
     if not module:
         return None
@@ -283,7 +283,7 @@ def findModuleVersion(moduleOrName: Union[str, types.ModuleType]) -> Optional[st
     return None
 
 
-def isOnSlowDrive(filePath: str):
+def is_on_slow_drive(filePath: str):
     # TODO determine whether the whole file or most of it has been cached:
     #      https://serverfault.com/questions/278454/is-it-possible-to-list-the-files-that-are-cached
     #      https://github.com/mxmlnkn/rapidgzip/issues/13#issuecomment-1592856413
@@ -314,7 +314,7 @@ class FixedRawIOBase(io.RawIOBase):
         return b"".join(chunks)
 
 
-def getXdgCacheHome():
+def get_xdg_cache_home():
     # https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
     # > $XDG_CACHE_HOME defines the base directory relative to which user-specific non-essential data files should
     # > be stored. If $XDG_CACHE_HOME is either not set or empty, a default equal to $HOME/.cache should be used.
@@ -325,11 +325,11 @@ def getXdgCacheHome():
     return path or os.path.join('~', '.cache')
 
 
-def decodeUnpaddedBase64(data: str) -> bytes:
+def decode_unpadded_base64(data: str) -> bytes:
     return base64.b64decode(data + '=' * ((4 - len(data) % 4) % 4))
 
 
-def removeDuplicatesStable(iterable: Iterable):
+def remove_duplicates_stable(iterable: Iterable):
     seen = set()
     deduplicated = []
     for x in iterable:
@@ -339,7 +339,7 @@ def removeDuplicatesStable(iterable: Iterable):
     return deduplicated
 
 
-def determineRecursionDepth(recursive: bool = False, recursionDepth: Optional[int] = None, **_) -> int:
+def determine_recursion_depth(recursive: bool = False, recursionDepth: Optional[int] = None, **_) -> int:
     """
     'recursionDepth' has higher precedence than 'recursive' if specified.
     Can be called directly i.e. f(a,b) or with kwargs f(**options) for which unknown keys will be ignored.
@@ -388,7 +388,7 @@ def compute_entropy(data: bytes) -> float:
     return -sum(p * math.log2(p) for p in probabilities)
 
 
-def isRandom(data: bytes) -> bool:
+def is_random(data: bytes) -> bool:
     if len(data) <= 1:
         return False
 
@@ -402,11 +402,11 @@ def isRandom(data: bytes) -> bool:
     # Does not work very well for small number of bytes! Should at least give 1024. A multiple of 256 is preferable.
     m = 40
 
-    def convergenceRate(n: int):
+    def convergence_rate(n: int):
         return 8 * (1 + m) / (n + m)
 
     def is_in_threshold(dataToTest: bytes):
-        return 8 - compute_entropy(dataToTest) < convergenceRate(len(dataToTest))
+        return 8 - compute_entropy(dataToTest) < convergence_rate(len(dataToTest))
 
     diffData = bytes((data[i + 1] - data[i] + 256) % 256 for i in range(len(data) - 1))
     return is_in_threshold(data) and is_in_threshold(diffData)

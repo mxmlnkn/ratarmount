@@ -10,7 +10,7 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.mountsource.factory import openMountSource  # noqa: E402
+from ratarmountcore.mountsource.factory import open_mount_source  # noqa: E402
 from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar  # noqa: E402
 from ratarmountcore.mountsource.formats.zip import ZipMountSource  # noqa: E402
 
@@ -32,7 +32,7 @@ class TestOpenMountSource:
         (tmp_path / "foo.002").write_bytes(compressed[len(compressed) // 2 :])
 
         for path in [tmp_path / "foo.001", tmp_path / "foo.002"]:
-            with openMountSource(transform_path(path)) as mountSource:
+            with open_mount_source(transform_path(path)) as mountSource:
                 fileInfo = mountSource.lookup("/<file object>")
                 assert fileInfo
                 assert mountSource.open(fileInfo).read() == b"foobar"
@@ -43,7 +43,7 @@ class TestOpenMountSource:
         (tmp_path / "foo.002").write_bytes(b"bar")
 
         for path in [tmp_path / "foo.001", tmp_path / "foo.002"]:
-            with openMountSource(transform_path(path)) as mountSource:
+            with open_mount_source(transform_path(path)) as mountSource:
                 fileInfo = mountSource.lookup("/foo")
                 assert fileInfo
                 assert mountSource.open(fileInfo).read() == b"foobar"
@@ -55,7 +55,7 @@ class TestOpenMountSource:
             (tmp_path / f"foo.{i:03}").write_bytes(str(i).encode())
             result += str(i).encode()
 
-        with openMountSource(transform_path(tmp_path / "foo.005")) as mountSource:
+        with open_mount_source(transform_path(tmp_path / "foo.005")) as mountSource:
             fileInfo = mountSource.lookup("/foo")
             assert fileInfo
             assert mountSource.open(fileInfo).read() == result
@@ -68,7 +68,7 @@ class TestOpenMountSource:
             indexPath.unlink()
 
         # Check simple open and that index files are NOT created because they are too small.
-        with openMountSource(
+        with open_mount_source(
             chimeraFilePath, writeIndex=True, prioritizedBackends=['zipfile', 'rapidgzip']
         ) as mountSource:
             assert isinstance(mountSource, ZipMountSource)
@@ -78,7 +78,7 @@ class TestOpenMountSource:
             assert not indexPath.exists()
 
         # Same as above, but force index creation by lowering the file count threshold.
-        with openMountSource(
+        with open_mount_source(
             chimeraFilePath,
             writeIndex=True,
             prioritizedBackends=['zipfile', 'rapidgzip'],
@@ -103,7 +103,7 @@ class TestOpenMountSource:
         # and more consistent. I think, only after implementing storing the backend name into the index,
         # should the next backend be tried instead of it being overwritten and recreated.
         assert indexPath.exists()
-        with openMountSource(
+        with open_mount_source(
             chimeraFilePath,
             writeIndex=True,
             prioritizedBackends=['rapidgzip', 'zipfile'],
@@ -123,7 +123,7 @@ class TestOpenMountSource:
         indexPath.unlink()
 
         # Index file is always created for compressed files such as .tar.bz2
-        with openMountSource(
+        with open_mount_source(
             chimeraFilePath, writeIndex=True, prioritizedBackends=['rapidgzip', 'zipfile']
         ) as mountSource:
             assert isinstance(mountSource, SQLiteIndexedTar)
@@ -139,7 +139,7 @@ class TestOpenMountSource:
 
         # Check that everything works fine even if the index exists and the backend order is reversed.
         assert indexPath.exists()
-        with openMountSource(
+        with open_mount_source(
             chimeraFilePath,
             writeIndex=True,
             prioritizedBackends=['zipfile', 'rapidgzip'],

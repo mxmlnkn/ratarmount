@@ -30,7 +30,7 @@ MountSource implementation.
  - AutoMountLayer: Takes one MountSource, goes over all its files and mounts
                    archives recursively in a similar manner to UnionMountSource.
 
-The factory function 'openMountSource' opens one of the format MountSource
+The factory function 'open_mount_source' opens one of the format MountSource
 implementations according to the file type.
 For performance and maintenance reasons, there are almost no module-level
 reimports, ergo you should specify the full module hierarchy for imports.
@@ -38,11 +38,11 @@ reimports, ergo you should specify the full module hierarchy for imports.
 Example:
 
     from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar
-    from ratarmountcore.factory import openMountSource
+    from ratarmountcore.factory import open_mount_source
 
     archive = SQLiteIndexedTar("foo.tar")
     # or alternatively:
-    archive = openMountSource("foo.tar", recursive=True)
+    archive = open_mount_source("foo.tar", recursive=True)
 
     archive.list("/")
     info = archive.lookup("/bar")
@@ -52,4 +52,4 @@ Example:
         print(file.read())
 """
 
-from .MountSource import FileInfo, MountSource, createRootFileInfo, mergeStatfs
+from .MountSource import FileInfo, MountSource, create_root_file_info, merge_statfs

@@ -6,8 +6,8 @@ import tempfile
 import urllib.parse
 from typing import IO, Any, Dict, Iterable, List, Optional, Union
 
-from ratarmountcore.formats import FileFormatID, replaceFormatCheck
-from ratarmountcore.mountsource import FileInfo, MountSource, createRootFileInfo
+from ratarmountcore.formats import FileFormatID, replace_format_check
+from ratarmountcore.mountsource import FileInfo, MountSource, create_root_file_info
 from ratarmountcore.SQLiteBlobFile import SQLiteBlobFile
 from ratarmountcore.StenciledFile import LambdaReaderFile
 from ratarmountcore.utils import overrides
@@ -101,7 +101,7 @@ try:
     from sqlcipher3 import dbapi2 as sqlcipher3  # type:ignore
 
     # No way to detect encrypted SQLAR.
-    replaceFormatCheck(FileFormatID.SQLAR, lambda x: True)
+    replace_format_check(FileFormatID.SQLAR, lambda x: True)
 except ImportError:
     sqlcipher3 = None  # type:ignore
     PBKDF2HMAC = None  # type:ignore
@@ -268,7 +268,7 @@ class SQLARMountSource(MountSource):
     @overrides(MountSource)
     def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         if path == "/":
-            return createRootFileInfo([-1])
+            return create_root_file_info([-1])
 
         result = self.connection.execute(
             f"SELECT {SQLARMountSource._SQLITE_FILEINFO_COLUMNS} FROM sqlar WHERE name=(?)", (path.strip("/"),)

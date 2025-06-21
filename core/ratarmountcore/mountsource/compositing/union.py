@@ -3,7 +3,7 @@ import stat
 import time
 from typing import IO, Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
-from ratarmountcore.mountsource import FileInfo, MountSource, createRootFileInfo, mergeStatfs
+from ratarmountcore.mountsource import FileInfo, MountSource, create_root_file_info, merge_statfs
 from ratarmountcore.utils import overrides
 
 
@@ -35,7 +35,7 @@ class UnionMountSource(MountSource):
         self.printDebug = printDebug
         self.folderCache: Dict[str, List[MountSource]] = {"/": self.mountSources}
         self.folderCacheDepth = 0  # depth 1 means, we only cached top-level directories.
-        self.rootFileInfo = createRootFileInfo(userdata=[None])
+        self.rootFileInfo = create_root_file_info(userdata=[None])
 
         if len(self.mountSources) > 1:
             self._build_folder_cache(maxCacheDepth, maxCacheEntries, maxSecondsToCache)
@@ -235,14 +235,14 @@ class UnionMountSource(MountSource):
 
     @overrides(MountSource)
     def statfs(self) -> Dict[str, Any]:
-        return mergeStatfs([mountSource.statfs() for mountSource in self.mountSources], printDebug=self.printDebug)
+        return merge_statfs([mountSource.statfs() for mountSource in self.mountSources], printDebug=self.printDebug)
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
         for mountSource in self.mountSources:
             mountSource.__exit__(exception_type, exception_value, exception_traceback)
 
-    def joinThreads(self):
+    def join_threads(self):
         for mountSource in self.mountSources:
-            if hasattr(mountSource, 'joinThreads'):
-                mountSource.joinThreads()
+            if hasattr(mountSource, 'join_threads'):
+                mountSource.join_threads()

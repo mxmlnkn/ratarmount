@@ -28,26 +28,26 @@ from ratarmountcore.BlockParallelReaders import ParallelXZReader, ParallelZstdRe
 
 
 def test_find_block():
-    findBlock = ParallelXZReader._find_block
+    find_block = ParallelXZReader._find_block
     for i in range(-10, 10):
-        assert findBlock([], i) is None
-        assert findBlock([0], i) is None
+        assert find_block([], i) is None
+        assert find_block([0], i) is None
 
-    assert findBlock([0, 1], -1) is None
-    assert findBlock([0, 1], 0) == 0
-    assert findBlock([0, 1], 1) is None
+    assert find_block([0, 1], -1) is None
+    assert find_block([0, 1], 0) == 0
+    assert find_block([0, 1], 1) is None
 
-    assert findBlock([0, 2], -1) is None
-    assert findBlock([0, 2], 0) == 0
-    assert findBlock([0, 2], 1) == 0
-    assert findBlock([0, 2], 2) is None
+    assert find_block([0, 2], -1) is None
+    assert find_block([0, 2], 0) == 0
+    assert find_block([0, 2], 1) == 0
+    assert find_block([0, 2], 2) is None
 
-    assert findBlock([0, 2, 4], -1) is None
-    assert findBlock([0, 2, 4], 0) == 0
-    assert findBlock([0, 2, 4], 1) == 0
-    assert findBlock([0, 2, 4], 2) == 1
-    assert findBlock([0, 2, 4], 3) == 1
-    assert findBlock([0, 2, 4], 4) is None
+    assert find_block([0, 2, 4], -1) is None
+    assert find_block([0, 2, 4], 0) == 0
+    assert find_block([0, 2, 4], 1) == 0
+    assert find_block([0, 2, 4], 2) == 1
+    assert find_block([0, 2, 4], 3) == 1
+    assert find_block([0, 2, 4], 4) is None
 
 
 def test_block_size():

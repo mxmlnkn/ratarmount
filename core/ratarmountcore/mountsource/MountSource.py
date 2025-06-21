@@ -134,7 +134,7 @@ class MountSource(ABC):
         pass
 
 
-def createRootFileInfo(userdata: List[Any]):
+def create_root_file_info(userdata: List[Any]):
     # fmt: off
     return FileInfo(
         size     = 0,
@@ -148,7 +148,7 @@ def createRootFileInfo(userdata: List[Any]):
     # fmt: on
 
 
-def mergeStatfs(values: Iterable[Dict[str, Any]], printDebug: int = 0):
+def merge_statfs(values: Iterable[Dict[str, Any]], printDebug: int = 0):
     result = {}
     for statfs in values:
         for key, value in statfs.items():

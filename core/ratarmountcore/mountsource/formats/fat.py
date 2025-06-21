@@ -4,7 +4,7 @@ import os
 import stat
 from typing import IO, Dict, Iterable, Optional, Union
 
-from ratarmountcore.formats import FileFormatID, replaceFormatCheck
+from ratarmountcore.formats import FileFormatID, replace_format_check
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.utils import overrides
 
@@ -44,7 +44,7 @@ def is_fat_image(fileObject) -> bool:
         fileObject.seek(offset)
 
 
-replaceFormatCheck(FileFormatID.FAT, is_fat_image)
+replace_format_check(FileFormatID.FAT, is_fat_image)
 
 
 class FATMountSource(MountSource):

@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 import pytest  # noqa: E402
 from ratarmountcore.mountsource.compositing.automount import AutoMountLayer  # noqa: E402
-from ratarmountcore.mountsource.factory import openMountSource  # noqa: E402
+from ratarmountcore.mountsource.factory import open_mount_source  # noqa: E402
 
 
 # @pytest.mark.parametrize("parallelization", [1, 2, 4])
@@ -26,7 +26,7 @@ class TestAutoMountLayer:
             'transformRecursiveMountPoint': ('.*/([^/]*).tar', r'\1'),
         }
 
-        with copy_test_file("packed-100-times.tar.gz") as path, openMountSource(path, **options) as mountSource:
+        with copy_test_file("packed-100-times.tar.gz") as path, open_mount_source(path, **options) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
 
             assert recursivelyMounted.list('/')
@@ -49,7 +49,7 @@ class TestAutoMountLayer:
         #      other files and those other files will actually take 10x or more longer than without this test running
         #      before! It might be that the memory usage makes Python's garbage collector a bottleneck because of too
         #      many small objects?!
-        with copy_test_file("compressed-100-times.tar.gz") as path, openMountSource(path, **options) as mountSource:
+        with copy_test_file("compressed-100-times.tar.gz") as path, open_mount_source(path, **options) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
 
             assert recursivelyMounted.list('/')
@@ -107,7 +107,7 @@ class TestAutoMountLayer:
         if sys.platform.startswith('darwin'):
             return
 
-        with copy_test_file("compressed-100-times.gz") as path, openMountSource(path, **options) as mountSource:
+        with copy_test_file("compressed-100-times.gz") as path, open_mount_source(path, **options) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
 
             assert recursivelyMounted.list('/')
@@ -124,7 +124,7 @@ class TestAutoMountLayer:
             'parallelization': parallelization,
         }
 
-        with copy_test_file("tests/double-compressed-nested-tar.tgz.tgz") as path, openMountSource(
+        with copy_test_file("tests/double-compressed-nested-tar.tgz.tgz") as path, open_mount_source(
             path, **options
         ) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
@@ -152,7 +152,7 @@ class TestAutoMountLayer:
             'recursionDepth': maxRecursionDepth,
             'parallelization': parallelization,
         }
-        with copy_test_file(archivePath) as path, openMountSource(path, **options) as mountSource:
+        with copy_test_file(archivePath) as path, open_mount_source(path, **options) as mountSource:
             recursivelyMounted = AutoMountLayer(mountSource, **options)
             assert recursivelyMounted.list('/')
 

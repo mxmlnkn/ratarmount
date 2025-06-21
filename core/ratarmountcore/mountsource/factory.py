@@ -11,7 +11,7 @@ import warnings
 from pathlib import Path
 from typing import IO, Dict, Iterable, List, Union
 
-from ratarmountcore.compressions import COMPRESSION_BACKENDS, checkForSplitFile
+from ratarmountcore.compressions import COMPRESSION_BACKENDS, check_for_split_file
 from ratarmountcore.formats import FILE_FORMATS, FileFormatID
 from ratarmountcore.StenciledFile import JoinedFileFromFactory
 from ratarmountcore.utils import CompressionError, RatarmountError
@@ -239,12 +239,12 @@ def try_open_url(url, printDebug: int) -> Union[MountSource, IO[bytes], str]:
     # Avoid resource leaks, e.g., when the seek check fails.
     oldDel = getattr(result, '__del__', None)
 
-    def newDel():
+    def new_del():
         if callable(oldDel):
             oldDel()
         result.close()
 
-    result.__del__ = newDel
+    result.__del__ = new_del
 
     # Check that seeking works. May fail when, e.g., the HTTP server does not support range requests.
     # Use https://github.com/danvk/RangeHTTPServer for testing purposes because
@@ -272,7 +272,7 @@ def find_backends_by_extension(fileName: str) -> List[str]:
     ]
 
 
-def openMountSource(fileOrPath: Union[str, IO[bytes], os.PathLike], **options) -> MountSource:
+def open_mount_source(fileOrPath: Union[str, IO[bytes], os.PathLike], **options) -> MountSource:
     printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
 
     if isinstance(fileOrPath, str) and '://' in fileOrPath:
@@ -299,7 +299,7 @@ def openMountSource(fileOrPath: Union[str, IO[bytes], os.PathLike], **options) -
         if path.is_dir():
             return FolderMountSource('.' if str(fileOrPath) == '.' else path.resolve())
 
-        splitFileResult = checkForSplitFile(str(fileOrPath))
+        splitFileResult = check_for_split_file(str(fileOrPath))
         if splitFileResult:
             filesToJoin = splitFileResult[0]
             joinedFileName = os.path.basename(filesToJoin[0]).rsplit('.', maxsplit=1)[0]

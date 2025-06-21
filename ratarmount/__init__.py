@@ -8,9 +8,9 @@ which could also be done programmatically.
 
 Example:
 
-    from ratarmountcore.factory as openMountSource
+    from ratarmountcore.factory as open_mount_source
 
-    archive = openMountSource("foo.tar", recursive=True)
+    archive = open_mount_source("foo.tar", recursive=True)
     archive.list("/")
     info = archive.lookup("/bar")
 

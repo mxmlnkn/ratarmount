@@ -95,11 +95,11 @@ class SQLiteIndexedTarFileSystem(MountSourceFileSystem):
 
         options = kwargs.copy()
 
-        self._openFile = None
+        self._open_file = None
         if isinstance(fo, str):
             # Implement URL chaining such as when calling fsspec.open("ratar://bar::file://single-file.tar").
             if target_protocol:
-                self._openFile = fsspec.open(fo, protocol=target_protocol, **target_options)
+                self._open_file = fsspec.open(fo, protocol=target_protocol, **target_options)
                 # Set the TAR file name so that the index can be found/stored accordingly.
                 if target_protocol == 'file':
                     options['tarFileName'] = fo
@@ -107,9 +107,9 @@ class SQLiteIndexedTarFileSystem(MountSourceFileSystem):
                         options['indexFilePath'] = fo + ".index.sqlite"
                     if 'writeIndex' not in options:
                         options['writeIndex'] = True
-                if isinstance(self._openFile, fsspec.core.OpenFiles):
-                    self._openFile = self._openFile[0]
-                fo = self._openFile.open()
+                if isinstance(self._open_file, fsspec.core.OpenFiles):
+                    self._open_file = self._open_file[0]
+                fo = self._open_file.open()
             else:
                 options['tarFileName'] = fo
                 if 'writeIndex' not in options:

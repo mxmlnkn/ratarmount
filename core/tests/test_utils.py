@@ -12,29 +12,29 @@ from ratarmountcore.utils import (  # noqa: E402
     HEX,
     LRUCache,
     Prefetcher,
-    ceilDiv,
-    formatNumber,
-    isLatinAlpha,
-    isLatinDigit,
-    isLatinHexAlpha,
-    isRandom,
+    ceil_div,
+    format_number,
+    is_latin_alpha,
+    is_latin_digit,
+    is_latin_hex_alpha,
+    is_random,
 )
 
 
 def test_ceil_div():
-    assert ceilDiv(0, 1) == 0
-    assert ceilDiv(0, 1000) == 0
-    assert ceilDiv(0, -1000) == 0
+    assert ceil_div(0, 1) == 0
+    assert ceil_div(0, 1000) == 0
+    assert ceil_div(0, -1000) == 0
 
-    assert ceilDiv(1, 1000) == 1
-    assert ceilDiv(1, 1) == 1
+    assert ceil_div(1, 1000) == 1
+    assert ceil_div(1, 1) == 1
 
-    assert ceilDiv(0, 2) == 0
-    assert ceilDiv(1, 2) == 1
-    assert ceilDiv(2, 2) == 1
-    assert ceilDiv(3, 2) == 2
-    assert ceilDiv(4, 2) == 2
-    assert ceilDiv(5, 2) == 3
+    assert ceil_div(0, 2) == 0
+    assert ceil_div(1, 2) == 1
+    assert ceil_div(2, 2) == 1
+    assert ceil_div(3, 2) == 2
+    assert ceil_div(4, 2) == 2
+    assert ceil_div(5, 2) == 3
 
 
 def test_prefetcher():
@@ -127,117 +127,117 @@ def test_lru_cache():
 
 def test_is_latin_alpha():
     assert ALPHA == 'abcdefghijklmnopqrstuvwxyz'
-    assert isLatinAlpha(ALPHA)
+    assert is_latin_alpha(ALPHA)
 
-    assert isLatinAlpha("a")
-    assert isLatinAlpha("ab")
-    assert isLatinAlpha("z")
-    assert not isLatinAlpha("0")
-    assert not isLatinAlpha("")
+    assert is_latin_alpha("a")
+    assert is_latin_alpha("ab")
+    assert is_latin_alpha("z")
+    assert not is_latin_alpha("0")
+    assert not is_latin_alpha("")
 
     # Python's isalpha is too Unicode. I only want to match the usual
     # ASCII Latin alphabet not mathematical or Greek symbols!
     # https://util.unicode.org/UnicodeJsps/confusables.jsp
     # https://www.unicode.org/Public/security/revision-03/confusablesSummary.txt
     assert "α".isalpha()
-    assert not isLatinAlpha("α")
+    assert not is_latin_alpha("α")
 
     assert "𝒻".isalpha()
-    assert not isLatinAlpha("𝒻")
+    assert not is_latin_alpha("𝒻")
 
 
 def test_is_latin_digit():
     assert DIGITS == '0123456789'
-    assert isLatinDigit(DIGITS)
+    assert is_latin_digit(DIGITS)
 
-    assert isLatinDigit("0")
-    assert isLatinDigit("10")
-    assert isLatinDigit("9")
-    assert not isLatinDigit("a")
-    assert not isLatinDigit("")
+    assert is_latin_digit("0")
+    assert is_latin_digit("10")
+    assert is_latin_digit("9")
+    assert not is_latin_digit("a")
+    assert not is_latin_digit("")
 
     # Python's isdigit is too Unicode. I only want to match the usual
     # ASCII Latin digits not decimal digits from other languages!
     # https://www.compart.com/en/unicode/category/Nd
     assert "௫".isdigit()
-    assert not isLatinDigit("௫")
+    assert not is_latin_digit("௫")
 
     assert "߂".isdigit()
-    assert not isLatinDigit("߂")
+    assert not is_latin_digit("߂")
 
 
 def test_is_latin_hex_alpha():
     assert HEX == '0123456789abcdef'
-    assert isLatinHexAlpha(HEX)
+    assert is_latin_hex_alpha(HEX)
 
-    assert isLatinHexAlpha("0")
-    assert isLatinHexAlpha("10")
-    assert isLatinHexAlpha("9")
-    assert isLatinHexAlpha("a")
-    assert isLatinHexAlpha("f")
-    assert not isLatinHexAlpha("g")
-    assert not isLatinHexAlpha("")
+    assert is_latin_hex_alpha("0")
+    assert is_latin_hex_alpha("10")
+    assert is_latin_hex_alpha("9")
+    assert is_latin_hex_alpha("a")
+    assert is_latin_hex_alpha("f")
+    assert not is_latin_hex_alpha("g")
+    assert not is_latin_hex_alpha("")
 
     # Python's isdigit is too Unicode. I only want to match the usual
     # ASCII Latin digits not decimal digits from other languages!
     # https://www.compart.com/en/unicode/category/Nd
     assert "௫".isdigit()
-    assert not isLatinHexAlpha("௫")
+    assert not is_latin_hex_alpha("௫")
 
     assert "߂".isdigit()
-    assert not isLatinHexAlpha("߂")
+    assert not is_latin_hex_alpha("߂")
 
 
 def test_format_number():
-    assert formatNumber(0, ALPHA) == 'a'
-    assert formatNumber(1, ALPHA) == 'b'
-    assert formatNumber(25, ALPHA) == 'z'
-    assert formatNumber(26, ALPHA) == 'ba'
-    assert formatNumber(26 * 26, ALPHA) == 'baa'
-    assert formatNumber(26 * 26 + 3, ALPHA) == 'bad'
+    assert format_number(0, ALPHA) == 'a'
+    assert format_number(1, ALPHA) == 'b'
+    assert format_number(25, ALPHA) == 'z'
+    assert format_number(26, ALPHA) == 'ba'
+    assert format_number(26 * 26, ALPHA) == 'baa'
+    assert format_number(26 * 26 + 3, ALPHA) == 'bad'
 
-    assert formatNumber(0, ALPHA, 3) == 'aaa'
-    assert formatNumber(1, ALPHA, 3) == 'aab'
-    assert formatNumber(25, ALPHA, 3) == 'aaz'
-    assert formatNumber(26, ALPHA, 3) == 'aba'
-    assert formatNumber(26 * 26, ALPHA, 3) == 'baa'
-    assert formatNumber(26 * 26 + 3, ALPHA, 3) == 'bad'
+    assert format_number(0, ALPHA, 3) == 'aaa'
+    assert format_number(1, ALPHA, 3) == 'aab'
+    assert format_number(25, ALPHA, 3) == 'aaz'
+    assert format_number(26, ALPHA, 3) == 'aba'
+    assert format_number(26 * 26, ALPHA, 3) == 'baa'
+    assert format_number(26 * 26 + 3, ALPHA, 3) == 'bad'
 
-    assert formatNumber(0, HEX) == '0'
-    assert formatNumber(1, HEX) == '1'
-    assert formatNumber(9, HEX) == '9'
-    assert formatNumber(10, HEX) == 'a'
-    assert formatNumber(15, HEX) == 'f'
-    assert formatNumber(16, HEX) == '10'
-    assert formatNumber(16 * 16, HEX) == '100'
-    assert formatNumber(16 * 16 + 3, HEX) == '103'
+    assert format_number(0, HEX) == '0'
+    assert format_number(1, HEX) == '1'
+    assert format_number(9, HEX) == '9'
+    assert format_number(10, HEX) == 'a'
+    assert format_number(15, HEX) == 'f'
+    assert format_number(16, HEX) == '10'
+    assert format_number(16 * 16, HEX) == '100'
+    assert format_number(16 * 16 + 3, HEX) == '103'
 
-    assert formatNumber(0, HEX, 3) == '000'
-    assert formatNumber(1, HEX, 3) == '001'
-    assert formatNumber(9, HEX, 3) == '009'
-    assert formatNumber(10, HEX, 3) == '00a'
-    assert formatNumber(15, HEX, 3) == '00f'
-    assert formatNumber(16, HEX, 3) == '010'
-    assert formatNumber(16 * 16, HEX, 3) == '100'
-    assert formatNumber(16 * 16 + 3, HEX, 3) == '103'
+    assert format_number(0, HEX, 3) == '000'
+    assert format_number(1, HEX, 3) == '001'
+    assert format_number(9, HEX, 3) == '009'
+    assert format_number(10, HEX, 3) == '00a'
+    assert format_number(15, HEX, 3) == '00f'
+    assert format_number(16, HEX, 3) == '010'
+    assert format_number(16 * 16, HEX, 3) == '100'
+    assert format_number(16 * 16 + 3, HEX, 3) == '103'
 
-    assert formatNumber(357641610, DIGITS) == '357641610'
+    assert format_number(357641610, DIGITS) == '357641610'
 
 
 def test_is_random():
     data = os.urandom(1 << 20)
     for size in [1024, 1280, 2048, 3333, 4096, len(data) // 100, len(data) // 10, len(data) // 2, len(data)]:
-        assert isRandom(data[:size])
+        assert is_random(data[:size])
 
     data = bytes(i for i in range(256))
-    assert not isRandom(data)
-    assert not isRandom(data * 4)
-    assert not isRandom(data * 100)
+    assert not is_random(data)
+    assert not is_random(data * 4)
+    assert not is_random(data * 100)
     # Too few bytes to determine randomness! Also no repeated letter! I guess the random test would have to check
     # specifically for some bit distributions because these are mostly ASCII characters, i.e., the 7-th bit is not
     # set. Or maybe some clustering analysis because the bytes are clustered in a very close range of bytes.
     # But oh well. Simply require >= 256 input bytes.
-    # assert isRandom(b'SQLite format 3\x00')
-    # assert isRandom(b'abcde')
-    # assert isRandom(b'abcdefghijklmnopqrstuvxyz')
-    # assert isRandom(b'aaaaa')
+    # assert is_random(b'SQLite format 3\x00')
+    # assert is_random(b'abcde')
+    # assert is_random(b'abcdefghijklmnopqrstuvxyz')
+    # assert is_random(b'aaaaa')

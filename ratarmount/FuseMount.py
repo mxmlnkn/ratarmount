@@ -13,9 +13,9 @@ from ratarmountcore.mountsource.compositing.automount import AutoMountLayer
 from ratarmountcore.mountsource.compositing.subvolumes import SubvolumesMountSource
 from ratarmountcore.mountsource.compositing.union import UnionMountSource
 from ratarmountcore.mountsource.compositing.versioning import FileVersionLayer
-from ratarmountcore.mountsource.factory import openMountSource
+from ratarmountcore.mountsource.factory import open_mount_source
 from ratarmountcore.mountsource.formats.folder import FolderMountSource
-from ratarmountcore.utils import determineRecursionDepth, overrides
+from ratarmountcore.utils import determine_recursion_depth, overrides
 
 from .fuse import fuse
 from .WriteOverlay import WritableFolderMountSource
@@ -76,7 +76,7 @@ class FuseMount(fuse.Operations):
         options['writeIndex'] = True
 
         # Explicitly enable recursion if it was specified implictily via recursionDepth.
-        if 'recursive' not in options and determineRecursionDepth(**options) > 0:
+        if 'recursive' not in options and determine_recursion_depth(**options) > 0:
             options['recursive'] = True
 
         # Add write overlay as folder mount source to read from with highest priority.
@@ -97,7 +97,7 @@ class FuseMount(fuse.Operations):
         for path in pathToMount:
             if os.path.realpath(path) != self.mountPoint:
                 # This also will create or load the block offsets for compressed formats
-                mountSources.append((os.path.basename(path), openMountSource(path, **options)))
+                mountSources.append((os.path.basename(path), open_mount_source(path, **options)))
                 continue
 
             if self.mountPointFd is not None:
@@ -169,7 +169,7 @@ class FuseMount(fuse.Operations):
 
         self.mountSource: MountSource = mountSources[0][1] if len(mountSources) == 1 else create_multi_mount()
 
-        if determineRecursionDepth(**options) > 0:
+        if determine_recursion_depth(**options) > 0:
             self.mountSource = AutoMountLayer(self.mountSource, **options)
 
         # No threads should be created and still be open before FUSE forks.
@@ -177,9 +177,9 @@ class FuseMount(fuse.Operations):
         # Therefore, close threads opened by the ParallelBZ2Reader for creating the block offsets.
         # Those threads will be automatically recreated again on the next read call.
         # Without this, the ratarmount background process won't quit even after unmounting!
-        joinThreads = getattr(self.mountSource, 'joinThreads', None)
-        if joinThreads is not None:
-            joinThreads()
+        join_threads = getattr(self.mountSource, 'join_threads', None)
+        if join_threads is not None:
+            join_threads()
 
         self.mountSource = FileVersionLayer(self.mountSource)
 

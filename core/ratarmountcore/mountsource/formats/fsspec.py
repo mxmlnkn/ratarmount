@@ -4,7 +4,7 @@ import time
 import urllib
 from typing import IO, Dict, Iterable, Optional, Union
 
-from ratarmountcore.mountsource import FileInfo, MountSource, createRootFileInfo
+from ratarmountcore.mountsource import FileInfo, MountSource, create_root_file_info
 from ratarmountcore.utils import overrides
 
 try:
@@ -84,7 +84,7 @@ class FSSpecMountSource(MountSource):
         else:
             raise ValueError("First argument must be an URL or inherit from fsspec.AbstractFileSystem!")
         self.fileSystem: fsspec.AbstractFileSystem = fs
-        self.rootFileInfo = createRootFileInfo(userdata=["/"])
+        self.rootFileInfo = create_root_file_info(userdata=["/"])
 
         # The fsspec filesystems are not uniform! http:// expects the arguments to isdir with prefixed
         # protocol while other filesystem implementations are fine with only the path.

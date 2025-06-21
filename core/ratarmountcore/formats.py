@@ -78,7 +78,7 @@ class FileFormatID(enum.Enum):
 FID = FileFormatID
 
 
-def isTAR(fileobj: IO[bytes], encoding: str = tarfile.ENCODING) -> bool:
+def is_tar(fileobj: IO[bytes], encoding: str = tarfile.ENCODING) -> bool:
     try:
         # r| will only open uncompressed TAR files and even allows unseekable ones!
         with tarfile.open(fileobj=fileobj, mode='r|', encoding=encoding):
@@ -124,7 +124,7 @@ def find_asar_header(fileobj: IO[bytes]) -> Tuple[int, int, int]:
     return ASAR_MAGIC_SIZE, sizeOfPickledHeader, dataOffset
 
 
-def isASAR(fileobj: IO[bytes]) -> bool:
+def is_asar(fileobj: IO[bytes]) -> bool:
     offset = fileobj.tell()
     try:
         # Reading the header and checking it to be correct JSON is to expensive for large archives.
@@ -270,8 +270,8 @@ ARCHIVE_FORMATS: Dict[FileFormatID, FileFormatInfo] = {
     FID.XAR: FileFormatInfo(['xar'], b'xar!'),
     FID.CPIO: FileFormatInfo(['cpio'], None, _is_cpio),
     # "TAR"-like compression formats without compression
-    FID.TAR: FileFormatInfo(['tar'], None, isTAR),
-    FID.ASAR: FileFormatInfo(['asar'], b'\x04\x00\x00\x00', isASAR),
+    FID.TAR: FileFormatInfo(['tar'], None, is_tar),
+    FID.ASAR: FileFormatInfo(['asar'], b'\x04\x00\x00\x00', is_asar),
     # Read-Only File systems
     FID.SQUASHFS: FileFormatInfo(['squashfs', 'AppImage', 'snap'], None, lambda x: find_squashfs_offset(x) >= 0),
     FID.ISO9660: FileFormatInfo(['iso'], None, _is_iso9660),
@@ -331,7 +331,7 @@ _MAGIC_BYTES_TO_FORMATS: Dict[bytes, List[FileFormatID]] = {}
 _FORMATS_WITHOUT_MAGIC_BYTES: List[FileFormatID] = []
 
 
-def recomputeCachedMagicBytes():
+def recompute_cached_magic_bytes():
     """Should be called when injecting new file formats from outsfide."""
     for fid, info in FILE_FORMATS.items():
         if info.magicBytes is None or len(info.magicBytes) < 2:
@@ -343,10 +343,10 @@ def recomputeCachedMagicBytes():
             _MAGIC_BYTES_TO_FORMATS[firstTwoBytes].append(fid)
 
 
-recomputeCachedMagicBytes()
+recompute_cached_magic_bytes()
 
 
-def mightBeFormat(fileobj: IO[bytes], fid: Union[FileFormatID, FileFormatInfo]) -> bool:
+def might_be_format(fileobj: IO[bytes], fid: Union[FileFormatID, FileFormatInfo]) -> bool:
     formatInfo = fid if isinstance(fid, FileFormatInfo) else FILE_FORMATS[fid]
     oldOffset = fileobj.tell()
     try:
@@ -363,7 +363,7 @@ def mightBeFormat(fileobj: IO[bytes], fid: Union[FileFormatID, FileFormatInfo]) 
     return bool(formatInfo.magicBytes or formatInfo.checkHeader)
 
 
-def detectFormats(fileobj: IO[bytes]) -> Set[FileFormatID]:
+def detect_formats(fileobj: IO[bytes]) -> Set[FileFormatID]:
     oldOffset = fileobj.tell()
     try:
         firstTwoBytes = fileobj.read(2)
@@ -375,10 +375,10 @@ def detectFormats(fileobj: IO[bytes]) -> Set[FileFormatID]:
     finally:
         fileobj.seek(oldOffset)
 
-    return {fid for fid in formatsToTest + _FORMATS_WITHOUT_MAGIC_BYTES if mightBeFormat(fileobj, fid)}
+    return {fid for fid in formatsToTest + _FORMATS_WITHOUT_MAGIC_BYTES if might_be_format(fileobj, fid)}
 
 
-def replaceFormatCheck(fid: FileFormatID, checkHeader: Optional[Callable[[IO[bytes]], bool]] = None):
+def replace_format_check(fid: FileFormatID, checkHeader: Optional[Callable[[IO[bytes]], bool]] = None):
     for formats in [ARCHIVE_FORMATS, COMPRESSION_FORMATS, FILE_FORMATS]:
         if fid in formats:
             info = dataclasses.asdict(formats[fid])

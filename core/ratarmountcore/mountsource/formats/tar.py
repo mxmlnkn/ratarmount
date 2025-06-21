@@ -20,8 +20,8 @@ with contextlib.suppress(ImportError):
     import rapidgzip
 
 from ratarmountcore.BlockParallelReaders import ParallelXZReader
-from ratarmountcore.compressions import COMPRESSION_BACKENDS, getGzipInfo, openCompressedFile
-from ratarmountcore.formats import FileFormatID, mightBeFormat
+from ratarmountcore.compressions import COMPRESSION_BACKENDS, get_gzip_info, open_compressed_file
+from ratarmountcore.formats import FileFormatID, might_be_format
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
 from ratarmountcore.ProgressBar import ProgressBar
@@ -31,10 +31,10 @@ from ratarmountcore.utils import (
     CompressionError,
     InvalidIndexError,
     RatarmountError,
-    ceilDiv,
-    decodeUnpaddedBase64,
-    determineRecursionDepth,
-    getXdgCacheHome,
+    ceil_div,
+    decode_unpadded_base64,
+    determine_recursion_depth,
+    get_xdg_cache_home,
     overrides,
 )
 
@@ -49,7 +49,7 @@ class _TarFileMetadataReader:
         recursionDepth: int,
     ):
         self._parent = parent
-        self._setFileInfos = setFileInfos
+        self._set_file_infos = setFileInfos
         self._setxattrs = setxattrs
         self._update_progress_bar = updateProgressBar
         self._recursionDepth = recursionDepth
@@ -60,7 +60,7 @@ class _TarFileMetadataReader:
         """Get the actual prefix as stored in the TAR."""
 
         # Offsets taken from https://en.wikipedia.org/wiki/Tar_(computing)#UStar_format
-        def extractPrefix(tarBlockOffset):
+        def extract_prefix(tarBlockOffset):
             fileObject.seek(tarBlockOffset + 345)
             return fileObject.read(155)
 
@@ -74,7 +74,7 @@ class _TarFileMetadataReader:
 
         oldPosition = fileObject.tell()
 
-        # Normally, getting the prefix, could be as easy as calling extractPrefix.
+        # Normally, getting the prefix, could be as easy as calling extract_prefix.
         # But, for long-names the prefix will not be prefixed but for long links it will be prefixed by tarfile.
         # This complicates things. Also, both long link and long name are implemented by a prepended
         # tar block with the special file name "././@LongLink" and tarfile will return the header offset of the
@@ -83,8 +83,8 @@ class _TarFileMetadataReader:
         try:
             if extract_name(tarInfo.offset).startswith(b"././@LongLink\0"):
                 nextHeaderOffset = tarInfo.offset + 512 + (extract_size(tarInfo.offset) + 512 - 1) // 512 * 512
-                return extractPrefix(nextHeaderOffset)
-            return extractPrefix(tarInfo.offset)
+                return extract_prefix(nextHeaderOffset)
+            return extract_prefix(tarInfo.offset)
 
         except Exception as exception:
             if printDebug >= 1:
@@ -195,7 +195,7 @@ class _TarFileMetadataReader:
         prefix = 'LIBARCHIVE.xattr.'
         xattrs.update(
             {
-                urllib.parse.unquote(key[len(prefix) :]): decodeUnpaddedBase64(value)
+                urllib.parse.unquote(key[len(prefix) :]): decode_unpadded_base64(value)
                 for key, value in tarInfo.pax_headers.items()
                 if key.startswith(prefix)
             }
@@ -286,7 +286,7 @@ class _TarFileMetadataReader:
             blockNumber += 1
             rawSize = blockContents[124 : 124 + 12].strip(b"\0")
             size = int(rawSize, 8) if rawSize else 0
-            blockNumber += ceilDiv(size, 512)
+            blockNumber += ceil_div(size, 512)
             fileObject.seek(blockNumber * 512)
 
             # A lot of the special files contain information about the next file, therefore keep do not yield
@@ -328,7 +328,7 @@ class _TarFileMetadataReader:
     def _process_serial(self, fileObject: IO[bytes], pathPrefix: str, streamOffset: int) -> Iterable[Tuple]:
         """
         Opens the given fileObject using the tarfile module, iterates over all files converting their metadata to
-        FileInfo tuples and inserting those into the database in a chunked manner using the given _setFileInfos.
+        FileInfo tuples and inserting those into the database in a chunked manner using the given _set_file_infos.
         """
 
         if self._recursionDepth > self._parent.maxRecursionDepth:
@@ -378,7 +378,7 @@ class _TarFileMetadataReader:
 
                 fileInfos.extend(newFileInfos)
                 if len(fileInfos) > 1000:
-                    self._setFileInfos(fileInfos)
+                    self._set_file_infos(fileInfos)
                     fileInfos.clear()
 
                 xattrs.extend(newXAttrs)
@@ -387,7 +387,7 @@ class _TarFileMetadataReader:
                     xattrs.clear()
 
         finally:
-            self._setFileInfos(fileInfos)
+            self._set_file_infos(fileInfos)
             self._setxattrs(xattrs)
 
         return filesToMountRecursively
@@ -395,7 +395,7 @@ class _TarFileMetadataReader:
     def process(self, fileObject: IO[bytes], pathPrefix: str, streamOffset: int) -> Iterable[Tuple]:
         """
         Iterates over all files inside the given fileObject TAR and inserts their metadata into the database using
-        the given _setFileInfos.
+        the given _set_file_infos.
         A list of files which might be of interest for recursive mounting of uncompressed TARs is returned.
         """
 
@@ -525,7 +525,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         self._recursionDepth              = -1
         # fmt: on
         self.prioritizedBackends: List[str] = [] if prioritizedBackends is None else prioritizedBackends
-        self.maxRecursionDepth = determineRecursionDepth(recursive=recursive, recursionDepth=recursionDepth)
+        self.maxRecursionDepth = determine_recursion_depth(recursive=recursive, recursionDepth=recursionDepth)
         self.parallelizations = copy.deepcopy(parallelizations) if parallelizations else {}
         if '' not in self.parallelizations:
             self.parallelizations[''] = parallelization
@@ -566,7 +566,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         # compression   : Stores what kind of compression the originally specified TAR file uses.
         # isTar         : Can be false for the degenerated case of only a bz2 or gz file not containing a TAR
         self.compression: Optional[FileFormatID] = None
-        self.tarFileObject, self.rawFileObject, self.compression = openCompressedFile(
+        self.tarFileObject, self.rawFileObject, self.compression = open_compressed_file(
             fileObject,
             gzipSeekPointSpacing=gzipSeekPointSpacing,
             parallelizations=self.parallelizations,
@@ -576,7 +576,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             prioritizedBackends=self.prioritizedBackends,
             printDebug=self.printDebug,
         )
-        self.isTar = mightBeFormat(self.tarFileObject, FileFormatID.TAR)
+        self.isTar = might_be_format(self.tarFileObject, FileFormatID.TAR)
         if not self.isTar:
             if printDebug >= 3:
                 print(f"[Info] File object {self.tarFileObject} from {self.tarFileName} is not a TAR.")
@@ -629,7 +629,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
         if indexFolders is None:
             indexFolders = ['', os.path.join("~", ".ratarmount")]
-            xdgCacheHome = getXdgCacheHome()
+            xdgCacheHome = get_xdg_cache_home()
             if xdgCacheHome and os.path.isdir(os.path.expanduser(xdgCacheHome)):
                 indexFolders.insert(1, os.path.join(xdgCacheHome, 'ratarmount'))
         elif isinstance(indexFolders, str):
@@ -652,7 +652,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             checkMetadata=self._check_metadata,
         )
 
-        if self.index.indexIsLoaded():
+        if self.index.index_is_loaded():
             if not self.hasBeenAppendedTo:  # indirectly set by a successful call to _try_load_index
                 self._load_or_store_compression_offsets()  # load
                 self.index.reload_index_read_only()
@@ -695,7 +695,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             self._isGnuIncremental = self._detect_gnu_incremental(self.tarFileObject)
 
         # Open new database when we didn't find an existing one.
-        if not self.index.indexIsLoaded():
+        if not self.index.index_is_loaded():
             # Simply open in memory without an error even if writeIndex is True but when no indication
             # for an index file location has been given.
             if writeIndex and (indexFilePath or self._get_archive_path() or not self.isFileObject):
@@ -705,7 +705,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
         self._create_index(self.tarFileObject)
         self._load_or_store_compression_offsets()  # store
-        if self.index.indexIsLoaded():
+        if self.index.index_is_loaded():
             self._store_metadata()
             self.index.reload_index_read_only()
 
@@ -804,7 +804,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             elif hasattr(fileobj, 'fileobj') and callable(fileobj.fileobj):
                 progressBar.update(fileobj.fileobj().tell())
             elif isinstance(fileobj, ParallelXZReader):
-                blockNumber = fileobj.findBlock(fileobj.tell())
+                blockNumber = fileobj.find_block(fileobj.tell())
                 if blockNumber and blockNumber < len(fileobj.approximateCompressedBlockBoundaries):
                     progressBar.update(fileobj.approximateCompressedBlockBoundaries[blockNumber])
             elif self.rawFileObject and hasattr(self.rawFileObject, 'tell'):
@@ -848,7 +848,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
     ) -> None:
         metadataReader = _TarFileMetadataReader(
             self,
-            self.index.setFileInfos,
+            self.index.set_file_infos,
             self.index.setxattrs,
             lambda: self._update_progress_bar(progressBar, fileObject),
             recursionDepth=recursionDepth,
@@ -940,21 +940,21 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 modifiedFileInfo[13] = True  # is generated, i.e., does not have xattr
                 modifiedFileInfo[14] += 1  # recursion depth
 
-                self.index.setFileInfo(tuple(modifiedFileInfo))
+                self.index.set_file_info(tuple(modifiedFileInfo))
 
                 # Update isTar to True for the tar
                 modifiedFileInfo = list(fileInfo)
                 modifiedFileInfo[11] = isTar
 
-                self.index.setFileInfo(tuple(modifiedFileInfo))
+                self.index.set_file_info(tuple(modifiedFileInfo))
 
         fileObject.seek(oldPos)
         self.tarFileName = oldPrintName
 
         # If no file is in the TAR, then it most likely indicates a possibly compressed non TAR file.
         # In that case add that itself to the file index. This will be ignored when called recursively
-        # because the table will at least contain the recursive file to mount itself, i.e., fileCount > 0
-        if self.index.fileCount() == 0:
+        # because the table will at least contain the recursive file to mount itself, i.e., file_count > 0
+        if self.index.file_count() == 0:
             if self.printDebug >= 3:
                 print(f"Did not find any file in the given TAR: {self.tarFileName}. Assuming a compressed file.")
 
@@ -983,7 +983,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 oldPos = self.rawFileObject.tell()
                 self.rawFileObject.seek(0)
                 try:
-                    info = getGzipInfo(self.rawFileObject)
+                    info = get_gzip_info(self.rawFileObject)
                     if info:
                         fname, mtime = info
                 except Exception:
@@ -1023,7 +1023,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 recursionDepth - 1                    ,  # 14 : recursion depth
             )
             # fmt: on
-            self.index.setFileInfo(fileInfo)
+            self.index.set_file_info(fileInfo)
 
     def _open_stencil(self, offset: int, size: int, buffering: int) -> IO[bytes]:
         if buffering == 0:
@@ -1166,7 +1166,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         if archiveStats.st_size < 64 * 1024 * 1024:
             raise InvalidIndexError("The archive did change but is too small to determine as having been appended to.")
 
-        if self.index.fileCount() < SQLiteIndex.NUMBER_OF_METADATA_TO_VERIFY:
+        if self.index.file_count() < SQLiteIndex.NUMBER_OF_METADATA_TO_VERIFY:
             raise InvalidIndexError(
                 "The archive did change but has too few files to determine as having been appended to."
             )
@@ -1405,6 +1405,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         if self.compression:
             self.index.synchronize_compression_offsets(self.tarFileObject, self.compression)
 
-    def joinThreads(self):
+    def join_threads(self):
         if hasattr(self.tarFileObject, 'join_threads'):
             self.tarFileObject.join_threads()

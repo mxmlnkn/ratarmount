@@ -77,7 +77,7 @@ class ZipMountSource(SQLiteIndexMountSource):
 
         isFileObject = not isinstance(fileOrPath, str)
 
-        if self.index.indexIsLoaded():
+        if self.index.index_is_loaded():
             self.index.reload_index_read_only()
         else:
             # Open new database when we didn't find an existing one.
@@ -89,7 +89,7 @@ class ZipMountSource(SQLiteIndexMountSource):
                 self.index.open_in_memory()
 
             self._create_index()
-            if self.index.indexIsLoaded():
+            if self.index.index_is_loaded():
                 self._store_metadata()
                 self.index.reload_index_read_only()
 
@@ -159,7 +159,7 @@ class ZipMountSource(SQLiteIndexMountSource):
         t0 = timer()
 
         self.index.ensure_intermediary_tables()
-        self.index.setFileInfos([self._convert_to_row(info) for info in self.fileObject.infolist()])
+        self.index.set_file_infos([self._convert_to_row(info) for info in self.fileObject.infolist()])
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
         if self.printDebug >= 2:

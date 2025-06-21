@@ -4,10 +4,10 @@ import importlib
 import os
 import sys
 
-from ratarmountcore.compressions import COMPRESSION_BACKENDS, checkForSplitFile
-from ratarmountcore.formats import FileFormatID, detectFormats
+from ratarmountcore.compressions import COMPRESSION_BACKENDS, check_for_split_file
+from ratarmountcore.formats import FileFormatID, detect_formats
 from ratarmountcore.mountsource.archives import ARCHIVE_BACKENDS
-from ratarmountcore.utils import isRandom
+from ratarmountcore.utils import is_random
 
 try:
     import fsspec
@@ -20,7 +20,7 @@ except ImportError:
     sqlcipher3 = None  # type: ignore
 
 
-def checkInputFileType(path: str, printDebug: int = 0) -> str:
+def check_input_file_type(path: str, printDebug: int = 0) -> str:
     """Raises an exception if it is not an accepted archive format else returns the real path."""
 
     splitURI = path.split('://')
@@ -39,12 +39,12 @@ def checkInputFileType(path: str, printDebug: int = 0) -> str:
         raise argparse.ArgumentTypeError(f"File '{path}' is not a file!")
     path = os.path.realpath(path)
 
-    result = checkForSplitFile(path)
+    result = check_for_split_file(path)
     if result:
         return result[0][0]
 
     with open(path, 'rb') as fileobj:
-        formats = detectFormats(fileobj)
+        formats = detect_formats(fileobj)
         # SQLAR will always appear because the encrypted version has no magic bytes. (Subject to change)
         # Formats which have no magic bytes and require modules for checking will also always appear, e.g., EXT4,
         # however, those should filtered when looking for backends supporting those.
@@ -95,7 +95,7 @@ def checkInputFileType(path: str, printDebug: int = 0) -> str:
             if all(module in sys.modules for module, _ in backend.requiredModules)
         }
         if not supportedCompressions.intersection(formats):
-            if sqlcipher3 is not None and path.lower().endswith(".sqlar") and isRandom(fileobj.read(4096)):
+            if sqlcipher3 is not None and path.lower().endswith(".sqlar") and is_random(fileobj.read(4096)):
                 return path
 
             if printDebug >= 2:

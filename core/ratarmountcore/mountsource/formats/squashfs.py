@@ -225,10 +225,10 @@ class SquashFSFile(io.RawIOBase):
     def read(self, size: int = -1) -> bytes:
         result = bytearray()
         while size < 0 or len(result) < size:
-            readData = self.read1(size if size < 0 else size - len(result))
-            if not readData:
+            read_data = self.read1(size if size < 0 else size - len(result))
+            if not read_data:
                 break
-            result.extend(readData)
+            result.extend(read_data)
         return bytes(result)
 
     @overrides(io.RawIOBase)
@@ -451,7 +451,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
 
         isFileObject = not isinstance(fileOrPath, str)
 
-        if self.index.indexIsLoaded():
+        if self.index.index_is_loaded():
             # self._load_or_store_compression_offsets()  # load
             self.index.reload_index_read_only()
         else:
@@ -465,7 +465,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
 
             self._create_index()
             # self._load_or_store_compression_offsets()  # store
-            if self.index.indexIsLoaded():
+            if self.index.index_is_loaded():
                 self._store_metadata()
                 self.index.reload_index_read_only()
 
@@ -525,7 +525,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         fileInfos = []
         for inodeOffset, info in self.image:
             fileInfos.append(self._convert_to_row(inodeOffset, info))
-        self.index.setFileInfos(fileInfos)
+        self.index.set_file_infos(fileInfos)
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
         if self.printDebug >= 2:

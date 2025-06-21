@@ -1,6 +1,6 @@
 from typing import IO, Dict, Iterable, List, Optional, Tuple, Union
 
-from ratarmountcore.mountsource import FileInfo, MountSource, createRootFileInfo
+from ratarmountcore.mountsource import FileInfo, MountSource, create_root_file_info
 from ratarmountcore.utils import overrides
 
 
@@ -16,7 +16,7 @@ class SubvolumesMountSource(MountSource):
             if '/' in name:
                 raise ValueError(f"Mount source names may not contain slashes! ({name})")
 
-        self.rootFileInfo = createRootFileInfo(userdata=[None])
+        self.rootFileInfo = create_root_file_info(userdata=[None])
 
     def _find_mount_source(self, path: str) -> Optional[Tuple[str, str]]:
         path = path.lstrip('/')
@@ -133,7 +133,7 @@ class SubvolumesMountSource(MountSource):
         for mountSource in self.mountSources:
             mountSource.__exit__(exception_type, exception_value, exception_traceback)
 
-    def joinThreads(self):
+    def join_threads(self):
         for mountSource in self.mountSources:
-            if hasattr(mountSource, 'joinThreads'):
-                mountSource.joinThreads()
+            if hasattr(mountSource, 'join_threads'):
+                mountSource.join_threads()

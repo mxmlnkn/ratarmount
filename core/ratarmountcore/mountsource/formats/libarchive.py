@@ -34,18 +34,18 @@ except ImportError:
 
 
 class ArchiveEntry:
-    def __init__(self, archive, entryIndex: int, encoding: str = 'utf-8'):
+    def __init__(self, archive, entry_index: int, encoding: str = 'utf-8'):
         self._archive = archive  # Store for lifetime
         self._entry = laffi.entry_new()
         self.eof = laffi.read_next_header2(self._archive, self._entry) == laffi.ARCHIVE_EOF
         self.encoding = encoding
-        self.entryIndex = entryIndex
+        self.entry_index = entry_index
         self._fileInfoRow: Optional[Tuple] = None
 
     def __del__(self):
         laffi.entry_free(self._entry)
 
-    def formatName(self):
+    def format_name(self):
         return laffi.format_name(self._archive)
 
     def get_time_by_name(self, name):
@@ -55,7 +55,7 @@ class ArchiveEntry:
         nseconds = getattr(laffi, f'entry_{name}_nsec')(self._entry)
         return float(seconds) + float(nseconds) / 1e9 if nseconds else int(seconds)
 
-    def getTime(self):
+    def get_time(self):
         result = self.get_time_by_name('mtime')
         if result is None:
             result = self.get_time_by_name('ctime')
@@ -75,7 +75,7 @@ class ArchiveEntry:
     def filetype(self):
         return laffi.entry_filetype(self._entry)
 
-    def isDirectory(self):
+    def is_directory(self):
         return self.filetype() & 0o170000 == 0o040000
 
     def is_symbolic_link(self):
@@ -120,7 +120,7 @@ class ArchiveEntry:
             mode = mode | stat.S_IFLNK
         else:
             linkname = ""
-            mode = mode | (stat.S_IFDIR if self.isDirectory() else stat.S_IFREG)
+            mode = mode | (stat.S_IFDIR if self.is_directory() else stat.S_IFREG)
 
         if not path:
             path = self.path()
@@ -142,7 +142,7 @@ class ArchiveEntry:
             headerOffset  ,  # 2  : header offset
             dataOffset    ,  # 3  : data offset
             size          ,  # 4  : file size
-            self.getTime(),  # 5  : modification time
+            self.get_time(),  # 5  : modification time
             mode          ,  # 6  : file mode / permissions
             0             ,  # 7  : TAR file type. Currently unused. Overlaps with mode
             linkname      ,  # 8  : linkname
@@ -211,7 +211,7 @@ class IterableArchive:
             except ArchiveError as exception2:
                 raise exception2 from exception
 
-    def formatName(self):
+    def format_name(self):
         return laffi.format_name(self._archive)
 
     def filter_names(self):
@@ -259,7 +259,7 @@ class IterableArchive:
             return
         self._buffer = ctypes.create_string_buffer(self.bufferSize)
 
-        def readFromFileObject(_archive, _context, pointerToBufferPointer):
+        def read_from_file_object(_archive, _context, pointerToBufferPointer):
             try:
                 size = self._file.readinto(self._buffer)
             except (NotImplementedError, AttributeError):
@@ -272,17 +272,17 @@ class IterableArchive:
 
         if hasattr(self._file, 'seekable') and self._file.seekable() and hasattr(self._file, 'tell'):
 
-            def seekFileObject(_archive, _context, offset, whence):
+            def seek_file_object(_archive, _context, offset, whence):
                 self._file.seek(offset, whence)
                 return self._file.tell()
 
             self._file.seek(0)
-            self._seekCallback = laffi.SEEK_CALLBACK(seekFileObject)
+            self._seekCallback = laffi.SEEK_CALLBACK(seek_file_object)
             # Needs to be assigned to self, or else, ctypes lifetime issues result in a segfault!
             laffi.read_set_seek_callback(self._archive, self._seekCallback)
 
         # Needs to be assigned to self, or else, ctypes lifetime issues result in a segfault!
-        self._readCallback = laffi.READ_CALLBACK(readFromFileObject)
+        self._readCallback = laffi.READ_CALLBACK(read_from_file_object)
         laffi.read_open(self._archive, None, laffi.NO_OPEN_CB, self._readCallback, laffi.NO_CLOSE_CB)
 
     def __enter__(self):
@@ -298,14 +298,14 @@ class IterableArchive:
         if self._eof:
             return None
 
-        self._entry = ArchiveEntry(self._archive, entryIndex=self._entryIndex, encoding=self.encoding)
+        self._entry = ArchiveEntry(self._archive, entry_index=self._entryIndex, encoding=self.encoding)
         if self._entryIndex == 0 and self.printDebug >= 2:
-            formatName = laffi.format_name(self._archive)
-            if isinstance(formatName, bytes):
-                formatName = formatName.decode()
+            format_name = laffi.format_name(self._archive)
+            if isinstance(format_name, bytes):
+                format_name = format_name.decode()
             # We need to try and read the first entry before format_name returns anything other than 'none'.
             print(
-                f"[Info] Successfully opened type '{formatName}' with libarchive. "
+                f"[Info] Successfully opened type '{format_name}' with libarchive. "
                 f"Using filters: {self.filter_names()}"
             )
 
@@ -316,10 +316,10 @@ class IterableArchive:
 
         return self._entry
 
-    def entryIndex(self):
+    def entry_index(self):
         return self._entryIndex
 
-    def readData(self, buffer, size):
+    def read_data(self, buffer, size):
         return laffi.read_data(self._archive, buffer, size)
 
 
@@ -333,12 +333,12 @@ class IterableArchiveCache:
         while len(self._cache) > self.cacheSize:
             self._cache.pop(0)
 
-    def take(self, entryIndex: int) -> Optional[IterableArchive]:
-        qualified = [i for i in range(len(self._cache)) if self._cache[i].entryIndex() < entryIndex]
+    def take(self, entry_index: int) -> Optional[IterableArchive]:
+        qualified = [i for i in range(len(self._cache)) if self._cache[i].entry_index() < entry_index]
         if not qualified:
             return None
         # Find the archive with the closest (highest) index not larger or equal than the requested one
-        result = max(qualified, key=lambda i: self._cache[i].entryIndex())
+        result = max(qualified, key=lambda i: self._cache[i].entry_index())
         return self._cache.pop(result)
 
 
@@ -346,7 +346,7 @@ class LibarchiveFile(io.RawIOBase):
     def __init__(
         self,
         file,
-        entryIndex,
+        entry_index,
         fileSize,
         passwords: Optional[List[str]] = None,
         printDebug: int = 0,
@@ -355,7 +355,7 @@ class LibarchiveFile(io.RawIOBase):
         io.RawIOBase.__init__(self)
         self.file = file
         self.fileSize = fileSize
-        self.entryIndex = entryIndex
+        self.entry_index = entry_index
         self.passwords = passwords
         self.printDebug = printDebug
         self._archiveCache = archiveCache
@@ -371,7 +371,7 @@ class LibarchiveFile(io.RawIOBase):
     def _open(self):
         self.close()
 
-        self._archive = self._archiveCache.take(self.entryIndex)
+        self._archive = self._archiveCache.take(self.entry_index)
         if self._archive is None:
             self._archive = IterableArchive(self.file, passwords=self.passwords, printDebug=self.printDebug)
 
@@ -379,12 +379,12 @@ class LibarchiveFile(io.RawIOBase):
             self._entry = self._archive.next_entry()
             if self._entry is None:
                 break
-            if self._entry.entryIndex == self.entryIndex:
+            if self._entry.entry_index == self.entry_index:
                 self._refill_buffer()
                 break
 
         if self._entry is None and self._bufferIO is None:
-            raise ValueError(f"Failed to find archive entry {self.entryIndex}.")
+            raise ValueError(f"Failed to find archive entry {self.entry_index}.")
 
     def _refill_buffer(self):
         bufferedSize = len(self._buffer) if self._buffer else 0
@@ -402,9 +402,9 @@ class LibarchiveFile(io.RawIOBase):
         elif self._buffer is None or len(self._buffer) != sizeToRead:
             self._buffer = ctypes.create_string_buffer(sizeToRead)
 
-        readSize = self._archive.readData(self._buffer, sizeToRead)
+        readSize = self._archive.read_data(self._buffer, sizeToRead)
         if readSize != sizeToRead:
-            raise RuntimeError(f"Read {readSize} bytes but expected {self.fileSize} for entry {self.entryIndex}!")
+            raise RuntimeError(f"Read {readSize} bytes but expected {self.fileSize} for entry {self.entry_index}!")
         self._bufferIO = io.BytesIO(self._buffer)
 
     @overrides(io.RawIOBase)
@@ -449,10 +449,10 @@ class LibarchiveFile(io.RawIOBase):
     def read(self, size: int = -1) -> bytes:
         result = bytearray()
         while size < 0 or len(result) < size:
-            readData = self.read1(size if size < 0 else size - len(result))
-            if not readData:
+            read_data = self.read1(size if size < 0 else size - len(result))
+            if not read_data:
                 break
-            result.extend(readData)
+            result.extend(read_data)
         return bytes(result)
 
     def _skip(self, size: int) -> None:
@@ -564,7 +564,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
 
         isFileObject = False  # Not supported yet
 
-        if self.index.indexIsLoaded():
+        if self.index.index_is_loaded():
             metadata = dict(self.index.get_connection().execute('SELECT * FROM metadata;'))
             if 'backend' not in metadata or metadata['backend'] != 'libarchive':
                 self.__exit__(None, None, None)
@@ -581,7 +581,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                 self.index.open_in_memory()
 
             self._create_index()
-            if self.index.indexIsLoaded():
+            if self.index.index_is_loaded():
                 self._store_metadata()
                 self.index.reload_index_read_only()
 
@@ -602,7 +602,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                     break
 
                 entryPath = None
-                if entry.entryIndex == 0 and self.tarFileName and entry.formatName() == b'raw':
+                if entry.entry_index == 0 and self.tarFileName and entry.format_name() == b'raw':
                     libarchiveSuffixes = [
                         s for fid in COMPRESSION_BACKENDS['libarchive'].formats for s in FILE_FORMATS[fid].extensions
                     ]
@@ -615,16 +615,16 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                     entryPath = fname
 
                 gotAnyEntry = True
-                fileInfos.append(entry.convert_to_row(entry.entryIndex, self.transform, path=entryPath))
+                fileInfos.append(entry.convert_to_row(entry.entry_index, self.transform, path=entryPath))
                 # Contains file info SQLite row tuples! 4 -> size, 6 -> mode
                 if not triedToOpen and not stat.S_ISDIR(fileInfos[-1][6]) and fileInfos[-1][4] > 0:
                     bufferSize = 1
                     buffer = ctypes.create_string_buffer(bufferSize)
                     try:
-                        archive.readData(buffer, 1)
+                        archive.read_data(buffer, 1)
                     except ArchiveError as exception:
                         # Very special case to delegate to py7zr somewhat smartly for encrypted 7z archives.
-                        if entry.formatName() == b'7-Zip' and self.passwords and "py7zr" in sys.modules:
+                        if entry.format_name() == b'7-Zip' and self.passwords and "py7zr" in sys.modules:
                             raise exception
                         if 'encrypt' in str(exception).lower() and self.printDebug >= 1:
                             print("[Warning] The file contents are encrypted but not the file hierarchy!")
@@ -632,12 +632,12 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                     triedToOpen = True
 
                 if len(fileInfos) > 1000:
-                    self.index.setFileInfos(fileInfos)
+                    self.index.set_file_infos(fileInfos)
                     fileInfos = []
 
             if fileInfos:
-                self.index.setFileInfos(fileInfos)
-            elif not gotAnyEntry and archive.formatName() == b'tar':
+                self.index.set_file_infos(fileInfos)
+            elif not gotAnyEntry and archive.format_name() == b'tar':
                 raise ArchiveError("Supposedly detected a TAR with no entries in it. Rejecting it as unknown format!")
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)

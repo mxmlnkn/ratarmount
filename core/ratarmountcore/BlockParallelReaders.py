@@ -337,7 +337,7 @@ class ParallelXZReader(BlockParallelReader):
     def read(self, size: int = -1) -> bytes:
         return super()._read(size, ParallelXZReader._decode_block)
 
-    def findBlock(self, offset) -> Optional[int]:
+    def find_block(self, offset) -> Optional[int]:
         """
         Returns the block number corresponding to the specified offset in the decompressed stream.
         """

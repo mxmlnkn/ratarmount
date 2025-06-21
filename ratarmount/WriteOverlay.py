@@ -11,7 +11,7 @@ import traceback
 import urllib.parse
 from typing import Any, Callable, Dict, List, Tuple
 
-from ratarmountcore.formats import isTAR
+from ratarmountcore.formats import is_tar
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.formats.folder import FolderMountSource
 from ratarmountcore.utils import RatarmountError, overrides
@@ -417,7 +417,7 @@ class WritableFolderMountSource(fuse.Operations):
         return self._statfs.copy()
 
 
-def commitOverlay(writeOverlay: str, tarFile: str, encoding: str = tarfile.ENCODING, printDebug: int = 0) -> None:
+def commit_overlay(writeOverlay: str, tarFile: str, encoding: str = tarfile.ENCODING, printDebug: int = 0) -> None:
     if not os.path.isdir(writeOverlay):
         raise RatarmountError("Need an existing write overlay folder for committing changes.")
 
@@ -425,7 +425,7 @@ def commitOverlay(writeOverlay: str, tarFile: str, encoding: str = tarfile.ENCOD
         raise RatarmountError(f"Specified TAR '{tarFile}' to commit to does not exist or is not a file!")
 
     with open(tarFile, 'rb') as file:
-        if not isTAR(file, encoding=encoding):
+        if not is_tar(file, encoding=encoding):
             raise RatarmountError("Currently, only modifications to an uncompressed TAR may be committed.")
 
     try:

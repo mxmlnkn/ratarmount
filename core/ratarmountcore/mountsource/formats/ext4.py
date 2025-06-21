@@ -1,6 +1,6 @@
 from typing import IO, Any, Dict, Iterable, Optional, Union
 
-from ratarmountcore.formats import FileFormatID, replaceFormatCheck
+from ratarmountcore.formats import FileFormatID, replace_format_check
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.utils import overrides
 
@@ -10,7 +10,7 @@ except ImportError:
     ext4 = None  # type: ignore
 
 
-def isEXT4Image(fileObject) -> bool:
+def is_ext4_image(fileObject) -> bool:
     if ext4 is None:
         return False
 
@@ -25,7 +25,7 @@ def isEXT4Image(fileObject) -> bool:
     return False
 
 
-replaceFormatCheck(FileFormatID.EXT4, isEXT4Image)
+replace_format_check(FileFormatID.EXT4, is_ext4_image)
 
 
 class EXT4MountSource(MountSource):

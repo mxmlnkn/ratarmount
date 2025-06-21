@@ -6,7 +6,7 @@ import tarfile
 from timeit import default_timer as timer
 from typing import IO, Any, Dict, List, Optional, Tuple, Union
 
-from ratarmountcore.formats import FileFormatID, replaceFormatCheck
+from ratarmountcore.formats import FileFormatID, replace_format_check
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
 from ratarmountcore.SQLiteIndex import SQLiteIndex
@@ -74,7 +74,7 @@ try:
         return file
 
     # https://github.com/miurahr/py7zr/issues/659#issuecomment-2954260661
-    replaceFormatCheck(FileFormatID.SEVEN_ZIP, py7zr.is_7zfile)  # type: ignore
+    replace_format_check(FileFormatID.SEVEN_ZIP, py7zr.is_7zfile)  # type: ignore
 
 except ImportError:
     py7zr = None  # type: ignore
@@ -106,14 +106,14 @@ class Py7zrMountSource(SQLiteIndexMountSource):
         #      currently is no SQLite table column to store this information in.
         # TODO I doubt that symbolic links work because py7zr.FileInfo does not have information regarding links.
 
-        def openFile(password: Optional[Union[str, bytes]] = None):
+        def open_file(password: Optional[Union[str, bytes]] = None):
             return py7zr.SevenZipFile(
                 # https://github.com/miurahr/py7zr/issues/659#issuecomment-2954260661
                 fileOrPath,  # type: ignore
                 password=None if password is None else (password if isinstance(password, str) else password.decode()),
             )
 
-        self.fileObject = Py7zrMountSource._find_password(openFile, options.get("passwords", []))
+        self.fileObject = Py7zrMountSource._find_password(open_file, options.get("passwords", []))
 
         # Force indexes in memory because:
         #  - I have no idea what ID to write into offset or offsetheader. The "ID" for the py7zr interface
@@ -136,7 +136,7 @@ class Py7zrMountSource(SQLiteIndexMountSource):
 
         isFileObject = not isinstance(fileOrPath, str)
 
-        if self.index.indexIsLoaded():
+        if self.index.index_is_loaded():
             self.index.reload_index_read_only()
         else:
             # Open new database when we didn't find an existing one.
@@ -148,7 +148,7 @@ class Py7zrMountSource(SQLiteIndexMountSource):
                 self.index.open_in_memory()
 
             self._create_index()
-            if self.index.indexIsLoaded():
+            if self.index.index_is_loaded():
                 self._store_metadata()
                 self.index.reload_index_read_only()
 
@@ -191,7 +191,7 @@ class Py7zrMountSource(SQLiteIndexMountSource):
         t0 = timer()
 
         self.index.ensure_intermediary_tables()
-        self.index.setFileInfos([self._convert_to_row(info) for info in self.fileObject.list()])
+        self.index.set_file_infos([self._convert_to_row(info) for info in self.fileObject.list()])
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
         if self.printDebug >= 2:

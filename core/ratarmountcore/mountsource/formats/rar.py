@@ -6,15 +6,15 @@ import sys
 import time
 from typing import IO, Dict, Iterable, List, Optional, Union
 
-from ratarmountcore.formats import FileFormatID, replaceFormatCheck
-from ratarmountcore.mountsource import FileInfo, MountSource, createRootFileInfo
+from ratarmountcore.formats import FileFormatID, replace_format_check
+from ratarmountcore.mountsource import FileInfo, MountSource, create_root_file_info
 from ratarmountcore.utils import overrides
 
 with contextlib.suppress(ImportError):
     import rarfile
 
 
-def isRarFile(fileObject: IO[bytes]) -> bool:
+def is_rar_file(fileObject: IO[bytes]) -> bool:
     # @see https://www.rarlab.com/technote.htm#rarsign
     # > RAR 5.0 signature consists of 8 bytes: 0x52 0x61 0x72 0x21 0x1A 0x07 0x01 0x00.
     # > You need to search for this signature in supposed archive from beginning and up to maximum SFX module size.
@@ -34,7 +34,7 @@ def isRarFile(fileObject: IO[bytes]) -> bool:
     return False
 
 
-replaceFormatCheck(FileFormatID.RAR, isRarFile)
+replace_format_check(FileFormatID.RAR, is_rar_file)
 
 
 class RarMountSource(MountSource):
@@ -163,7 +163,7 @@ class RarMountSource(MountSource):
         # If we have a fileInfo for the given directory path, then everything is fine.
         pathAsDir = path.strip('/') + '/'
         if pathAsDir == '/':
-            return [createRootFileInfo(userdata=[None])]
+            return [create_root_file_info(userdata=[None])]
 
         infoList = [
             RarMountSource._convert_to_file_info(normalizedPath, info)
