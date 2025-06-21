@@ -8,7 +8,7 @@ import threading
 from timeit import default_timer as timer
 from typing import IO, Any, Dict, List, Optional, Tuple, Union, cast
 
-from ratarmountcore.formats import findASARHeader
+from ratarmountcore.formats import find_asar_header
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
 from ratarmountcore.SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
@@ -96,7 +96,7 @@ class ASARMountSource(SQLiteIndexMountSource):
         )
 
         # Try to open file
-        self._headerOffset, self._headerSize, self._dataOffset = findASARHeader(self.fileObject)
+        self._headerOffset, self._headerSize, self._dataOffset = find_asar_header(self.fileObject)
         self.fileObject.seek(self._headerOffset + self._headerSize - 1)
         if not self.fileObject.read(1):
             raise ValueError(

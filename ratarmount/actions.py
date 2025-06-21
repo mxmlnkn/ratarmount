@@ -26,7 +26,7 @@ from .fuse import fuse
 from .WriteOverlay import commitOverlay
 
 
-def hasFUSENonEmptySupport() -> bool:
+def has_fuse_non_empty_support() -> bool:
     try:
         # Check suffix of shared library
         if 'fuse' in globals() and getattr(fuse, '_libfuse_path', '').endswith(".so.2"):
@@ -194,7 +194,7 @@ def findShortLicense(distribution) -> str:
     return shortLicense
 
 
-def printOSSAttributionsShort() -> None:
+def print_oss_attributions_short() -> None:
     def doForDistribution(distribution):
         if 'Name' in distribution.metadata:
             print(f"{distribution.metadata['Name']:20} {distribution.version:12} {findShortLicense(distribution)}")
@@ -206,7 +206,7 @@ def printOSSAttributionsShort() -> None:
     printMetadataRecursively({"ratarmount": {"full"}}, doForDistribution, printOnNewLevel)
 
 
-def printOSSAttributions() -> None:
+def print_oss_attributions() -> None:
     def doForDistribution(distribution):
         if 'Name' not in distribution.metadata:
             return
@@ -490,7 +490,7 @@ def createFuseMount(args) -> None:
         fusekwargs['modules'] = 'subdir'
         fusekwargs['subdir'] = args.prefix
 
-    if os.path.isdir(args.mount_point) and os.listdir(args.mount_point) and hasFUSENonEmptySupport():
+    if os.path.isdir(args.mount_point) and os.listdir(args.mount_point) and has_fuse_non_empty_support():
         fusekwargs['nonempty'] = True
 
     from .FuseMount import FuseMount  # pylint: disable=import-outside-toplevel

@@ -67,7 +67,7 @@ try:
 except ImportError:
     Compressor = object
 
-from ratarmountcore.formats import findSquashFSOffset
+from ratarmountcore.formats import find_squashfs_offset
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
 from ratarmountcore.SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
@@ -412,7 +412,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
             file = fileOrPath
             file.seek(0)
 
-        offset = findSquashFSOffset(file)
+        offset = find_squashfs_offset(file)
         if offset < 0:
             if openedFile:
                 file.close()

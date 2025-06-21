@@ -36,17 +36,17 @@ class PrintVersionAction(argparse.Action):
 
 class PrintOSSAttributionAction(argparse.Action):
     def __call__(self, parser, args, values, option_string=None):
-        from .actions import printOSSAttributions
+        from .actions import print_oss_attributions
 
-        printOSSAttributions()
+        print_oss_attributions()
         parser.exit()
 
 
 class PrintOSSAttributionShortAction(argparse.Action):
     def __call__(self, parser, args, values, option_string=None):
-        from .actions import printOSSAttributionsShort
+        from .actions import print_oss_attributions_short
 
-        printOSSAttributionsShort()
+        print_oss_attributions_short()
         parser.exit()
 
 

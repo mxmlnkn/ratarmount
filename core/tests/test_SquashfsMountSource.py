@@ -14,7 +14,7 @@ from helpers import copy_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.formats import findSquashFSOffset  # noqa: E402
+from ratarmountcore.formats import find_squashfs_offset  # noqa: E402
 from ratarmountcore.mountsource.formats.squashfs import SquashFSMountSource  # noqa: E402
 
 compressionsToTest = []
@@ -31,25 +31,25 @@ if importlib.util.find_spec('PySquashfsImage'):
 class TestSquashfsMountSource:
     @staticmethod
     def test_find_magic_bytes():
-        assert findSquashFSOffset(io.BytesIO()) < 0
-        assert findSquashFSOffset(io.BytesIO(b"")) < 0
-        assert findSquashFSOffset(io.BytesIO(b"a")) < 0
-        assert findSquashFSOffset(io.BytesIO(b"ab")) < 0
-        assert findSquashFSOffset(io.BytesIO(b"ab")) < 0
-        assert findSquashFSOffset(io.BytesIO(b"foob")) < 0
+        assert find_squashfs_offset(io.BytesIO()) < 0
+        assert find_squashfs_offset(io.BytesIO(b"")) < 0
+        assert find_squashfs_offset(io.BytesIO(b"a")) < 0
+        assert find_squashfs_offset(io.BytesIO(b"ab")) < 0
+        assert find_squashfs_offset(io.BytesIO(b"ab")) < 0
+        assert find_squashfs_offset(io.BytesIO(b"foob")) < 0
 
         validHeader = b"hsqs" + struct.pack('<IIII', 0, 0, 4096, 0) + struct.pack('<HHHHHH', 0, 12, 0, 0, 4, 0)
-        assert findSquashFSOffset(io.BytesIO(validHeader)) == 0
-        assert findSquashFSOffset(io.BytesIO(b"0" + validHeader)) == 1
-        assert findSquashFSOffset(io.BytesIO(b"0" * 1234 + validHeader)) == 1234
-        assert findSquashFSOffset(io.BytesIO(b"0" * 1234 + validHeader + validHeader)) == 1234
+        assert find_squashfs_offset(io.BytesIO(validHeader)) == 0
+        assert find_squashfs_offset(io.BytesIO(b"0" + validHeader)) == 1
+        assert find_squashfs_offset(io.BytesIO(b"0" * 1234 + validHeader)) == 1234
+        assert find_squashfs_offset(io.BytesIO(b"0" * 1234 + validHeader + validHeader)) == 1234
 
     @staticmethod
     @pytest.mark.parametrize('compression', compressionsToTest)
     def test_simple_usage(compression):
         with copy_test_file(f'folder-symlink.{compression}.squashfs') as path, SquashFSMountSource(path) as mountSource:
             with open(path, 'rb') as file:
-                assert findSquashFSOffset(file) == 0
+                assert find_squashfs_offset(file) == 0
 
             for folder in ['/', '/foo', '/foo/fighter']:
                 fileInfo = mountSource.lookup(folder)

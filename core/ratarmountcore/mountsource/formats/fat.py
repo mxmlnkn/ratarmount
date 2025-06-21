@@ -20,7 +20,7 @@ except ImportError:
     PyFATException = None  # type: ignore
 
 
-def isFATImage(fileObject) -> bool:
+def is_fat_image(fileObject) -> bool:
     if PyFat is None:
         return False
 
@@ -44,7 +44,7 @@ def isFATImage(fileObject) -> bool:
         fileObject.seek(offset)
 
 
-replaceFormatCheck(FileFormatID.FAT, isFATImage)
+replaceFormatCheck(FileFormatID.FAT, is_fat_image)
 
 
 class FATMountSource(MountSource):

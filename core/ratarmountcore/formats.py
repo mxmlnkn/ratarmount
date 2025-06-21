@@ -88,7 +88,7 @@ def isTAR(fileobj: IO[bytes], encoding: str = tarfile.ENCODING) -> bool:
     return False
 
 
-def findASARHeader(fileobj: IO[bytes]) -> Tuple[int, int, int]:
+def find_asar_header(fileobj: IO[bytes]) -> Tuple[int, int, int]:
     """Return triple (start of header JSON, size of header JSON, start of file objects)"""
     # https://github.com/electron/asar/issues/128
     # https://github.com/electron/asar
@@ -129,7 +129,7 @@ def isASAR(fileobj: IO[bytes]) -> bool:
     try:
         # Reading the header and checking it to be correct JSON is to expensive for large archives.
         # The unnecessary pickling already should introduce enough redundancy for checks and detection.
-        findASARHeader(fileobj)
+        find_asar_header(fileobj)
         return True
     except Exception:
         pass
@@ -138,7 +138,7 @@ def isASAR(fileobj: IO[bytes]) -> bool:
     return False
 
 
-def isSquashFS(fileobj: IO[bytes]) -> bool:
+def is_squashfs(fileobj: IO[bytes]) -> bool:
     offset = fileobj.tell()
     try:
         # https://dr-emann.github.io/squashfs/squashfs.html#_the_superblock
@@ -169,12 +169,12 @@ def isSquashFS(fileobj: IO[bytes]) -> bool:
     return True
 
 
-def findSquashFSOffset(fileobj: IO[bytes], maxSkip=1024 * 1024) -> int:
+def find_squashfs_offset(fileobj: IO[bytes], maxSkip=1024 * 1024) -> int:
     """
     Looks for the SquashFS superblock, which can be at something other than offset 0 for AppImage files.
     """
     # https://dr-emann.github.io/squashfs/squashfs.html#_the_superblock
-    if isSquashFS(fileobj):
+    if is_squashfs(fileobj):
         return 0
 
     oldOffset = fileobj.tell()
@@ -187,7 +187,7 @@ def findSquashFSOffset(fileobj: IO[bytes], maxSkip=1024 * 1024) -> int:
             if magicOffset < 0 or magicOffset >= len(data):
                 break
             fileobj.seek(magicOffset)
-            if isSquashFS(fileobj):
+            if is_squashfs(fileobj):
                 return magicOffset
     finally:
         fileobj.seek(oldOffset)
@@ -273,7 +273,7 @@ ARCHIVE_FORMATS: Dict[FileFormatID, FileFormatInfo] = {
     FID.TAR: FileFormatInfo(['tar'], None, isTAR),
     FID.ASAR: FileFormatInfo(['asar'], b'\x04\x00\x00\x00', isASAR),
     # Read-Only File systems
-    FID.SQUASHFS: FileFormatInfo(['squashfs', 'AppImage', 'snap'], None, lambda x: findSquashFSOffset(x) >= 0),
+    FID.SQUASHFS: FileFormatInfo(['squashfs', 'AppImage', 'snap'], None, lambda x: find_squashfs_offset(x) >= 0),
     FID.ISO9660: FileFormatInfo(['iso'], None, _is_iso9660),
     # Fully-fledged file systems
     FID.FAT: FileFormatInfo(['fat', 'img', 'dd', 'fat12', 'fat16', 'fat32', 'raw'], None),
