@@ -124,7 +124,7 @@ def _open_sshfs_mount_source(url: str) -> Union[MountSource, IO[bytes], str]:
     return fs.open(path) if fs.isfile(path) else FSSpecMountSource(fs, path)
 
 
-def tryOpenURL(url, printDebug: int) -> Union[MountSource, IO[bytes], str]:
+def try_open_url(url, printDebug: int) -> Union[MountSource, IO[bytes], str]:
     splitURI = url.split('://', 1)
     protocol = splitURI[0] if len(splitURI) > 1 else ''
     if not protocol:
@@ -178,7 +178,7 @@ def tryOpenURL(url, printDebug: int) -> Union[MountSource, IO[bytes], str]:
             password = os.environ.get('WEBDAV_PASSWORD')
         auth = None if username is None or password is None else (username, password)
 
-        def checkForHTTPS(url):
+        def check_for_https(url):
             try:
                 connection = http.client.HTTPSConnection(url, timeout=2)
                 connection.request("HEAD", "/")
@@ -188,7 +188,7 @@ def tryOpenURL(url, printDebug: int) -> Union[MountSource, IO[bytes], str]:
                     print("[Info] Determined WebDAV URL to not use HTTP instead HTTPS because of:", exception)
                 return False
 
-        transportProtocol = "https" if checkForHTTPS(baseURL) else "http"
+        transportProtocol = "https" if check_for_https(baseURL) else "http"
         fileSystem = WebdavFileSystem(f"{transportProtocol}://{baseURL}", auth=auth)
     elif protocol == 'dropbox':
         # Dropbox needs special handling because there is no way to specify the token and because
@@ -264,7 +264,7 @@ def _matches_extension(fileName: str, formats: Iterable[FileFormatID]) -> bool:
     )
 
 
-def findBackendsByExtension(fileName: str) -> List[str]:
+def find_backends_by_extension(fileName: str) -> List[str]:
     return [backend for backend, info in ARCHIVE_BACKENDS.items() if _matches_extension(fileName, info.formats)] + [
         info.delegatedArchiveBackend
         for _, info in COMPRESSION_BACKENDS.items()
@@ -276,7 +276,7 @@ def openMountSource(fileOrPath: Union[str, IO[bytes], os.PathLike], **options) -
     printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
 
     if isinstance(fileOrPath, str) and '://' in fileOrPath:
-        openedURL = tryOpenURL(fileOrPath, printDebug=printDebug)
+        openedURL = try_open_url(fileOrPath, printDebug=printDebug)
 
         # If the URL pointed to a folder, return a MountSource, else open the returned file object as an archive.
         if isinstance(openedURL, MountSource):
@@ -312,9 +312,9 @@ def openMountSource(fileOrPath: Union[str, IO[bytes], os.PathLike], **options) -
             )
         else:
             fileOrPath = str(fileOrPath)
-            autoPrioritizedBackends = findBackendsByExtension(fileOrPath)
+            autoPrioritizedBackends = find_backends_by_extension(fileOrPath)
     else:
-        autoPrioritizedBackends = findBackendsByExtension(options.get('tarFileName', ''))
+        autoPrioritizedBackends = find_backends_by_extension(options.get('tarFileName', ''))
 
     prioritizedBackends = options.get("prioritizedBackends", [])
     triedBackends = set()

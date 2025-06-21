@@ -191,10 +191,10 @@ class TestLibarchiveMountSource:
         memoryFile = io.BytesIO(Path(find_test_file('folder-symlink.zip')).read_bytes())
         with IterableArchive(memoryFile) as archive:
             while True:
-                entry = archive.nextEntry()
+                entry = archive.next_entry()
                 if entry is None:
                     break
-                fileInfo = entry.convertToRow(0, lambda x: x)
+                fileInfo = entry.convert_to_row(0, lambda x: x)
                 assert fileInfo
 
     @staticmethod

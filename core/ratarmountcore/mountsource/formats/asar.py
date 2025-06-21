@@ -127,25 +127,25 @@ class ASARMountSource(SQLiteIndexMountSource):
         # Load or create index (copy-paste)
 
         if self.index.indexIsLoaded():
-            self.index.reloadIndexReadOnly()
+            self.index.reload_index_read_only()
         else:
             # Open new database when we didn't find an existing one.
             # Simply open in memory without an error even if writeIndex is True but when not indication
             # for a index file location has been given.
             if writeIndex and (indexFilePath or not self.isFileObject):
-                self.index.openWritable()
+                self.index.open_writable()
             else:
-                self.index.openInMemory()
+                self.index.open_in_memory()
 
             self._create_index()
             if self.index.indexIsLoaded():
                 self._store_metadata()
-                self.index.reloadIndexReadOnly()
+                self.index.reload_index_read_only()
 
     def _store_metadata(self) -> None:
         argumentsToSave = ['encoding', 'transformPattern']
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
-        self.index.storeMetadata(argumentsMetadata, self.archiveFilePath)
+        self.index.store_metadata(argumentsMetadata, self.archiveFilePath)
 
     def _convert_to_row(self, fullPath, entry: Dict[str, Any], dataOffset: int) -> Tuple:
         path, name = SQLiteIndex.normpath(self.transform(fullPath)).rsplit("/", 1)
@@ -185,7 +185,7 @@ class ASARMountSource(SQLiteIndexMountSource):
             print(f"Creating offset dictionary for {self.archiveFilePath} ...")
         t0 = timer()
 
-        self.index.ensureIntermediaryTables()
+        self.index.ensure_intermediary_tables()
 
         # Using StenciledFile instead of josn.loads(self.fileObject.read()) to avoid yet another copy in memory,
         # to roughly halve memory usage for very large JSONs. Note that the JSON size is limited to 4 GiB because
@@ -249,12 +249,12 @@ class ASARMountSource(SQLiteIndexMountSource):
 
     def _check_metadata(self, metadata: Dict[str, Any]) -> None:
         """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
-        SQLiteIndex.checkArchiveStats(self.archiveFilePath, metadata, self.verifyModificationTime)
+        SQLiteIndex.check_archive_stats(self.archiveFilePath, metadata, self.verifyModificationTime)
 
         if 'arguments' in metadata:
-            SQLiteIndex.checkMetadataArguments(
+            SQLiteIndex.check_metadata_arguments(
                 json.loads(metadata['arguments']), self, argumentsToCheck=['encoding', 'transformPattern']
             )
 
         if 'backendName' not in metadata:
-            self.index.tryToOpenFirstFile(lambda path: self.open(self.lookup(path)))
+            self.index.try_to_open_first_file(lambda path: self.open(self.lookup(path)))

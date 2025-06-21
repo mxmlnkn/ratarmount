@@ -219,7 +219,7 @@ def formatNumber(i: int, base: str, length: int = 0):
     return result[::-1]
 
 
-def distributionContainsFile(distribution, path: str) -> bool:
+def distribution_contains_file(distribution, path: str) -> bool:
     if not distribution.files:
         return False
 
@@ -235,7 +235,7 @@ def distributionContainsFile(distribution, path: str) -> bool:
     return False
 
 
-def getModule(module: Union[str, types.ModuleType]) -> Optional[types.ModuleType]:
+def get_module(module: Union[str, types.ModuleType]) -> Optional[types.ModuleType]:
     if isinstance(module, types.ModuleType):
         return module
 
@@ -246,7 +246,7 @@ def getModule(module: Union[str, types.ModuleType]) -> Optional[types.ModuleType
 
 
 def findModuleVersion(moduleOrName: Union[str, types.ModuleType]) -> Optional[str]:
-    module = getModule(moduleOrName)
+    module = get_module(moduleOrName)
     if not module:
         return None
 
@@ -275,7 +275,7 @@ def findModuleVersion(moduleOrName: Union[str, types.ModuleType]) -> Optional[st
     if moduleFilePath:
         for distribution in imeta.distributions():
             try:
-                if distributionContainsFile(distribution, moduleFilePath) and 'Version' in distribution.metadata:
+                if distribution_contains_file(distribution, moduleFilePath) and 'Version' in distribution.metadata:
                     return distribution.metadata['Version']
             except Exception:
                 pass
@@ -349,7 +349,7 @@ def determineRecursionDepth(recursive: bool = False, recursionDepth: Optional[in
     return (sys.maxsize if recursive else 0) if recursionDepth is None else recursionDepth
 
 
-def computeEntropy(data: bytes) -> float:
+def compute_entropy(data: bytes) -> float:
     if not data:
         return 0.0
 
@@ -405,8 +405,8 @@ def isRandom(data: bytes) -> bool:
     def convergenceRate(n: int):
         return 8 * (1 + m) / (n + m)
 
-    def isInThreshold(dataToTest: bytes):
-        return 8 - computeEntropy(dataToTest) < convergenceRate(len(dataToTest))
+    def is_in_threshold(dataToTest: bytes):
+        return 8 - compute_entropy(dataToTest) < convergenceRate(len(dataToTest))
 
     diffData = bytes((data[i + 1] - data[i] + 256) % 256 for i in range(len(data) - 1))
-    return isInThreshold(data) and isInThreshold(diffData)
+    return is_in_threshold(data) and is_in_threshold(diffData)

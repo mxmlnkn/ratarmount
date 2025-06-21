@@ -64,11 +64,11 @@ class _TarFileMetadataReader:
             fileObject.seek(tarBlockOffset + 345)
             return fileObject.read(155)
 
-        def extractName(tarBlockOffset):
+        def extract_name(tarBlockOffset):
             fileObject.seek(tarBlockOffset)
             return fileObject.read(100)
 
-        def extractSize(tarBlockOffset):
+        def extract_size(tarBlockOffset):
             fileObject.seek(tarBlockOffset + 124)
             return int(fileObject.read(12).strip(b"\0"), 8)  # octal encoded file size TODO might also be base64
 
@@ -81,8 +81,8 @@ class _TarFileMetadataReader:
         # corresponding GNU LongLink file header in the TarInfo object instead of the actual file header, which
         # contains the prefix.
         try:
-            if extractName(tarInfo.offset).startswith(b"././@LongLink\0"):
-                nextHeaderOffset = tarInfo.offset + 512 + (extractSize(tarInfo.offset) + 512 - 1) // 512 * 512
+            if extract_name(tarInfo.offset).startswith(b"././@LongLink\0"):
+                nextHeaderOffset = tarInfo.offset + 512 + (extract_size(tarInfo.offset) + 512 - 1) // 512 * 512
                 return extractPrefix(nextHeaderOffset)
             return extractPrefix(tarInfo.offset)
 
@@ -250,7 +250,7 @@ class _TarFileMetadataReader:
         return fileInfos, xattrRows, False, isGnuIncremental
 
     @staticmethod
-    def findTarFileOffsets(fileObject: IO[bytes], ignoreZeros: bool) -> Generator[Tuple[int, bytes], None, None]:
+    def find_tar_file_offsets(fileObject: IO[bytes], ignoreZeros: bool) -> Generator[Tuple[int, bytes], None, None]:
         """
         Generator which yields offsets in the given TAR suitable for splitting the file into sub TARs.
         Also returns the type of the TAR metadata block at the returned offset for convenience.
@@ -655,7 +655,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         if self.index.indexIsLoaded():
             if not self.hasBeenAppendedTo:  # indirectly set by a successful call to _try_load_index
                 self._load_or_store_compression_offsets()  # load
-                self.index.reloadIndexReadOnly()
+                self.index.reload_index_read_only()
                 return
 
             # TODO Handling appended files to compressed archives would have to account for dropping the offsets,
@@ -663,9 +663,9 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             #      bar as well as saving the block offsets out after reading and possibly other things.
             if self.compression:
                 # When loading compression offsets, the backends assume they are complete, so we have to clear them.
-                self.index.clearCompressionOffsets()
+                self.index.clear_compression_offsets()
 
-            pastEndOffset = self._get_past_end_offset(self.index.getConnection())
+            pastEndOffset = self._get_past_end_offset(self.index.get_connection())
             if not self.compression and pastEndOffset and self._check_index_validity():
                 archiveSize = self.tarFileObject.seek(0, io.SEEK_END)
 
@@ -679,9 +679,9 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
                 self._load_or_store_compression_offsets()  # store
 
-                self.index.dropMetadata()
+                self.index.drop_metadata()
                 self._store_metadata()
-                self.index.reloadIndexReadOnly()
+                self.index.reload_index_read_only()
                 return
 
             self.index.close()
@@ -699,15 +699,15 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             # Simply open in memory without an error even if writeIndex is True but when no indication
             # for an index file location has been given.
             if writeIndex and (indexFilePath or self._get_archive_path() or not self.isFileObject):
-                self.index.openWritable()
+                self.index.open_writable()
             else:
-                self.index.openInMemory()
+                self.index.open_in_memory()
 
         self._create_index(self.tarFileObject)
         self._load_or_store_compression_offsets()  # store
         if self.index.indexIsLoaded():
             self._store_metadata()
-            self.index.reloadIndexReadOnly()
+            self.index.reload_index_read_only()
 
         if self.printDebug >= 1 and self.index.indexFilePath and os.path.isfile(self.index.indexFilePath):
             # The 0-time is legacy for the automated tests
@@ -734,7 +734,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             # For an uncompressed 500MB TAR, this iteration took ~0.7s for 1M files roughly 30x faster than tarfile.
             # But for compressed TARs or for HDDs as opposed to SSDs, this might be much slower.
             nMaxToTry = 1000 if self.isFileObject or self.compression else 10000
-            for _, typeFlag in _TarFileMetadataReader.findTarFileOffsets(fileObject, self.ignoreZeros):
+            for _, typeFlag in _TarFileMetadataReader.find_tar_file_offsets(fileObject, self.ignoreZeros):
                 # It seems to be possible to create mixtures of incremental archives and normal contents,
                 # therefore do not check that all files must have the mtime prefix.
                 if typeFlag == b'D':
@@ -784,8 +784,8 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
         # The second argument must be a path to a file to call os.stat with, not simply a file name.
-        self.index.storeMetadata(argumentsMetadata, None if self.isFileObject else self.tarFileName)
-        self.index.storeMetadataKeyValue('isGnuIncremental', '1' if self._isGnuIncremental else '0')
+        self.index.store_metadata(argumentsMetadata, None if self.isFileObject else self.tarFileName)
+        self.index.store_metadata_key_value('isGnuIncremental', '1' if self._isGnuIncremental else '0')
 
     def _update_progress_bar(self, progressBar, fileobj: Any) -> None:
         if not progressBar:
@@ -822,7 +822,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             print(f"Creating offset dictionary for {self.tarFileName} ...")
         t0 = timer()
 
-        self.index.ensureIntermediaryTables()
+        self.index.ensure_intermediary_tables()
 
         progressBar = ProgressBar(self._archiveFileSize)
         self._create_index_recursively(
@@ -1195,7 +1195,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 f"{storedStats['st_size']} to {archiveStats.st_size}. It cannot be treated as appended."
             )
 
-        if self.index.getIndexVersion() != SQLiteIndex.__version__:
+        if self.index.get_index_version() != SQLiteIndex.__version__:
             raise InvalidIndexError("Cannot append to index of different versions!")
 
         if self.printDebug >= 2:
@@ -1286,7 +1286,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             if self.compression == FileFormatID.GZIP:
                 argumentsToCheck.append('gzipSeekPointSpacing')
 
-            SQLiteIndex.checkMetadataArguments(indexArgs, self, argumentsToCheck)
+            SQLiteIndex.check_metadata_arguments(indexArgs, self, argumentsToCheck)
 
         # Restore the self._isGnuIncremental flag before doing any row validation because else there could be
         # false positive warnings regarding GNU incremental detection.
@@ -1306,7 +1306,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         if 'backendName' not in metadata:
             # Checking the first two should already be enough to detect an index created with a different backend.
             # Do not verify folders because parent folders and root get automatically added!
-            result = self.index.getConnection().execute(
+            result = self.index.get_connection().execute(
                 f"""SELECT * {SQLiteIndex.FROM_REGULAR_FILES} ORDER BY offset ASC LIMIT 2;"""
             )
             if not self._check_rows_validity(result):
@@ -1315,7 +1315,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
     def _check_index_validity(self) -> bool:
         # Check some of the first and last files in the archive and some random selection in between.
         selectFiles = "SELECT * " + SQLiteIndex.FROM_REGULAR_FILES
-        result = self.index.getConnection().execute(
+        result = self.index.get_connection().execute(
             f"""
             SELECT * FROM ( {selectFiles} ORDER BY offset ASC LIMIT 100 )
             UNION
@@ -1403,7 +1403,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
     def _load_or_store_compression_offsets(self):
         if self.compression:
-            self.index.synchronizeCompressionOffsets(self.tarFileObject, self.compression)
+            self.index.synchronize_compression_offsets(self.tarFileObject, self.compression)
 
     def joinThreads(self):
         if hasattr(self.tarFileObject, 'join_threads'):

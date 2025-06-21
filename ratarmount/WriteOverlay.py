@@ -99,7 +99,7 @@ class WritableFolderMountSource(fuse.Operations):
         )
         return sqlConnection
 
-    def setFolderDescriptor(self, fd: int) -> None:
+    def set_folder_descriptor(self, fd: int) -> None:
         """
         Make this mount source manage the special "." folder by changing to that directory.
         Because we change to that directory, it may only be used for one mount source but it also works
@@ -157,7 +157,7 @@ class WritableFolderMountSource(fuse.Operations):
         else:
             self.sqlConnection.execute('DELETE FROM "files" WHERE (path,name) == (?,?)', (folder, name))
 
-    def listDeleted(self, path: str) -> List[str]:
+    def list_deleted(self, path: str) -> List[str]:
         """Return list of files marked as deleted in the given path."""
         result = self.sqlConnection.execute(
             'SELECT name FROM "files" WHERE path == (?) AND deleted == 1', (path.rstrip('/'),)
@@ -167,7 +167,7 @@ class WritableFolderMountSource(fuse.Operations):
         suffixes = ['', '-journal', '-shm', '-wal']
         return [x[0] for x in result] + [self.hiddenDatabaseName + suffix for suffix in suffixes]
 
-    def isDeleted(self, path: str) -> bool:
+    def is_deleted(self, path: str) -> bool:
         folder, name = self._split_path(path)
         result = self.sqlConnection.execute(
             'SELECT COUNT(*) > 0 FROM "files" WHERE path == (?) AND name == (?) AND deleted == 1', (folder, name)
@@ -234,7 +234,7 @@ class WritableFolderMountSource(fuse.Operations):
             print("[Info] Caught exception when trying to apply metadata to real file.")
             print("[Info] It was applied in the metadata database!")
 
-    def updateFileInfo(self, path: str, fileInfo: FileInfo):
+    def update_file_info(self, path: str, fileInfo: FileInfo):
         folder, name = self._split_path(path)
         row = self.sqlConnection.execute(
             """SELECT * FROM "files" WHERE "path" == (?) AND "name" == (?);""", (folder, name)
@@ -284,7 +284,7 @@ class WritableFolderMountSource(fuse.Operations):
 
     @overrides(fuse.Operations)
     def rename(self, old, new):
-        if not self.mountSource.exists(old) or self.isDeleted(old):
+        if not self.mountSource.exists(old) or self.is_deleted(old):
             raise fuse.FuseOSError(errno.ENOENT)
 
         folder, name = self._split_path(new)
@@ -331,11 +331,11 @@ class WritableFolderMountSource(fuse.Operations):
 
     @overrides(fuse.Operations)
     def rmdir(self, path):
-        if not self.mountSource.exists(path) or self.isDeleted(path):
+        if not self.mountSource.exists(path) or self.is_deleted(path):
             raise fuse.FuseOSError(errno.ENOENT)
 
         contents = self.mountSource.list(path)
-        if contents is not None and set(contents.keys()) - set(self.listDeleted(path)):
+        if contents is not None and set(contents.keys()) - set(self.list_deleted(path)):
             raise fuse.FuseOSError(errno.ENOTEMPTY)
 
         try:
@@ -371,7 +371,7 @@ class WritableFolderMountSource(fuse.Operations):
     def unlink(self, path):
         # Note that despite the name this is called for removing both, files and links.
 
-        if not self.mountSource.exists(path) or self.isDeleted(path):
+        if not self.mountSource.exists(path) or self.is_deleted(path):
             # This is for the rare case that the file only exists in the overlay metadata database.
             self._mark_as_deleted(path)
             raise fuse.FuseOSError(errno.ENOENT)
@@ -440,7 +440,7 @@ def commitOverlay(writeOverlay: str, tarFile: str, encoding: str = tarfile.ENCOD
     deletionList = os.path.join(tmpFolder, "deletions.lst")
     appendList = os.path.join(tmpFolder, "append.lst")
 
-    def addToDeletionFile(deletionListFile, pathRelativeToRoot: str):
+    def add_to_deletion_file(deletionListFile, pathRelativeToRoot: str):
         # Delete with and without leading slash because GNU tar matches exactly while
         # ratarmount does not discern between these two cases.
         deletionListFile.write(f"{pathRelativeToRoot}\0")
@@ -454,7 +454,7 @@ def commitOverlay(writeOverlay: str, tarFile: str, encoding: str = tarfile.ENCOD
 
         with open(deletionList, 'a', encoding=encoding) as deletionListFile:
             for path, name in sqlConnection.execute("SELECT path,name FROM files WHERE deleted == 1;"):
-                addToDeletionFile(deletionListFile, f"{path}/{name}".lstrip('/'))
+                add_to_deletion_file(deletionListFile, f"{path}/{name}".lstrip('/'))
 
     # Delete all files to be replaced with other files
     with open(deletionList, 'a', encoding=encoding) as deletionListFile, open(
@@ -479,7 +479,7 @@ def commitOverlay(writeOverlay: str, tarFile: str, encoding: str = tarfile.ENCOD
                 pathRelativeToRoot = f"{dirpath}/{name}".lstrip('/')
                 if pathRelativeToRoot in toBeIgnored:
                     continue
-                addToDeletionFile(deletionListFile, pathRelativeToRoot)
+                add_to_deletion_file(deletionListFile, pathRelativeToRoot)
                 appendListFile.write(f"{pathRelativeToRoot}\0")
 
             # Append empty folders
@@ -512,7 +512,7 @@ def commitOverlay(writeOverlay: str, tarFile: str, encoding: str = tarfile.ENCOD
             )
         print()
 
-    def runWithoutLocale(*args, check=True, **kwargs):
+    def run_without_locale(*args, check=True, **kwargs):
         adjustedEnvironment = os.environ.copy()
         for key in [k for k in adjustedEnvironment if k.startswith('LC_')]:
             del adjustedEnvironment[key]
@@ -527,7 +527,7 @@ def commitOverlay(writeOverlay: str, tarFile: str, encoding: str = tarfile.ENCOD
     try:
         if input() == 'commit':
             if os.stat(deletionList).st_size > 0:
-                tarDelete = runWithoutLocale(
+                tarDelete = run_without_locale(
                     [
                         "tar",
                         "--delete",
@@ -552,7 +552,7 @@ def commitOverlay(writeOverlay: str, tarFile: str, encoding: str = tarfile.ENCOD
                     raise RatarmountError("There were problems when trying to delete files.")
 
             if os.stat(appendList).st_size > 0:
-                runWithoutLocale(
+                run_without_locale(
                     [
                         "tar",
                         "--append",

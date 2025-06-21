@@ -30,10 +30,10 @@ class TestLambdaReaderFile:
 
         expression = "SELECT {}data{} FROM gzipindexes WHERE ROWID == 1"
 
-        assert SQLiteBlobFile.readBlobPart(db, expression, 0, 10) == randomTestData[0:10]
-        assert SQLiteBlobFile.readBlobPart(db, expression, 300, 128) == randomTestData[300 : 300 + 128]
-        assert SQLiteBlobFile.readBlobPart(db, expression, 1000, 1000) == randomTestData[1000:2000]
-        assert SQLiteBlobFile.readBlobPart(db, expression, 0, len(randomTestData)) == randomTestData
+        assert SQLiteBlobFile.read_blob_part(db, expression, 0, 10) == randomTestData[0:10]
+        assert SQLiteBlobFile.read_blob_part(db, expression, 300, 128) == randomTestData[300 : 300 + 128]
+        assert SQLiteBlobFile.read_blob_part(db, expression, 1000, 1000) == randomTestData[1000:2000]
+        assert SQLiteBlobFile.read_blob_part(db, expression, 0, len(randomTestData)) == randomTestData
 
         file = SQLiteBlobFile(db, expression)
         assert file.tell() == 0

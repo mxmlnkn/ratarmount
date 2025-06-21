@@ -6,7 +6,7 @@ from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.utils import overrides
 
 
-def maxUpCount(path):
+def max_up_count(path):
     if os.path.isabs(path):
         return 0
     result = 0
@@ -31,7 +31,7 @@ class FolderMountSource(MountSource):
         self.root = str(path)
         self._statfs = FolderMountSource._get_statfs_for_folder(self.root)
 
-    def setFolderDescriptor(self, fd: int) -> None:
+    def set_folder_descriptor(self, fd: int) -> None:
         """
         Make this mount source manage the special "." folder by changing to that directory.
         Because we change to that directory it may only be used for one mount source but it also works
@@ -113,7 +113,7 @@ class FolderMountSource(MountSource):
             # assumption that there are no symbolic links in the path, else it might make things worse.
             if (
                 not os.path.isabs(linkname)
-                and maxUpCount(linkname) > path.strip('/').count('/')
+                and max_up_count(linkname) > path.strip('/').count('/')
                 and os.path.exists(realpath)
             ):
                 realpath = os.path.realpath(realpath)
@@ -143,13 +143,13 @@ class FolderMountSource(MountSource):
         # > system call on Unix but only requires one for symbolic links on Windows.
         # Unfortunately, I am not sure whether it would be sufficient to build the file mode from these
         # two getters. For now, I'd say that all the esoteric stuff is simply not supported.
-        def makeMode(dirEntry):
+        def make_mode(dirEntry):
             mode = stat.S_IFDIR if dirEntry.is_dir(follow_symlinks=False) else stat.S_IFREG
             if dirEntry.is_symlink():
                 mode = stat.S_IFLNK
             return mode
 
-        return {os.fsdecode(dirEntry.name): makeMode(dirEntry) for dirEntry in os.scandir(realpath)}
+        return {os.fsdecode(dirEntry.name): make_mode(dirEntry) for dirEntry in os.scandir(realpath)}
 
     @overrides(MountSource)
     def versions(self, path: str) -> int:
@@ -157,7 +157,7 @@ class FolderMountSource(MountSource):
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
-        realpath = self.getFilePath(fileInfo)
+        realpath = self.get_file_path(fileInfo)
         try:
             return open(realpath, 'rb', buffering=buffering)
         except Exception as e:
@@ -169,17 +169,19 @@ class FolderMountSource(MountSource):
 
     @overrides(MountSource)
     def list_xattr(self, fileInfo: FileInfo) -> List[str]:
-        return os.listxattr(self.getFilePath(fileInfo), follow_symlinks=False) if hasattr(os, 'listxattr') else []
+        return os.listxattr(self.get_file_path(fileInfo), follow_symlinks=False) if hasattr(os, 'listxattr') else []
 
     @overrides(MountSource)
     def get_xattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
-        return os.getxattr(self.getFilePath(fileInfo), key, follow_symlinks=False) if hasattr(os, 'getxattr') else None
+        return (
+            os.getxattr(self.get_file_path(fileInfo), key, follow_symlinks=False) if hasattr(os, 'getxattr') else None
+        )
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
         pass
 
-    def getFilePath(self, fileInfo: FileInfo) -> str:
+    def get_file_path(self, fileInfo: FileInfo) -> str:
         path = fileInfo.userdata[-1]
         assert isinstance(path, str)
         # Path argument is only expected to be absolute for symbolic links pointing outside self.root.

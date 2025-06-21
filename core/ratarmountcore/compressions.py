@@ -294,7 +294,7 @@ def _compress_zstd(data):
     return zstandard.ZstdCompressor().compress(data)
 
 
-def compressZstd(filePath: str, outputFilePath: str, frameSize: int, parallelization: Optional[int] = None):
+def compress_zstd(filePath: str, outputFilePath: str, frameSize: int, parallelization: Optional[int] = None):
     """
     Compresses filePath into outputFilePath with one zstandard frame for each frameSize chunk of uncompressed data.
     """
@@ -403,7 +403,7 @@ def detectCompression(
     return None
 
 
-def useRapidgzip(
+def use_rapidgzip(
     fileobj: IO[bytes],
     gzipSeekPointSpacing: int = 16 * 1024 * 1024,
     prioritizedBackends: Optional[List[str]] = None,
@@ -493,7 +493,7 @@ def openCompressedFile(
     parallelization = 1
 
     if compression == FID.GZIP:
-        if useRapidgzip(
+        if use_rapidgzip(
             fileobj,
             gzipSeekPointSpacing=gzipSeekPointSpacing,
             prioritizedBackends=prioritizedBackends,

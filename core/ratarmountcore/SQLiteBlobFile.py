@@ -21,12 +21,12 @@ class SQLiteBlobFile(LambdaReaderFile):
         self.expression = expression
 
         super().__init__(
-            (lambda offset, size: SQLiteBlobFile.readBlobPart(self.connection, expression, offset, size)),
+            (lambda offset, size: SQLiteBlobFile.read_blob_part(self.connection, expression, offset, size)),
             self.connection.execute(self.expression.format("LENGTH(", ")")).fetchone()[0] if size is None else size,
         )
 
     @staticmethod
-    def readBlobPart(connection: sqlite3.Connection, expression: str, offset: int, size: int):
+    def read_blob_part(connection: sqlite3.Connection, expression: str, offset: int, size: int):
         # Note that SQLite offsets begin counting at 1 unlike any other programming language except maybe for Fortran
         return connection.execute(expression.format("substr(", ",?,?)"), (offset + 1, size)).fetchone()[0]
 

@@ -65,7 +65,7 @@ try:
             self.products[filename] = product
             return product
 
-    def openInMemory(archive, target: str, offset: int = 0, maxSize: int = sys.maxsize) -> IO[bytes]:
+    def open_in_memory(archive, target: str, offset: int = 0, maxSize: int = sys.maxsize) -> IO[bytes]:
         factory = CachedFileFactory(offset=offset, maxSize=maxSize)
         archive.reset()
         archive.extract(targets=[target], factory=factory)
@@ -137,25 +137,25 @@ class Py7zrMountSource(SQLiteIndexMountSource):
         isFileObject = not isinstance(fileOrPath, str)
 
         if self.index.indexIsLoaded():
-            self.index.reloadIndexReadOnly()
+            self.index.reload_index_read_only()
         else:
             # Open new database when we didn't find an existing one.
             # Simply open in memory without an error even if writeIndex is True but when not indication
             # for a index file location has been given.
             if writeIndex and (indexFilePath or not isFileObject):
-                self.index.openWritable()
+                self.index.open_writable()
             else:
-                self.index.openInMemory()
+                self.index.open_in_memory()
 
             self._create_index()
             if self.index.indexIsLoaded():
                 self._store_metadata()
-                self.index.reloadIndexReadOnly()
+                self.index.reload_index_read_only()
 
     def _store_metadata(self) -> None:
         argumentsToSave = ['encoding']
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
-        self.index.storeMetadata(argumentsMetadata, self.archiveFilePath)
+        self.index.store_metadata(argumentsMetadata, self.archiveFilePath)
 
     def _convert_to_row(self, info) -> Tuple:
         mode = 0o777 | (stat.S_IFDIR if info.is_directory else stat.S_IFREG)
@@ -190,7 +190,7 @@ class Py7zrMountSource(SQLiteIndexMountSource):
             print(f"Creating offset dictionary for {self.archiveFilePath} ...")
         t0 = timer()
 
-        self.index.ensureIntermediaryTables()
+        self.index.ensure_intermediary_tables()
         self.index.setFileInfos([self._convert_to_row(info) for info in self.fileObject.list()])
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
@@ -224,7 +224,7 @@ class Py7zrMountSource(SQLiteIndexMountSource):
         for password in [None, *passwords]:
             fileobj = openFile(password)
             try:
-                openInMemory(fileobj, files[0].filename)
+                open_in_memory(fileobj, files[0].filename)
                 return fileobj
             except Exception:
                 pass
@@ -238,11 +238,11 @@ class Py7zrMountSource(SQLiteIndexMountSource):
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
-        return openInMemory(self.fileObject, fileInfo.linkname)
+        return open_in_memory(self.fileObject, fileInfo.linkname)
 
     def _check_metadata(self, metadata: Dict[str, Any]) -> None:
         """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
-        SQLiteIndex.checkArchiveStats(self.archiveFilePath, metadata, self.verifyModificationTime)
+        SQLiteIndex.check_archive_stats(self.archiveFilePath, metadata, self.verifyModificationTime)
 
         if 'arguments' in metadata:
-            SQLiteIndex.checkMetadataArguments(json.loads(metadata['arguments']), self, argumentsToCheck=['encoding'])
+            SQLiteIndex.check_metadata_arguments(json.loads(metadata['arguments']), self, argumentsToCheck=['encoding'])

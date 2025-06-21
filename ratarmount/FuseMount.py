@@ -114,7 +114,7 @@ class FuseMount(fuse.Operations):
             # FUSE mount point.
             if options.get('lazyMounting', False):
 
-                def pointsIntoMountPoint(pathToTest):
+                def points_into_mount_point(pathToTest):
                     return os.path.commonpath([pathToTest, self.mountPoint]) == self.mountPoint
 
                 hasIndexPath = False
@@ -129,7 +129,7 @@ class FuseMount(fuse.Operations):
                     if '://' not in indexFilePath:
                         indexFilePath = os.path.realpath(options['indexFilePath'])
 
-                    if pointsIntoMountPoint(indexFilePath):
+                    if points_into_mount_point(indexFilePath):
                         del options['indexFilePath']
                     else:
                         options['indexFilePath'] = indexFilePath
@@ -139,7 +139,7 @@ class FuseMount(fuse.Operations):
                     indexFolders = options['indexFolders']
                     newIndexFolders = []
                     for folder in indexFolders:
-                        if pointsIntoMountPoint(folder):
+                        if points_into_mount_point(folder):
                             continue
                         newIndexFolders.append(os.path.realpath(folder))
                     options['indexFolders'] = newIndexFolders
@@ -151,7 +151,7 @@ class FuseMount(fuse.Operations):
                 if not hasIndexPath:
                     options['indexFilePath'] = ':memory:'
 
-        def createMultiMount() -> MountSource:
+        def create_multi_mount() -> MountSource:
             if not options.get('disableUnionMount', False):
                 return UnionMountSource([x[1] for x in mountSources], **options)
 
@@ -167,7 +167,7 @@ class FuseMount(fuse.Operations):
                     submountSources[key] = mountSource
             return SubvolumesMountSource(submountSources, printDebug=self.printDebug)
 
-        self.mountSource: MountSource = mountSources[0][1] if len(mountSources) == 1 else createMultiMount()
+        self.mountSource: MountSource = mountSources[0][1] if len(mountSources) == 1 else create_multi_mount()
 
         if determineRecursionDepth(**options) > 0:
             self.mountSource = AutoMountLayer(self.mountSource, **options)
@@ -265,7 +265,7 @@ class FuseMount(fuse.Operations):
         return self.lastFileHandle
 
     def _lookup(self, path: str) -> FileInfo:
-        if self.writeOverlay and self.writeOverlay.isDeleted(path):
+        if self.writeOverlay and self.writeOverlay.is_deleted(path):
             raise fuse.FuseOSError(errno.ENOENT)
 
         fileInfo = self.mountSource.lookup(path)
@@ -282,7 +282,7 @@ class FuseMount(fuse.Operations):
         # TODO Note that if the path contains special .version versioning, then it will most likely fail
         #      to find the path in the write overlay, which is problematic for things like foo.versions/0.
         #      Would be really helpful if the file info would contain the actual path and name, too :/
-        return self.writeOverlay.updateFileInfo(path[len(subMountPoint) :], fileInfo)
+        return self.writeOverlay.update_file_info(path[len(subMountPoint) :], fileInfo)
 
     @staticmethod
     def _redirect_output(name: str, file: IO[str]):
@@ -313,9 +313,9 @@ class FuseMount(fuse.Operations):
             self._redirect_output('stderr', self.logFile)
 
         if self.selfBindMount is not None and self.mountPointFd is not None:
-            self.selfBindMount.setFolderDescriptor(self.mountPointFd)
+            self.selfBindMount.set_folder_descriptor(self.mountPointFd)
             if self.writeOverlay and self.writeOverlay.root == self.mountPoint:
-                self.writeOverlay.setFolderDescriptor(self.mountPointFd)
+                self.writeOverlay.set_folder_descriptor(self.mountPointFd)
 
     @staticmethod
     def _file_info_to_dict(fileInfo: FileInfo):
@@ -360,7 +360,7 @@ class FuseMount(fuse.Operations):
             yield '.'
             yield '..'
 
-        deletedFiles = self.writeOverlay.listDeleted(path) if self.writeOverlay else []
+        deletedFiles = self.writeOverlay.list_deleted(path) if self.writeOverlay else []
 
         if isinstance(files, dict):
             for name, mode in files.items():

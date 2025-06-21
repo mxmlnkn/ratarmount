@@ -58,7 +58,7 @@ class AutoMountLayer(MountSource):
         while foldersToWalk:
             newFoldersToWalk = []
             for folder in foldersToWalk:
-                if self.getRecursionDepth(folder) > self.maxRecursionDepth:
+                if self.get_recursion_depth(folder) > self.maxRecursionDepth:
                     continue
 
                 fileNames = self.list(folder)
@@ -92,7 +92,7 @@ class AutoMountLayer(MountSource):
         assert '/' in self.mounted
         return '/', path
 
-    def getRecursionDepth(self, path: str) -> int:
+    def get_recursion_depth(self, path: str) -> int:
         mountPoint, pathInMountPoint = self._simply_find_mounted(path)
         mountInfo = self.mounted[mountPoint]
         fileInfo = mountInfo.mountSource.lookup(pathInMountPoint)
@@ -122,7 +122,7 @@ class AutoMountLayer(MountSource):
         if strippedFilePath == path:
             return None
 
-        recursionDepth = self.getRecursionDepth(path)
+        recursionDepth = self.get_recursion_depth(path)
         if recursionDepth > self.maxRecursionDepth:
             return None
 
@@ -158,7 +158,7 @@ class AutoMountLayer(MountSource):
                 if isinstance(indexedTarData, SQLiteIndexedTarUserData) and indexedTarData.istar:
                     return None
 
-        recursionDepth = self.getRecursionDepth(path)
+        recursionDepth = self.get_recursion_depth(path)
 
         try:
             options = self.options.copy()
@@ -169,7 +169,7 @@ class AutoMountLayer(MountSource):
                 # Open from file path on host file system in order to write out TAR index files.
                 # Care has to be taken if a folder is bind mounted onto itself because then it can happen that
                 # the file open triggers a recursive FUSE call, which then hangs up everything.
-                mountSource = openMountSource(deepestMountSource.getFilePath(deepestFileInfo), **options)
+                mountSource = openMountSource(deepestMountSource.get_file_path(deepestFileInfo), **options)
             else:
                 # This will fail with StenciledFile objects as returned by SQLiteIndexedTar mount sources and when
                 # given to backends like indexed_zstd, which do expect the file object to have a valid fileno.
@@ -214,7 +214,7 @@ class AutoMountLayer(MountSource):
             for part in path.lstrip('/').split('/'):
                 subPath = os.path.join(subPath, part)
 
-                if self.getRecursionDepth(subPath) > self.maxRecursionDepth:
+                if self.get_recursion_depth(subPath) > self.maxRecursionDepth:
                     break
 
                 if subPath not in self.mounted:
@@ -244,13 +244,13 @@ class AutoMountLayer(MountSource):
         if mountPoint != '/' and pathInMountPoint == '/':
             originalFileVersions = self.mounted['/'].mountSource.versions(path)
 
-        def normalizeFileVersion(version, versions):
+        def normalize_file_version(version, versions):
             return ((version - 1) % versions + 1) % versions if versions > 1 else version
 
         # fileVersion=0 is the most recent. Version 1..fileVersions number from the first occurrence / oldest
         # version to the most recent, i.e., fileVersion = 0 is equivalent to fileVersion = fileVersions.
         fileVersions = self.versions(path)
-        fileVersion = normalizeFileVersion(fileVersion, fileVersions)
+        fileVersion = normalize_file_version(fileVersion, fileVersions)
         if fileVersion == 0 and pathInMountPoint == '/':
             return mountInfo.rootFileInfo.clone()
 

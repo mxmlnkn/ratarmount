@@ -44,7 +44,7 @@ def has_fuse_non_empty_support() -> bool:
     return False  # On macOS, fusermount does not exist and macfuse also seems to complain with nonempty option.
 
 
-def parseRequirement(requirement: str) -> Optional[Tuple[str, List[str], Optional[str]]]:
+def parse_requirement(requirement: str) -> Optional[Tuple[str, List[str], Optional[str]]]:
     # https://packaging.python.org/en/latest/specifications/name-normalization/
     # Match only valid project name and avoid cruft like extras and requirements, e.g.,
     # indexed_gzip >= 1.6.3, != 1.9.4; python_version < '3.8'
@@ -59,7 +59,7 @@ def parseRequirement(requirement: str) -> Optional[Tuple[str, List[str], Optiona
     return match.group(1), match.group(4).split(',') if match.group(4) else [], match.group(6)
 
 
-def printMetadataRecursively(
+def print_metadata_recursively(
     packages: Dict[str, Set[str]],
     doWithDistribution: Callable[[Any], None],
     doOnNewLevel: Optional[Callable[[int], None]] = None,
@@ -91,7 +91,7 @@ def printMetadataRecursively(
         doWithDistribution(distribution)
 
         for requirement in distribution.requires or []:
-            parsed = parseRequirement(requirement)
+            parsed = parse_requirement(requirement)
             if not parsed:
                 # Should not happen and does not in my tests.
                 print(f"  Cannot parse requirement: {requirement}")
@@ -105,7 +105,7 @@ def printMetadataRecursively(
 
             requirements[requiredPackage] = requirements.get(requiredPackage, set()).union(set(packageExtras))
 
-    printMetadataRecursively(requirements, doWithDistribution, doOnNewLevel, level + 1, processedPackages)
+    print_metadata_recursively(requirements, doWithDistribution, doOnNewLevel, level + 1, processedPackages)
 
 
 def printVersions() -> None:
@@ -129,7 +129,7 @@ def printVersions() -> None:
         if level > 1:
             print(f"\nLevel {level} Dependencies:\n")
 
-    printMetadataRecursively({"ratarmount": {"full"}}, doForDistribution, printOnNewLevel)
+    print_metadata_recursively({"ratarmount": {"full"}}, doForDistribution, printOnNewLevel)
 
     print()
     print("System Software:")
@@ -162,7 +162,7 @@ def printVersions() -> None:
             print(library.rsplit('/', maxsplit=1)[-1])
 
 
-def findShortLicense(distribution) -> str:
+def find_short_license(distribution) -> str:
     shortLicense = ""
 
     # Check classifiers
@@ -197,13 +197,13 @@ def findShortLicense(distribution) -> str:
 def print_oss_attributions_short() -> None:
     def doForDistribution(distribution):
         if 'Name' in distribution.metadata:
-            print(f"{distribution.metadata['Name']:20} {distribution.version:12} {findShortLicense(distribution)}")
+            print(f"{distribution.metadata['Name']:20} {distribution.version:12} {find_short_license(distribution)}")
 
     def printOnNewLevel(level):
         if level > 1:
             print(f"\nLevel {level} Dependencies:\n")
 
-    printMetadataRecursively({"ratarmount": {"full"}}, doForDistribution, printOnNewLevel)
+    print_metadata_recursively({"ratarmount": {"full"}}, doForDistribution, printOnNewLevel)
 
 
 def print_oss_attributions() -> None:
@@ -252,10 +252,10 @@ def print_oss_attributions() -> None:
             for licenseContents in licenses:
                 print("```\n" + licenseContents.strip('\n') + "\n```\n")
         else:
-            print(name, "License:", findShortLicense(distribution))
+            print(name, "License:", find_short_license(distribution))
         print()
 
-    printMetadataRecursively({"ratarmount": {"full"}}, doForDistribution)
+    print_metadata_recursively({"ratarmount": {"full"}}, doForDistribution)
 
     # Licenses for non-Python libraries
     licenses = [
@@ -475,11 +475,11 @@ def processParsedArguments(args) -> int:
         commitOverlay(args.write_overlay, args.mount_source[0], encoding=args.encoding, printDebug=args.debug)
         return 0
 
-    createFuseMount(args)  # Throws on errors.
+    create_fuse_mount(args)  # Throws on errors.
     return 0
 
 
-def createFuseMount(args) -> None:
+def create_fuse_mount(args) -> None:
     # Convert the comma separated list of key[=value] options into a dictionary for fusepy
     fusekwargs = (
         dict(option.split('=', 1) if '=' in option else (option, True) for option in args.fuse.split(','))

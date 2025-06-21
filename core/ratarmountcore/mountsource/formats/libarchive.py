@@ -48,7 +48,7 @@ class ArchiveEntry:
     def formatName(self):
         return laffi.format_name(self._archive)
 
-    def getTimeByName(self, name):
+    def get_time_by_name(self, name):
         if not getattr(laffi, f'entry_{name}_is_set')(self._entry):
             return None
         seconds = getattr(laffi, f'entry_{name}')(self._entry)
@@ -56,11 +56,11 @@ class ArchiveEntry:
         return float(seconds) + float(nseconds) / 1e9 if nseconds else int(seconds)
 
     def getTime(self):
-        result = self.getTimeByName('mtime')
+        result = self.get_time_by_name('mtime')
         if result is None:
-            result = self.getTimeByName('ctime')
+            result = self.get_time_by_name('ctime')
         if result is None:
-            result = self.getTimeByName('birthtime')
+            result = self.get_time_by_name('birthtime')
         return result or 0
 
     def path(self) -> str:
@@ -78,12 +78,12 @@ class ArchiveEntry:
     def isDirectory(self):
         return self.filetype() & 0o170000 == 0o040000
 
-    def isSymbolicLink(self):
+    def is_symbolic_link(self):
         return self.filetype() & 0o170000 == 0o120000
 
     def linkname(self):
         path = ""
-        if self.isSymbolicLink():
+        if self.is_symbolic_link():
             path = laffi.entry_symlink_w(self._entry)
             if not path:
                 path = laffi.entry_symlink(self._entry)
@@ -98,7 +98,7 @@ class ArchiveEntry:
 
         return path
 
-    def convertToRow(self, entryCount: int, transform: Callable[[str], str], path: Optional[str] = None) -> Tuple:
+    def convert_to_row(self, entryCount: int, transform: Callable[[str], str], path: Optional[str] = None) -> Tuple:
         # The data logic may only be evaluated once because determining the size may require reading the whole file!
         if self._fileInfoRow is not None:
             return self._fileInfoRow
@@ -214,7 +214,7 @@ class IterableArchive:
     def formatName(self):
         return laffi.format_name(self._archive)
 
-    def filterNames(self):
+    def filter_names(self):
         allNames = [laffi.filter_name(self._archive, i) for i in range(laffi.filter_count(self._archive))]
         return [name for name in allNames if name != b'none']
 
@@ -241,7 +241,7 @@ class IterableArchive:
                 f"but got: {self._file}"
             )
 
-        if not allowArchives and not self.filterNames():
+        if not allowArchives and not self.filter_names():
             raise ArchiveError("When not looking for archives, there must be at least one filter!")
 
     def _set_passwords(self, passwords: List[Union[str, bytes]]):
@@ -294,7 +294,7 @@ class IterableArchive:
     def __del__(self):
         laffi.read_free(self._archive)
 
-    def nextEntry(self) -> Optional[ArchiveEntry]:
+    def next_entry(self) -> Optional[ArchiveEntry]:
         if self._eof:
             return None
 
@@ -306,7 +306,7 @@ class IterableArchive:
             # We need to try and read the first entry before format_name returns anything other than 'none'.
             print(
                 f"[Info] Successfully opened type '{formatName}' with libarchive. "
-                f"Using filters: {self.filterNames()}"
+                f"Using filters: {self.filter_names()}"
             )
 
         self._entryIndex += 1
@@ -376,7 +376,7 @@ class LibarchiveFile(io.RawIOBase):
             self._archive = IterableArchive(self.file, passwords=self.passwords, printDebug=self.printDebug)
 
         while True:
-            self._entry = self._archive.nextEntry()
+            self._entry = self._archive.next_entry()
             if self._entry is None:
                 break
             if self._entry.entryIndex == self.entryIndex:
@@ -565,39 +565,39 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
         isFileObject = False  # Not supported yet
 
         if self.index.indexIsLoaded():
-            metadata = dict(self.index.getConnection().execute('SELECT * FROM metadata;'))
+            metadata = dict(self.index.get_connection().execute('SELECT * FROM metadata;'))
             if 'backend' not in metadata or metadata['backend'] != 'libarchive':
                 self.__exit__(None, None, None)
                 raise InvalidIndexError("The found index was not created by the libarchive backend.")
 
-            self.index.reloadIndexReadOnly()
+            self.index.reload_index_read_only()
         else:
             # Open new database when we didn't find an existing one.
             # Simply open in memory without an error even if writeIndex is True but when not indication
             # for a index file location has been given.
             if writeIndex and (indexFilePath or not isFileObject):
-                self.index.openWritable()
+                self.index.open_writable()
             else:
-                self.index.openInMemory()
+                self.index.open_in_memory()
 
             self._create_index()
             if self.index.indexIsLoaded():
                 self._store_metadata()
-                self.index.reloadIndexReadOnly()
+                self.index.reload_index_read_only()
 
     def _create_index(self) -> None:
         if self.printDebug >= 1:
             print(f"Creating offset dictionary for {self.archiveFilePath} ...")
         t0 = timer()
 
-        self.index.ensureIntermediaryTables()
+        self.index.ensure_intermediary_tables()
 
         triedToOpen = False
         fileInfos = []
         gotAnyEntry = False
         with IterableArchive(self.fileOrPath, passwords=self.passwords, printDebug=self.printDebug) as archive:
             while True:
-                entry = archive.nextEntry()
+                entry = archive.next_entry()
                 if entry is None:
                     break
 
@@ -615,7 +615,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                     entryPath = fname
 
                 gotAnyEntry = True
-                fileInfos.append(entry.convertToRow(entry.entryIndex, self.transform, path=entryPath))
+                fileInfos.append(entry.convert_to_row(entry.entryIndex, self.transform, path=entryPath))
                 # Contains file info SQLite row tuples! 4 -> size, 6 -> mode
                 if not triedToOpen and not stat.S_ISDIR(fileInfos[-1][6]) and fileInfos[-1][4] > 0:
                     bufferSize = 1
@@ -653,8 +653,8 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
     def _store_metadata(self) -> None:
         argumentsToSave = ['encoding', 'transformPattern']
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
-        self.index.storeMetadata(argumentsMetadata, self.archiveFilePath)
-        self.index.storeMetadataKeyValue('backend', 'libarchive')
+        self.index.store_metadata(argumentsMetadata, self.archiveFilePath)
+        self.index.store_metadata_key_value('backend', 'libarchive')
 
     def __del__(self):
         # TODO check that all objects are really closed to avoid memory leaks
@@ -679,9 +679,9 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
 
     def _check_metadata(self, metadata: Dict[str, Any]) -> None:
         """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
-        SQLiteIndex.checkArchiveStats(self.archiveFilePath, metadata, self.verifyModificationTime)
+        SQLiteIndex.check_archive_stats(self.archiveFilePath, metadata, self.verifyModificationTime)
 
         if 'arguments' in metadata:
-            SQLiteIndex.checkMetadataArguments(
+            SQLiteIndex.check_metadata_arguments(
                 json.loads(metadata['arguments']), self, argumentsToCheck=['encoding', 'transformPattern']
             )
