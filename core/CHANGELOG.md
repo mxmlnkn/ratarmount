@@ -1,4 +1,40 @@
 
+# Version 0.9.0 built on 2025-06-21
+
+## Feature
+
+ - Add support for SQLAR SQLite archives.
+ - Add support for mounting .index.sqlite ratarmount indexes directly without the associated archive-
+ - Add support for encrypted 7z files via py7zr.
+ - Add support for EXT4 images.
+ - Add support for SAR archives.
+ - Add new method to specify fine-granular parallelization for each backend.
+ - Make `--recursion-depth 0` only undo the compression on TAR files.
+ - Show better error message when trying to open supported file formats with missing Python modules.
+ - `Libarchive`: Add warning when file contents are encrypted and no password specified.
+
+## Performance
+
+ - Do not import everything in main module to aid some delayed import workflows for smaller latencies.
+
+## API
+
+ - Rename `AutoMountLayer.recursionDepth` to `maxRecursionDepth`.
+ - Restructure ratarmountcore file hierarchy. Move `MountSource` implementations into subfolders.
+ - Use `snake_case` for functions and class methods, one step further towards PEP 8.
+ - Accept `os.PathLike` in `open_mount_source`.
+
+## Fixes
+
+ - The progress bar was wrong for parallelized XZ decompression.
+ - Collect correct file permissions for SquashFS, RAR, ZIP, and Libarchive.
+ - `FileVersionLayer`: Do not dispatch requests on .versions folder to underlying mount source.
+ - `AutoMountLayer`: Account for recursions depths introduced by `SQLiteIndexedTar`.
+ - Mounting `github://` without a prefix did not work correctly.
+ - Avoid misdetection of images as TAR by libarchive.
+ - `SubvolumeMountSource`: Return clone of root file info to avoid duplicate `userdata` elements.
+
+
 # Version 0.8.2 built on 2025-05-30
 
 ## Fixes

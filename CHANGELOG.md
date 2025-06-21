@@ -1,4 +1,19 @@
 
+# Version 1.1.0 built on 2025-06-21
+
+## Features
+
+ - Add support for argument completion in your shell with `argcomplete` if it is installed.
+ - Make `--unmount` accept multiple mount points to unmount.
+ - Add support for extended file attributes.
+ - Extract libfuse3 support into `mfusepy`, a fork of `fusepy`, and depend on it.
+ - Add `--log-file` option to write output to file when daemonized.
+
+## Performance
+
+ - Try backends in smarter order based on file suffix.
+
+
 # Version 1.0.0 built on 2024-11-01
 
 Semantic versioning of GUIs and CLIs is not easy to define.
