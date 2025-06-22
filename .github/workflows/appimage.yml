@@ -175,7 +175,7 @@ jobs:
 
     - uses: ncipollo/release-action@v1
       with:
-        artifacts: "ratarmount*.AppImage"
+        artifacts: "ratarmount*.AppImage/*.AppImage"
         tag: ${{ github.ref_name }}
         name: "Ratarmount ${{ github.ref_name }}"
         bodyFile: release.md
