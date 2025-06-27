@@ -45,8 +45,6 @@ jobs:
         twine upload --skip-existing -u __token__ dist/*
 
   Deploy-AUR:
-    # Require the tarball to be uploaded first to PyPI, so that we can download it in this step.
-    needs: Deploy-PyPI
     runs-on: ubuntu-latest
     container:
       image: archlinux
@@ -88,10 +86,12 @@ jobs:
       shell: bash
       run: |
         pkgver=${GITHUB_REF#refs/tags/v}
-        curl -L --output "$pkgver.tar.gz" https://github.com/mxmlnkn/ratarmount/archive/$GITHUB_REF.tar.gz
+        curl -L --output "$pkgver.tar.gz" "https://github.com/mxmlnkn/ratarmount/archive/refs/tags/v${pkgver}.tar.gz"
         b2sum512=$( b2sum ${pkgver}.tar.gz | sed 's| .*||' )
         # Update PKGBUILD
         sed -i "s|pkgver=.*|pkgver=$pkgver|" PKGBUILD
+        # Reset pkgrel to 1 https://wiki.archlinux.org/title/PKGBUILD#pkgrel
+        sed -i "s|pkgrel=.*|pkgrel=1|" PKGBUILD
         sed -i "s|b2sums=.*|b2sums=('$b2sum512')|" PKGBUILD
         su user -c 'namcap PKGBUILD'
         su user -c 'makepkg --printsrcinfo > .SRCINFO'
@@ -117,9 +117,9 @@ jobs:
         # python3-s3fs won't install because of fsspec version conflict -.-
         # python-s3fs depends on: 'python-fsspec=2024.6.1'
         # found in 'PackageSource.REPO': '2024.10.0-1'
-        su user -c 'pikaur --noconfirm --asdeps -Sy python-aiohttp python-requests python-smbprotocol python-webdav4'
-        su user -c 'python3 -c "import sys; import ratarmountcore as rmc; files = rmc.open(sys.argv[1]).listDir(\"\"); print(files); assert files" *.tar.gz'
-        su user -c 'python3 -c "import ratarmountcore as rmc; files = rmc.open(\"https://raw.githubusercontent.com/mxmlnkn/ratarmount/refs/heads/master/tests/single-file.tar\").listDir(\"\"); print(files); assert files"'
+        su user -c 'pikaur --noconfirm --asdeps -Sy python-fsspec python-aiohttp python-requests'
+        su user -c 'python3 -c "import sys; from ratarmountcore.mountsource.factory import open_mount_source as oms; files = oms(sys.argv[1], printDebug=3).list(\"\"); print(files); assert files" *.tar.gz'
+        su user -c 'python3 -c "from ratarmountcore.mountsource.factory import open_mount_source as oms; files = oms(\"https://raw.githubusercontent.com/mxmlnkn/ratarmount/refs/heads/master/tests/single-file.tar\", printDebug=3).list(\"\"); print(files); assert files"'
 
     - name: Push PKGBUILD
       if: startsWith(github.ref, 'refs/tags/v')
