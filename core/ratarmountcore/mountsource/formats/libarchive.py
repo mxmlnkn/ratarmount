@@ -72,6 +72,9 @@ class ArchiveEntry:
                     path = path.decode(self.encoding)
         return path
 
+    def mode(self):
+        return laffi.entry_mode(self._entry)
+
     def filetype(self):
         return laffi.entry_filetype(self._entry)
 
@@ -114,7 +117,7 @@ class ArchiveEntry:
                     break
                 size += readSize
 
-        mode = self.filetype() & 0o777
+        mode = self.mode() & 0o777
         linkname = self.linkname()
         if linkname:
             mode = mode | stat.S_IFLNK
