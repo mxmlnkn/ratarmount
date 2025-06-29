@@ -110,10 +110,13 @@ def find_asar_header(fileobj: IO[bytes]) -> Tuple[int, int, int]:
     sizeOfPickledSize, sizeOfPickledPickledPickledHeader, sizeOfPickledPickledHeader, sizeOfPickledHeader = (
         struct.unpack('<LLLL', fileobj.read(ASAR_MAGIC_SIZE))
     )
-    assert sizeOfPickledSize == 4
-    assert sizeOfPickledPickledPickledHeader == sizeOfPickledPickledHeader + 4
+    if sizeOfPickledSize != 4:
+        raise ValueError("First magic bytes quadruplet does not match SQLAR!")
+    if sizeOfPickledPickledPickledHeader != sizeOfPickledPickledHeader + 4:
+        raise ValueError("Second magic bytes quadruplet does not match SQLAR!")
     padding = (4 - sizeOfPickledHeader % 4) % 4
-    assert sizeOfPickledPickledHeader == sizeOfPickledHeader + padding + 4
+    if sizeOfPickledPickledHeader != sizeOfPickledHeader + padding + 4:
+        raise ValueError("Third magic bytes quadruplet does not match SQLAR!")
 
     dataOffset = ASAR_MAGIC_SIZE + sizeOfPickledHeader + padding
 
