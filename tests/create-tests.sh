@@ -531,3 +531,7 @@ npx @electron/asar pack non-existing empty.asar
 mkdir foodir
 mv foo foodir
 npx @electron/asar pack foodir nested-tar.asar
+
+# Skippable frame in LZ4
+printf '\x5a\x2a\x4d\x18\x03\x00\x00\x00\x00\x00\x00' > nested-tar.skippable-frame.lz4
+lz4 -c nested-tar.tar >> nested-tar.skippable-frame.lz4
