@@ -232,6 +232,33 @@ def _is_bzip2(fileobj: IO[bytes]) -> bool:
     return fileobj.read(4)[:3] == b'BZh' and fileobj.read(6) == (0x314159265359).to_bytes(6, 'big')
 
 
+def _check_lz4_header(fileobj: IO[bytes]) -> bool:
+    SKIPPABLE_FRAME_MAGIC = 0x184D2A50
+    (magic,) = struct.unpack('<L', fileobj.read(4))
+
+    # https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md#skippable-frames
+    while magic & 0xFFFF_FFF0 == SKIPPABLE_FRAME_MAGIC:
+        (frame_size,) = struct.unpack('<L', fileobj.read(4))
+        fileobj.seek(fileobj.tell() + frame_size)
+        (magic,) = struct.unpack('<L', fileobj.read(4))
+
+    # https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md#general-structure-of-lz4-frame-format
+    return magic == 0x184D2204
+
+
+def _check_zstandard_header(fileobj: IO[bytes]) -> bool:
+    SKIPPABLE_FRAME_MAGIC = 0x184D2A50
+    (magic,) = struct.unpack('<L', fileobj.read(4))
+
+    # https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md#skippable-frames
+    while magic & 0xFFFF_FFF0 == SKIPPABLE_FRAME_MAGIC:
+        (frame_size,) = struct.unpack('<L', fileobj.read(4))
+        fileobj.seek(fileobj.tell() + frame_size)
+        (magic,) = struct.unpack('<L', fileobj.read(4))
+
+    return magic == 0xFD2FB528
+
+
 @dataclasses.dataclass
 class FileFormatInfo:
     # Extensions without the initial '.'
@@ -289,7 +316,7 @@ COMPRESSION_FORMATS: Dict[FileFormatID, FileFormatInfo] = {
     FID.BZIP2: FileFormatInfo(['bz2', 'bzip2'], b'BZh', _is_bzip2),
     FID.GZIP: FileFormatInfo(['gz', 'gzip'], b'\x1f\x8b'),
     FID.XZ: FileFormatInfo(['xz'], b"\xfd7zXZ\x00"),
-    FID.ZSTANDARD: FileFormatInfo(['zst', 'zstd'], (0xFD2FB528).to_bytes(4, 'little')),
+    FID.ZSTANDARD: FileFormatInfo(['zst', 'zstd', 'pzstd'], None, _check_zstandard_header),
     FID.ZLIB: FileFormatInfo(['zz', 'zlib'], None, _check_zlib_header),
     # https://github.com/libarchive/libarchive/blob/6110e9c82d8ba830c3440f36b990483ceaaea52c/libarchive/
     # archive_read_support_filter_grzip.c#L46
@@ -300,7 +327,7 @@ COMPRESSION_FORMATS: Dict[FileFormatID, FileFormatInfo] = {
     # https://github.com/ckolivas/lrzip/blob/master/doc/magic.header.txt
     FID.LRZIP: FileFormatInfo(['lrz', 'lrzip'], b'LRZI\x00'),
     # https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md#general-structure-of-lz4-frame-format
-    FID.LZ4: FileFormatInfo(['lz4'], b'\x04\x22\x4d\x18'),
+    FID.LZ4: FileFormatInfo(['lz4'], None, _check_lz4_header),
     # https://www.ietf.org/archive/id/draft-diaz-lzip-09.txt
     FID.LZIP: FileFormatInfo(['lz', 'lzip'], b'LZIP\x01'),
     # https://github.com/jljusten/LZMA-SDK/blob/master/DOC/lzma-specification.txt

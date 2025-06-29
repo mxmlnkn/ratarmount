@@ -126,7 +126,10 @@ COMPRESSION_BACKENDS: Dict[str, CompressionBackendInfo] = {
         'tarfile',
     ),
     'libarchive': CompressionBackendInfo(
-        libarchive_file_reader,
+        # TODO Does not work because libarchive_file_reader is some kind of context manager.
+        #      This only affects detect_compression for undoing the compression in SQLiteIndexedTar,
+        #      so not that important for now.
+        (lambda x, parallelization=1: libarchive_file_reader(x)),
         {
             # Also supported by other backends, which should be used first.
             FID.BZIP2,

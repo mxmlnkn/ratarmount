@@ -103,6 +103,27 @@ try:
     # No way to detect encrypted SQLAR.
     replace_format_check(FileFormatID.SQLAR, lambda x: True)
 except ImportError:
+    # The cryptography imports can fail pretty badly and it does not seem to be catchable :(
+    #
+    #    core/tests/test_formats.py:13: in <module>
+    #        import ratarmountcore.mountsource.archives  # noqa: E402, F401
+    #        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    #    core/ratarmountcore/mountsource/archives.py:14: in <module>
+    #        from .formats.sqlar import SQLARMountSource
+    #    core/ratarmountcore/mountsource/formats/sqlar.py:99: in <module>
+    #        from cryptography.hazmat.primitives import hashes
+    #    /usr/lib/python3/dist-packages/cryptography/hazmat/primitives/hashes.py:10: in <module>
+    #        from cryptography.hazmat.bindings._rust import openssl as rust_openssl
+    #    E   pyo3_runtime.PanicException: Python API call failed
+    #    ------------------------- Captured stderr -------------------------
+    #    ModuleNotFoundError: No module named '_cffi_backend'
+    #    thread '<unnamed>' panicked at /usr/share/cargo/registry/pyo3-0.20.2/src/err/mod.rs:788:5:
+    #    Python API call failed
+    #    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+    #
+    # In my case, pytest pointed to the Python 3.11 version even though my system-default is 3.12.
+    # Using python3 -m pytest instead of pytest fixed the error. (Re)installing cffi and cryptography in 3.11
+    # might also have worked.
     sqlcipher3 = None  # type:ignore
     PBKDF2HMAC = None  # type:ignore
     default_backend = None  # type:ignore

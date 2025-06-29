@@ -164,6 +164,11 @@ pytestedTests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/single-nested-folder.tar               foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/nested-tar.tar                         foo/fighter/ufo
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar.tar                         foo/lighter.tar/fighter/bar
+    # https://github.com/libarchive/libarchive/issues/2692
+    #2709a3348eb2c52302a7606ecf5860bc tests/nested-tar.skippable-frame.lz4         foo/fighter/ufo
+    #2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar.skippable-frame.lz4         foo/lighter.tar/fighter/bar
+    2709a3348eb2c52302a7606ecf5860bc tests/nested-tar.tar.pzstd                   foo/fighter/ufo
+    2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar.tar.pzstd                   foo/lighter.tar/fighter/bar
     2709a3348eb2c52302a7606ecf5860bc tests/directly-nested-tar.tar                fighter/ufo
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/directly-nested-tar.tar                lighter.tar/fighter/bar
     2709a3348eb2c52302a7606ecf5860bc tests/nested-tar-with-overlapping-name.tar   foo/fighter/ufo
