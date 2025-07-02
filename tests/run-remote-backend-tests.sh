@@ -36,7 +36,9 @@ checkFileInTARForeground()
 
     $RATARMOUNT_CMD -c -f -d 3 "$archive" "$mountFolder" >ratarmount.stdout.log 2>ratarmount.stderr.log &
     waitForMountpoint "$mountFolder" || returnError 'Waiting for mountpoint timed out!'
-    ! 'grep' -C 5 -Ei '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
+    # Beware with matching because the randomly-generated temporary file name did already
+    # lead to a false positive for: /tmp/tmp.lq1FWaRnWe, which contains "WaRn"!
+    ! 'grep' -C 5 -E '(warning|error|Warning|Error|WARNING|ERROR)' ratarmount.stdout.log ratarmount.stderr.log ||
         returnError "$LINENO" "Found warnings while executing: $RATARMOUNT_CMD $*"
 
     echo "Check access to $archive"

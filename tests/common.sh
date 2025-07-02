@@ -45,13 +45,13 @@ if uname | 'grep' -q -i darwin; then
     getFileMode() { stat -f %OLp -- "$1"; }
     getFileMtime() { stat -f %m -- "$1"; }
     setFileMTime() { touch -m -t "$( date -r "$1" +%Y%m%d%H%M.%S )" "$2"; }
-    safeRmdir() { if [[ -z "$( find "$1" -maxdepth 1 )" ]]; then rmdir "$1"; fi; }
+    safeRmdir() { if [[ -d "$1" && -z "$( find "$1" -maxdepth 1 )" ]]; then rmdir "$1"; fi; }
 else
     getFileSize() { stat -c %s -- "$1"; }
     getFileMode() { stat -c %a -- "$1"; }
     getFileMtime() { stat -c %Y -- "$1"; }
     setFileMTime() { touch -d "@$1" "$2"; }
-    safeRmdir() { rmdir --ignore-fail-on-non-empty -- "$1"; }
+    safeRmdir() { if [[ -d "$1" ]]; then rmdir --ignore-fail-on-non-empty -- "$1"; fi; }
 fi
 
 export -f getFileSize

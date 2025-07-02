@@ -337,9 +337,11 @@ fi
 
 # We need to run these tests without pytest because, for some reason,
 # pytest slows the zip decryption fix down from 0.1 s to 1.1 s?!
-python3 core/tests/test_ZipMountSource.py
+if [[ $TEST_EXTERNAL_COMMAND -eq 0 ]]; then
+    python3 core/tests/test_ZipMountSource.py
+fi
 
-bash tests/run-complex-tests.sh
+bash tests/run-complex-usage-tests.sh
 bash tests/run-fixed-archive-tests.sh
 bash tests/run-remote-backend-tests.sh
 

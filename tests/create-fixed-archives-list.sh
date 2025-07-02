@@ -98,10 +98,22 @@ tests+=(
 )
 
 # https://github.com/indygreg/python-zstandard/issues/238
-if [[ -n "$python3MinorVersion" && "$python3MinorVersion" -ge 14 ]]; then
+if [[ -n "$python3MinorVersion" && "$python3MinorVersion" -lt 14 ]]; then
 pytestedTests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.zstd.squashfs           foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.zstd.squashfs           foo/jet/ufo
+)
+fi
+
+if [[ -n "$python3MinorVersion" && "$python3MinorVersion" -ge 9 ]]; then
+pytestedTests+=(
+    # Directly testing the .ext.bz2 does not work with --ignore-zeros
+    # because the nested TAR gets detected before trying EXT4.
+    2709a3348eb2c52302a7606ecf5860bc tests/nested-tar-1M.ext4                     foo/fighter/ufo
+    2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar-1M.ext4                     foo/lighter.tar/fighter/bar
+    2709a3348eb2c52302a7606ecf5860bc tests/nested-tar-10M.ext4                    foo/fighter/ufo
+    2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar-10M.ext4                    foo/lighter.tar/fighter/bar
+
 )
 fi
 
@@ -113,13 +125,6 @@ pytestedTests+=(
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar.sqlar                       foo/lighter.tar/fighter/bar
     2709a3348eb2c52302a7606ecf5860bc tests/nested-tar-compressed.sqlar            foo/fighter/ufo
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar-compressed.sqlar            foo/lighter.tar/fighter/bar
-
-    # Directly testing the .ext.bz2 does not work with --ignore-zeros
-    # because the nested TAR gets detected before trying EXT4.
-    2709a3348eb2c52302a7606ecf5860bc tests/nested-tar-1M.ext4                     foo/fighter/ufo
-    2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar-1M.ext4                     foo/lighter.tar/fighter/bar
-    2709a3348eb2c52302a7606ecf5860bc tests/nested-tar-10M.ext4                    foo/fighter/ufo
-    2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar-10M.ext4                    foo/lighter.tar/fighter/bar
 
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.gzip.squashfs           foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lz4.squashfs            foo/fighter/ufo
@@ -229,3 +234,5 @@ pytestedTests+=(
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   02.normal1.bin
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   03.sparse1.bin
 )
+
+'cp' 'tests/single-file.tar' 'tests/#not-a-good-name! Ör, is it?.tar'

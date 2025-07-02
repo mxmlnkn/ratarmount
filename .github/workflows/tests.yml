@@ -24,7 +24,7 @@ jobs:
         sudo apt-get -y install liblzo2-dev
         python3 -m pip install --upgrade pip
         python3 -m pip install --user pytest lz4 PySquashfsImage asyncssh fsspec pygit2 sqlcipher3-wheels
-        ( cd core && python3 -m pip install --user .[full] )
+        ( cd core && python3 -m pip install --user .[full,ext4,fsspec,sqlar] )
         python3 -m pip install --user .
 
     - name: Style Check With Ruff
@@ -86,7 +86,7 @@ jobs:
         sudo apt-get -y install liblzo2-dev
         python3 -m pip install --upgrade pip
         python3 -m pip install --user pytest lz4 PySquashfsImage asyncssh fsspec pygit2 sqlcipher3-wheels
-        ( cd core && python3 -m pip install --user .[full] )
+        ( cd core && python3 -m pip install --user .[full,ext4,fsspec,sqlar] )
         python3 -m pip install --user .
 
     - name: Lint With Pytype
@@ -247,7 +247,7 @@ jobs:
       run: |
         python3 -m build
         twine check dist/*
-        python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )"[full]
+        python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )"[full,ext4,fsspec,sqlar]
         python3 -m pip install mfusepy
 
     - name: Test Startup Without Compression Dependencies
@@ -293,7 +293,7 @@ jobs:
 
     - name: Test Installation From Source
       run: |
-        python3 -m pip install .[full,fsspec,sqlar]
+        python3 -m pip install .[full,ext4,fsspec,sqlar]
 
     - name: Test Simple Startup
       run: |

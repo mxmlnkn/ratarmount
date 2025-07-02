@@ -6,7 +6,6 @@ source tests/common.sh
 source tests/create-fixed-archives-list.sh
 
 rm -f tests/*.*.index.*
-'cp' 'tests/single-file.tar' 'tests/#not-a-good-name! Ör, is it?.tar'
 
 # This is slow and it should not make much of a difference for the different parallelizations.
 parallelization=1
@@ -54,6 +53,9 @@ for parallelization in $PARALLELIZATIONS; do
 
     cleanup
 
-    for file in tests/*.index.*; do git ls-files --error-unmatch "$file" &>/dev/null || 'rm' -f "$file"; done
+    for file in tests/*.index.*; do
+        if [[ ! -f "$file" ]]; then continue; fi
+        git ls-files --error-unmatch "$file" &>/dev/null || 'rm' -f "$file";
+    done
     for folder in tests/*/; do safeRmdir "$folder"; done
 done
