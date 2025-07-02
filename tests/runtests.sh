@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." || { echo 'Failed to cd to git root!'; exit 1; }
 
 source tests/common.sh
