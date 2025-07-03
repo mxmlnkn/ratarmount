@@ -106,6 +106,14 @@ class FSSpecMountSource(MountSource):
             return self.prefix.rstrip("/") + "/" + path.lstrip("/")
         if self._pathsWithoutLeadingSlash:
             return path.lstrip("/")
+        # The fsspec TAR implementation is verbatim. The path must exactly match the one in the archive, even
+        # if the archive path is not normalized. E.g., compare with these:
+        #  - tests/nested-symlinks.tar -> leading /. Did not work because
+        #  - tests/nested-tar.tar -> no leading / only works with this fix
+        #  - tests/single-file-with-leading-dot-slash.tar -> not working at all.
+        #       We cannot test all possible denormalized paths when a normalized path is requested via FUSE.
+        if not self.fileSystem.lexists(path) and self.fileSystem.lexists(path.lstrip("/")):
+            path = path.lstrip("/")
         return path
 
     @staticmethod
@@ -214,6 +222,18 @@ class FSSpecMountSource(MountSource):
             )
             for entry in result
         }
+
+        # For some dumb reason, only the TAR filesystem, returns '/' for some subfolders.
+        # It happens with nested-symlinks.tar, probably because the subfolder as its own entry in the TAR:
+        #     drwx------ user/user  0 2020-04-10 10:46 /foo/
+        #     lrwxrwxrwx user/user  0 2020-04-10 10:46 /foo/ufo -> /foo/foo
+        #     -rwx------ user/user  6 2020-04-09 17:59 /foo/foo
+        #     drwx------ user/user  0 2020-04-09 17:57 /foo/fighter/
+        #     lrwxrwxrwx user/user  0 2020-04-09 16:53 /foo/fighter/foo -> ../foo
+        #     lrwxrwxrwx user/user  0 2020-04-09 16:52 /foo/fighter/python -> /usr/bin/python
+        #     lrwxrwxrwx user/user  0 2020-04-09 18:01 /foo/iriya -> ../iriya
+        if '' in result:
+            del result['']
 
         # For HTTPFileSystem, we need to filter out the entries for sorting.
         # For WebDAV we do not even need to unquote! We get unquoted file names with ls!
