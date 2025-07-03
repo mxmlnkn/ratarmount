@@ -25,10 +25,9 @@ def check_input_file_type(path: str, printDebug: int = 0) -> str:
 
     splitURI = path.split('://')
     if len(splitURI) > 1:
-        protocol = splitURI[0]
         if fsspec is None:
             raise argparse.ArgumentTypeError("Detected an URI, but fsspec was not found. Try: pip install fsspec.")
-        if protocol not in fsspec.available_protocols():
+        if not all(protocol in fsspec.available_protocols() for protocol in splitURI[0].split('::')):
             raise argparse.ArgumentTypeError(
                 f"URI: {path} uses an unknown protocol. Protocols known by fsspec are: "
                 + ', '.join(fsspec.available_protocols())
