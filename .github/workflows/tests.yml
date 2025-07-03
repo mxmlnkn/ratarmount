@@ -372,7 +372,7 @@ jobs:
         sudo bash tests/install-smbd.sh
 
     - name: Regression Tests (FUSE 3)
-      if: ${{ !startsWith( matrix.os, 'macos' ) }}
+      if: ${{ !startsWith( matrix.os, 'macos' ) && matrix.libfuse-version != 'system' }}
       env:
         DROPBOX_TOKEN: ${{ secrets.DROPBOX_TOKEN }}
       run: |
