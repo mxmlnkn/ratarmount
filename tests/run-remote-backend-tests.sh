@@ -16,6 +16,13 @@ checkURLProtocolFile()
 }
 
 
+checkURLProtocolChainedTarFile()
+{
+    checkFileInTAR 'tar::file://tests/single-file.tar' bar d3b07384d113edec49eaa6238ad5ff00 ||
+        returnError "$LINENO" 'Failed to read via file:// protocol'
+}
+
+
 checkFileInTARForeground()
 {
     # Similar to checkFileInTAR but calls ratarmount with -f as is necessary for some threaded fsspec backends.
@@ -692,6 +699,7 @@ rm -f ratarmount.{stdout,stderr}.log
 # https://filesystem-spec.readthedocs.io/en/latest/api.html#other-known-implementations
 
 checkURLProtocolFile || returnError 'Failed file:// check'
+checkURLProtocolChainedTarFile || returnError 'Failed tar::file:// check'
 checkURLProtocolGit || returnError 'Failed git:// check'
 checkURLProtocolGithub || returnError 'Failed github:// check'
 checkURLProtocolFTP || returnError 'Failed ftp:// check'
