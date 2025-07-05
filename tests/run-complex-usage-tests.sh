@@ -1228,6 +1228,73 @@ EOF
     return 0
 }
 
+checkSymbolicLinkResolution()
+{
+    local tmpFolder
+    tmpFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
+    
+    local mountFolder
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+    
+    TMP_FILES_TO_CLEANUP+=( "$tmpFolder" )
+    
+    # Create test directory structure with symbolic link
+    mkdir -p "$tmpFolder/root"
+    echo "target" > "$tmpFolder/root/target"
+    (cd "$tmpFolder" && ln -s root/target symlink)
+    tar -cf "$tmpFolder/test.tar" -C "$tmpFolder" symlink root
+    
+    # Test without resolving symbolic links
+    local args=( -P "$parallelization" -c "$tmpFolder/test.tar" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}"
+        
+        # Check that the symbolic link is preserved
+        if [[ ! -L "$mountFolder/symlink" ]]; then
+            returnError "$LINENO" 'Expected symbolic link without --resolve-symbolic-links'
+        fi
+        
+        # Check the link target
+        if [[ "$( readlink "$mountFolder/symlink" )" != "root/target" ]]; then
+            returnError "$LINENO" 'Symbolic link target mismatch without --resolve-symbolic-links'
+        fi
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+    
+    funmount "$mountFolder"
+    
+    # Test with resolving symbolic links
+    local args=( -P "$parallelization" -c --resolve-symbolic-links "$tmpFolder/test.tar" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}"
+        
+        # Check that the symbolic link is resolved to a regular file
+        if [[ -L "$mountFolder/symlink" ]]; then
+            returnError "$LINENO" 'Symbolic link should be resolved with --resolve-symbolic-links'
+        fi
+        
+        # Check that it's a regular file
+        if [[ ! -f "$mountFolder/symlink" ]]; then
+            returnError "$LINENO" 'Expected regular file after resolving symbolic link'
+        fi
+        
+        # Check the file content
+        if [[ "$( cat "$mountFolder/symlink" )" != "target" ]]; then
+            returnError "$LINENO" 'Resolved symbolic link content mismatch'
+        fi
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+    
+    funmount "$mountFolder"
+    
+    # Cleanup
+    safeRmdir "$mountFolder"
+    'rm' -rf -- "$tmpFolder"
+    
+    echoerr "[${FUNCNAME[0]}] Tested successfully symbolic link resolution."
+    
+    return 0
+}
+
 
 # 'parallelization' should not matter for most of these tests, therefore skip tests with different values.
 
@@ -1273,6 +1340,8 @@ checkTarEncoding tests/nested-special-char.tar latin1 'Ördner-mìt-dämlicher-K
 
 checkLinkInTAR tests/symlinks.tar foo ../foo
 checkLinkInTAR tests/symlinks.tar python /usr/bin/python
+
+checkSymbolicLinkResolution || returnError "$LINENO" 'Symbolic link resolution test failed!'
 
 checkFileInTARPrefix '' tests/single-nested-file.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
 checkFileInTARPrefix foo tests/single-nested-file.tar fighter/ufo 2709a3348eb2c52302a7606ecf5860bc

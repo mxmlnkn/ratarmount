@@ -253,6 +253,12 @@ For further information, see the ReadMe on the project's homepage:
              'octal modification prefixes. Note that this is only a heuristic derived by testing 1000-10000 file '
              'entries. If you are sure it is an incremental TAR, use --gnu-incremental instead.')
 
+    tarGroup.add_argument(
+        '--resolve-symbolic-links', action='store_true', default=False,
+        help='Resolve symbolic links transparently. When enabled, accessing a symbolic link will directly '
+             'access the target file or directory instead of showing the link itself. This makes symbolic '
+             'links appear as if they were regular files or directories.')
+
     # Write Overlay Options
 
     writeGroup.add_argument(
