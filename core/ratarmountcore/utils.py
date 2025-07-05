@@ -410,3 +410,55 @@ def is_random(data: bytes) -> bool:
 
     diffData = bytes((data[i + 1] - data[i] + 256) % 256 for i in range(len(data) - 1))
     return is_in_threshold(data) and is_in_threshold(diffData)
+
+
+if sys.version_info >= (3, 8):
+    from functools import cached_property
+else:
+    # Python < 3.8 compatibility
+    class cached_property:  # noqa: N801
+        """A property that is only computed once and then cached.
+
+        This is a compatibility implementation for Python < 3.8 where
+        functools.cached_property is not available.
+        """
+
+        def __init__(self, func):
+            self.func = func
+            self.attrname = None
+            self.__doc__ = func.__doc__
+
+        def __set_name__(self, owner, name):
+            if self.attrname is None:
+                self.attrname = name
+            elif name != self.attrname:
+                raise RuntimeError(
+                    f"Cannot assign the same cached_property to two different names "
+                    f"({self.attrname!r} and {name!r})."
+                )
+
+        def __get__(self, instance, owner=None):
+            if instance is None:
+                return self
+            if self.attrname is None:
+                raise TypeError("Cannot use cached_property instance without calling __set_name__ on it.")
+            try:
+                cache = instance.__dict__
+            except AttributeError:
+                msg = (
+                    f"No '__dict__' attribute on {type(instance).__name__!r} "
+                    f"instance to cache {self.attrname!r} property."
+                )
+                raise TypeError(msg) from None
+            val = cache.get(self.attrname, self)
+            if val is self:
+                val = self.func(instance)
+                try:
+                    cache[self.attrname] = val
+                except TypeError:
+                    msg = (
+                        f"The '__dict__' attribute on {type(instance).__name__!r} instance "
+                        f"does not support item assignment for caching {self.attrname!r} property."
+                    )
+                    raise TypeError(msg) from None
+            return val

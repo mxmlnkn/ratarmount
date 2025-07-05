@@ -9,7 +9,7 @@ import tempfile
 import time
 import traceback
 import urllib.parse
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Tuple
 
 from ratarmountcore.formats import is_tar
 from ratarmountcore.mountsource import FileInfo, MountSource
@@ -334,9 +334,11 @@ class WritableFolderMountSource(fuse.Operations):
         if not self.mountSource.exists(path) or self.is_deleted(path):
             raise fuse.FuseOSError(errno.ENOENT)
 
-        contents = self.mountSource.list(path)
-        if contents is not None and set(contents.keys()) - set(self.list_deleted(path)):
-            raise fuse.FuseOSError(errno.ENOTEMPTY)
+        contents = self.mountSource.list_mode(path)
+        if contents is not None:
+            keys = contents.keys() if isinstance(contents, Mapping) else contents
+            if set(keys) - set(self.list_deleted(path)):
+                raise fuse.FuseOSError(errno.ENOTEMPTY)
 
         try:
             if os.path.exists(self._realpath(path)):
