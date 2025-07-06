@@ -2,6 +2,8 @@
 
 cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." || { echo 'Failed to cd to git root!'; exit 1; }
 
+export RATARMOUNT_CHECK_OVERRIDES=1
+
 #export PYTHONTRACEMALLOC=1
 
 if [[ -z "$RATARMOUNT_CMD" ]]; then
