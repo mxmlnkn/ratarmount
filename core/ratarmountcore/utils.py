@@ -55,6 +55,9 @@ def overrides(parentClass):
         parentMethod = getattr(parentClass, method.__name__)
         assert callable(parentMethod)
 
+        if os.getenv('RATARMOUNT_CHECK_OVERRIDES', '').lower() not in ('1', 'yes', 'on', 'enable', 'enabled'):
+            return method
+
         # Example return of get_type_hints:
         # {'path': <class 'str'>,
         #  'return': typing.Union[typing.Iterable[str],
