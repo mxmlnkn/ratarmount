@@ -9,7 +9,7 @@ import tempfile
 import time
 import traceback
 import urllib.parse
-from typing import Any, Callable, Dict, List, Mapping, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
 from ratarmountcore.formats import is_tar
 from ratarmountcore.mountsource import FileInfo, MountSource
@@ -258,11 +258,11 @@ class WritableFolderMountSource(fuse.Operations):
     # Metadata modification
 
     @overrides(fuse.Operations)
-    def chmod(self, path, mode):
+    def chmod(self, path: str, mode: int):
         self._set_file_metadata(path, lambda p: os.chmod(p, mode), {'mode': mode})
 
     @overrides(fuse.Operations)
-    def chown(self, path, uid, gid):
+    def chown(self, path: str, uid: int, gid: int):
         data = {}
         if uid != -1:
             data['uid'] = uid
@@ -275,7 +275,7 @@ class WritableFolderMountSource(fuse.Operations):
         self._set_file_metadata(path, lambda p: None, data)
 
     @overrides(fuse.Operations)
-    def utimens(self, path, times=None):
+    def utimens(self, path: str, times: Optional[Tuple[int, int]] = None):
         """Argument "times" is a (atime, mtime) tuple. If "times" is None, use the current time."""
 
         mtime = time.time() if times is None else times[1]
@@ -283,7 +283,7 @@ class WritableFolderMountSource(fuse.Operations):
         self._set_file_metadata(path, lambda p: os.utime(p, times), {'mtime': mtime})
 
     @overrides(fuse.Operations)
-    def rename(self, old, new):
+    def rename(self, old: str, new: str):
         if not self.mountSource.exists(old) or self.is_deleted(old):
             raise fuse.FuseOSError(errno.ENOENT)
 
@@ -298,9 +298,11 @@ class WritableFolderMountSource(fuse.Operations):
         else:
             self._ensure_parent_exists(new)
 
-            with self.mountSource.open(self.mountSource.lookup(old)) as sourceObject, open(
-                self._realpath(new), 'wb'
-            ) as targetObject:
+            fileInfo = self.mountSource.lookup(old)
+            if fileInfo is None:
+                raise fuse.FuseOSError(errno.ENOENT)
+
+            with self.mountSource.open(fileInfo) as sourceObject, open(self._realpath(new), 'wb') as targetObject:
                 shutil.copyfileobj(sourceObject, targetObject)
 
             self._mark_as_deleted(old)
@@ -308,11 +310,11 @@ class WritableFolderMountSource(fuse.Operations):
     # Links
 
     @overrides(fuse.Operations)
-    def symlink(self, target, source):
+    def symlink(self, target: str, source: str):
         os.symlink(source, self._realpath(target))
 
     @overrides(fuse.Operations)
-    def link(self, target, source):
+    def link(self, target: str, source: str):
         # Can only hardlink to files which are also in the overlay folder.
         overlaySource = self._realpath(source)
         if not os.path.exists(overlaySource) and self.mountSource.lookup(source):
@@ -325,12 +327,12 @@ class WritableFolderMountSource(fuse.Operations):
     # Folders
 
     @overrides(fuse.Operations)
-    def mkdir(self, path, mode):
+    def mkdir(self, path: str, mode: int):
         self._open(path, mode | stat.S_IFDIR)
         os.mkdir(self._realpath(path), mode)
 
     @overrides(fuse.Operations)
-    def rmdir(self, path):
+    def rmdir(self, path: str):
         if not self.mountSource.exists(path) or self.is_deleted(path):
             raise fuse.FuseOSError(errno.ENOENT)
 
@@ -352,7 +354,7 @@ class WritableFolderMountSource(fuse.Operations):
     # Files
 
     @overrides(fuse.Operations)
-    def open(self, path, flags):
+    def open(self, path: str, flags: int):
         # if flags & os.O_CREAT != 0:  # I hope that FUSE simple calls create in this case.
         #    self._open(path)   # what would the default mode even be?
         if not os.path.exists(self._realpath(path)):
@@ -365,12 +367,12 @@ class WritableFolderMountSource(fuse.Operations):
         return os.open(self._realpath(path), flags)
 
     @overrides(fuse.Operations)
-    def create(self, path, mode, fi=None):
+    def create(self, path: str, mode: int, fi=None):
         self._open(path, mode)
         return os.open(self._realpath(path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
 
     @overrides(fuse.Operations)
-    def unlink(self, path):
+    def unlink(self, path: str):
         # Note that despite the name this is called for removing both, files and links.
 
         if not self.mountSource.exists(path) or self.is_deleted(path):
@@ -388,34 +390,34 @@ class WritableFolderMountSource(fuse.Operations):
             self._mark_as_deleted(path)
 
     @overrides(fuse.Operations)
-    def mknod(self, path, mode, dev):
+    def mknod(self, path: str, mode: int, dev: int):
         self._ensure_parent_exists(path)
         os.mknod(self._realpath(path), mode, dev)
 
     @overrides(fuse.Operations)
-    def truncate(self, path, length, fh=None):
+    def truncate(self, path: str, length: int, fh=None):
         self._ensure_file_is_modifiable(path)
         os.truncate(self._realpath(path), length)
 
     # Actual writing
 
     @overrides(fuse.Operations)
-    def write(self, path, data, offset, fh):
+    def write(self, path: str, data, offset: int, fh):
         os.lseek(fh, offset, 0)
         return os.write(fh, data)
 
     # Flushing
 
     @overrides(fuse.Operations)
-    def flush(self, path, fh):
+    def flush(self, path: str, fh):
         return os.fsync(fh)
 
     @overrides(fuse.Operations)
-    def fsync(self, path, datasync, fh):
+    def fsync(self, path: str, datasync: int, fh):
         return os.fsync(fh) if datasync == 0 else os.fdatasync(fh)
 
     @overrides(fuse.Operations)
-    def statfs(self, path):
+    def statfs(self, path: str):
         return self._statfs.copy()
 
 
