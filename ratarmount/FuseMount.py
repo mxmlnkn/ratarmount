@@ -328,7 +328,7 @@ class FuseMount(fuse.Operations):
         setattr(sys, name, file)
 
     @overrides(fuse.Operations)
-    def init(self, path) -> None:
+    def init(self, path: str) -> None:
         if self.logFile:
             self._redirect_output('stdout', self.logFile)
             self._redirect_output('stderr', self.logFile)
@@ -402,7 +402,7 @@ class FuseMount(fuse.Operations):
         return self._lookup(path).linkname
 
     @overrides(fuse.Operations)
-    def open(self, path, flags):
+    def open(self, path: str, flags: int):
         """Returns file handle of opened path."""
 
         fileInfo = self._lookup(path)
@@ -419,7 +419,7 @@ class FuseMount(fuse.Operations):
             raise fuse.FuseOSError(errno.EIO) from exception
 
     @overrides(fuse.Operations)
-    def release(self, path, fh):
+    def release(self, path: str, fh):
         if fh not in self.openedFiles:
             raise fuse.FuseOSError(errno.ESTALE)
 
@@ -433,7 +433,7 @@ class FuseMount(fuse.Operations):
         return fh
 
     @overrides(fuse.Operations)
-    def read(self, path: str, size: int, offset: int, fh: int) -> bytes:
+    def read(self, path: str, size: int, offset: int, fh) -> bytes:
         if fh in self.openedFiles:
             openedFile = self._resolve_file_handle(fh)
             if isinstance(openedFile, int):
@@ -465,37 +465,37 @@ class FuseMount(fuse.Operations):
         return self.openedFiles[fh][1]
 
     @overrides(fuse.Operations)
-    def create(self, path, mode, fi=None):
+    def create(self, path: str, mode: int, fi=None):
         if self.writeOverlay:
             return self._add_new_handle(self.writeOverlay.create(path, mode, fi), 0)
         raise fuse.FuseOSError(errno.EROFS)
 
     @overrides(fuse.Operations)
-    def write(self, path, data, offset, fh):
-        if not self._is_write_overlay_handle(fh):
+    def write(self, path: str, data, offset: int, fh):
+        if not self.writeOverlay or not self._is_write_overlay_handle(fh):
             flags, openedFile = self.openedFiles[fh]
             if self.writeOverlay and not isinstance(openedFile, int) and (flags & (os.O_WRONLY | os.O_RDWR)):
                 openedFile.close()
                 self.openedFiles[fh] = (flags, self.writeOverlay.open(path, flags))
 
-        if self._is_write_overlay_handle(fh):
+        if self.writeOverlay and self._is_write_overlay_handle(fh):
             return self.writeOverlay.write(path, data, offset, self._resolve_file_handle(fh))
         raise fuse.FuseOSError(errno.EROFS)
 
     @overrides(fuse.Operations)
-    def flush(self, path, fh):
-        if self._is_write_overlay_handle(fh):
+    def flush(self, path: str, fh):
+        if self.writeOverlay and self._is_write_overlay_handle(fh):
             self.writeOverlay.flush(path, self._resolve_file_handle(fh))
         return 0  # Nothing to flush, so return success
 
     @overrides(fuse.Operations)
-    def fsync(self, path, datasync, fh):
-        if self._is_write_overlay_handle(fh):
+    def fsync(self, path: str, datasync: int, fh):
+        if self.writeOverlay and self._is_write_overlay_handle(fh):
             self.writeOverlay.fsync(path, datasync, self._resolve_file_handle(fh))
         return 0  # Nothing to flush, so return success
 
     @overrides(fuse.Operations)
-    def statfs(self, path):
+    def statfs(self, path: str):
         # The filesystem block size is used, e.g., by Python as the default buffer size and therefore the
         # default (p)read size when possible. For network file systems such as Lustre, or block compression
         # such as in SquashFS, this proved to be highly insufficient to reach optimal performance!
@@ -519,14 +519,14 @@ class FuseMount(fuse.Operations):
         return result
 
     @overrides(fuse.Operations)
-    def listxattr(self, path):
+    def listxattr(self, path: str):
         # Beware, keys not prefixed with "user." will not be listed by getfattr by default.
         # Use: "getfattr --match=.* mounted/foo" It seems that libfuse and the FUSE kernel module accept
         # all keys, I tried with "key1", "security.key1", "user.key1".
         return self.mountSource.list_xattr(self._lookup(path))
 
     @overrides(fuse.Operations)
-    def getxattr(self, path, name, position=0):
+    def getxattr(self, path: str, name, position=0):
         if position:
             # Specifically do not raise ENOSYS because libfuse will then disable getxattr calls wholly from now on,
             # but I think that small values should still work as long as position is 0.
