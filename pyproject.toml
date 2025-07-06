@@ -4,6 +4,7 @@
 # Use setuptools >= 43 because it automatically includes pyproject.toml in source distribution
 # Use setuptools >= 46.5 to use attr: package.__version__
 # Use setuptools >= 61 for pyproject.toml support
+# Use setuptools >= 70.1 for built-in bdist_wheel which obsoletes the wheel standalone package
 # https://setuptools.readthedocs.io/en/latest/history.html#id284
 # Use setuptools <= 82 because the license specification changes backward-incompatible in 2026-02.
 # https://github.com/pypa/setuptools/issues/4903#issuecomment-2923109576
