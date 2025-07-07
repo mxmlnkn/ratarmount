@@ -29,6 +29,7 @@ jobs:
         python3 -m pip install --upgrade pip
         python3 -m pip install --user pytest lz4 PySquashfsImage asyncssh fsspec pygit2 sqlcipher3-wheels
         ( cd core && python3 -m pip install --user .[full,ext4,fsspec,sqlar] )
+        python3 -m pip install --force-reinstall 'git+https://github.com/mxmlnkn/mfusepy.git@master#egginfo=mfusepy'
         python3 -m pip install --user .
 
     - name: Style Check With Ruff
@@ -95,6 +96,7 @@ jobs:
         python3 -m pip install --upgrade pip
         python3 -m pip install --user pytest lz4 PySquashfsImage asyncssh fsspec pygit2 sqlcipher3-wheels
         ( cd core && python3 -m pip install --user .[full,ext4,fsspec,sqlar] )
+        python3 -m pip install --force-reinstall 'git+https://github.com/mxmlnkn/mfusepy.git@master#egginfo=mfusepy'
         python3 -m pip install --user .
 
     - name: Lint With Pytype
@@ -263,7 +265,7 @@ jobs:
         python3 -m build
         twine check dist/*
         python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )"[full,ext4,fsspec,sqlar]
-        python3 -m pip install mfusepy
+        python3 -m pip install --force-reinstall 'git+https://github.com/mxmlnkn/mfusepy.git@master#egginfo=mfusepy'
 
     - name: Test Startup Without Compression Dependencies
       if: ${{ !startsWith( matrix.os, 'macos' ) }}
@@ -309,6 +311,7 @@ jobs:
     - name: Test Installation From Source
       run: |
         python3 -m pip install .[full,ext4,fsspec,sqlar]
+        python3 -m pip install --force-reinstall 'git+https://github.com/mxmlnkn/mfusepy.git@master#egginfo=mfusepy'
 
     - name: Test Simple Startup
       run: |
