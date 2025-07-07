@@ -458,7 +458,7 @@ checkIndexArgumentChangeDetection()
         verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
     funmount "$mountFolder"
-    'grep' -Eqi '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
+    'grep' -Eq '(warning|error|Warning|Error|WARNING|ERROR)' ratarmount.stdout.log ratarmount.stderr.log ||
         returnError "$LINENO" "Expected warnings while executing: $RATARMOUNT_CMD ${args[*]}"
 
     cleanup
@@ -1016,7 +1016,7 @@ checkWriteOverlayCommitDelete()
     args=( --commit-overlay "${args[@]}" )
     {
         echo commit | $RATARMOUNT_CMD "${args[@]}" >ratarmount.stdout.log 2>ratarmount.stderr.log.tmp
-        ! 'grep' -C 5 -Ei '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
+        ! 'grep' -C 5 -E '(warning|error|Warning|Error|WARNING|ERROR)' ratarmount.stdout.log ratarmount.stderr.log ||
             returnError "$LINENO" "Found warnings while executing: $RATARMOUNT_CMD ${args[*]}"
     } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
 

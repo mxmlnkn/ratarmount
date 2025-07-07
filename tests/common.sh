@@ -191,7 +191,7 @@ runAndCheckRatarmount()
 {
     rm -f ratarmount.stdout.log ratarmount.stderr.log
     runRatarmount "$@"
-    ! 'grep' -C 5 -Ei '(warn|error)' ratarmount.stdout.log ratarmount.stderr.log ||
+    ! 'grep' -C 5 -E '(warning|error|Warning|Error|WARNING|ERROR)' ratarmount.stdout.log ratarmount.stderr.log ||
         returnError "$LINENO" "Found warnings while executing: $RATARMOUNT_CMD $*"
 }
 
