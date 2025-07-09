@@ -45,6 +45,8 @@ class FuseMount(fuse.Operations):
     # ratarmountcore, StenciledFile, and other layers they have to go through.
     MINIMUM_BLOCK_SIZE = 256 * 1024
 
+    use_ns = True
+
     def __init__(self, pathToMount: Union[str, list[str]], mountPoint: str, **options) -> None:
         self.printDebug: int = int(options.get('printDebug', 0))
         self.writeOverlay: Optional[WritableFolderMountSource] = None
@@ -338,31 +340,31 @@ class FuseMount(fuse.Operations):
             if self.writeOverlay and self.writeOverlay.root == self.mountPoint:
                 self.writeOverlay.set_folder_descriptor(self.mountPointFd)
 
-    @staticmethod
-    def _file_info_to_dict(fileInfo: FileInfo):
-        # dictionary keys: https://pubs.opengroup.org/onlinepubs/007904875/basedefs/sys/stat.h.html
-        statDict = {"st_" + key: getattr(fileInfo, key) for key in ('size', 'mtime', 'mode', 'uid', 'gid')}
-        statDict['st_mtime'] = int(statDict['st_mtime'])
-        statDict['st_nlink'] = 1  # TODO: this is wrong for files with hardlinks
-
-        # `du` sums disk usage (the number of blocks used by a file) instead of the file sizes by default.
-        # So, we need to return some valid values. Tar files are usually a series of 512 B blocks, but this
-        # block size is also used by Python as the default read call size, so it should be something larger
-        # for better performance.
-        blockSize = FuseMount.MINIMUM_BLOCK_SIZE
-        statDict['st_blksize'] = blockSize
-        # Number of 512 B (!) blocks irrespective of st_blksize!
-        #  - https://linux.die.net/man/2/stat
-        #  - https://unix.stackexchange.com/a/521240/111050
-        # We do not have information about sparse files in the index and we do not transmit sparse information to FUSE
-        # anyway because there seems to be no interface for that, i.e., lseek( ..., SEEK_HOLE ) does not work anyway.
-        statDict['st_blocks'] = ceil_div(fileInfo.size, 512)
-
-        return statDict
-
     @overrides(fuse.Operations)
     def getattr(self, path: str, fh=None) -> dict[str, Any]:
-        return self._file_info_to_dict(self._lookup(path))
+        fileInfo = self._lookup(path)
+        blockSize = FuseMount.MINIMUM_BLOCK_SIZE
+        return {
+            # dictionary keys: https://pubs.opengroup.org/onlinepubs/007904875/basedefs/sys/stat.h.html
+            'st_size': fileInfo.size,
+            'st_mode': fileInfo.mode,
+            'st_uid': fileInfo.uid,
+            'st_gid': fileInfo.gid,
+            'st_mtime': int(fileInfo.mtime * 1e9),
+            'st_nlink': 1,  # TODO: this is wrong for files with hardlinks,
+            # `du` sums disk usage (the number of blocks used by a file) instead of the file sizes by default.
+            # So, we need to return some valid values. Tar files are usually a series of 512 B blocks, but this
+            # block size is also used by Python as the default read call size, so it should be something larger
+            # for better performance.
+            'st_blksize': blockSize,
+            # Number of 512 B (!) blocks irrespective of st_blksize!
+            #  - https://linux.die.net/man/2/stat
+            #  - https://unix.stackexchange.com/a/521240/111050
+            # We do not have information about sparse files in the index and we do not transmit sparse information
+            # to FUSE anyway because there seems to be no interface for that, i.e., lseek( ..., SEEK_HOLE ) does
+            # not work anyway.
+            'st_blocks': ceil_div(fileInfo.size, 512),
+        }
 
     @overrides(fuse.Operations)
     def readdir(self, path: str, fh):

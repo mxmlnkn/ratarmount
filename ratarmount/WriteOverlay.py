@@ -280,9 +280,10 @@ class WritableFolderMountSource(fuse.Operations):
     def utimens(self, path: str, times: Optional[tuple[int, int]] = None):
         """Argument "times" is a (atime, mtime) tuple. If "times" is None, use the current time."""
 
-        mtime = time.time() if times is None else times[1]
+        mtime = time.time() if times is None else times[1] / 1e9
+        ns = (int(mtime * 1e9), int(mtime * 1e9)) if times is None else times
 
-        self._set_file_metadata(path, lambda p: os.utime(p, times), {'mtime': mtime})
+        self._set_file_metadata(path, lambda p: os.utime(p, ns=ns), {'mtime': mtime})
 
     @overrides(fuse.Operations)
     def rename(self, old: str, new: str):

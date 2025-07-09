@@ -140,7 +140,7 @@ def create_root_file_info(userdata: list[Any]):
     # fmt: off
     return FileInfo(
         size     = 0,
-        mtime    = int(time.time()),
+        mtime    = time.time(),
         mode     = 0o777 | stat.S_IFDIR,
         linkname = "",
         uid      = os.getuid(),
