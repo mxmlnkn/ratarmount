@@ -49,7 +49,7 @@ dependencies = [
     # https://packaging.python.org/en/latest/glossary/#term-Requirement-Specifier
     # https://packaging.python.org/en/latest/specifications/dependency-specifiers/#dependency-specifiers
     "ratarmountcore[7z, bzip2, fat, gzip, rar, xz, zip, zstd] ~= 0.9.0",
-    "mfusepy ~= 1.0",
+    "mfusepy ~= 3.0",
 ]
 dynamic = ["version"]
 

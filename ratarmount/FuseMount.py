@@ -378,12 +378,12 @@ class FuseMount(fuse.Operations):
         # we only need to return these special directories. FUSE automatically expands these and will not ask
         # for paths like /../foo/./../bar, so we don't need to worry about cleaning such paths
         if isinstance(files, dict):
-            yield '.', self.getattr(path), 0
+            yield '.', self.getattr(path)['st_mode'], 0
 
             if path == '/':
-                yield '..', self.mountPointInfo, 0
+                yield '..', self.mountPointInfo['st_mode'], 0
             else:
-                yield '..', self.getattr(path.rsplit('/', 1)[0]), 0
+                yield '..', self.getattr(path.rsplit('/', 1)[0])['st_mode'], 0
         else:
             yield '.'
             yield '..'
@@ -393,7 +393,7 @@ class FuseMount(fuse.Operations):
         if isinstance(files, dict):
             for name, mode in files.items():
                 if name not in deletedFiles:
-                    yield name, {'st_mode': mode}, 0
+                    yield name, mode, 0
         elif files is not None:
             for key in files:
                 if key not in deletedFiles:
