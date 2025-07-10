@@ -154,3 +154,5 @@ venv.bak/
 
 *.pickle
 *.index.*
+ratarmount.stdout
+ratarmount.stderr
