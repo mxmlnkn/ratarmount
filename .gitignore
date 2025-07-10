@@ -1,8 +1,9 @@
 *.txt
 *.diff
-benchmarks/data/**/*.png
+*.png
 knowledge
 worktrees
+experiments/
 miscellaneous/
 *mimi*
 *momo*
@@ -39,6 +40,11 @@ linuxdeploy
 *.squashfs
 *.ext4
 *.tmp
+*.fat16
+*.pzstd
+*.tpxz
+*.tbz2
+*.tgz
 *.[0-9]
 
 # Byte-compiled / optimized / DLL files
