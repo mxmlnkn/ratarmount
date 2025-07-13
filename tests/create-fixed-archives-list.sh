@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 
-tests=()
+tests=(
+    # Not done with pytest because it takes more than 10x longer for some reason.
+    # Without pytest, mounting takes 4.5 s and md5sum takes 17.5 s.
+    cb5d4faf665db396dc34df1689ef1da8 tests/sparse-file-larger-than-8GiB-followed-by-normal-file.tar.zst sparse
+)
 pytestedTests=()
 
 
@@ -236,3 +240,4 @@ pytestedTests+=(
 )
 
 'cp' 'tests/single-file.tar' 'tests/#not-a-good-name! Ör, is it?.tar'
+zstd -d -k -f tests/sparse-file-larger-than-8GiB-followed-by-normal-file.tar.zst.zst

@@ -392,7 +392,17 @@ class _TarFileMetadataReader:
 
         try:
             for tarInfo in loadedTarFile:
-                loadedTarFile.members = []  # Clear this in order to limit memory usage by tarfile
+                # Clear this in order to limit memory usage by tarfile.
+                loadedTarFile.members = []
+                # Note that the .members trick already assumes that we are only iterating over the tar file once.
+                # The next iteration would fail because loadedTarFile._loaded would be True and .members would be
+                # yielded even though they are now empty. Therefore it is fine to do some monkey-patching here.
+                if 'size' in tarInfo.pax_headers:
+                    # Patch https://github.com/python/cpython/issues/136601
+                    for key in ('GNU.sparse.size', 'GNU.sparse.realsize'):
+                        if key in tarInfo.pax_headers:
+                            with contextlib.suppress(ValueError):
+                                tarInfo.size = int(tarInfo.pax_headers[key])
 
                 # ProgressBar does a similar check like this inside 'update' but doing this outside avoids huge
                 # call stacks and also avoids calling tell() on the file object in each loop iteration.
@@ -1103,7 +1113,16 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         #      or because tarFile is simply not closed correctly here, I'm not sure.
         #      Sparse files are kinda edge-cases anyway, so it isn't high priority as long as the tests work.
         tarFile = tarfile.open(fileobj=cast(IO[bytes], tarSubFile), mode='r:', encoding=self.encoding)
-        fileObject = tarFile.extractfile(next(iter(tarFile)))
+        tarInfo = next(iter(tarFile))
+
+        # Patch https://github.com/python/cpython/issues/136601
+        if 'size' in tarInfo.pax_headers:
+            for key in ('GNU.sparse.size', 'GNU.sparse.realsize'):
+                if key in tarInfo.pax_headers:
+                    with contextlib.suppress(ValueError):
+                        tarInfo.size = int(tarInfo.pax_headers[key])
+
+        fileObject = tarFile.extractfile(tarInfo)
         if not fileObject:
             raise CompressionError("tarfile.extractfile returned nothing!")
 

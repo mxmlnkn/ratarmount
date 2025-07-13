@@ -35,7 +35,8 @@ except ImportError:
 class RunRatarmount:
     def __init__(self, mountPoint, arguments, debug: int = 3):
         self.debug = debug
-        self.timeout = 4
+        # sparse-file-larger-than-8GiB-followed-by-normal-file.tar.zst takes 4.5 s on my system.
+        self.timeout = 20
         self.mountPoint = mountPoint
         args = ['-f', '-d', str(debug), *arguments, mountPoint]
         self.thread = threading.Thread(target=ratarmountcli, args=(args,))
@@ -249,6 +250,11 @@ ARCHIVES_TO_TEST = [
     ("832c78afcb9832e1a21c18212fc6c38b", "gnu-sparse-files.tar", "01.sparse1.bin"),
     ("832c78afcb9832e1a21c18212fc6c38b", "gnu-sparse-files.tar", "02.normal1.bin"),
     ("832c78afcb9832e1a21c18212fc6c38b", "gnu-sparse-files.tar", "03.sparse1.bin"),
+    (
+        "cb5d4faf665db396dc34df1689ef1da8",
+        "sparse-file-larger-than-8GiB-followed-by-normal-file.tar.zst",
+        "sparse",
+    ),
     ("2709a3348eb2c52302a7606ecf5860bc", "nested-tar.asar", "foo/fighter/ufo"),
     ("2b87e29fca6ee7f1df6c1a76cb58e101", "nested-tar.asar", "foo/lighter.tar/fighter/bar"),
     ("2709a3348eb2c52302a7606ecf5860bc", "nested-tar.sqlar", "foo/fighter/ufo"),
@@ -355,8 +361,14 @@ def test_file_in_archive(archivePath, pathInArchive, checksum, parallelization):
                 stats = path.stat()  # implicitly tests that this does not throw
                 assert stats.st_size > 0
 
-                contents = path.read_bytes()  # extra line because it might fail
-                assert hashlib.md5(contents).hexdigest() == checksum
+                hash_md5 = hashlib.md5()
+                with path.open('rb') as file:
+                    while True:
+                        contents = file.read(1024 * 1024)
+                        if not contents:
+                            break
+                        hash_md5.update(contents)
+                assert hash_md5.hexdigest() == checksum
 
                 if '.tar' in tmpArchive and '.7z' not in tmpArchive:
                     output = ratarmountInstance.get_stdout() + ratarmountInstance.get_stderr()
