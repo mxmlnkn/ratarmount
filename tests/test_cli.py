@@ -255,6 +255,11 @@ ARCHIVES_TO_TEST = [
         "sparse-file-larger-than-8GiB-followed-by-normal-file.tar.zst",
         "sparse",
     ),
+    (
+        "c157a79031e1c40f85931829bc5fc552",
+        "sparse-file-larger-than-8GiB-followed-by-normal-file.tar.zst",
+        "foo",
+    ),
     ("2709a3348eb2c52302a7606ecf5860bc", "nested-tar.asar", "foo/fighter/ufo"),
     ("2b87e29fca6ee7f1df6c1a76cb58e101", "nested-tar.asar", "foo/lighter.tar/fighter/bar"),
     ("2709a3348eb2c52302a7606ecf5860bc", "nested-tar.sqlar", "foo/fighter/ufo"),

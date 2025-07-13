@@ -1,5 +1,6 @@
 import contextlib
 import copy
+import inspect
 import io
 import json
 import math
@@ -42,6 +43,31 @@ BLOCK_SIZE = 512
 # Note that the number of decimal digits for UINT64_MAX is ceil[64*ln(2)/ln(10)] = 20.
 _PAX_HEADER_LENGTH_PREFIX_REGEX = re.compile(b"([0-9]{1,20}) ")
 _PAX_HEADER_SIZE_KEYWORD = re.compile(br" size=([0-9]{1,20})\n")
+
+
+# Patch https://github.com/python/cpython/issues/136602
+def patch_tarfile():
+    _proc_gnusparse_10 = getattr(tarfile.TarInfo, '_proc_gnusparse_10', None)
+    if (
+        not callable(_proc_gnusparse_10)
+        or not hasattr(tarfile.TarInfo, '_link_target')
+        or inspect.getfullargspec(_proc_gnusparse_10).args != ['self', 'next', 'pax_headers', 'tarfile']
+    ):
+        return
+
+    # pylint: disable=redefined-builtin,redefined-outer-name,protected-access
+    def _wrapped_proc_gnusparse_10(self, next, pax_headers, tarfile, *args, **kwargs):  # noqa
+        # Abuse _link_target because I am too inept to dynamically extend TarInfo.__slots__.
+        # This member is only used for extracting anyway and we only use extract* methods for sparse files.
+        # And it makes wrapping __init__ unnecessary.
+        next._link_target = next.offset_data
+        return _proc_gnusparse_10(self, next, pax_headers, tarfile, *args, **kwargs)
+
+    tarfile.TarInfo._proc_gnusparse_10 = _wrapped_proc_gnusparse_10
+
+
+with contextlib.suppress(Exception):
+    patch_tarfile()
 
 
 class _TarFileMetadataReader:
@@ -403,6 +429,17 @@ class _TarFileMetadataReader:
                         if key in tarInfo.pax_headers:
                             with contextlib.suppress(ValueError):
                                 tarInfo.size = int(tarInfo.pax_headers[key])
+
+                    # Patch https://github.com/python/cpython/issues/136602
+                    if (
+                        tarInfo.pax_headers.get('GNU.sparse.major') == '1'
+                        and tarInfo.pax_headers.get('GNU.sparse.minor') == '0'
+                        and isinstance(getattr(tarInfo, '_link_target', None), int)
+                    ):
+                        # pylint: disable=protected-access
+                        loadedTarFile.offset = (
+                            tarInfo._link_target + ceil_div(int(tarInfo.pax_headers['size']), BLOCK_SIZE) * BLOCK_SIZE
+                        )
 
                 # ProgressBar does a similar check like this inside 'update' but doing this outside avoids huge
                 # call stacks and also avoids calling tell() on the file object in each loop iteration.
