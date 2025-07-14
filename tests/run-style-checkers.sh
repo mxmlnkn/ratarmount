@@ -49,10 +49,9 @@ fi
 rm pylint.log
 
 # No parallelism yet: https://github.com/python/mypy/issues/933
-mypy --config-file tests/.mypy.ini "${files[@]}" || returnError "$LINENO" 'Mypy failed!'
-mypy --config-file tests/.mypy.ini "${testFiles[@]}" || returnError "$LINENO" 'Mypy failed!'
+mypy --config-file tests/.mypy.ini ratarmount core/ratarmountcore core/tests || returnError "$LINENO" 'Mypy failed!'
 
-pytype -d import-error -P"$( cd core && pwd ):$( pwd )" "${files[@]}" \
+pytype -j auto -d import-error -P"$( cd core && pwd ):$( pwd )" ratarmount core/ratarmountcore core/tests \
     || returnError "$LINENO" 'Pytype failed!'
 
 black -q --line-length 120 --skip-string-normalization "${allPythonFiles[@]}"

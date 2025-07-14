@@ -16,7 +16,7 @@ from ratarmountcore.mountsource.formats.py7zr import Py7zrMountSource, py7zr  # 
 class TestPy7zrMountSource:
     @staticmethod
     def test_password():
-        if py7zr is None or not py7zr.__version__.startswith("1.0"):
+        if py7zr is None or not getattr(py7zr, '__version__', '').startswith("1.0"):
             return
 
         with copy_test_file('encrypted-nested-tar.7z') as path, Py7zrMountSource(

@@ -64,7 +64,7 @@ jobs:
     - name: Lint With Mypy
       run: |
         yes | python3 -m pip install --upgrade-strategy eager --upgrade types-dataclasses mypy
-        mypy --config-file tests/.mypy.ini *.py core/ratarmountcore/*.py
+        mypy --config-file tests/.mypy.ini ratarmount core/ratarmountcore core/tests
         yes | python3 -m pip uninstall types-dataclasses
 
     - name: Lint With ShellCheck
@@ -100,7 +100,7 @@ jobs:
     - name: Lint With Pytype
       run: |
         python3 -m pip install pytype
-        pytype -d import-error -P$( cd core && pwd ):$( pwd ) ratarmount/*.py core/ratarmountcore/*.py
+        pytype -j auto -d import-error -P$( cd core && pwd ):$( pwd ) ratarmount core/ratarmountcore core/tests
 
   Tests:
     runs-on: ${{ matrix.os }}
