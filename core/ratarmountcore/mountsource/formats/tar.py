@@ -38,8 +38,10 @@ from ratarmountcore.utils import (
     overrides,
 )
 
-
 BLOCK_SIZE = 512
+# Note that the number of decimal digits for UINT64_MAX is ceil[64*ln(2)/ln(10)] = 20.
+_PAX_HEADER_LENGTH_PREFIX_REGEX = re.compile(b"([0-9]{1,20}) ")
+_PAX_HEADER_SIZE_KEYWORD = re.compile(br" size=([0-9]{1,20})\n")
 
 
 class _TarFileMetadataReader:
@@ -253,6 +255,32 @@ class _TarFileMetadataReader:
         return fileInfos, xattrRows, False, isGnuIncremental
 
     @staticmethod
+    def _get_pax_size(block: bytes) -> int:
+        # See https://pubs.opengroup.org/onlinepubs/9699919799/utilities/pax.html#tag_20_92_13_03
+        # > An extended header shall consist of one or more records, each constructed as follows:
+        # >   "%d %s=%s\n", <length>, <keyword>, <value>
+        # > The <length> field shall be the decimal length of the extended header record in octets,
+        # > including the trailing <newline>.
+        offset = 0
+        pax_size = -1
+        while offset < len(block) and block[offset] != 0:
+            match_length = _PAX_HEADER_LENGTH_PREFIX_REGEX.match(block, offset)
+            if not match_length:
+                break
+
+            length = int(match_length.group(1))  # Leading zeros are not a problem.
+            # Shortest length is "5 x=\n"
+            if length < 5 or offset + length > len(block):
+                break
+
+            match_size = _PAX_HEADER_SIZE_KEYWORD.match(block, match_length.end(1), offset + length)
+            if match_size:
+                pax_size = int(match_size.group(1))
+
+            offset += length
+        return pax_size
+
+    @staticmethod
     def find_tar_file_offsets(fileObject: IO[bytes], ignoreZeros: bool) -> Generator[Tuple[int, bytes], None, None]:
         """
         Generator which yields offsets in the given TAR suitable for splitting the file into sub TARs.
@@ -261,6 +289,7 @@ class _TarFileMetadataReader:
 
         block_number = 0
         skip_next_blocks = 0
+        pax_size = -1
         fileObject.seek(0)
 
         while True:
@@ -290,7 +319,15 @@ class _TarFileMetadataReader:
 
             raw_size = block_contents[124 : 124 + 12].strip(b"\0")
             size = int(raw_size, 8) if raw_size else 0
-            block_number += ceil_div(size, BLOCK_SIZE)
+            if size == 0 and pax_size > 0:
+                size = pax_size
+            data_block_count = ceil_div(size, BLOCK_SIZE)
+
+            pax_size = -1
+            if type_flag in (b"x", b"g", b"X"):
+                pax_size = _TarFileMetadataReader._get_pax_size(fileObject.read(data_block_count * BLOCK_SIZE))
+
+            block_number += data_block_count
             fileObject.seek(block_number * BLOCK_SIZE)
 
             # A lot of the special files contain information about the next file, therefore keep do not yield
@@ -298,6 +335,8 @@ class _TarFileMetadataReader:
             # K: Identifies the *next* file on the tape as having a long name.
             # L: Identifies the *next* file on the tape as having a long linkname.
             # x: Extended header with meta data for the next file in the archive (POSIX.1-2001)
+            # X: Solaris extended header
+            # g: Extended global header (POSIX.1-2001)
             # 0: Normal file.
             if type_flag != b'0':
                 skip_next_blocks += 1
@@ -751,9 +790,9 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                     break
 
         except Exception as exception:
-            if self.printDebug >= 4:
+            if self.printDebug >= 3:
                 print("[Info] TAR was not recognized as GNU incremental TAR because of exception", exception)
-            if self.printDebug >= 4:
+            if self.printDebug >= 3:
                 traceback.print_exc()
         finally:
             fileObject.seek(oldPos)
