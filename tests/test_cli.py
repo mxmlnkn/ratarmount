@@ -1,14 +1,11 @@
 # pylint: disable=wrong-import-position
 # pylint: disable=protected-access
 
-import contextlib
 import hashlib
 import io
 import os
-import shutil
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 from pathlib import Path
@@ -17,7 +14,9 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../core')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../core/tests')))
 
+from helpers import copy_test_file  # noqa: E402
 from ratarmountcore.compressions import libarchive  # noqa: E402
 
 from ratarmount.cli import cli as ratarmountcli  # noqa: E402
@@ -31,22 +30,6 @@ try:
     import sqlcipher3
 except ImportError:
     sqlcipher3 = None  # type:ignore
-
-
-def find_test_file(relativePathOrName):
-    for i in range(3):
-        path = os.path.sep.join([".."] * i + ["tests", relativePathOrName])
-        if os.path.exists(path):
-            return path
-    return relativePathOrName
-
-
-@contextlib.contextmanager
-def copy_test_file(relativePathOrName):
-    with tempfile.TemporaryDirectory() as folder:
-        path = os.path.join(folder, os.path.basename(relativePathOrName))
-        shutil.copy(find_test_file(relativePathOrName), path)
-        yield path
 
 
 class RunRatarmount:
