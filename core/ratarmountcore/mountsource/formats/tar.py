@@ -39,6 +39,9 @@ from ratarmountcore.utils import (
 )
 
 
+BLOCK_SIZE = 512
+
+
 class _TarFileMetadataReader:
     def __init__(
         self,
@@ -256,38 +259,39 @@ class _TarFileMetadataReader:
         Also returns the type of the TAR metadata block at the returned offset for convenience.
         """
 
-        blockNumber = 0
-        skipNextBlocks = 0
+        block_number = 0
+        skip_next_blocks = 0
         fileObject.seek(0)
 
         while True:
-            blockContents = fileObject.read(512)
-            if len(blockContents) < 512:
+            block_contents = fileObject.read(BLOCK_SIZE)
+            block_number += 1
+            if len(block_contents) < BLOCK_SIZE:
                 break
 
             # > The end of an archive is marked by at least two consecutive zero-filled records.
-            if blockContents == b"\0" * 512:
-                blockContents = fileObject.read(512)
-                if blockContents == b"\0" * 512:
+            if not any(block_contents):
+                block_contents = fileObject.read(BLOCK_SIZE)
+                block_number += 1
+                if not any(block_contents):
                     if ignoreZeros:
                         continue
                     break
 
-                if len(blockContents) < 512:
+                if len(block_contents) < BLOCK_SIZE:
                     break
 
-            typeFlag = blockContents[156:157]
+            type_flag = block_contents[156:157]
 
-            if skipNextBlocks > 0:
-                skipNextBlocks -= 1
+            if skip_next_blocks > 0:
+                skip_next_blocks -= 1
             else:
-                yield blockNumber * 512, typeFlag
+                yield (block_number - 1) * BLOCK_SIZE, type_flag
 
-            blockNumber += 1
-            rawSize = blockContents[124 : 124 + 12].strip(b"\0")
-            size = int(rawSize, 8) if rawSize else 0
-            blockNumber += ceil_div(size, 512)
-            fileObject.seek(blockNumber * 512)
+            raw_size = block_contents[124 : 124 + 12].strip(b"\0")
+            size = int(raw_size, 8) if raw_size else 0
+            block_number += ceil_div(size, BLOCK_SIZE)
+            fileObject.seek(block_number * BLOCK_SIZE)
 
             # A lot of the special files contain information about the next file, therefore keep do not yield
             # the offset of the next block so that the TAR will not be split between them.
@@ -295,8 +299,8 @@ class _TarFileMetadataReader:
             # L: Identifies the *next* file on the tape as having a long linkname.
             # x: Extended header with meta data for the next file in the archive (POSIX.1-2001)
             # 0: Normal file.
-            if typeFlag != b'0':
-                skipNextBlocks += 1
+            if type_flag != b'0':
+                skip_next_blocks += 1
 
     def _open_tar(self, fileObject: IO[bytes]):
         """
