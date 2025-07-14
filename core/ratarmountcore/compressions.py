@@ -459,8 +459,8 @@ def use_rapidgzip(
 
 def open_compressed_file(
     fileobj: IO[bytes],
-    gzipSeekPointSpacing: int,
-    parallelizations: dict[str, int],
+    gzipSeekPointSpacing: int = 16 * 1024 * 1024,
+    parallelizations: Optional[dict[str, int]] = None,
     enabledBackends: Optional[list[str]] = None,
     prioritizedBackends: Optional[list[str]] = None,
     printDebug: int = 0,
@@ -497,6 +497,8 @@ def open_compressed_file(
         )
 
     parallelization = 1
+    if parallelizations is None:
+        parallelizations = {}
 
     if compression == FID.GZIP:
         if use_rapidgzip(

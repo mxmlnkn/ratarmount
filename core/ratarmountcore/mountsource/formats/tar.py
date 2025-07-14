@@ -1112,7 +1112,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             # fmt: on
             self.index.set_file_info(fileInfo)
 
-    def _open_stencil(self, fileStencils: List[Tuple[IO, int, int]], buffering: int) -> IO[bytes]:
+    def _open_stencil(self, fileStencils: list[tuple[IO, int, int]], buffering: int) -> IO[bytes]:
         bufferSize = self.blockSize if buffering == -1 else buffering
         if bufferSize == 0:
             return cast(IO[bytes], RawStenciledFile(fileStencils, self.fileObjectLock))
@@ -1166,11 +1166,11 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             #    - It seems underspecified. CPython tarfile would try to read the data chunks as if they were
             #      concatenated without 512 B alignment!
             # See GNU.sparse.map at https://www.gnu.org/software/tar/manual/html_section/Sparse-Formats.html
-            stencils: List[Tuple[bool, int, int]] = []  # is_null, offset_into_tar_block, size
+            stencils: list[tuple[bool, int, int]] = []  # is_null, offset_into_tar_block, size
             lastEnd = 0
             # The same as in tarfile.ExFileObject, i.e., offset_data already has the sparse information skipped.
             tarOffset = tarFileInfo.offsetheader + tarInfo.offset_data
-            for offset, size in cast(List[Tuple[int, int]], tarInfo.sparse):
+            for offset, size in cast(list[tuple[int, int]], tarInfo.sparse):
                 if offset == 0 and size == 0:
                     continue
                 if offset < lastEnd:
