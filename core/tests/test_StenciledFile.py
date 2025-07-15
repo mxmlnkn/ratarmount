@@ -10,6 +10,7 @@ import threading
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+import pytest  # noqa: E402
 from ratarmountcore.StenciledFile import (  # noqa: E402
     JoinedFile,
     JoinedFileFromFactory,
@@ -90,35 +91,47 @@ class TestStenciledFile:
 
     @staticmethod
     def test_seek_and_tell():
-        stenciledFile = TestStenciledFile._create_stenciled_file(tmpFile, [(1, 2), (2, 2), (0, 2)])
+        file = TestStenciledFile._create_stenciled_file(tmpFile, [(1, 2), (2, 2), (0, 2)])
+
+        assert file.readable()
+        assert file.seekable()
+        assert not file.writable()
+        assert not file.closed
+
         for i in range(7):
-            assert stenciledFile.tell() == i
-            stenciledFile.read(1)
+            assert file.tell() == i
+            file.read(1)
         for i in reversed(range(6)):
-            assert stenciledFile.seek(-1, io.SEEK_CUR) == i
-            assert stenciledFile.tell() == i
-        assert stenciledFile.seek(0, io.SEEK_END) == 6
-        assert stenciledFile.tell() == 6
-        assert stenciledFile.seek(20, io.SEEK_END) == 26
-        assert stenciledFile.tell() == 26
-        assert stenciledFile.read(1) == b""
-        assert stenciledFile.seek(-6, io.SEEK_END) == 0
-        assert stenciledFile.read(1) == b"2"
+            assert file.seek(-1, io.SEEK_CUR) == i
+            assert file.tell() == i
+        assert file.seek(0, io.SEEK_END) == 6
+        assert file.tell() == 6
+        assert file.seek(20, io.SEEK_END) == 26
+        assert file.tell() == 26
+        assert file.read(1) == b""
+        assert file.seek(-6, io.SEEK_END) == 0
+        assert file.read(1) == b"2"
+
+        with pytest.raises(io.UnsupportedOperation):
+            file.fileno()
+
+        file.close()
+        assert file.closed
 
     @staticmethod
     def test_reading_from_shared_file():
-        stenciledFile1 = StenciledFile([(tmpFile, 0, len(testData))])
-        stenciledFile2 = StenciledFile([(tmpFile, 0, len(testData))])
+        file1 = StenciledFile([(tmpFile, 0, len(testData))])
+        file2 = StenciledFile([(tmpFile, 0, len(testData))])
         for i in range(len(testData)):
-            assert stenciledFile1.read(1) == testData[i : i + 1]
-            assert stenciledFile2.read(1) == testData[i : i + 1]
+            assert file1.read(1) == testData[i : i + 1]
+            assert file2.read(1) == testData[i : i + 1]
 
     @staticmethod
     def successive_reads_test(lock=None):
-        stenciledFile = StenciledFile([(randomTmpFile, 0, len(randomTestData))], lock)
+        file = StenciledFile([(randomTmpFile, 0, len(randomTestData))], lock)
         batchSize = 1024
         for i in range(len(randomTestData) // batchSize):
-            assert stenciledFile.read(batchSize) == randomTestData[i * batchSize : (i + 1) * batchSize]
+            assert file.read(batchSize) == randomTestData[i * batchSize : (i + 1) * batchSize]
 
     @staticmethod
     def test_successive_reads():
@@ -154,11 +167,23 @@ class TestJoinedFile:
     @staticmethod
     def test_single_file_seek_read():
         file = JoinedFile([io.BytesIO(b"foobar")])
+
+        assert file.readable()
+        assert file.seekable()
+        assert not file.writable()
+        assert not file.closed
+
         assert file.seek(1) == 1
         assert file.read(1) == b"o"
         assert file.read() == b"obar"
         assert file.seek(-1, io.SEEK_END) == 5
         assert file.read() == b"r"
+
+        with pytest.raises(io.UnsupportedOperation):
+            file.fileno()
+
+        file.close()
+        assert file.closed
 
     @staticmethod
     def test_two_files_full_read():
@@ -206,11 +231,23 @@ class TestJoinedFileFromFactory:
     @staticmethod
     def test_single_file_seek_read():
         file = JoinedFileFromFactory([lambda: io.BytesIO(b"foobar")])
+
+        assert file.readable()
+        assert file.seekable()
+        assert not file.writable()
+        assert not file.closed
+
         assert file.seek(1) == 1
         assert file.read(1) == b"o"
         assert file.read() == b"obar"
         assert file.seek(-1, io.SEEK_END) == 5
         assert file.read() == b"r"
+
+        with pytest.raises(io.UnsupportedOperation):
+            file.fileno()
+
+        file.close()
+        assert file.closed
 
     @staticmethod
     def test_two_files_full_read():

@@ -97,26 +97,12 @@ class RawStenciledFile(FixedRawIOBase):
         pass
 
     @overrides(io.RawIOBase)
-    def close(self) -> None:
-        # Don't close the file objects given to us.
-        pass
-
-    @overrides(io.RawIOBase)
-    def fileno(self) -> int:
-        # This is a virtual Python level file object and therefore does not have a valid OS file descriptor!
-        raise io.UnsupportedOperation
-
-    @overrides(io.RawIOBase)
     def seekable(self) -> bool:
         return all(fobj.seekable() for fobj in self.fileObjects)
 
     @overrides(io.RawIOBase)
     def readable(self) -> bool:
         return True
-
-    @overrides(io.RawIOBase)
-    def writable(self) -> bool:
-        return False
 
     @overrides(io.RawIOBase)
     def readinto(self, buffer):
@@ -235,7 +221,7 @@ class RawJoinedFileFromFactory(io.RawIOBase):
         if self.fileObject and self.fileObject[0] == index:
             return self.fileObject[1]
 
-        self.close()
+        self._close_fileobj()
         self.fileObject = index, self.factories[index]()
         return self.fileObject[1]
 
@@ -245,15 +231,14 @@ class RawJoinedFileFromFactory(io.RawIOBase):
     def __exit__(self, exception_type, exception_value, exception_traceback):
         self.close()
 
-    @overrides(io.RawIOBase)
-    def close(self) -> None:
+    def _close_fileobj(self) -> None:
         if self.fileObject and not self.fileObject[1].closed:
             self.fileObject[1].close()
 
     @overrides(io.RawIOBase)
-    def fileno(self) -> int:
-        # This is a virtual Python level file object and therefore does not have a valid OS file descriptor!
-        raise io.UnsupportedOperation
+    def close(self) -> None:
+        self._close_fileobj()
+        super().close()
 
     @overrides(io.RawIOBase)
     def seekable(self) -> bool:
@@ -262,10 +247,6 @@ class RawJoinedFileFromFactory(io.RawIOBase):
     @overrides(io.RawIOBase)
     def readable(self) -> bool:
         return True
-
-    @overrides(io.RawIOBase)
-    def writable(self) -> bool:
-        return False
 
     @overrides(io.RawIOBase)
     def readinto(self, buffer):
@@ -383,25 +364,12 @@ class LambdaReaderFile(io.RawIOBase):
         pass
 
     @overrides(io.RawIOBase)
-    def close(self) -> None:
-        pass
-
-    @overrides(io.RawIOBase)
-    def fileno(self) -> int:
-        # This is a virtual Python level file object and therefore does not have a valid OS file descriptor!
-        raise io.UnsupportedOperation
-
-    @overrides(io.RawIOBase)
     def seekable(self) -> bool:
         return True
 
     @overrides(io.RawIOBase)
     def readable(self) -> bool:
         return True
-
-    @overrides(io.RawIOBase)
-    def writable(self) -> bool:
-        return False
 
     @overrides(io.RawIOBase)
     def readinto(self, buffer):
