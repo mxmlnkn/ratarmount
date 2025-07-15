@@ -380,7 +380,7 @@ class LambdaReaderFile(io.RawIOBase):
 
     @overrides(io.RawIOBase)
     def read(self, size: int = -1) -> bytes:
-        result = self.rawRead(self.offset, self.size if size == -1 else size)
+        result = self.rawRead(self.offset, min(self.size if size < 0 else size, max(0, self.size - self.offset)))
         self.offset += len(result)
         return result
 
@@ -403,3 +403,10 @@ class LambdaReaderFile(io.RawIOBase):
     @overrides(io.RawIOBase)
     def tell(self) -> int:
         return self.offset
+
+
+class ZeroFile(LambdaReaderFile):
+    """A file abstraction layer for a simple file containing only zero bytes."""
+
+    def __init__(self, size: int) -> None:
+        super().__init__((lambda offset, size: b"\x00" * size), size)
