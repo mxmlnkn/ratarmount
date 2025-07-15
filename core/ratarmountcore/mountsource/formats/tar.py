@@ -28,7 +28,7 @@ from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
 from ratarmountcore.ProgressBar import ProgressBar
 from ratarmountcore.SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
-from ratarmountcore.StenciledFile import RawStenciledFile, StenciledFile
+from ratarmountcore.StenciledFile import RawStenciledFile, StenciledFile, ZeroFile
 from ratarmountcore.utils import (
     CompressionError,
     InvalidIndexError,
@@ -1116,17 +1116,11 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             # fmt: on
             self.index.set_file_info(fileInfo)
 
-    def _open_stencil(self, offset: int, size: int, buffering: int) -> IO[bytes]:
-        if buffering == 0:
-            return cast(IO[bytes], RawStenciledFile([(self.tarFileObject, offset, size)], self.fileObjectLock))
-        return cast(
-            IO[bytes],
-            StenciledFile(
-                [(self.tarFileObject, offset, size)],
-                self.fileObjectLock,
-                bufferSize=self.blockSize if buffering == -1 else buffering,
-            ),
-        )
+    def _open_stencil(self, fileStencils: list[tuple[IO, int, int]], buffering: int) -> IO[bytes]:
+        bufferSize = self.blockSize if buffering == -1 else buffering
+        if bufferSize == 0:
+            return cast(IO[bytes], RawStenciledFile(fileStencils, self.fileObjectLock))
+        return cast(IO[bytes], StenciledFile(fileStencils, self.fileObjectLock, bufferSize=bufferSize))
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
@@ -1137,34 +1131,77 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         # This is not strictly necessary but it saves two file object layers and therefore might be more performant.
         # Furthermore, non-sparse files should be the much more likely case anyway.
         if not tarFileInfo.issparse:
-            return self._open_stencil(tarFileInfo.offset, fileInfo.size, buffering)
+            return self._open_stencil([(self.tarFileObject, tarFileInfo.offset, fileInfo.size)], buffering)
 
-        # The TAR file format is very simple. It's just a concatenation of TAR blocks. There is not even a
-        # global header, only the TAR block headers. That's why we can simply cut out the TAR block for
-        # the sparse file using StenciledFile and then use tarfile on it to expand the sparse file correctly.
-        tarBlockSize = tarFileInfo.offset - tarFileInfo.offsetheader + fileInfo.size
+        # Each TAR file consists of concatenated TAR blocks. We can excise such a block and parse it to get
+        # the sparse information, which we did not store in the index. This assumes that there was no important
+        # global PAX header before. Because we only store the actual file size in the index, not the TAR data
+        # block size, we must choose the StenciledFile to go up to the archive file end.
+        with self.fileObjectLock:
+            self.tarFileObject.seek(0, io.SEEK_END)
+            tarFileSize = self.tarFileObject.tell()
+        tarSubFile = self._open_stencil([(self.tarFileObject, tarFileInfo.offsetheader, tarFileSize)], buffering)
 
-        tarSubFile = self._open_stencil(tarFileInfo.offsetheader, tarBlockSize, buffering)
-        # TODO It might be better to somehow call close on tarFile but the question is where and how.
-        #      It would have to be appended to the __exit__ method of fileObject like if being decorated.
-        #      For now this seems to work either because fileObject does not require tarFile to exist
-        #      or because tarFile is simply not closed correctly here, I'm not sure.
-        #      Sparse files are kinda edge-cases anyway, so it isn't high priority as long as the tests work.
-        tarFile = tarfile.open(fileobj=cast(IO[bytes], tarSubFile), mode='r:', encoding=self.encoding)
-        tarInfo = next(iter(tarFile))
+        with tarfile.open(fileobj=cast(IO[bytes], tarSubFile), mode='r:', encoding=self.encoding) as tarFile:
+            tarInfo = next(iter(tarFile))
+            if not tarInfo.sparse:
+                raise RatarmountError("Expected a sparse file but it does not seem to be one!")
 
-        # Patch https://github.com/python/cpython/issues/136601
-        if 'size' in tarInfo.pax_headers:
+            # Implementing our own desparser also avoids: https://github.com/python/cpython/issues/136601
+            # For GNU sparse format, the real size is stored at TAR header offset 483.
+            # https://www.gnu.org/software/tar/manual/html_section/Sparse-Formats.html
+            realFileSize = tarInfo.size
             for key in ('GNU.sparse.size', 'GNU.sparse.realsize'):
                 if key in tarInfo.pax_headers:
                     with contextlib.suppress(ValueError):
-                        tarInfo.size = int(tarInfo.pax_headers[key])
+                        realFileSize = int(tarInfo.pax_headers[key])
 
-        fileObject = tarFile.extractfile(tarInfo)
-        if not fileObject:
-            raise CompressionError("tarfile.extractfile returned nothing!")
+            # Offset-size pairs of data ranges, e.g., [(0, 1073741824), (1084227584, 8579448836), (9663676420, 0)]
+            # The last pair, with size 0, exists to show the real file size. This is redundant when PAX is used.
+            # For sparse.gnu.tar: [(512, 0), (0, 0), (0, 0), (0, 0)] because the format specifies at least 4 pairs!
+            # The data for these chunks is assumed to exist in the TAR block in this order concatenated and in 512 B
+            # granularity:
+            #  - It should be in this order because TAR by design is something that was intended for sequential tapes.
+            #  - I don't see it specified anywhere, but sparsity was probably assumed to be in 512 B blocks or larger.
+            #    - Because 512 B is the TAR block size.
+            #    - Because there are almost no file systems with <512 B block size, most nowadays are 4 KiB!
+            #    - Smaller blocks can be done by changing buf[BLOCK_SIZE] to buf[32] in tar/sparse.c, but it creates
+            #      separate 512 B tar blocks for each <= 32 B data chunk, i.e., it is very inefficient.
+            #    - It seems underspecified. CPython tarfile would try to read the data chunks as if they were
+            #      concatenated without 512 B alignment!
+            # See GNU.sparse.map at https://www.gnu.org/software/tar/manual/html_section/Sparse-Formats.html
+            stencils: list[tuple[bool, int, int]] = []  # is_null, offset_into_tar_block, size
+            lastEnd = 0
+            # The same as in tarfile.ExFileObject, i.e., offset_data already has the sparse information skipped.
+            tarOffset = tarFileInfo.offsetheader + tarInfo.offset_data
+            for offset, size in cast(list[tuple[int, int]], tarInfo.sparse):
+                if offset == 0 and size == 0:
+                    continue
+                if offset < lastEnd:
+                    raise RatarmountError("Sparse offset information overlaps or is not sorted! " + str(tarInfo.sparse))
 
-        return fileObject
+                # Note that the very last offset or size does not have to be multiples of 512 B!
+                if tarOffset % BLOCK_SIZE != 0 and size > 0:
+                    raise RatarmountError(
+                        f"Sparsity data chunks must be in multiples of 512 B! Real TAR offset: {tarOffset}"
+                    )
+
+                if offset > lastEnd:
+                    stencils.append((True, 0, offset - lastEnd))
+                stencils.append((False, tarOffset, size))
+                tarOffset += size
+                lastEnd = offset + size
+
+            if lastEnd > realFileSize:
+                raise RatarmountError("Sparse map seems to be larger than specified real file size!")
+            if lastEnd < realFileSize:
+                stencils.append((True, 0, realFileSize - lastEnd))
+
+            zeros = cast(IO[bytes], ZeroFile(max(x[2] for x in stencils if x[0])))
+            return self._open_stencil(
+                [(zeros if is_null else self.tarFileObject, offset, size) for is_null, offset, size in stencils],
+                buffering,
+            )
 
     @overrides(MountSource)
     def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:

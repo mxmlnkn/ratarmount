@@ -576,3 +576,53 @@ asar pack foodir nested-tar.asar
 # Skippable frame in LZ4
 printf '\x5a\x2a\x4d\x18\x03\x00\x00\x00\x00\x00\x00' > nested-tar.skippable-frame.lz4
 lz4 -c nested-tar.tar >> nested-tar.skippable-frame.lz4
+
+cat <<"EOF" | sed 's|^$| |' > tar-custom-sparse.patch
+diff --git a/src/create.c b/src/create.c
+index 2e487314..dd53538c 100644
+--- a/src/create.c
++++ b/src/create.c
+@@ -1722,7 +1722,7 @@ dump_file0 (struct tar_stat_info *st, char const *name, char const *p)
+ 	{
+ 	  enum dump_status status;
+
+-	  if (fd && sparse_option && ST_IS_SPARSE (st->stat))
++	  if (fd && sparse_option)
+ 	    {
+ 	      status = sparse_dump_file (fd, st);
+ 	      if (status == dump_status_not_implemented)
+
+
+EOF
+git clone --recursive 'https://git.savannah.gnu.org/git/tar.git'
+(
+    cd tar &&
+    ./bootstrap &&
+    ./configure &&
+    git apply ../tar-custom-sparse.patch &&
+    make -j "$( nproc )"
+)
+TAR='custom-sparse/tar/src/tar --numeric-owner'
+python3 -c '
+from pathlib import Path
+Path("sparse-512B").write_bytes(b"\x00" * 512)
+
+with open("sparse-513B", "wb") as file:
+    file.write(b"\x00" * 512)
+    file.write(b"\x01")
+
+import os, random
+file = open("sparse-1MiB", "wb")
+size = 1024 * 1024
+os.ftruncate(file.fileno(), size)
+for offset in (random.randint(0, size) for i in range(200)):
+    file.seek(offset)
+    file.write(bytes([ord(b"0") + random.randint(0,10)]))
+'
+for sparseVersion in '1.0' '0.1' '0.0'; do
+    # ustar does not support sparseness and PAX does not support GNU TAR sparse format versions.
+    # --sparse-version only applies to the pax format, not the gnu format, as can be checked with md5sum on the result.
+    $TAR --sparse-version=$sparseVersion --format=pax --hole-detection=raw -S -cf \
+        sparse.pax.sparse-$sparseVersion.tar sparse-512B sparse-513B sparse-1MiB
+done
+$TAR --format=gnu --hole-detection=raw -S -cf sparse.gnu.tar sparse-512B sparse-513B sparse-1MiB

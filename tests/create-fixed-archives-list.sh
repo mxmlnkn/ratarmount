@@ -233,6 +233,21 @@ pytestedTests+=(
     c157a79031e1c40f85931829bc5fc552 tests/single-file-incremental-long-name-mockup.tar 14130613451/000000000100000000020000000003000000000400000000050000000006000000000700000000080000000009000000000A000000000B000000000C
     c157a79031e1c40f85931829bc5fc552 tests/single-file-incremental-long-name.tar 000000000100000000020000000003000000000400000000050000000006000000000700000000080000000009000000000A000000000B000000000C
 
+    bf619eac0cdf3f68d496ea9344137e8b tests/sparse.gnu.tar                         sparse-512B
+    bf619eac0cdf3f68d496ea9344137e8b tests/sparse.pax.sparse-0.0.tar              sparse-512B
+    bf619eac0cdf3f68d496ea9344137e8b tests/sparse.pax.sparse-0.1.tar              sparse-512B
+    bf619eac0cdf3f68d496ea9344137e8b tests/sparse.pax.sparse-1.0.tar              sparse-512B
+
+    370a398ecaff897a26df4747c2036ee5 tests/sparse.gnu.tar                         sparse-513B
+    370a398ecaff897a26df4747c2036ee5 tests/sparse.pax.sparse-0.0.tar              sparse-513B
+    370a398ecaff897a26df4747c2036ee5 tests/sparse.pax.sparse-0.1.tar              sparse-513B
+    370a398ecaff897a26df4747c2036ee5 tests/sparse.pax.sparse-1.0.tar              sparse-513B
+
+    3d8197de2852aebea45828751bac572e tests/sparse.gnu.tar                         sparse-1MiB
+    3d8197de2852aebea45828751bac572e tests/sparse.pax.sparse-0.0.tar              sparse-1MiB
+    3d8197de2852aebea45828751bac572e tests/sparse.pax.sparse-0.1.tar              sparse-1MiB
+    3d8197de2852aebea45828751bac572e tests/sparse.pax.sparse-1.0.tar              sparse-1MiB
+
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   01.sparse1.bin
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   02.normal1.bin
     832c78afcb9832e1a21c18212fc6c38b tests/gnu-sparse-files.tar                   03.sparse1.bin

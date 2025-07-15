@@ -16,6 +16,7 @@ from ratarmountcore.StenciledFile import (  # noqa: E402
     JoinedFileFromFactory,
     RawStenciledFile,
     StenciledFile,
+    ZeroFile,
 )
 
 testData = b"1234567890"
@@ -286,3 +287,50 @@ class TestJoinedFileFromFactory:
         assert factories[1]().read() == b"bar"
 
         assert JoinedFileFromFactory(factories).read() == b"foobar"
+
+
+class TestZeroFile:
+    @staticmethod
+    def test_empty_file():
+        file = ZeroFile(0)
+
+        assert file.readable()
+        assert file.seekable()
+        assert not file.writable()
+        assert not file.closed
+
+        assert file.read() == b""
+
+        with pytest.raises(io.UnsupportedOperation):
+            file.fileno()
+
+        file.close()
+        assert file.closed
+
+    @staticmethod
+    def test_seek_and_tell():
+        file = ZeroFile(6)
+
+        assert file.readable()
+        assert file.seekable()
+        assert not file.writable()
+        assert not file.closed
+
+        for i in range(7):
+            assert file.tell() == i
+            file.read(1)
+        for i in reversed(range(6)):
+            assert file.seek(-1, io.SEEK_CUR) == i
+            assert file.tell() == i
+        assert file.seek(0, io.SEEK_END) == 6
+        assert file.tell() == 6
+        assert file.read(1) == b""
+        assert file.seek(-6, io.SEEK_END) == 0
+        assert file.read(1) == b"\x00"
+        assert file.read() == b"\x00" * 5
+
+        with pytest.raises(io.UnsupportedOperation):
+            file.fileno()
+
+        file.close()
+        assert file.closed
