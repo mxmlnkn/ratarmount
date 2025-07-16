@@ -110,6 +110,7 @@ Homepage = "https://github.com/mxmlnkn/ratarmount/ratarmountcore"
 [project.optional-dependencies]
 # https://peps.python.org/pep-0508/ Dependency specification for Python Software Packages
 full = [
+    "rich",
     "indexed_gzip ~= 1.7",
     'indexed_zstd >= 1.3.1, < 2.0; sys_platform=="darwin"',
     'indexed_zstd >= 1.2.2, < 2.0; platform_system!="Windows"',
@@ -148,6 +149,9 @@ full = [
     #"gcsfs",  # untested
     #"adlfs",  # untested. build error in Python 3.13
 ]
+# There are too many major versions and I don't wanna lock into one. I only need the most basic things anyway.
+# It should work with almost every version.
+colors = ["rich"]
 bzip2 = ["rapidgzip >= 0.13.1"]
 git = ["pygit2"]
 gzip = ["indexed_gzip ~= 1.7"]

@@ -19,6 +19,23 @@ from ratarmountcore.utils import RatarmountError, get_xdg_cache_home
 with contextlib.suppress(ImportError):
     import argcomplete
 
+if "_ARGCOMPLETE" not in os.environ:
+    try:
+        import rich_argparse
+
+        class _RichFormatter(
+            rich_argparse.ArgumentDefaultsRichHelpFormatter,
+            rich_argparse.RawDescriptionRichHelpFormatter,
+        ):
+            def add_arguments(self, actions):
+                actions = sorted(actions, key=lambda action: action.option_strings)
+                super().add_arguments(actions)
+
+    except ImportError:
+        _RichFormatter = None  # type: ignore
+else:
+    _RichFormatter = None  # type: ignore
+
 
 class _CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):
     def add_arguments(self, actions):
@@ -53,7 +70,7 @@ class PrintOSSAttributionShortAction(argparse.Action):
 def _parse_args(rawArgs: Optional[list[str]] = None):
     parser = argparse.ArgumentParser(
         prog='ratarmount',
-        formatter_class=_CustomFormatter,
+        formatter_class=_RichFormatter or _CustomFormatter,  # type: ignore
         add_help=False,
         description='''\
 With ratarmount, you can:
@@ -311,7 +328,7 @@ For further information, see the ReadMe on the project's homepage:
 
     advancedGroup.add_argument(
         '-p', '--prefix', type=str, default='',
-        help='[deprecated] Use "-o modules=subdir,subdir=<prefix>" instead. '
+        help='DEPRECATED Use "-o modules=subdir,subdir=<prefix>" instead. '
              'This standard way utilizes FUSE itself and will also work for other FUSE '
              'applications. So, it is preferable even if a bit more verbose.'
              'The specified path to the folder inside the TAR will be mounted to root. '

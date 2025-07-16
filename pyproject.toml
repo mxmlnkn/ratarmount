@@ -59,6 +59,7 @@ content-type = "text/markdown"
 
 [project.optional-dependencies]
 full = ["ratarmountcore[full]"]
+colors = ["rich-argparse"]
 bzip2 = ["ratarmountcore[bzip2]"]
 gzip = ["ratarmountcore[gzip]"]
 rar = ["ratarmountcore[rar]"]
