@@ -1,4 +1,13 @@
 
+# Version 1.1.1 built on 2025-07-23
+
+## Fixes
+
+ - Fix possible issue when deleting from write overlay.
+ - Do not filter chained fsspec protocols as unknown protocol.
+ - Return the correct number of blocks for files. This fixes results from `du`.
+ - Improve automatic mount point inference.
+
 # Version 1.1.0 built on 2025-06-21
 
 ## Features

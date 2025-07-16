@@ -1,4 +1,22 @@
 
+# Version 0.9.1 built on 2025-07-23
+
+## Fixes
+
+ - Python file object implementations did not return `True` for `closed` after closing them.
+ - Patch broken TAR parsing for >8 GiB file with sparsity.
+ - Patch wrong checksum for >8 GiB file with sparsity.
+ - Support files larger than 8 GiB for GNU sparse detection.
+ - Fix very long parsing time during GNU sparse detection with `--ignore-zeros`.
+ - Make `@overrides` a test-time error not a runtime-error.
+ - Make fsspec `tar://` protocol work. For most cases this should be avoided though because it does not
+   use the performance benefits of ratarmount.
+ - Use exceptions over asserts for functional SQLAR magic bytes checks so that it works with `python3 -O`
+   optimization mode.
+ - Detect Zstandard files created by pzstd, which start with a skippable frame.
+ - Show the correct permissions for the archives opened via libarchive.
+
+
 # Version 0.9.0 built on 2025-06-21
 
 ## Feature
