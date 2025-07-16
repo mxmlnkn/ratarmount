@@ -1035,7 +1035,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
                 self.index.set_file_info(tuple(modifiedFileInfo))
 
-        fileObject.seek(oldPos)
         self.tarFileName = oldPrintName
 
         # If no file is in the TAR, then it most likely indicates a possibly compressed non TAR file.
