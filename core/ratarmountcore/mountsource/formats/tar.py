@@ -378,14 +378,11 @@ class _TarFileMetadataReader:
             return []  # Feign an empty TAR file (iterable) if anything goes wrong
 
         try:
-            # r: uses seeks to skip to the next file inside the TAR while r| doesn't do any seeks.
-            # r| might be slower but for compressed files we have to go over all the data once anyways.
             # Note that with ignore_zeros = True, no invalid header issues or similar will be raised even for
             # non TAR files!?
-            # fmt:off
             return tarfile.open(
                 fileobj      = fileObject,
-                mode         = 'r|' if self._parent.compression else 'r:',
+                mode         = 'r:',
                 ignore_zeros = self._parent.ignoreZeros,
                 encoding     = self._parent.encoding,
             )
