@@ -478,80 +478,92 @@ seeking capabilities when opening that file.
 
 ## Xz and Zst Files
 
-In contrast to bzip2 and gzip compressed files, true seeking on xz and zst files is only possible at block or frame boundaries.
+In contrast to bzip2 and gzip compressed files, true seeking on XZ and ZStandard files is only possible at block or frame boundaries.
 This wouldn't be noteworthy, if both standard compressors for [xz](https://tukaani.org/xz/) and [zstd](https://github.com/facebook/zstd) were not by default creating unsuited files.
-Even though both file formats do support multiple frames and xz even contains a frame table at the end for easy seeking, both compressors write only a single frame and/or block out, making this feature unusable.
-In order to generate truly seekable compressed files, you'll have to use [pixz](https://github.com/vasi/pixz) for xz files.
-For zstd compressed, you can try with [t2sz](https://github.com/martinellimarco/t2sz).
+Even though both file formats do support multiple frames and XZ even contains a frame table at the end for easy seeking, both compressors write only a single frame and/or block out, making this feature unusable.
 The standard zstd tool does not support setting smaller block sizes yet although an [issue](https://github.com/facebook/zstd/issues/2121) does exist.
-Alternatively, you can simply split the original file into parts, compress those parts, and then concatenate those parts together to get a suitable multiframe zst file.
-Here is a bash function, which can be used for that:
 
-<details>
-<summary>Bash script: createMultiFrameZstd</summary>
+In order to generate truly seekable compressed files, you'll have to use [pixz](https://github.com/vasi/pixz) for XZ files.
+You can check with `xz -l <file>` for the number of streams and blocks in the generated XZ file.
 
-```bash
-createMultiFrameZstd()
-(
-    # Detect being piped into
-    if [ -t 0 ]; then
-        file=$1
-        frameSize=$2
-        if [[ ! -f "$file" ]]; then echo "Could not find file '$file'." 1>&2; return 1; fi
-        fileSize=$( stat -c %s -- "$file" )
-    else
-        if [ -t 1 ]; then echo 'You should pipe the output to somewhere!' 1>&2; return 1; fi
-        echo 'Will compress from stdin...' 1>&2
-        frameSize=$1
-    fi
-    if [[ ! $frameSize =~ ^[0-9]+$ ]]; then
-        echo "Frame size '$frameSize' is not a valid number." 1>&2
-        return 1
-    fi
+For ZStandard, you can use `zstd -l <file>` to check that a file contains more than one frame and therefore is seekable.
+These are some possibilities to create seekable ZStandard files:
 
-    # Create a temporary file. I avoid simply piping to zstd
-    # because it wouldn't store the uncompressed size.
-    if [[ -d /dev/shm ]]; then frameFile=$( mktemp --tmpdir=/dev/shm ); fi
-    if [[ -z $frameFile ]]; then frameFile=$( mktemp ); fi
-    if [[ -z $frameFile ]]; then
-        echo "Could not create a temporary file for the frames." 1>&2
-        return 1
-    fi
+ - [pzstd](https://github.com/facebook/zstd): It comes installed with the `zstd` Ubuntu/Debian package.
+   Unfortunately, it it is in ["maintenance-only mode"](https://github.com/facebook/zstd/issues/3650#issuecomment-1997938922) even though there is no replacement for the multi-stream functionality.
+   `zstd -T0` does use parallelism but creates only a single frame and hence unseekable file.
+ - [t2sz](https://github.com/martinellimarco/t2sz): There is a `deb` package on the releases page.
+   If that cannot be used, it has to be compiled from the C sources using CMake.
+ - [zstd-seekable-format-go](https://github.com/SaveTheRbtz/zstd-seekable-format-go): Some of the releases, e.g., [v0.7.1](https://github.com/SaveTheRbtz/zstd-seekable-format-go/releases/tag/v0.7.1) contain static binaries that can be downloaded and used without installation.
+   Unfortunately, not all releases seem to have static binaries. So, if some other version is required it might be necessary to [install from source](https://github.com/SaveTheRbtz/zstd-seekable-format-go/issues/199) with a Go compiler.
+ - You can manually split the original file into parts, compress those parts, and then concatenate those parts together to get a suitable multiframe ZStandard file.
+   Here is a bash function, which can be used for that:
 
-    if [ -t 0 ]; then
-        true > "$file.zst"
-        for (( offset = 0; offset < fileSize; offset += frameSize )); do
-            dd if="$file" of="$frameFile" bs=$(( 1024*1024 )) \
-               iflag=skip_bytes,count_bytes skip="$offset" count="$frameSize" 2>/dev/null
-            zstd -c -q -- "$frameFile" >> "$file.zst"
-        done
-    else
-        while true; do
-            dd of="$frameFile" bs=$(( 1024*1024 )) \
-               iflag=count_bytes count="$frameSize" 2>/dev/null
-            # pipe is finished when reading it yields no further data
-            if [[ ! -s "$frameFile" ]]; then break; fi
-            zstd -c -q -- "$frameFile"
-        done
-    fi
+   <details>
+   <summary>Bash script: createMultiFrameZstd</summary>
 
-    'rm' -f -- "$frameFile"
-)
-```
+   ```bash
+   createMultiFrameZstd()
+   (
+       # Detect being piped into
+       if [ -t 0 ]; then
+           file=$1
+           frameSize=$2
+           if [[ ! -f "$file" ]]; then echo "Could not find file '$file'." 1>&2; return 1; fi
+           fileSize=$( stat -c %s -- "$file" )
+       else
+           if [ -t 1 ]; then echo 'You should pipe the output to somewhere!' 1>&2; return 1; fi
+           echo 'Will compress from stdin...' 1>&2
+           frameSize=$1
+       fi
+       if [[ ! $frameSize =~ ^[0-9]+$ ]]; then
+           echo "Frame size '$frameSize' is not a valid number." 1>&2
+           return 1
+       fi
 
-In order to compress a file named `foo` into a multiframe zst file called `foo.zst`, which contains frames sized 4MiB of uncompressed ata, you would call it like this:
+       # Create a temporary file. I avoid simply piping to zstd
+       # because it wouldn't store the uncompressed size.
+       if [[ -d /dev/shm ]]; then frameFile=$( mktemp --tmpdir=/dev/shm ); fi
+       if [[ -z $frameFile ]]; then frameFile=$( mktemp ); fi
+       if [[ -z $frameFile ]]; then
+           echo "Could not create a temporary file for the frames." 1>&2
+           return 1
+       fi
 
-```bash
-createMultiFrameZstd foo  $(( 4*1024*1024 ))
-```
+       if [ -t 0 ]; then
+           true > "$file.zst"
+           for (( offset = 0; offset < fileSize; offset += frameSize )); do
+               dd if="$file" of="$frameFile" bs=$(( 1024*1024 )) \
+                  iflag=skip_bytes,count_bytes skip="$offset" count="$frameSize" 2>/dev/null
+               zstd -c -q -- "$frameFile" >> "$file.zst"
+           done
+       else
+           while true; do
+               dd of="$frameFile" bs=$(( 1024*1024 )) \
+                  iflag=count_bytes count="$frameSize" 2>/dev/null
+               # pipe is finished when reading it yields no further data
+               if [[ ! -s "$frameFile" ]]; then break; fi
+               zstd -c -q -- "$frameFile"
+           done
+       fi
 
-It also works when being piped to. This can be useful for recompressing files to avoid having to decompress them first to disk.
+       'rm' -f -- "$frameFile"
+   )
+   ```
 
-```bash
-lbzip2 -cd well-compressed-file.bz2 | createMultiFrameZstd $(( 4*1024*1024 )) > recompressed.zst
-```
+   In order to compress a file named `foo` into a multiframe zst file called `foo.zst`, which contains frames sized 4MiB of uncompressed ata, you would call it like this:
 
-</details>
+   ```bash
+   createMultiFrameZstd foo  $(( 4*1024*1024 ))
+   ```
+
+   It also works when being piped to. This can be useful for recompressing files to avoid having to decompress them first to disk.
+
+   ```bash
+   lbzip2 -cd well-compressed-file.bz2 | createMultiFrameZstd $(( 4*1024*1024 )) > recompressed.zst
+   ```
+
+   </details>
 
 
 # Remote Files
