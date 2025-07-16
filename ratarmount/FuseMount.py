@@ -15,7 +15,7 @@ from ratarmountcore.mountsource.compositing.union import UnionMountSource
 from ratarmountcore.mountsource.compositing.versioning import FileVersionLayer
 from ratarmountcore.mountsource.factory import open_mount_source
 from ratarmountcore.mountsource.formats.folder import FolderMountSource
-from ratarmountcore.utils import determine_recursion_depth, overrides
+from ratarmountcore.utils import ceil_div, determine_recursion_depth, overrides
 
 from .fuse import fuse
 from .WriteOverlay import WritableFolderMountSource
@@ -330,7 +330,12 @@ class FuseMount(fuse.Operations):
         # for better performance.
         blockSize = FuseMount.MINIMUM_BLOCK_SIZE
         statDict['st_blksize'] = blockSize
-        statDict['st_blocks'] = 1 + ((fileInfo.size + blockSize - 1) // blockSize)
+        # Number of 512 B (!) blocks irrespective of st_blksize!
+        #  - https://linux.die.net/man/2/stat
+        #  - https://unix.stackexchange.com/a/521240/111050
+        # We do not have information about sparse files in the index and we do not transmit sparse information to FUSE
+        # anyway because there seems to be no interface for that, i.e., lseek( ..., SEEK_HOLE ) does not work anyway.
+        statDict['st_blocks'] = ceil_div(fileInfo.size, 512)
 
         return statDict
 

@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../c
 
 from helpers import copy_test_file  # noqa: E402
 from ratarmountcore.compressions import libarchive  # noqa: E402
+from ratarmountcore.utils import ceil_div  # noqa: E402
 
 from ratarmount.cli import cli as ratarmountcli  # noqa: E402
 
@@ -365,6 +366,11 @@ def test_file_in_archive(archivePath, pathInArchive, checksum, parallelization):
                 assert path.is_file()
                 stats = path.stat()  # implicitly tests that this does not throw
                 assert stats.st_size > 0
+
+                if pathInArchive == "02.normal.bin":
+                    assert stats.st_size == 10 * 1024 * 1024 + 1
+                    # https://linux.die.net/man/2/stat The number of blocks is ALWAYS with 512 B block size.
+                    assert stats.st_blocks == ceil_div(10 * 1024 * 1024 + 1, 512)
 
                 hash_md5 = hashlib.md5()
                 with path.open('rb') as file:
