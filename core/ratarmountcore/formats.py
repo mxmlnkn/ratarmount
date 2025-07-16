@@ -80,8 +80,8 @@ FID = FileFormatID
 
 def is_tar(fileobj: IO[bytes], encoding: str = tarfile.ENCODING) -> bool:
     try:
-        # r| will only open uncompressed TAR files and even allows unseekable ones!
-        with tarfile.open(fileobj=fileobj, mode='r|', encoding=encoding):
+        # Will only open uncompressed TAR files.
+        with tarfile.open(fileobj=fileobj, mode='r:', encoding=encoding):
             return True
     except (tarfile.ReadError, tarfile.CompressionError):
         pass
