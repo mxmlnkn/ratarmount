@@ -54,6 +54,7 @@ Homepage = "https://github.com/mxmlnkn/ratarmount/ratarmountcore"
 
 [project.optional-dependencies]
 full = [
+    "rich",
     "indexed_gzip >= 1.6.3, < 2.0; python_version >= '3.8'",
     # https://github.com/pauldmccarthy/indexed_gzip/issues/167
     "indexed_gzip >= 1.6.3, != 1.9.4; python_version < '3.8'",
@@ -109,6 +110,9 @@ full = [
     #"gcsfs",  # untested
     #"adlfs",  # untested. build error in Python 3.13
 ]
+# There are too many major versions and I don't wanna lock into one. I only need the most basic things anyway.
+# It should work with almost every version.
+colors = ["rich"]
 bzip2 = ["rapidgzip >= 0.13.1"]
 git = ["pygit2"]
 gzip = [

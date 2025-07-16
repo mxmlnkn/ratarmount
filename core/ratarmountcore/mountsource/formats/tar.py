@@ -911,14 +911,14 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
         self.index.ensure_intermediary_tables()
 
-        progressBar = ProgressBar(self._archiveFileSize)
-        self._create_index_recursively(
-            fileObject,
-            progressBar=progressBar,
-            pathPrefix="",
-            streamOffset=streamOffset,
-            recursionDepth=self._recursionDepth + 1,
-        )
+        with ProgressBar(self._archiveFileSize) as progressBar:
+            self._create_index_recursively(
+                fileObject,
+                progressBar=progressBar,
+                pathPrefix="",
+                streamOffset=streamOffset,
+                recursionDepth=self._recursionDepth + 1,
+            )
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
         if self.printDebug >= 2:
