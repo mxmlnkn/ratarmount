@@ -84,6 +84,7 @@ jobs:
     - name: Install Dependencies
       run: |
         # These are required for creating test files on the fly not for ratarmount!
+        sudo apt-get -y update
         sudo apt-get -y install bzip2 pixz zstd unar fuse
 
     - name: Install pip Test Dependencies
