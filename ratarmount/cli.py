@@ -20,6 +20,35 @@ from ratarmountcore.utils import RatarmountError, get_xdg_cache_home
 with contextlib.suppress(ImportError):
     import argcomplete
 
+if "_ARGCOMPLETE" not in os.environ:
+    try:
+        import rich_argparse
+
+        class _RichFormatter(
+            rich_argparse.ArgumentDefaultsRichHelpFormatter,
+            rich_argparse.RawDescriptionRichHelpFormatter,
+        ):
+            def add_arguments(self, actions):
+                actions = sorted(actions, key=lambda action: action.option_strings)
+                super().add_arguments(actions)
+
+    except ImportError:
+        _RichFormatter = None  # type: ignore
+
+    try:
+        from rich.console import Console as RichConsole
+        from rich.logging import RichHandler
+        from rich.theme import Theme as RichTheme
+    except ImportError:
+        RichConsole = None  # type: ignore
+        RichHandler = None  # type: ignore
+        RichTheme = None  # type: ignore
+else:
+    _RichFormatter = None  # type: ignore
+    RichConsole = None  # type: ignore
+    RichHandler = None  # type: ignore
+    RichTheme = None  # type: ignore
+
 
 class _CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):
     def add_arguments(self, actions):
@@ -51,10 +80,10 @@ class PrintOSSAttributionShortAction(argparse.Action):
         parser.exit()
 
 
-def _parse_args(rawArgs: Optional[list[str]] = None):
+def create_parser(useColor: bool = True) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog='ratarmount',
-        formatter_class=_CustomFormatter,
+        formatter_class=_RichFormatter if useColor and _RichFormatter else _CustomFormatter,  # type: ignore
         add_help=False,
         description='''\
 With ratarmount, you can:
@@ -98,6 +127,7 @@ For further information, see the ReadMe on the project's homepage:
     recursionGroup = parser.add_argument_group("Recursion Options")
     tarGroup = parser.add_argument_group("Tar Options")
     writeGroup = parser.add_argument_group("Write Overlay Options")
+    outputGroup = parser.add_argument_group("Output Options")
     advancedGroup = parser.add_argument_group("Advanced Options")
 
     defaultParallelization = len(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else os.cpu_count()
@@ -120,10 +150,6 @@ For further information, see the ReadMe on the project's homepage:
     commonGroup.add_argument(
         '-h', '--help', action='help', default=argparse.SUPPRESS,
         help='Show this help message and exit.')
-
-    indexGroup.add_argument(
-        '-c', '--recreate-index', action='store_true', default=False,
-        help='If specified, pre-existing .index files will be deleted and newly created.')
 
     commonGroup.add_argument(
         '-r', '--recursive', action='store_true', default=False,
@@ -150,6 +176,10 @@ For further information, see the ReadMe on the project's homepage:
         help='Specify a single password which shall be used for RAR and ZIP files.')
 
     # Index Options
+
+    indexGroup.add_argument(
+        '-c', '--recreate-index', action='store_true', default=False,
+        help='If specified, pre-existing .index files will be deleted and newly created.')
 
     indexGroup.add_argument(
         '--verify-mtime', action='store_true',
@@ -269,6 +299,22 @@ For further information, see the ReadMe on the project's homepage:
         '--commit-overlay', action='store_true', default=False,
         help='Apply deletions and content modifications done in the write overlay to the archive.')
 
+    # Output Options
+
+    outputGroup.add_argument(
+        '-d', '--debug', type=int, default=1,
+        help='Sets the debugging level. Higher means more output. Currently, 3 is the highest.')
+
+    outputGroup.add_argument(
+        '--log-file', type=str, default='',
+        help='Specifies a file to redirect all output into. The redirection only takes effect after the mount point '
+             'is provided because, without -f, there is no other way to get output after daemonization and forking '
+             'into the background.')
+
+    outputGroup.add_argument(
+        '--color', action=argparse.BooleanOptionalAction, default=True,
+        help='Enable or disable colored help and logging output.')
+
     # Advanced Options
 
     advancedGroup.add_argument(
@@ -280,16 +326,6 @@ For further information, see the ReadMe on the project's homepage:
         '-f', '--foreground', action='store_true', default=False,
         help='Keeps the python program in foreground so it can print debug '
              'output when the mounted path is accessed.')
-
-    advancedGroup.add_argument(
-        '-d', '--debug', type=int, default=1,
-        help='Sets the debugging level. Higher means more output. Currently, 3 is the highest.')
-
-    advancedGroup.add_argument(
-        '--log-file', type=str, default='',
-        help='Specifies a file to redirect all output into. The redirection only takes effect after the mount point '
-             'is provided because, without -f, there is no other way to get output after daemonization and forking '
-             'into the background.')
 
     # Considerations for the default value:
     #   - seek times for the bz2 backend are between 0.01s and 0.1s
@@ -312,7 +348,7 @@ For further information, see the ReadMe on the project's homepage:
 
     advancedGroup.add_argument(
         '-p', '--prefix', type=str, default='',
-        help='[deprecated] Use "-o modules=subdir,subdir=<prefix>" instead. '
+        help='DEPRECATED Use "-o modules=subdir,subdir=<prefix>" instead. '
              'This standard way utilizes FUSE itself and will also work for other FUSE '
              'applications. So, it is preferable even if a bit more verbose.'
              'The specified path to the folder inside the TAR will be mounted to root. '
@@ -384,10 +420,10 @@ For further information, see the ReadMe on the project's homepage:
 
     if 'argcomplete' in sys.modules:
         argcomplete.autocomplete(parser)
-    return parser.parse_args(rawArgs)
+    return parser
 
 
-def configure_logging(debug: int) -> None:
+def configure_logging(debug: int, useColor: bool) -> None:
     level = logging.ERROR
     if debug >= 3:
         level = logging.DEBUG
@@ -404,6 +440,45 @@ def configure_logging(debug: int) -> None:
 
     handlers: list[Any] = []
     logFormat = '%(levelname)s %(name)s: %(message)s'
+
+    if useColor and RichHandler is not None:
+        logFormat = '%(name)s: %(message)s'
+        console = None
+        if RichConsole is not None and RichTheme is not None:
+            # https://rich.readthedocs.io/en/stable/appendix/colors.html
+            custom_theme = RichTheme(
+                {
+                    # It seems that level name must be lowercase or else it does not get matched! -.-
+                    'logging.level.[warning]': 'yellow',
+                    'logging.level.[debug]': 'gray50',
+                    'logging.level.[info]': 'green',
+                    'logging.level.[error]': 'red',
+                    'logging.level.[critical]': 'red',
+                    'repr.call': 'bold gray50',
+                    'repr.none': 'bold gray50',
+                    'repr.number': 'yellow',
+                    'repr.number_complex': 'yellow',
+                    'repr.tag_name': 'bold gray50',
+                }
+            )
+            console = RichConsole(theme=custom_theme)
+
+        handler = RichHandler(console=console, show_time=False)
+
+        # Fix the bugged level name column width, which is always fixed to 8.
+        logRender = getattr(handler, '_log_render', None)
+        if logRender and hasattr(logRender, 'level_width'):
+            logRender.level_width = max(
+                len(logging.getLevelName(level))
+                for level in [logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL]
+            )
+
+        handlers.append(handler)
+
+    # Remove previous handlers as is necessary if useColor first True and then False in a subsequent call.
+    rootLogger = logging.getLogger()
+    if rootLogger.hasHandlers():
+        rootLogger.handlers.clear()
 
     logging.basicConfig(level=level, format=logFormat, handlers=handlers if handlers else None)
 
@@ -431,17 +506,24 @@ def cli(rawArgs: Optional[list[str]] = None) -> int:
     # Manually parse --debug argument in case argument parsing with argparse itself goes wrong.
     tmpArgs = rawArgs or sys.argv
     debug = 1
+    useColor = True
     for i in range(len(tmpArgs) - 1):
         if tmpArgs[i] in ['-d', '--debug'] and tmpArgs[i + 1].isdecimal():
             try:
                 debug = int(tmpArgs[i + 1])
             except ValueError:
                 continue
+        elif tmpArgs[i] == '--color':
+            useColor = True
+        elif tmpArgs[i] == '--no-color':
+            useColor = False
 
-    configure_logging(debug)
+    configure_logging(debug=debug, useColor=useColor)
 
     try:
-        args = _parse_args(rawArgs)
+        args = create_parser(useColor=useColor).parse_args(rawArgs)
+        if args.debug != debug or args.color != useColor:
+            configure_logging(args.debug, args.color)
         from .actions import process_parsed_arguments
 
         return process_parsed_arguments(args)

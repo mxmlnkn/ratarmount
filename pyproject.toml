@@ -58,7 +58,8 @@ file = "README.md"
 content-type = "text/markdown"
 
 [project.optional-dependencies]
-full = ["ratarmountcore[full]"]
+full = ["ratarmountcore[full]", "rich-argparse", "rich"]
+colors = ["rich-argparse", "rich"]
 bzip2 = ["ratarmountcore[bzip2]"]
 gzip = ["ratarmountcore[gzip]"]
 rar = ["ratarmountcore[rar]"]

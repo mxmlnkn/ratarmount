@@ -880,25 +880,30 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             return
 
         try:
+            value = 0
             if (
                 hasattr(fileobj, 'tell_compressed')
                 and 'rapidgzip' in sys.modules
                 and isinstance(fileobj, (rapidgzip.IndexedBzip2File, rapidgzip.RapidgzipFile))
             ):
                 # Note that because bz2 works on a bitstream the tell_compressed returns the offset in bits
-                progressBar.update(fileobj.tell_compressed() // 8)
+                value = fileobj.tell_compressed() // 8
             elif hasattr(fileobj, 'tell_compressed'):
-                progressBar.update(fileobj.tell_compressed())
+                value = fileobj.tell_compressed()
             elif hasattr(fileobj, 'fileobj') and callable(fileobj.fileobj):
-                progressBar.update(fileobj.fileobj().tell())
+                value = fileobj.fileobj().tell()
             elif isinstance(fileobj, ParallelXZReader):
                 blockNumber = fileobj.find_block(fileobj.tell())
                 if blockNumber and blockNumber < len(fileobj.approximateCompressedBlockBoundaries):
-                    progressBar.update(fileobj.approximateCompressedBlockBoundaries[blockNumber])
+                    value = fileobj.approximateCompressedBlockBoundaries[blockNumber]
             elif self.rawFileObject and hasattr(self.rawFileObject, 'tell'):
-                progressBar.update(self.rawFileObject.tell())
+                value = self.rawFileObject.tell()
             else:
-                progressBar.update(fileobj.tell())
+                value = fileobj.tell()
+
+            # Old parallel indexed_bzip2 versions return tell_compressed 0 at EOF.
+            if value > 0:
+                progressBar.update(value)
         except Exception as exception:
             if self.printDebug >= 1:
                 print("An exception occurred when trying to update the progress bar:", exception)
@@ -912,14 +917,16 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
         self.index.ensure_intermediary_tables()
 
-        progressBar = ProgressBar(self._archiveFileSize)
-        self._create_index_recursively(
-            fileObject,
-            progressBar=progressBar,
-            pathPrefix="",
-            streamOffset=streamOffset,
-            recursionDepth=self._recursionDepth + 1,
-        )
+        with ProgressBar(self._archiveFileSize) as progressBar:
+            self._create_index_recursively(
+                fileObject,
+                progressBar=progressBar,
+                pathPrefix="",
+                streamOffset=streamOffset,
+                recursionDepth=self._recursionDepth + 1,
+            )
+            # Call one last time to ensure that it is updated with the most recent value.
+            self._update_progress_bar(progressBar, fileObject)
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
         if self.printDebug >= 2:
