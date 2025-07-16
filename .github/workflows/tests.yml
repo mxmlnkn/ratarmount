@@ -105,6 +105,11 @@ jobs:
     needs: [Static-Code-Checks]
 
     strategy:
+      # Disable because it makes no sense. Most often, they run in parallel, i.e., they would fail in roughly the
+      # same time anyway if the error persists on every system, and if not, it would be nice to know which systems
+      # work and which don't. If multiple systems are affected it might only extend debugging because I would only
+      # notice the error on the next CI run.
+      fail-fast: false
       matrix:
         os: ['macos-13', 'ubuntu-latest']
         # macos-13 / macos-latest does not work anymore because the dependencies don't have any wheels,
