@@ -109,7 +109,7 @@ The factory function `open` opens one of the archive `MountSource` implementatio
 ## Example
 
 ```Python3
-from ratarmountcore.factory import open_mount_source
+from ratarmountcore.mountsource.factory import open_mount_source
 
 archive = open_mount_source("foo.tar", recursive=True)
 print(archive.list("/"))

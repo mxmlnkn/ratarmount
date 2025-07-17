@@ -38,7 +38,7 @@ reimports, ergo you should specify the full module hierarchy for imports.
 Example:
 
     from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar
-    from ratarmountcore.factory import open_mount_source
+    from ratarmountcore.mountsource.factory import open_mount_source
 
     archive = SQLiteIndexedTar("foo.tar")
     # or alternatively:
