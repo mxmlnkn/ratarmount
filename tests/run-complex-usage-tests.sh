@@ -279,11 +279,27 @@ checkAutoMountPointCreation()
     cp "$testsFolder/single-nested-file.tar" .
     runAndCheckRatarmount -- *.tar
     command grep -q 'iriya' single-nested-file/foo/fighter/ufo ||
-    returnError "$LINENO" 'Check for auto mount point creation failed!'
+        returnError "$LINENO" 'Check for auto mount point creation failed!'
 
     funmount 'single-nested-file'
     sleep 1s
     [[ ! -d 'single-nested-file' ]] ||
+        returnError "$LINENO" 'Automatically created mount point was not removed after unmount!'
+
+    cd .. || returnError "$LINENO" 'Could not cd to parent in order to clean up!'
+    rm -rf -- "$tmpFolder" || returnError "$LINENO" 'Something went wrong. Should have been able to clean up!'
+
+    # Check for non-standard extension
+
+    'cp' "$testsFolder/single-nested-file.tar" 'single-nested-file-tar'
+    runAndCheckRatarmount -- 'single-nested-file-tar'
+    mountPoint='single-nested-file-tar.mounted'
+    command grep -q 'iriya' "$mountPoint/foo/fighter/ufo" ||
+        returnError "$LINENO" 'Check for auto mount point creation failed!'
+
+    funmount "$mountPoint"
+    sleep 1s
+    [[ ! -d "$mountPoint" ]] ||
         returnError "$LINENO" 'Automatically created mount point was not removed after unmount!'
 
     cd .. || returnError "$LINENO" 'Could not cd to parent in order to clean up!'
@@ -1237,7 +1253,7 @@ if [[ ! -f tests/2k-recursive-tars.tar ]]; then
     bzip2 -q -d -k tests/2k-recursive-tars.tar.bz2
 fi
 
-#checkExtendedAttributes || returnError "$LINENO" 'Extended attributes check failed!'
+checkExtendedAttributes || returnError "$LINENO" 'Extended attributes check failed!'
 checkStatfs || returnError "$LINENO" 'Statfs failed!'
 checkStatfsWriteOverlay || returnError "$LINENO" 'Statfs with write overlay failed!'
 checkSymbolicLinkRecursion || returnError "$LINENO" 'Symbolic link recursion failed!'

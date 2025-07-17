@@ -423,13 +423,31 @@ def process_parsed_arguments(args) -> int:
 
     # Automatically generate a default mount path
     if not args.mount_point:
-        autoMountPoint = strip_suffix_from_archive(args.mount_source[0])
-        if args.mount_point == autoMountPoint:
-            args.mount_point = os.path.splitext(args.mount_source[0])[0]
-        else:
-            args.mount_point = autoMountPoint
+        args.mount_point = strip_suffix_from_archive(args.mount_source[0])
+
         if '://' in args.mount_point:
-            args.mount_point = "ratarmount.mounted"
+            # There will be at least 2 slashes in args.mount_point, namely from ://.
+            args.mount_point = args.mount_point.rsplit('/', 1)[1]
+
+        # Files might not have a standard archive file extension, e.g., chimera files or docx (ZIP) and so on.
+        # Therefore, try to generically strip the file extension.
+        if args.mount_point == args.mount_source[0]:
+            # splitext is smarter than split('.') and will not split dots in parent folders!
+            args.mount_point = os.path.splitext(args.mount_point)[0]
+
+        # If the file has no extension at all, then add one to get a different mount point:
+        if args.mount_point == args.mount_source[0]:
+            args.mount_point = args.mount_point + ".mounted"
+
+        if os.path.exists(args.mount_point) and not os.path.isdir(args.mount_point):
+            raise argparse.ArgumentTypeError(
+                "No mount point was specified and failed to automatically infer a valid one. "
+                "Please explicitly specify a mount point. See --help."
+            )
+
+        if args.debug >= 2:
+            print(f"[Info] No mount point specified. Automatically inferred: {args.mount_point}")
+
     args.mount_point = os.path.abspath(args.mount_point)
 
     # Preprocess the --index-folders list as a string argument
