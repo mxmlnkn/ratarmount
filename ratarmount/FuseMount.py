@@ -59,7 +59,7 @@ class FuseMount(fuse.Operations):
         self.mountPoint = os.path.realpath(mountPoint)
         # This check is important for the self-bind test below, which assumes a folder.
         if os.path.exists(self.mountPoint) and not os.path.isdir(self.mountPoint):
-            raise ValueError("Mount point must either not exist or be a directory!")
+            raise ValueError(f"Mount point '{self.mountPoint}' must either not exist or be a directory!")
 
         if not isinstance(pathToMount, list):
             try:
