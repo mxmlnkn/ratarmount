@@ -7,6 +7,9 @@ source tests/common.sh
 
 shellcheck -x tests/run*.sh || returnError "$LINENO" 'shellcheck failed!'
 
+yamlFiles=()
+while read -r file; do yamlFiles+=( "$file" ); done < <( git ls-tree -r --name-only HEAD | 'grep' '[.]yml$' )
+yamllint -c tests/.yamllint.yml "${yamlFiles[@]}" || returnError "$LINENO" 'yamllint failed!'
 
 files=()
 while read -r file; do

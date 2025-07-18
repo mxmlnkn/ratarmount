@@ -12,6 +12,7 @@ pytest-xdist
 # msgspec/_core.c:11254:15: error: too few arguments to function ‘_PyLong_AsByteArray’
 pytype; python_version >= '3.8' and python_version < '3.13'
 ruff
+yamllint
 
 # Build tools
 build
