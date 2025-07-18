@@ -135,6 +135,12 @@ jobs:
       with:
         pattern: ratarmount-*.AppImage
 
+    - name: Strip -full suffix
+      run: |
+        for file in $( find . -maxdepth 2 -type f -name 'ratarmount-*full*.AppImage' ); do
+            mv -- "$file" "$( printf %s "$file" | sed -E 's|-full([^/]*)$|\1|' )"
+        done
+
     - uses: ncipollo/release-action@v1
       with:
         artifacts: "ratarmount*.AppImage/*.AppImage"

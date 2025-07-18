@@ -12,11 +12,15 @@ If the AppImage is too slow to start up or to reduce memory overhead for the App
  - Add a link to `/opt/ratarmount-<version>/AppRun` into some folder that is in your `PATH` variable, e.g., with:
    `ln -s /opt/ratarmount-<version>/AppRun ~/.local/bin/ratarmount`
 
-## Slim version
+## Slim Version
 
 Supports: 7z, ASAR, bzip2, EXT4, FAT, gzip, RAR, SQLAR, TAR, XZ, ZIP, zlib, ZStandard
 
-## Full version
+## Normal / Full Version
 
-Supports: All slim formats + libarchive (ar, CAB, cpio, grzip, ISO9660, lrzip, LZ4, lzip, LZMA, lzop, RPM, UU, WARC, XAR, Z), SquashFS, and all remote protocols (ftp://, git://, http://, ssh://, ...)
+Supports:
+
+ - all slim formats
+ - libarchive (ar, CAB, cpio, grzip, ISO9660, lrzip, LZ4, lzip, LZMA, lzop, RPM, UU, WARC, XAR, Z), SquashFS
+ - all remote protocols (ftp://, git://, http://, ssh://, ...)
 
