@@ -4,17 +4,21 @@
 import dataclasses
 import io
 import os
+import stat
 import sys
 import tarfile
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from ratarmountcore.mountsource.compositing.singlefile import SingleFileMountSource  # noqa: E402
 from ratarmountcore.mountsource.compositing.subvolumes import SubvolumesMountSource  # noqa: E402
 from ratarmountcore.mountsource.formats.folder import FolderMountSource  # noqa: E402
 from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar  # noqa: E402
+from ratarmountcore.mountsource.MountSource import MountSource  # noqa: E402
 
 
 @dataclasses.dataclass
@@ -97,10 +101,16 @@ def fixture_sample_tar_b(tmp_path):
 
 class TestSubvolumesMountSource:
     @staticmethod
-    def _check_file(mountSource, path, version, contents=None):
+    def _check_file(mountSource: MountSource, path: str, version: int, contents: Optional[bytes] = None):
         fileInfo = mountSource.lookup(path, version)
         assert fileInfo is not None
-        if contents is not None:
+
+        if contents is None:
+            assert stat.S_ISDIR(fileInfo.mode)
+        else:
+            assert not stat.S_ISDIR(fileInfo.mode)
+            assert stat.S_ISREG(fileInfo.mode)
+
             # The MountSource interface only allows to open files in binary mode, which returns bytes not string.
             if isinstance(contents, str):
                 contents = contents.encode()
@@ -108,10 +118,18 @@ class TestSubvolumesMountSource:
                 assert file.read() == contents
 
     @staticmethod
+    @pytest.mark.parametrize('paths', [("foo", "/foo"), ("/foo", "//foo"), ("folder/foo", "folder//foo")])
+    def test_duplicate_paths(paths):
+        with pytest.raises(ValueError, match='exists'):
+            SubvolumesMountSource({path: SingleFileMountSource("bar", io.BytesIO(b"bar")) for path in paths})
+
+    @staticmethod
     def test_unite_two_folders(sample_folder_a, sample_folder_b):
         union = SubvolumesMountSource(
             {"folderA": FolderMountSource(sample_folder_a.path), "folderB": FolderMountSource(sample_folder_b.path)}
         )
+
+        assert union.lookup("folderC") is None
 
         # Check folders
         for path in sample_folder_a.folders:
