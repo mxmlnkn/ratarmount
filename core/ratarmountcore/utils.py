@@ -66,14 +66,6 @@ def overrides(parentClass):
     return overrider
 
 
-class _DummyContext:
-    def __enter__(self):
-        pass
-
-    def __exit__(self, *args):
-        pass
-
-
 def ceil_div(dividend, divisor):
     return -(dividend // -divisor)
 
