@@ -14,13 +14,21 @@ from ratarmountcore.utils import overrides
 class SingleFileMountSource(MountSource):
     """MountSource exposing a single file as a mount source."""
 
+    # It makes no sense to merge this class into SubvolumesMountSource because of the file locking and file size
+    # for each file that needs to be saved and it would require adding if-else into almost every method in
+    # SubvolumesMountSource. Having a simple SingleFileMountSource to be used with SubvolumesMountSource is far
+    # more elegant. The only difference might be how to handle multiple mount points/files per parent folder.
+    # This is currently not possible because SingleFileMountSource implies a single folder containing a single file.
+    # It could be emulated with UnionMountSource or by extending SingleFileMountSource to support multiple files,
+    # but then it would add inconsistencies when these multiple files have different full paths / implied parents...
+
     def __init__(self, path: str, fileobj: IO[bytes]):
         """
         fileobj: The given file object to be mounted. It may be advisable for this file object to be unbuffered
                  because opening file objects via this mount source will add additional buffering if not disabled.
         """
-        self.path = '/' + path.lstrip('/')
-        if self.path.endswith('/'):
+        self.path = os.path.normpath('/' + path).lstrip('/')
+        if self.path.endswith('/') or not self.path:
             raise ValueError("File object must belong to a non-folder path!")
 
         self.fileObjectLock = threading.Lock()
@@ -61,14 +69,14 @@ class SingleFileMountSource(MountSource):
 
     @overrides(MountSource)
     def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
-        pathWithSlash = path.rstrip('/') + '/'
+        pathWithSlash = (path.strip('/') + '/').lstrip('/')  # append / to be able to use startswith correctly
         if self.path.startswith(pathWithSlash):
             return [self.path[len(pathWithSlash) :].split('/', maxsplit=1)[0]]
         return None
 
     @overrides(MountSource)
     def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
-        pathWithSlash = path.rstrip('/') + '/'
+        pathWithSlash = (path.strip('/') + '/').lstrip('/')  # append / to be able to use startswith correctly
         if self.path.startswith(pathWithSlash):
             # fmt: off
             return FileInfo(
@@ -82,7 +90,7 @@ class SingleFileMountSource(MountSource):
             )
             # fmt: on
 
-        return self._create_file_info() if path == self.path else None
+        return self._create_file_info() if path.strip('/') == self.path else None
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
