@@ -1,8 +1,9 @@
 import bisect
+import contextlib
 import io
 from typing import IO, Callable, Optional
 
-from .utils import FixedRawIOBase, _DummyContext, overrides
+from .utils import FixedRawIOBase, overrides
 
 
 class RawStenciledFile(FixedRawIOBase):
@@ -143,7 +144,7 @@ class RawStenciledFile(FixedRawIOBase):
             return b''
 
         result = b''
-        with self.fileObjectLock or _DummyContext():
+        with self.fileObjectLock or contextlib.nullcontext():
             while len(result) < size:
                 tmp = self._read1_unlocked(size - len(result))
                 if not tmp:
@@ -269,7 +270,7 @@ class RawJoinedFileFromFactory(io.RawIOBase):
         if i >= len(self.sizes):
             return result
 
-        with self.fileObjectLock or _DummyContext():
+        with self.fileObjectLock or contextlib.nullcontext():
             fileObject = self._get_file_object(i)
 
             # Note that seek and read of the file object itself do not seem to check against this and
