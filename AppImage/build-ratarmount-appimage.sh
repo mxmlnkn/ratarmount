@@ -70,10 +70,6 @@ function installAppImagePythonPackages()
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ext4 &>/dev/null
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir cachetools==5 &>/dev/null
 
-    # https://github.com/nathanhi/pyfatfs/issues/41
-    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir \
-        'git+https://github.com/mxmlnkn/pyfatfs.git@master#egginfo=pyfatfs'
-
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ../core || exit 1
 
     if [[ "$APPIMAGE_VARIANT" == 'slim' ]]; then

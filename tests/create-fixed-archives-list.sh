@@ -81,15 +81,9 @@ pytestedTests+=(
 )
 fi
 
-# pyfatfs depends on PyFilesystem2, which only works for Python < 3.12 because of the removed pkg_resources.
-# https://github.com/nathanhi/pyfatfs/issues/41
-if python3 -c 'import pyfatfs' &>/dev/null; then
 tests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.fat12.bz2               folder-symlink.fat12/foo/fighter/ufo
-)
-fi
 
-tests+=(
     f47c75614087a8dd938ba4acff252494 tests/simple-file-split.001                  simple-file-split
     f47c75614087a8dd938ba4acff252494 tests/simple-file-split.002                  simple-file-split
     d3b07384d113edec49eaa6238ad5ff00 tests/single-file-split.tar.001              bar

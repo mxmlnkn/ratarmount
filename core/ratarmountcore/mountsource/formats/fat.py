@@ -2,19 +2,17 @@ import errno
 import io
 import os
 import stat
-from typing import IO, Dict, Iterable, Optional, Union
+from typing import IO, Dict, Iterable, Optional, Union, cast
 
 from ratarmountcore.formats import FileFormatID, replace_format_check
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.utils import overrides
 
 try:
-    import pyfatfs
-    from pyfatfs import PyFATException
-    from pyfatfs.FatIO import FatIO
-    from pyfatfs.PyFat import PyFat
+    from ratarmountcore._external.pyfatfs import PyFATException
+    from ratarmountcore._external.pyfatfs.FatIO import FatIO
+    from ratarmountcore._external.pyfatfs.PyFat import PyFat
 except ImportError:
-    pyfatfs = None  # type: ignore
     FatIO = None  # type: ignore
     PyFat = None  # type: ignore
     PyFATException = None  # type: ignore
@@ -29,16 +27,16 @@ def is_fat_image(fileObject) -> bool:
         fs = PyFat()
         # TODO Avoid possibly slow full FAT parsing here. Only do some quick checks such as PyFatFS.PyFat.parse_header
         #      Calling __set_fp instead of set_fp avoids that but it is not part of the public interface per convention!
-        fs._PyFat__set_fp(fileObject)
+        fs._PyFat__set_fp(fileObject)  # type: ignore
         fs.is_read_only = True
         try:
             fs.parse_header()
             return True
-        except (pyfatfs.PyFATException, ValueError):
+        except (PyFATException, ValueError):
             return False
         finally:
             # Reset file object so that it does not get closed! Cannot be None because that is checked.
-            fs._PyFat__fp = io.BytesIO()
+            fs._PyFat__fp = io.BytesIO()  # type: ignore
 
     finally:
         fileObject.seek(offset)
@@ -127,7 +125,7 @@ class FATMountSource(MountSource):
         path = fileInfo.userdata[-1]
         assert isinstance(path, str)
         # TODO There is no option in FatIO to configure the buffering yet.
-        return FatIO(self.fileSystem, path)
+        return cast(IO[bytes], FatIO(self.fileSystem, path))
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
