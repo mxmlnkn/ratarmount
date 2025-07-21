@@ -34,12 +34,12 @@ jobs:
     - name: Style Check With Ruff
       run: |
         python3 -m pip install ruff
-        ruff check --config tests/.ruff.toml -- $( git ls-tree -r --name-only HEAD | 'grep' -E '[.]py$' )
+        ruff check --config tests/.ruff.toml -- $( git ls-tree -r --name-only HEAD | 'grep' -E '[.]py$' | 'grep' -v '/_external/' )
 
     - name: Style Check With Black
       run: |
         python3 -m pip install black
-        black -q --diff --line-length 120 --skip-string-normalization $( git ls-tree -r --name-only HEAD | 'grep' '[.]py$' ) > black.diff
+        black -q --diff --line-length 120 --skip-string-normalization $( git ls-tree -r --name-only HEAD | 'grep' '[.]py$' | 'grep' -v '/_external/' ) > black.diff
         if [ -s black.diff ]; then
             cat black.diff
             exit 123
@@ -48,7 +48,7 @@ jobs:
     - name: Lint With Codespell
       run: |
         python3 -m pip install codespell
-        codespell $( git ls-tree -r --name-only HEAD | 'grep' -E '[.](py|md|txt|sh|yml)$' )
+        codespell $( git ls-tree -r --name-only HEAD | 'grep' -E '[.](py|md|txt|sh|yml)$' | 'grep' -v '/_external/' )
 
     - name: Lint With Flake8
       run: |
@@ -58,7 +58,7 @@ jobs:
     - name: Lint With Pylint
       run: |
         python3 -m pip install pylint
-        pylint -j 2 --rcfile tests/.pylintrc ratarmount core/ratarmountcore tests/*.py core/tests/*.py | tee pylint.log
+        pylint --rcfile tests/.pylintrc ratarmount core/ratarmountcore tests/*.py core/tests/*.py | tee pylint.log
         ! 'egrep' ': E[0-9]{4}: ' pylint.log
 
     - name: Lint With Mypy
@@ -100,7 +100,7 @@ jobs:
     - name: Lint With Pytype
       run: |
         python3 -m pip install pytype
-        pytype -j auto -d import-error -P$( cd core && pwd ):$( pwd ) ratarmount core/ratarmountcore core/tests
+        pytype -j auto -d import-error -P$( cd core && pwd ):$( pwd ) --exclude=core/ratarmountcore/_external ratarmount core/ratarmountcore core/tests
 
   Tests:
     runs-on: ${{ matrix.os }}
@@ -365,14 +365,6 @@ jobs:
     - name: Install pip Test Dependencies
       run: |
         python3 -m pip install -r tests/requirements-tests.txt
-        # https://github.com/nathanhi/pyfatfs/issues/41
-        # Stalled PyFilesystem2 now also triggers a Deprecation Warning in Python 3.9, which triggers my tests:
-        # /opt/hostedtoolcache/Python/3.9.22/x64/lib/python3.9/site-packages/fs/__init__.py:4:
-        # UserWarning: pkg_resources is deprecated as an API.
-        # See https://setuptools.pypa.io/en/latest/pkg_resources.html.
-        # The pkg_resources package is slated for removal as early as 2025-11-30.
-        # Refrain from using this package or pin to Setuptools<81.
-        python3 -m pip uninstall --yes pyfatfs
 
     - name: Install Test Dependencies (Linux)
       if: ${{ !startsWith( matrix.os, 'macos' ) }}

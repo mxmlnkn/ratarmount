@@ -8,7 +8,9 @@ source tests/common.sh
 shellcheck -x tests/run*.sh AppImage/ratarmount-metadata/*.sh || returnError "$LINENO" 'shellcheck failed!'
 
 yamlFiles=()
-while read -r file; do yamlFiles+=( "$file" ); done < <( git ls-tree -r --name-only HEAD | 'grep' '[.]yml$' )
+while read -r file; do
+    yamlFiles+=( "$file" )
+done < <( git ls-tree -r --name-only HEAD | 'grep' '[.]yml$' | 'grep' -v '/_external/' )
 yamllint -c tests/.yamllint.yml "${yamlFiles[@]}" || returnError "$LINENO" 'yamllint failed!'
 
 files=()
@@ -20,19 +22,20 @@ done < <(
         'grep' -v -F '__init__.py' |
         'grep' -v 'benchmarks/' |
         'grep' -v -F 'setup.py' |
-        'grep' -v 'test.*.py'
+        'grep' -v 'test.*.py' |
+        'grep' -v '/_external/'
 )
 
 allTextFiles=()
 while read -r file; do
     allTextFiles+=( "$file" )
-done < <( git ls-tree -r --name-only HEAD | 'grep' -E '[.](py|md|txt|sh|yml)' )
+done < <( git ls-tree -r --name-only HEAD | 'grep' -E '[.](py|md|txt|sh|yml)' | 'grep' -v '/_external/' )
 codespell "${allTextFiles[@]}"
 
 allPythonFiles=()
 while read -r file; do
     allPythonFiles+=( "$file" )
-done < <( git ls-tree -r --name-only HEAD | 'grep' '[.]py$' )
+done < <( git ls-tree -r --name-only HEAD | 'grep' '[.]py$' | 'grep' -v '/_external/' )
 
 ruff check --config tests/.ruff.toml -- "${allPythonFiles[@]}"
 ruff check --fix --config tests/.ruff.toml -- "${allPythonFiles[@]}"
@@ -41,10 +44,12 @@ ruff check --fix --config tests/.ruff.toml -- "${allPythonFiles[@]}"
 testFiles=()
 while read -r file; do
     testFiles+=( "$file" )
-done < <( git ls-tree -r --name-only HEAD | 'grep' 'test.*[.]py$' | 'grep' -v 'conftest[.]py$' )
+done < <(
+    git ls-tree -r --name-only HEAD | 'grep' 'test.*[.]py$' | 'grep' -v 'conftest[.]py$' | 'grep' -v '/_external/'
+)
 
 # Parallelism with -j 3 does not improve much anymore and anything larger even worsens the runtime!
-pylint -j 2 --rcfile tests/.pylintrc ratarmount core/ratarmountcore "${testFiles[@]}" | tee pylint.log
+pylint --rcfile tests/.pylintrc ratarmount core/ratarmountcore "${testFiles[@]}" | tee pylint.log
 if 'grep' -E -q ': E[0-9]{4}: ' pylint.log; then
     echoerr 'There were warnings during the pylint run!'
     exit 1
@@ -54,15 +59,15 @@ rm pylint.log
 # No parallelism yet: https://github.com/python/mypy/issues/933
 mypy --config-file tests/.mypy.ini ratarmount core/ratarmountcore core/tests || returnError "$LINENO" 'Mypy failed!'
 
-pytype -j auto -d import-error -P"$( cd core && pwd ):$( pwd )" ratarmount core/ratarmountcore core/tests \
-    || returnError "$LINENO" 'Pytype failed!'
+pytype -j auto -d import-error -P"$( cd core && pwd ):$( pwd )" --exclude=core/ratarmountcore/_external \
+    ratarmount core/ratarmountcore core/tests || returnError "$LINENO" 'Pytype failed!'
 
 black -q --line-length 120 --skip-string-normalization "${allPythonFiles[@]}"
 
 filesToSpellCheck=()
 while read -r file; do
     filesToSpellCheck+=( "$file" )
-done < <( git ls-tree -r --name-only HEAD | 'grep' -E '[.](py|md|txt|sh|yml)' )
+done < <( git ls-tree -r --name-only HEAD | 'grep' -E '[.](py|md|txt|sh|yml)' | 'grep' -v '/_external/' )
 # fsspec uses cachable instead of cacheable ...
 codespell "${filesToSpellCheck[@]}"
 
