@@ -253,6 +253,8 @@ class FuseMount(fuse.Operations):
         except Exception as exception:
             if self.printDebug >= 1:
                 print("[Warning] Failed to tear down root mount source because of:", exception)
+            if self.printDebug >= 3:
+                traceback.print_exc()
 
     def __del__(self) -> None:
         self._close()

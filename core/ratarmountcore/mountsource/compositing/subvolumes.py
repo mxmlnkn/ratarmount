@@ -130,7 +130,7 @@ class SubvolumesMountSource(MountSource):
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
-        for mountSource in self.mountSources:
+        for mountSource in self.mountSources.values():
             mountSource.__exit__(exception_type, exception_value, exception_traceback)
 
     def join_threads(self):
