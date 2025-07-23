@@ -1,10 +1,12 @@
 import contextlib
 import ctypes
 import errno
+import io
 import os
 import sys
+import tempfile
 import traceback
-from typing import IO, Any, Optional, Union
+from typing import IO, Any, Callable, Optional, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource
 
@@ -17,6 +19,7 @@ from ratarmountcore.mountsource.factory import open_mount_source
 from ratarmountcore.mountsource.formats.folder import FolderMountSource
 from ratarmountcore.utils import ceil_div, determine_recursion_depth, overrides
 
+from .ControlLayer import ControlLayer
 from .fuse import fuse
 from .WriteOverlay import WritableFolderMountSource
 
@@ -51,10 +54,13 @@ class FuseMount(fuse.Operations):
         self.printDebug: int = int(options.get('printDebug', 0))
         self.writeOverlay: Optional[WritableFolderMountSource] = None
         self.overlayPath: Optional[str] = None
+        # Maps handles to either opened I/O objects or os module file handles for the writeOverlay and the open flags.
+        self.openedFiles: dict[int, tuple[int, Union[IO[bytes], int]]] = {}
+        self.lastFileHandle: int = 0  # It will be incremented before being returned. It can't hurt to never return 0.
+        self.logFile: Optional[IO[str]] = None
 
         # Only open the log file at the end shortly before it is needed to not end up with an empty file on error.
-        logFilePath: str = options.get('logFile', '')
-        options.pop('logFile', None)
+        logFilePath: str = options.pop('logFile', '')
         if logFilePath:
             logFilePath = os.path.realpath(logFilePath)
 
@@ -152,6 +158,29 @@ class FuseMount(fuse.Operations):
                 if not hasIndexPath:
                     options['indexFilePath'] = ':memory:'
 
+        # Open log file.
+        openLog: Optional[Callable[[], IO[bytes]]] = None
+        self._tmpLogFile: Optional[Any] = None
+        enableControlInterface = bool(options.pop('controlInterface', False))
+        if not logFilePath and enableControlInterface:
+            self._tmpLogFile = tempfile.NamedTemporaryFile('w+', encoding='utf-8', suffix='.ratarmount.log')
+            logFilePath = self._tmpLogFile.name
+        if logFilePath:
+            self.logFile = open(logFilePath, "w+", buffering=1, encoding='utf-8')
+
+            def _get_log():
+                self.logFile.seek(0)
+                # Quite expensive copy, but just so much easier. Else we would have to write our own class
+                # to support this case of "write UTF-8", "read bytes" with some kind of adapter class.
+                # Normally, the log should not grow to more than a dozen megabytes. Somehow adding a limit
+                # to that would be much more useful.
+                return io.BytesIO(self.logFile.read().encode())
+
+            openLog = _get_log
+
+        if enableControlInterface:
+            mountSources.append(('/', ControlLayer(".ratarmount-control", openOutput=openLog)))
+
         def create_multi_mount() -> MountSource:
             if not options.get('disableUnionMount', False):
                 return UnionMountSource([x[1] for x in mountSources], **options)
@@ -185,10 +214,6 @@ class FuseMount(fuse.Operations):
         if options.get('enableFileVersions', True):
             self.mountSource = FileVersionLayer(self.mountSource)
 
-        # Maps handles to either opened I/O objects or os module file handles for the writeOverlay and the open flags.
-        self.openedFiles: dict[int, tuple[int, Union[IO[bytes], int]]] = {}
-        self.lastFileHandle: int = 0  # It will be incremented before being returned. It can't hurt to never return 0.
-
         if self.overlayPath:
             self.writeOverlay = WritableFolderMountSource(self.overlayPath, self.mountSource)
 
@@ -216,11 +241,6 @@ class FuseMount(fuse.Operations):
         statResults = os.lstat(self.mountPoint)
         self.mountPointInfo = {key: getattr(statResults, key) for key in dir(statResults) if key.startswith('st_')}
 
-        # Open log file.
-        self.logFile: Optional[IO[str]] = None
-        if logFilePath:
-            self.logFile = open(logFilePath, 'w', buffering=1, encoding='utf-8')
-
         if self.printDebug >= 1:
             print("Created mount point at:", self.mountPoint)
 
@@ -233,6 +253,12 @@ class FuseMount(fuse.Operations):
         self._close()
 
     def _close(self) -> None:
+        try:
+            if self._tmpLogFile:
+                self._tmpLogFile.close()
+        except Exception:
+            pass
+
         try:
             if self.mountPointWasCreated:
                 os.rmdir(self.mountPoint)
