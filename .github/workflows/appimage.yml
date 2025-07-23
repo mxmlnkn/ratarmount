@@ -168,6 +168,12 @@ jobs:
       with:
         pattern: ratarmount-*.AppImage
 
+    - name: Strip -full suffix
+      run: |
+        for file in $( find . -maxdepth 2 -type f -name 'ratarmount-*full*.AppImage' ); do
+            mv -- "$file" "$( printf %s "$file" | sed -E 's|-full([^/]*)$|\1|' )"
+        done
+
     # For some dumb reason, Github creates a dummy tag with the commit message as contents?!
     # Therefore, delete that and fetch the actual tag -.-
     - name: Fetch tags
