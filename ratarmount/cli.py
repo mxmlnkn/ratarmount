@@ -152,7 +152,7 @@ For further information, see the ReadMe on the project's homepage:
         help='Show this help message and exit.')
 
     commonGroup.add_argument(
-        '-r', '--recursive', action='store_true', default=False,
+        '-r', '--recursive', action=argparse.BooleanOptionalAction, default=False,
         help='Mount archives inside archives recursively. Same as --recursion-depth -1.')
 
     commonGroup.add_argument(
@@ -178,11 +178,11 @@ For further information, see the ReadMe on the project's homepage:
     # Index Options
 
     indexGroup.add_argument(
-        '-c', '--recreate-index', action='store_true', default=False,
+        '-c', '--recreate-index', action=argparse.BooleanOptionalAction, default=False,
         help='If specified, pre-existing .index files will be deleted and newly created.')
 
     indexGroup.add_argument(
-        '--verify-mtime', action='store_true',
+        '--verify-mtime', action=argparse.BooleanOptionalAction, default=False,
         help='By default, only the TAR file size is checked to match the one in the found existing ratarmount index. '
              'If this option is specified, then also check the modification timestamp. But beware that the mtime '
              'might change during copying or downloading without the contents changing. So, this check might cause '
@@ -237,12 +237,12 @@ For further information, see the ReadMe on the project's homepage:
              'Recreate the index if you want change the recursive mounting policy anyways.')
 
     recursionGroup.add_argument(
-        '-l', '--lazy', action='store_true', default=False,
+        '-l', '--lazy', action=argparse.BooleanOptionalAction, default=False,
         help='When used with recursively bind-mounted folders, TAR files inside the mounted folder will only be '
              'mounted on first access to it.')
 
     recursionGroup.add_argument(
-        '-s', '--strip-recursive-tar-extension', action='store_true',
+        '-s', '--strip-recursive-tar-extension', action=argparse.BooleanOptionalAction, default=False,
         help='If true, then recursively mounted TARs named <file>.tar will be mounted at <file>/. '
              'This might lead to folders of the same name being overwritten, so use with care. '
              'The index needs to be (re)created to apply this option!')
@@ -264,7 +264,7 @@ For further information, see the ReadMe on the project's homepage:
              'Possible encodings: https://docs.python.org/3/library/codecs.html#standard-encodings')
 
     tarGroup.add_argument(
-        '-i', '--ignore-zeros', action='store_true',
+        '-i', '--ignore-zeros', action=argparse.BooleanOptionalAction, default=False,
         help='Ignore zeroed blocks in archive. Normally, two consecutive 512-blocks filled with zeroes mean EOF '
              'and ratarmount stops reading after encountering them. This option instructs it to read further and '
              'is useful when reading archives created with the -A option.')
@@ -320,7 +320,7 @@ For further information, see the ReadMe on the project's homepage:
              'Example: --fuse "allow_other,entry_timeout=2.8,gid=0". ')
 
     advancedGroup.add_argument(
-        '-f', '--foreground', action='store_true', default=False,
+        '-f', '--foreground', action=argparse.BooleanOptionalAction, default=False,
         help='Keeps the python program in foreground so it can print debug '
              'output when the mounted path is accessed.')
 

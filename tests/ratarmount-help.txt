@@ -1,13 +1,17 @@
-Usage: ratarmount [-h] [-r] [-u] [-P PARALLELIZATION] [-v] [--password PASSWORD] [-c]
-                  [--verify-mtime] [--index-file INDEX_FILE] [--index-folders INDEX_FOLDERS]
-                  [--recursion-depth RECURSION_DEPTH] [-l] [-s]
+Usage: ratarmount [-h] [-r | --recursive | --no-recursive] [-u] [-P PARALLELIZATION] [-v]
+                  [--password PASSWORD] [-c | --recreate-index | --no-recreate-index]
+                  [--verify-mtime | --no-verify-mtime] [--index-file INDEX_FILE]
+                  [--index-folders INDEX_FOLDERS] [--recursion-depth RECURSION_DEPTH]
+                  [-l | --lazy | --no-lazy]
+                  [-s | --strip-recursive-tar-extension | --no-strip-recursive-tar-extension]
                   [--transform-recursive-mount-point REGEX_PATTERN REPLACEMENT] [-e ENCODING]
-                  [-i] [--gnu-incremental | --no-gnu-incremental] [--detect-gnu-incremental]
+                  [-i | --ignore-zeros | --no-ignore-zeros]
+                  [--gnu-incremental | --no-gnu-incremental] [--detect-gnu-incremental]
                   [-w WRITE_OVERLAY] [--commit-overlay] [-d DEBUG] [--log-file LOG_FILE]
-                  [--color | --no-color] [-o FUSE] [-f] [-gs GZIP_SEEK_POINT_SPACING]
-                  [-p PREFIX] [--password-file PASSWORD_FILE] [--use-backend USE_BACKEND]
-                  [--oss-attributions-short] [--oss-attributions] [--disable-union-mount]
-                  [--file-versions | --no-file-versions]
+                  [--color | --no-color] [-o FUSE] [-f | --foreground | --no-foreground]
+                  [-gs GZIP_SEEK_POINT_SPACING] [-p PREFIX] [--password-file PASSWORD_FILE]
+                  [--use-backend USE_BACKEND] [--oss-attributions-short] [--oss-attributions]
+                  [--disable-union-mount] [--file-versions | --no-file-versions]
                   [--union-mount-cache-max-depth UNION_MOUNT_CACHE_MAX_DEPTH]
                   [--union-mount-cache-max-entries UNION_MOUNT_CACHE_MAX_ENTRIES]
                   [--union-mount-cache-timeout UNION_MOUNT_CACHE_TIMEOUT]
@@ -37,7 +41,8 @@ Optional Arguments:
                         parallelization>,<backend 2>:<parallelization>,..." (default:
                         :1,rapidgzip-bzip2:0)
   -h, --help            Show this help message and exit.
-  -r, --recursive       Mount archives inside archives recursively. Same as --recursion-depth
+  -r, --recursive, --no-recursive
+                        Mount archives inside archives recursively. Same as --recursion-depth
                         -1. (default: False)
   -u, --unmount         Unmount the given mount point(s). Equivalent to calling "fusermount -u"
                         for each mount point. (default: False)
@@ -80,12 +85,14 @@ Index Options:
                         ~/.ratarmount as a storage location and nothing else. Instead, it will
                         first try ~/.ratarmount and the folder "foo,9000". (default:
                         ,~/.cache/ratarmount,~/.ratarmount)
-  --verify-mtime        By default, only the TAR file size is checked to match the one in the
+  --verify-mtime, --no-verify-mtime
+                        By default, only the TAR file size is checked to match the one in the
                         found existing ratarmount index. If this option is specified, then also
                         check the modification timestamp. But beware that the mtime might change
                         during copying or downloading without the contents changing. So, this
                         check might cause false positives. (default: False)
-  -c, --recreate-index  If specified, pre-existing .index files will be deleted and newly
+  -c, --recreate-index, --no-recreate-index
+                        If specified, pre-existing .index files will be deleted and newly
                         created. (default: False)
 
 Recursion Options:
@@ -107,10 +114,11 @@ Recursion Options:
                         /folder/archive.tar. Or you can replace '^.*/([^/]+).tar.gz$' to '/' to
                         mount all recursive folders under the top-level without extensions.
                         (default: None)
-  -l, --lazy            When used with recursively bind-mounted folders, TAR files inside the
+  -l, --lazy, --no-lazy
+                        When used with recursively bind-mounted folders, TAR files inside the
                         mounted folder will only be mounted on first access to it. (default:
                         False)
-  -s, --strip-recursive-tar-extension
+  -s, --strip-recursive-tar-extension, --no-strip-recursive-tar-extension
                         If true, then recursively mounted TARs named <file>.tar will be mounted
                         at <file>/. This might lead to folders of the same name being
                         overwritten, so use with care. The index needs to be (re)created to
@@ -134,7 +142,8 @@ Tar Options:
                         UTF-8 system. Possible encodings:
                         https://docs.python.org/3/library/codecs.html#standard-encodings
                         (default: utf-8)
-  -i, --ignore-zeros    Ignore zeroed blocks in archive. Normally, two consecutive 512-blocks
+  -i, --ignore-zeros, --no-ignore-zeros
+                        Ignore zeroed blocks in archive. Normally, two consecutive 512-blocks
                         filled with zeroes mean EOF and ratarmount stops reading after
                         encountering them. This option instructs it to read further and is
                         useful when reading archives created with the -A option. (default:
@@ -204,7 +213,8 @@ Advanced Options:
                         'indexed_gzip', 'indexed_zstd', 'libarchive', 'lzmaffi', 'py7zr',
                         'pyfatfs', 'rapidgzip', 'rapidgzip-bzip2', 'rarfile', 'sqlar',
                         'tarfile', 'xz', 'zipfile'] (default: None)
-  -f, --foreground      Keeps the python program in foreground so it can print debug output when
+  -f, --foreground, --no-foreground
+                        Keeps the python program in foreground so it can print debug output when
                         the mounted path is accessed. (default: False)
   -gs, --gzip-seek-point-spacing GZIP_SEEK_POINT_SPACING
                         This only is applied when the index is first created or recreated with
