@@ -57,7 +57,7 @@ class _CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescr
 
 
 class PrintVersionAction(argparse.Action):
-    def __call__(self, parser, args, values, option_string=None):
+    def __call__(self, parser, namespace, values, option_string=None):
         from .actions import print_versions
 
         print_versions()
@@ -65,7 +65,7 @@ class PrintVersionAction(argparse.Action):
 
 
 class PrintOSSAttributionAction(argparse.Action):
-    def __call__(self, parser, args, values, option_string=None):
+    def __call__(self, parser, namespace, values, option_string=None):
         from .actions import print_oss_attributions
 
         print_oss_attributions()
@@ -73,7 +73,7 @@ class PrintOSSAttributionAction(argparse.Action):
 
 
 class PrintOSSAttributionShortAction(argparse.Action):
-    def __call__(self, parser, args, values, option_string=None):
+    def __call__(self, parser, namespace, values, option_string=None):
         from .actions import print_oss_attributions_short
 
         print_oss_attributions_short()
@@ -270,13 +270,10 @@ For further information, see the ReadMe on the project's homepage:
              'is useful when reading archives created with the -A option.')
 
     tarGroup.add_argument(
-        '--gnu-incremental', dest='gnu_incremental', action='store_true', default=False,
-        help='Will strip octal modification time prefixes from file paths, which appear in GNU incremental backups '
-             'created with GNU tar with the --incremental or --listed-incremental options.')
-
-    tarGroup.add_argument(
-        '--no-gnu-incremental', dest='gnu_incremental', action='store_false', default=False,
-        help='If specified, will never strip octal modification prefixes and will also not do automatic detection.')
+        '--gnu-incremental', action=argparse.BooleanOptionalAction, default=False,
+        help='Enable or disable stripping of octal modification time prefixes from file paths, which appear in '
+             'GNU incremental backups created with GNU tar with the --incremental or --listed-incremental options. '
+             'This overwrites automatic detection if specified before this.')
 
     tarGroup.add_argument(
         '--detect-gnu-incremental', dest='gnu_incremental', action='store_const', const=None, default=False,
@@ -379,6 +376,11 @@ For further information, see the ReadMe on the project's homepage:
     advancedGroup.add_argument(
         '--disable-union-mount', action='store_true', default=False,
         help='Mounts all specified archives in equally named subfolders under the mount point.')
+
+    advancedGroup.add_argument(
+        '--file-versions', action=argparse.BooleanOptionalAction, default=True,
+        help='Enables special <file-path>.versions/ folders to access different file versions if there are multiple '
+             'in the archive or overlapping file paths for union mounting.')
 
     advancedGroup.add_argument(
         '--union-mount-cache-max-depth', type=int, default=1024,

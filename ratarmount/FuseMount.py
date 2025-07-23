@@ -51,6 +51,9 @@ class FuseMount(fuse.Operations):
         self.printDebug: int = int(options.get('printDebug', 0))
         self.writeOverlay: Optional[WritableFolderMountSource] = None
         self.overlayPath: Optional[str] = None
+        # Maps handles to either opened I/O objects or os module file handles for the writeOverlay and the open flags.
+        self.openedFiles: dict[int, tuple[int, Union[IO[bytes], int]]] = {}
+        self.lastFileHandle: int = 0  # It will be incremented before being returned. It can't hurt to never return 0.
 
         # Only open the log file at the end shortly before it is needed to not end up with an empty file on error.
         logFilePath: str = options.get('logFile', '')
@@ -173,6 +176,9 @@ class FuseMount(fuse.Operations):
         if determine_recursion_depth(**options) > 0:
             self.mountSource = AutoMountLayer(self.mountSource, **options)
 
+        if options.get('enableFileVersions', True):
+            self.mountSource = FileVersionLayer(self.mountSource)
+
         # No threads should be created and still be open before FUSE forks.
         # Instead, they should be created in 'init'.
         # Therefore, close threads opened by the ParallelBZ2Reader for creating the block offsets.
@@ -181,12 +187,6 @@ class FuseMount(fuse.Operations):
         join_threads = getattr(self.mountSource, 'join_threads', None)
         if join_threads is not None:
             join_threads()
-
-        self.mountSource = FileVersionLayer(self.mountSource)
-
-        # Maps handles to either opened I/O objects or os module file handles for the writeOverlay and the open flags.
-        self.openedFiles: dict[int, tuple[int, Union[IO[bytes], int]]] = {}
-        self.lastFileHandle: int = 0  # It will be incremented before being returned. It can't hurt to never return 0.
 
         if self.overlayPath:
             self.writeOverlay = WritableFolderMountSource(self.overlayPath, self.mountSource)

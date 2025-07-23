@@ -2,11 +2,12 @@ Usage: ratarmount [-h] [-r] [-u] [-P PARALLELIZATION] [-v] [--password PASSWORD]
                   [--verify-mtime] [--index-file INDEX_FILE] [--index-folders INDEX_FOLDERS]
                   [--recursion-depth RECURSION_DEPTH] [-l] [-s]
                   [--transform-recursive-mount-point REGEX_PATTERN REPLACEMENT] [-e ENCODING]
-                  [-i] [--gnu-incremental] [--no-gnu-incremental] [--detect-gnu-incremental]
+                  [-i] [--gnu-incremental | --no-gnu-incremental] [--detect-gnu-incremental]
                   [-w WRITE_OVERLAY] [--commit-overlay] [-d DEBUG] [--log-file LOG_FILE]
                   [--color | --no-color] [-o FUSE] [-f] [-gs GZIP_SEEK_POINT_SPACING]
                   [-p PREFIX] [--password-file PASSWORD_FILE] [--use-backend USE_BACKEND]
                   [--oss-attributions-short] [--oss-attributions] [--disable-union-mount]
+                  [--file-versions | --no-file-versions]
                   [--union-mount-cache-max-depth UNION_MOUNT_CACHE_MAX_DEPTH]
                   [--union-mount-cache-max-entries UNION_MOUNT_CACHE_MAX_ENTRIES]
                   [--union-mount-cache-timeout UNION_MOUNT_CACHE_TIMEOUT]
@@ -122,11 +123,11 @@ Tar Options:
                         only a heuristic derived by testing 1000-10000 file entries. If you are
                         sure it is an incremental TAR, use --gnu-incremental instead. (default:
                         False)
-  --gnu-incremental     Will strip octal modification time prefixes from file paths, which
-                        appear in GNU incremental backups created with GNU tar with the
-                        --incremental or --listed-incremental options. (default: False)
-  --no-gnu-incremental  If specified, will never strip octal modification prefixes and will also
-                        not do automatic detection. (default: False)
+  --gnu-incremental, --no-gnu-incremental
+                        Enable or disable stripping of octal modification time prefixes from
+                        file paths, which appear in GNU incremental backups created with GNU tar
+                        with the --incremental or --listed-incremental options. This overwrites
+                        automatic detection if specified before this. (default: False)
   -e, --encoding ENCODING
                         Specify an input encoding used for file names among others in the TAR.
                         This must be used when, e.g., trying to open a latin1 encoded TAR on an
@@ -165,6 +166,10 @@ Advanced Options:
   --disable-union-mount
                         Mounts all specified archives in equally named subfolders under the
                         mount point. (default: False)
+  --file-versions, --no-file-versions
+                        Enables special <file-path>.versions/ folders to access different file
+                        versions if there are multiple in the archive or overlapping file paths
+                        for union mounting. (default: True)
   --index-minimum-file-count INDEX_MINIMUM_FILE_COUNT
                         Create indexes for archives with fewer than this limit of files in
                         memory instead of creating a .index.sqlite file. This is currently not

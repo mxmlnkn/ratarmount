@@ -545,6 +545,7 @@ def create_fuse_mount(args) -> None:
         maxSecondsToCache            = args.union_mount_cache_timeout,
         indexMinimumFileCount        = args.index_minimum_file_count,
         logFile                      = args.log_file,
+        enableFileVersions           = args.file_versions,
     ) as fuseOperationsObject:
         # fmt: on
         try:
