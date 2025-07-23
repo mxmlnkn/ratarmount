@@ -8,8 +8,9 @@ import stat
 import sys
 import traceback
 import warnings
+from collections.abc import Iterable
 from pathlib import Path
-from typing import IO, Dict, Iterable, List, Union
+from typing import IO, Union
 
 from ratarmountcore.compressions import COMPRESSION_BACKENDS, check_for_split_file
 from ratarmountcore.formats import FILE_FORMATS, FileFormatID
@@ -113,8 +114,7 @@ def _open_sshfs_mount_source(url: str) -> Union[MountSource, IO[bytes], str]:
     #   ssh://127.0.0.1/relative/path
     #   ssh://127.0.0.1//home/user/relative/path
     path = fsspec.utils.infer_storage_options(url)['path']
-    if path.startswith("/"):
-        path = path[1:]
+    path = path.removeprefix("/")
     if not path:
         path = "."
 
@@ -264,7 +264,7 @@ def _matches_extension(fileName: str, formats: Iterable[FileFormatID]) -> bool:
     )
 
 
-def find_backends_by_extension(fileName: str) -> List[str]:
+def find_backends_by_extension(fileName: str) -> list[str]:
     return [backend for backend, info in ARCHIVE_BACKENDS.items() if _matches_extension(fileName, info.formats)] + [
         info.delegatedArchiveBackend
         for _, info in COMPRESSION_BACKENDS.items()
@@ -289,7 +289,7 @@ def open_mount_source(fileOrPath: Union[str, IO[bytes], os.PathLike], **options)
 
         fileOrPath = openedURL
 
-    autoPrioritizedBackends: List[str] = []
+    autoPrioritizedBackends: list[str] = []
     joinedFileName = ''
     if isinstance(fileOrPath, (str, os.PathLike)):
         path = Path(fileOrPath)
@@ -320,7 +320,7 @@ def open_mount_source(fileOrPath: Union[str, IO[bytes], os.PathLike], **options)
     triedBackends = set()
     # Map user-specified backend prioritization such as rapidgzip, indexed_bzip2, ... to tarfile,
     # which actually undoes those.
-    mapToArchiveBackend: Dict[str, str] = {
+    mapToArchiveBackend: dict[str, str] = {
         backend: info.delegatedArchiveBackend for backend, info in COMPRESSION_BACKENDS.items()
     }
 

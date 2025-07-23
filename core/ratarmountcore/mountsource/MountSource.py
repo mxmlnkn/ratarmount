@@ -1,9 +1,11 @@
+import builtins
 import dataclasses
 import os
 import stat
 import time
 from abc import ABC, abstractmethod
-from typing import IO, Any, Dict, Iterable, List, Optional, Union
+from collections.abc import Iterable
+from typing import IO, Any, Optional, Union
 
 
 @dataclasses.dataclass
@@ -19,7 +21,7 @@ class FileInfo:
     # FileInfo to a possibly recursively "mounted" MountSource, remove that last element belonging to it.
     # This way an arbitrary amount of userdata can be stored and it should be decidable which belongs to whom in
     # a chain of MountSource objects.
-    userdata : List[Any]
+    userdata : list[Any]
     # fmt: on
 
     def clone(self):
@@ -40,10 +42,10 @@ class MountSource(ABC):
     """
 
     @abstractmethod
-    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], dict[str, FileInfo]]]:
         pass
 
-    def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+    def list_mode(self, path: str) -> Optional[Union[Iterable[str], dict[str, int]]]:
         """
         This function can and should be overwritten with something that is faster than list
         because only a simple path -> mode mapping needs to be returned, not all file metadata.
@@ -68,7 +70,7 @@ class MountSource(ABC):
                     a default buffer size equal to the file(system)'s block size or Python's io.DEFAULT_BUFFER_SIZE.
         """
 
-    def statfs(self) -> Dict[str, Any]:
+    def statfs(self) -> dict[str, Any]:
         """
         Returns a dictionary with keys named like the POSIX statvfs struct.
         https://pubs.opengroup.org/onlinepubs/009695399/basedefs/sys/statvfs.h.html
@@ -111,7 +113,7 @@ class MountSource(ABC):
         return fileInfo is not None and stat.S_ISDIR(fileInfo.mode)
 
     # pylint: disable=unused-argument
-    def list_xattr(self, fileInfo: FileInfo) -> List[str]:
+    def list_xattr(self, fileInfo: FileInfo) -> builtins.list[str]:
         """
         Should return list of extended file attribute keys for the given fileInfo.
         """
@@ -134,7 +136,7 @@ class MountSource(ABC):
         pass
 
 
-def create_root_file_info(userdata: List[Any]):
+def create_root_file_info(userdata: list[Any]):
     # fmt: off
     return FileInfo(
         size     = 0,
@@ -148,7 +150,7 @@ def create_root_file_info(userdata: List[Any]):
     # fmt: on
 
 
-def merge_statfs(values: Iterable[Dict[str, Any]], printDebug: int = 0):
+def merge_statfs(values: Iterable[dict[str, Any]], printDebug: int = 0):
     result = {}
     for statfs in values:
         for key, value in statfs.items():

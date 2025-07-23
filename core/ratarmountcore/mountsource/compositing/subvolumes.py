@@ -1,15 +1,17 @@
-from typing import IO, Dict, Iterable, List, Optional, Tuple, Union
+import builtins
+from collections.abc import Iterable
+from typing import IO, Optional, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource, create_root_file_info
 from ratarmountcore.utils import overrides
 
 
 class SubvolumesMountSource(MountSource):
-    def __init__(self, mountSources: Dict[str, MountSource], printDebug: int = 0) -> None:
+    def __init__(self, mountSources: dict[str, MountSource], printDebug: int = 0) -> None:
         """
         mountSources : List of mount sources to mount as subfolders.
         """
-        self.mountSources: Dict[str, MountSource] = mountSources
+        self.mountSources: dict[str, MountSource] = mountSources
         self.printDebug = printDebug
 
         for name in self.mountSources:
@@ -18,7 +20,7 @@ class SubvolumesMountSource(MountSource):
 
         self.rootFileInfo = create_root_file_info(userdata=[None])
 
-    def _find_mount_source(self, path: str) -> Optional[Tuple[str, str]]:
+    def _find_mount_source(self, path: str) -> Optional[tuple[str, str]]:
         path = path.lstrip('/')
         subvolume, subpath = path.split('/', maxsplit=1) if '/' in path else [path, ""]
         return (subvolume, '/' + subpath) if subvolume in self.mountSources else None
@@ -73,11 +75,11 @@ class SubvolumesMountSource(MountSource):
         )
 
     @overrides(MountSource)
-    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], dict[str, FileInfo]]]:
         return self._list(path, onlyMode=False)
 
     @overrides(MountSource)
-    def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+    def list_mode(self, path: str) -> Optional[Union[Iterable[str], dict[str, int]]]:
         return self._list(path, onlyMode=True)
 
     @overrides(MountSource)
@@ -101,7 +103,7 @@ class SubvolumesMountSource(MountSource):
             fileInfo.userdata.append(subvolume)
 
     @overrides(MountSource)
-    def list_xattr(self, fileInfo: FileInfo) -> List[str]:
+    def list_xattr(self, fileInfo: FileInfo) -> builtins.list[str]:
         subvolume = fileInfo.userdata.pop()
         try:
             return [] if subvolume is None else self.mountSources[subvolume].list_xattr(fileInfo)
@@ -117,7 +119,7 @@ class SubvolumesMountSource(MountSource):
             fileInfo.userdata.append(subvolume)
 
     @overrides(MountSource)
-    def get_mount_source(self, fileInfo: FileInfo) -> Tuple[str, MountSource, FileInfo]:
+    def get_mount_source(self, fileInfo: FileInfo) -> tuple[str, MountSource, FileInfo]:
         sourceFileInfo = fileInfo.clone()
         subvolume = sourceFileInfo.userdata.pop()
 

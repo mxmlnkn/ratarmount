@@ -1,6 +1,6 @@
 import dataclasses
 import traceback
-from typing import IO, Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import IO, Any, Callable, Optional, Union
 
 from ratarmountcore.formats import FileFormatID
 
@@ -68,11 +68,11 @@ class ArchiveBackendInfo:
     # Note that the MountSource derived classes themselves (or rather their __init__) are fitting callables!
     open: Callable[[Any], Optional[MountSource]]
     # Supported file formats. These are for quick checks and prioritization based on file extension.
-    formats: Set[FileFormatID]
+    formats: set[FileFormatID]
     # If a format is suspected e.g. by extension or by a non-module dependent format check,
     # the modules listed here are checked and the module package name can be suggested to be installed.
     # Tuple: (module name, package name)
-    requiredModules: List[Tuple[str, str]]
+    requiredModules: list[tuple[str, str]]
 
 
 # Map of backends to their respective open-function. The order implies a priority.
@@ -80,7 +80,7 @@ class ArchiveBackendInfo:
 # file extensions via ARCHIVE_FORMATS. Furthermore, the backend is only tried if any of the associated
 # file format checkers returns True!
 # The keys are the backend names the user can specify with --backends or via prioritizedBackends arguments.
-ARCHIVE_BACKENDS: Dict[str, ArchiveBackendInfo] = {
+ARCHIVE_BACKENDS: dict[str, ArchiveBackendInfo] = {
     "rarfile": ArchiveBackendInfo(RarMountSource, {FID.RAR}, [('rarfile', 'rarfile')]),
     "tarfile": ArchiveBackendInfo(
         _open_tar_mount_source, {FID.TAR, FID.GZIP, FID.BZIP2, FID.XZ, FID.ZSTANDARD}, [('tarfile', '')]

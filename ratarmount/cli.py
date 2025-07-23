@@ -12,7 +12,7 @@ import sys
 import tarfile
 import tempfile
 import traceback
-from typing import List, Optional
+from typing import Optional
 
 from ratarmountcore.utils import RatarmountError, get_xdg_cache_home
 
@@ -50,7 +50,7 @@ class PrintOSSAttributionShortAction(argparse.Action):
         parser.exit()
 
 
-def _parse_args(rawArgs: Optional[List[str]] = None):
+def _parse_args(rawArgs: Optional[list[str]] = None):
     parser = argparse.ArgumentParser(
         prog='ratarmount',
         formatter_class=_CustomFormatter,
@@ -102,7 +102,7 @@ For further information, see the ReadMe on the project's homepage:
     defaultParallelization = len(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else os.cpu_count()
 
     # https://github.com/kislyuk/argcomplete/blob/a2b8bc6461bcfc919bc3f4b3f83c7716bd078583/argcomplete/finders.py#L117
-    backendNames: List[str] = []
+    backendNames: list[str] = []
     DEFAULT_GZIP_SEEK_POINT_SPACING = 16 * 1024 * 1024
     if "_ARGCOMPLETE" not in os.environ:
         # Expensive imports because they import all required modules for each format.
@@ -386,7 +386,7 @@ For further information, see the ReadMe on the project's homepage:
     return parser.parse_args(rawArgs)
 
 
-def cli(rawArgs: Optional[List[str]] = None) -> int:
+def cli(rawArgs: Optional[list[str]] = None) -> int:
     """
     Command line interface for ratarmount. Call with args = [ '--help' ] for a description.
 

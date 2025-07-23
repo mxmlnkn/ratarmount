@@ -13,7 +13,7 @@ import traceback
 import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import IO, Any, AnyStr, Callable, Dict, List, Optional, Tuple, Union
+from typing import IO, Any, AnyStr, Callable, Optional, Union
 
 try:
     import fsspec
@@ -25,6 +25,8 @@ with contextlib.suppress(ImportError):
 
 with contextlib.suppress(ImportError):
     import rapidgzip
+
+import builtins
 
 from .compressions import COMPRESSION_BACKENDS, detect_compression, find_available_backend
 from .formats import FILE_FORMATS, FileFormatID
@@ -45,7 +47,7 @@ def get_sqlite_tables(connection: sqlite3.Connection):
     return [x[0] for x in connection.execute('SELECT name FROM sqlite_master WHERE type="table" OR type="view"')]
 
 
-def _to_version_tuple(version: str) -> Optional[Tuple[int, int, int]]:
+def _to_version_tuple(version: str) -> Optional[tuple[int, int, int]]:
     versionNumbers = [re.sub('[^0-9]', '', x) for x in version.split('.')]
     if len(versionNumbers) == 3:
         return (int(versionNumbers[0]), int(versionNumbers[1]), int(versionNumbers[2]))
@@ -255,7 +257,7 @@ class SQLiteIndex:
     def __init__(
         self,
         indexFilePath: Optional[str],
-        indexFolders: Optional[List[str]] = None,
+        indexFolders: Optional[list[str]] = None,
         archiveFilePath: Optional[str] = None,
         *,  # force all parameters after to be keyword-only
         encoding: str = tarfile.ENCODING,
@@ -303,7 +305,7 @@ class SQLiteIndex:
             ignoreCurrentFolder,
         )
         # stores which parent folders were last tried to add to database and therefore do exist
-        self.parentFolderCache: List[Tuple[str, str]] = []
+        self.parentFolderCache: list[tuple[str, str]] = []
         self.preferMemory = preferMemory
         self.indexMinimumFileCount = indexMinimumFileCount
         self.backendName = backendName
@@ -331,10 +333,10 @@ class SQLiteIndex:
     @staticmethod
     def get_possible_index_file_paths(
         indexFilePath: Optional[str],
-        indexFolders: Optional[List[str]] = None,
+        indexFolders: Optional[list[str]] = None,
         archiveFilePath: Optional[str] = None,
         ignoreCurrentFolder: bool = False,
-    ) -> List[str]:
+    ) -> list[str]:
         if indexFilePath == ':memory:':
             return []
 
@@ -387,7 +389,7 @@ class SQLiteIndex:
             if os.path.isfile(indexPath):
                 os.remove(indexPath)
 
-    def open_existing(self, checkMetadata: Optional[Callable[[Dict[str, Any]], None]] = None, readOnly: bool = False):
+    def open_existing(self, checkMetadata: Optional[Callable[[dict[str, Any]], None]] = None, readOnly: bool = False):
         """Tries to find an already existing index."""
         for indexPath in self.possibleIndexFilePaths:
             if self._try_load_index(indexPath, checkMetadata=checkMetadata, readOnly=readOnly):
@@ -461,7 +463,7 @@ class SQLiteIndex:
 
             def make_version_row(
                 versionName: str, version: str
-            ) -> Tuple[str, str, Optional[str], Optional[str], Optional[str]]:
+            ) -> tuple[str, str, Optional[str], Optional[str], Optional[str]]:
                 versionNumbers = [re.sub('[^0-9]', '', x) for x in version.split('.')]
                 return (
                     versionName,
@@ -568,7 +570,7 @@ class SQLiteIndex:
 
     @staticmethod
     def check_archive_stats(
-        archiveFilePath: Optional[str], metadata: Dict[str, Any], verifyModificationTime: bool
+        archiveFilePath: Optional[str], metadata: dict[str, Any], verifyModificationTime: bool
     ) -> None:
         """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
 
@@ -604,7 +606,7 @@ class SQLiteIndex:
             )
 
     @staticmethod
-    def check_metadata_arguments(metadata: Dict, arguments, argumentsToCheck: List[str]):
+    def check_metadata_arguments(metadata: dict, arguments, argumentsToCheck: list[str]):
         # Check arguments used to create the found index.
         # These are only warnings and not forcing a rebuild by default.
         # TODO: Add option to force index rebuild on metadata mismatch?
@@ -620,7 +622,7 @@ class SQLiteIndex:
             for arg, oldState, newState in differingArgs:
                 print(f"[Warning] {arg}: index: {oldState}, current: {newState}")
 
-    def check_metadata_backend(self, metadata: Dict):
+    def check_metadata_backend(self, metadata: dict):
         # When opening an index without a backend via SQLiteIndexMountSource directly, it should not be checked.
         if not self.backendName:
             return
@@ -727,7 +729,7 @@ class SQLiteIndex:
         return sqlConnection
 
     @staticmethod
-    def _open_path(indexFilePath: Optional[str], printDebug: int = 0) -> Tuple[str, sqlite3.Connection]:
+    def _open_path(indexFilePath: Optional[str], printDebug: int = 0) -> tuple[str, sqlite3.Connection]:
         indexFilePath = indexFilePath or ':memory:'
 
         if printDebug >= 1:
@@ -830,7 +832,7 @@ class SQLiteIndex:
         return self.get_connection().execute('SELECT COUNT(*) FROM "files";').fetchone()[0]
 
     @staticmethod
-    def _row_to_file_info(row: Dict[str, Any]) -> FileInfo:
+    def _row_to_file_info(row: dict[str, Any]) -> FileInfo:
         # fmt: off
         userData = SQLiteIndexedTarUserData(
             offset         = row['offset'],
@@ -867,7 +869,7 @@ class SQLiteIndex:
         # This effect is good to have for inserting rows but not for querying rows.
         return '/' + os.path.normpath(path if path.startswith('../') else '/' + path).lstrip('/')
 
-    def list(self, path: str) -> Optional[Dict[str, FileInfo]]:
+    def list(self, path: str) -> Optional[dict[str, FileInfo]]:
         """
         Return a dictionary for the given directory path: { fileName : FileInfo, ... } or None
         if the path does not exist.
@@ -912,7 +914,7 @@ class SQLiteIndex:
         if 'recursiondepth' in columns:
             selected_columns += ['recursiondepth']
 
-        def row_to_file_info(cursor, row) -> Tuple[str, FileInfo]:  # pylint: disable=unused-argument
+        def row_to_file_info(cursor, row) -> tuple[str, FileInfo]:  # pylint: disable=unused-argument
             # fmt: off
             return row[0], FileInfo(
                 size     = row[1],
@@ -934,7 +936,7 @@ class SQLiteIndex:
 
         oldRowFactory = self.get_connection().row_factory
         self.get_connection().row_factory = row_to_file_info
-        directory: Dict[str, FileInfo] = dict(
+        directory: dict[str, FileInfo] = dict(
             self.get_connection().execute(
                 'SELECT ' + ','.join(selected_columns) + ' FROM "files" WHERE "path" == (?) ORDER BY "offsetheader"',
                 (self._query_normpath(path).rstrip('/'),),
@@ -946,7 +948,7 @@ class SQLiteIndex:
         directory.pop('', None)
         return directory if gotResults else None
 
-    def list_mode(self, path: str) -> Optional[Dict[str, int]]:
+    def list_mode(self, path: str) -> Optional[dict[str, int]]:
         """
         Return a dictionary mapping file names to file modes for the given directory path or None
         if the path does not exist.
@@ -969,7 +971,7 @@ class SQLiteIndex:
         directory.pop('', None)
         return directory if gotResults else None
 
-    def versions(self, path: str) -> Dict[str, FileInfo]:
+    def versions(self, path: str) -> dict[str, FileInfo]:
         """
         Return metadata for all versions of a file possibly appearing more than once
         in the index as a directory dictionary or an empty dictionary if the path does not exist.
@@ -1018,10 +1020,10 @@ class SQLiteIndex:
         )
         return self._row_to_file_info(row) if row else None
 
-    def setxattrs(self, rows: List[Tuple[int, str, bytes]]):
+    def setxattrs(self, rows: builtins.list[tuple[int, str, bytes]]):
         self.get_connection().executemany('INSERT OR REPLACE INTO "xattrs" VALUES (?,?,?)', rows)
 
-    def list_xattr(self, fileInfo: FileInfo) -> List[str]:
+    def list_xattr(self, fileInfo: FileInfo) -> builtins.list[str]:
         if not fileInfo.userdata:
             return []
         userData = fileInfo.userdata[-1]
@@ -1107,7 +1109,7 @@ class SQLiteIndex:
             [(p[0], p[1], offsetheader, offset) for p in paths],
         )
 
-    def set_file_infos(self, rows: List[Tuple]) -> None:
+    def set_file_infos(self, rows: builtins.list[tuple]) -> None:
         if not rows:
             return
 
@@ -1215,7 +1217,7 @@ class SQLiteIndex:
             self.indexFilePathDeleteOnClose = deleteOnClose
 
     def _load_index(
-        self, indexFilePath: str, checkMetadata: Optional[Callable[[Dict[str, Any]], None]], readOnly: bool = False
+        self, indexFilePath: str, checkMetadata: Optional[Callable[[dict[str, Any]], None]], readOnly: bool = False
     ) -> None:
         """
         Loads the given index SQLite database and checks it for validity raising an exception if it is invalid.
@@ -1234,8 +1236,7 @@ class SQLiteIndex:
         # to avoid useless copies to the temporary directory.
         if indexFilePath.count('://') == 1:
             fileURLPrefix = 'file://'
-            if indexFilePath.startswith(fileURLPrefix):
-                indexFilePath = indexFilePath[len(fileURLPrefix) :]
+            indexFilePath = indexFilePath.removeprefix(fileURLPrefix)
 
         temporaryFolder = os.environ.get("RATARMOUNT_INDEX_TMPDIR", None)
 
@@ -1382,7 +1383,7 @@ class SQLiteIndex:
     def _try_load_index(
         self,
         indexFilePath: str,
-        checkMetadata: Optional[Callable[[Dict[str, Any]], None]] = None,
+        checkMetadata: Optional[Callable[[dict[str, Any]], None]] = None,
         readOnly: bool = False,
     ) -> bool:
         """Calls loadIndex if index is not loaded already and provides extensive error handling."""

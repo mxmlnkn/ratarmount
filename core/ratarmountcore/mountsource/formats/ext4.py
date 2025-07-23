@@ -1,4 +1,5 @@
-from typing import IO, Any, Dict, Iterable, Optional, Union
+from collections.abc import Iterable
+from typing import IO, Any, Optional, Union
 
 from ratarmountcore.formats import FileFormatID, replace_format_check
 from ratarmountcore.mountsource import FileInfo, MountSource
@@ -65,7 +66,7 @@ class EXT4MountSource(MountSource):
             return False
         return True
 
-    def _list(self, path: str, getValue) -> Optional[Dict[str, Any]]:
+    def _list(self, path: str, getValue) -> Optional[dict[str, Any]]:
         try:
             inode = self.fileSystem.inode_at(path)
         except FileNotFoundError:
@@ -81,11 +82,11 @@ class EXT4MountSource(MountSource):
         }
 
     @overrides(MountSource)
-    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], dict[str, FileInfo]]]:
         return self._list(path, EXT4MountSource._convert_ext4_directory_entry_to_file_info)
 
     @overrides(MountSource)
-    def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+    def list_mode(self, path: str) -> Optional[Union[Iterable[str], dict[str, int]]]:
         return self._list(path, lambda inode: inode.i_mode.value)
 
     @overrides(MountSource)

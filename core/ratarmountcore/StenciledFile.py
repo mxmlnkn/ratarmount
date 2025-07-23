@@ -1,6 +1,6 @@
 import bisect
 import io
-from typing import IO, Callable, List, Optional, Tuple
+from typing import IO, Callable, Optional
 
 from .utils import FixedRawIOBase, _DummyContext, overrides
 
@@ -16,7 +16,7 @@ class RawStenciledFile(FixedRawIOBase):
 
     def __init__(
         self,
-        fileStencils: List[Tuple[IO, int, int]],
+        fileStencils: list[tuple[IO, int, int]],
         fileObjectLock=None,
     ) -> None:
         """
@@ -43,9 +43,9 @@ class RawStenciledFile(FixedRawIOBase):
 
         self.offset = 0
         self.fileObjectLock = fileObjectLock
-        self.offsets: List[int] = []
-        self.sizes: List[int] = []
-        self.fileObjects: List[IO] = []
+        self.offsets: list[int] = []
+        self.sizes: list[int] = []
+        self.fileObjects: list[IO] = []
 
         if fileStencils:
             self.fileObjects, self.offsets, self.sizes = zip(*fileStencils)
@@ -174,7 +174,7 @@ class RawStenciledFile(FixedRawIOBase):
 
 
 class RawJoinedFileFromFactory(io.RawIOBase):
-    def __init__(self, file_object_factories: List[Callable[[], IO[bytes]]], file_lock=None) -> None:
+    def __init__(self, file_object_factories: list[Callable[[], IO[bytes]]], file_lock=None) -> None:
         """
         Similar to StenciledFile but instead of joining a list of file objects, which neccessitates keeping all
         files open, this class opens each file on demand and only keeps one file open. This is useful to avoid
@@ -185,10 +185,10 @@ class RawJoinedFileFromFactory(io.RawIOBase):
         self.offset = 0
         self.fileObjectLock = file_lock
         # Stores index and file object of currently opened file object. It basically is a cache for the factories.
-        self.fileObject: Optional[Tuple[int, IO[bytes]]] = None
+        self.fileObject: Optional[tuple[int, IO[bytes]]] = None
 
-        self.sizes: List[int] = []
-        self.factories: List[Callable[[], IO[bytes]]] = []
+        self.sizes: list[int] = []
+        self.factories: list[Callable[[], IO[bytes]]] = []
         self.cumsizes = [0]
         self._seekable = True
         for factory in file_object_factories:
@@ -314,7 +314,7 @@ class RawJoinedFileFromFactory(io.RawIOBase):
 
 class StenciledFile(io.BufferedReader):
     def __init__(
-        self, fileStencils: List[Tuple[IO, int, int]], fileObjectLock=None, bufferSize=io.DEFAULT_BUFFER_SIZE
+        self, fileStencils: list[tuple[IO, int, int]], fileObjectLock=None, bufferSize=io.DEFAULT_BUFFER_SIZE
     ) -> None:
         """
         bufferSize: Gets forwarded to io.BufferedReader.__init__ buffer_size argument and has the same semantic,
@@ -324,7 +324,7 @@ class StenciledFile(io.BufferedReader):
 
 
 class JoinedFile(io.BufferedReader):
-    def __init__(self, file_objects: List[IO], file_lock=None, buffer_size: int = io.DEFAULT_BUFFER_SIZE) -> None:
+    def __init__(self, file_objects: list[IO], file_lock=None, buffer_size: int = io.DEFAULT_BUFFER_SIZE) -> None:
         sizes = [fobj.seek(0, io.SEEK_END) for fobj in file_objects]
         for fobj, size in zip(file_objects, sizes):
             if size is None:
@@ -336,7 +336,7 @@ class JoinedFile(io.BufferedReader):
 
 class JoinedFileFromFactory(io.BufferedReader):
     def __init__(
-        self, file_object_factories: List[Callable[[], IO]], file_lock=None, buffer_size: int = io.DEFAULT_BUFFER_SIZE
+        self, file_object_factories: list[Callable[[], IO]], file_lock=None, buffer_size: int = io.DEFAULT_BUFFER_SIZE
     ) -> None:
         """
         Similar to JoinedFile but instead of joining a list of file objects, which neccessitates keeping all

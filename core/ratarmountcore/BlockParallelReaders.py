@@ -3,7 +3,7 @@ import io
 import multiprocessing.pool
 import os
 import signal
-from typing import List, Optional
+from typing import Optional
 
 try:
     import xz
@@ -30,7 +30,7 @@ class BlockParallelReader(io.BufferedIOBase):
         self,
         filename: str,
         fileobj,
-        blockBoundaries: List[int],
+        blockBoundaries: list[int],
         parallelization: Optional[int],
         initWorker=None,
         initArgs=(),
@@ -50,7 +50,7 @@ class BlockParallelReader(io.BufferedIOBase):
 
         self.filename = filename
         self.fileobj = fileobj
-        self.blockBoundaries: List[int] = blockBoundaries
+        self.blockBoundaries: list[int] = blockBoundaries
         self.initWorker = BlockParallelReader._init_worker if initWorker is None else initWorker
         self.initArgs = initArgs
 
@@ -87,7 +87,7 @@ class BlockParallelReader(io.BufferedIOBase):
         signal.signal(signal.SIGINT, signal.SIG_IGN)
 
     @staticmethod
-    def _find_block(blockBoundaries: List[int], offset: int) -> Optional[int]:
+    def _find_block(blockBoundaries: list[int], offset: int) -> Optional[int]:
         """
         Returns the blockNumber such that the requested offset is inside the block starting at
         self.blockBoundaries[blockNumber].
@@ -97,7 +97,7 @@ class BlockParallelReader(io.BufferedIOBase):
         return blockNumber if blockNumber >= 0 and blockNumber + 1 < len(blockBoundaries) else None
 
     @staticmethod
-    def _block_size(blockBoundaries: List[int], blockNumber) -> int:
+    def _block_size(blockBoundaries: list[int], blockNumber) -> int:
         if blockNumber + 1 >= len(blockBoundaries) or blockNumber < 0:
             return 0
         return blockBoundaries[blockNumber + 1] - blockBoundaries[blockNumber]
@@ -258,14 +258,14 @@ class ParallelXZReader(BlockParallelReader):
         #     for block_boundary in stream.block_boundaries
         # ]
         # This also gives us hints how to manually compute the compressed block offsets.
-        blockBoundaries: List[int] = fileObject.block_boundaries.copy()
+        blockBoundaries: list[int] = fileObject.block_boundaries.copy()
         blockBoundaries.append(len(fileObject))
 
         # Compute compressed block offsets because python-xz has no way to query that information:
         # https://github.com/Rogdham/python-xz/blob/89af850a59aaf83920a0eb7c314d9f2ed71979fa/src/xz/stream.py#L43-L46
         # These offsets are only approximate because of the missing interface and because I do not want to parse
         # the format myself.
-        self.approximateCompressedBlockBoundaries: List[int] = []
+        self.approximateCompressedBlockBoundaries: list[int] = []
         if hasattr(fileObject, '_fileobjs'):
             streamOffset = 0
             # xz.open returns XZFile defined in xz/file.py as subclass of IOCombiner[XZStream].

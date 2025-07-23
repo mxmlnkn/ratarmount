@@ -2,7 +2,8 @@ import os
 import stat
 import time
 import urllib
-from typing import IO, Dict, Iterable, Optional, Union
+from collections.abc import Iterable
+from typing import IO, Optional, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource, create_root_file_info
 from ratarmountcore.utils import overrides
@@ -163,7 +164,7 @@ class FSSpecMountSource(MountSource):
     def exists(self, path: str) -> bool:
         return self.fileSystem.lexists(self._get_path(path))
 
-    def _list(self, path: str, onlyMode: bool) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def _list(self, path: str, onlyMode: bool) -> Optional[Union[Iterable[str], dict[str, FileInfo]]]:
         path = self._get_path(path)
 
         if path == '/' and DropboxDriveFileSystem and isinstance(self.fileSystem, DropboxDriveFileSystem):
@@ -245,11 +246,11 @@ class FSSpecMountSource(MountSource):
         return result
 
     @overrides(MountSource)
-    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], dict[str, FileInfo]]]:
         return self._list(path, onlyMode=False)
 
     @overrides(MountSource)
-    def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+    def list_mode(self, path: str) -> Optional[Union[Iterable[str], dict[str, int]]]:
         return self._list(path, onlyMode=True)
 
     def _lookup_http(self, path: str) -> Optional[FileInfo]:

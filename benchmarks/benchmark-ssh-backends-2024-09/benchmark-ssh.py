@@ -9,7 +9,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 import asyncssh
 import fsspec
@@ -653,7 +653,7 @@ benchmarks = [
 ]
 
 
-def _parse_args(raw_args: Optional[List[str]] = None):
+def _parse_args(raw_args: Optional[list[str]] = None):
     parser = argparse.ArgumentParser(add_help=False, description="SSH backend benchmarking tool")
 
     parser.add_argument(

@@ -6,7 +6,8 @@ import platform
 import struct
 import sys
 import traceback
-from typing import IO, Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, cast
+from collections.abc import Iterable
+from typing import IO, Any, Callable, Optional, cast
 
 from .BlockParallelReaders import ParallelXZReader
 from .formats import ARCHIVE_FORMATS, COMPRESSION_FORMATS, FID, FileFormatID, might_be_format
@@ -72,7 +73,7 @@ except Exception:
         raise ImportError("Please install python-libarchive-c with: pip install libarchive-c")
 
 
-TAR_CONTRACTED_EXTENSIONS: Dict[FileFormatID, List[str]] = {
+TAR_CONTRACTED_EXTENSIONS: dict[FileFormatID, list[str]] = {
     FID.BZIP2: ['tb2', 'tbz', 'tbz2', 'tz2'],
     FID.GZIP: ['taz', 'tgz'],
     FID.XZ: ['txz'],
@@ -85,15 +86,15 @@ class CompressionBackendInfo:
     # Opens a file object from a path or file object and additional options (kwargs).
     open: Callable[..., IO[bytes]]
     # Supported file formats. These are for quick checks and prioritization based on file extension.
-    formats: Set[FileFormatID]
+    formats: set[FileFormatID]
     # If a format is suspected e.g. by extension or by a non-module dependent format check,
     # the modules listed here are checked and the module package name can be suggested to be installed.
     # Tuple: (module name, package name)
-    requiredModules: List[Tuple[str, str]]
+    requiredModules: list[tuple[str, str]]
     delegatedArchiveBackend: str
 
 
-COMPRESSION_BACKENDS: Dict[str, CompressionBackendInfo] = {
+COMPRESSION_BACKENDS: dict[str, CompressionBackendInfo] = {
     'rapidgzip-bzip2': CompressionBackendInfo(
         (lambda x, parallelization=0: rapidgzip.IndexedBzip2File(x, parallelization=parallelization)),
         {FID.BZIP2},
@@ -155,8 +156,8 @@ COMPRESSION_BACKENDS: Dict[str, CompressionBackendInfo] = {
 
 def find_available_backend(
     compression: FileFormatID,
-    enabledBackends: Optional[List[str]] = None,
-    prioritizedBackends: Optional[List[str]] = None,
+    enabledBackends: Optional[list[str]] = None,
+    prioritizedBackends: Optional[list[str]] = None,
 ) -> Optional[CompressionBackendInfo]:
     if prioritizedBackends is None:
         prioritizedBackends = []
@@ -216,8 +217,8 @@ def has_matching_alphabets(a: str, b: str):
     )
 
 
-def check_for_sequence(extensions: Iterable[str], numberFormatter: Callable[[int], str]) -> List[str]:
-    suffixSequence: List[str] = []
+def check_for_sequence(extensions: Iterable[str], numberFormatter: Callable[[int], str]) -> list[str]:
+    suffixSequence: list[str] = []
     i = 0
     suffixLength = len(numberFormatter(0))
 
@@ -234,7 +235,7 @@ def check_for_sequence(extensions: Iterable[str], numberFormatter: Callable[[int
     return suffixSequence
 
 
-def check_for_split_file(path: str) -> Optional[Tuple[List[str], str]]:
+def check_for_split_file(path: str) -> Optional[tuple[list[str], str]]:
     """
     Returns the paths to all files belonging to the split and a string identifying the format.
     The latter is one of: '', 'x', 'a' to specify the numbering system: decimal, hexadecimal, alphabetical.
@@ -277,7 +278,7 @@ def check_for_split_file(path: str) -> Optional[Tuple[List[str], str]]:
 
     # Note that even if something consists only of letters or only digits it still might be hexadecimal encoding!
     maxFormatSpecifier = ''
-    maxExtensions: List[str] = []
+    maxExtensions: list[str] = []
     for formatSpecifier, baseDigits in [('a', ALPHA), ('0', DIGITS), ('x', HEX)]:
         extensionSequence = check_for_sequence(
             extensions, lambda i, baseDigits=baseDigits: format_number(i, baseDigits, len(extension))  # type: ignore
@@ -324,7 +325,7 @@ def compress_zstd(filePath: str, outputFilePath: str, frameSize: int, paralleliz
             compressedFile.write(results.pop(0).result())
 
 
-def get_gzip_info(fileobj: IO[bytes]) -> Optional[Tuple[str, int]]:
+def get_gzip_info(fileobj: IO[bytes]) -> Optional[tuple[str, int]]:
     id1, id2, compression, flags, mtime, _, _ = struct.unpack('<BBBBLBB', fileobj.read(10))
     if id1 != 0x1F or id2 != 0x8B or compression != 0x08:
         return None
@@ -345,7 +346,7 @@ def get_gzip_info(fileobj: IO[bytes]) -> Optional[Tuple[str, int]]:
 
 def detect_compression(
     fileobj: IO[bytes],
-    prioritizedBackends: Optional[List[str]] = None,
+    prioritizedBackends: Optional[list[str]] = None,
     printDebug: int = 0,
 ) -> Optional[FileFormatID]:
     # isinstance(fileobj, io.IOBase) does not work for everything, e.g., for paramiko.sftp_file.SFTPFile
@@ -411,7 +412,7 @@ def detect_compression(
 def use_rapidgzip(
     fileobj: IO[bytes],
     gzipSeekPointSpacing: int = 16 * 1024 * 1024,
-    prioritizedBackends: Optional[List[str]] = None,
+    prioritizedBackends: Optional[list[str]] = None,
     printDebug: int = 0,
 ) -> bool:
     if fileobj is None:
@@ -459,11 +460,11 @@ def use_rapidgzip(
 def open_compressed_file(
     fileobj: IO[bytes],
     gzipSeekPointSpacing: int,
-    parallelizations: Dict[str, int],
-    enabledBackends: Optional[List[str]] = None,
-    prioritizedBackends: Optional[List[str]] = None,
+    parallelizations: dict[str, int],
+    enabledBackends: Optional[list[str]] = None,
+    prioritizedBackends: Optional[list[str]] = None,
     printDebug: int = 0,
-) -> Tuple[Any, Optional[IO[bytes]], Optional[FileFormatID]]:
+) -> tuple[Any, Optional[IO[bytes]], Optional[FileFormatID]]:
     """
     Opens a file possibly undoing the compression.
     Returns (tar_file_obj, raw_file_obj, compression).
