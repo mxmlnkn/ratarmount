@@ -305,9 +305,11 @@ def compress_zstd(filePath: str, outputFilePath: str, frameSize: int, paralleliz
         parallelization = os.cpu_count()
         assert parallelization is not None, "Cannot automatically determine CPU count!"
 
-    with open(filePath, 'rb') as file, open(
-        outputFilePath, 'wb'
-    ) as compressedFile, concurrent.futures.ThreadPoolExecutor(parallelization) as pool:
+    with (
+        open(filePath, 'rb') as file,
+        open(outputFilePath, 'wb') as compressedFile,
+        concurrent.futures.ThreadPoolExecutor(parallelization) as pool,
+    ):
         results = []
         while True:
             toCompress = file.read(frameSize)

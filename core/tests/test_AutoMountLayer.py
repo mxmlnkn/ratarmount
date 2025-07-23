@@ -124,9 +124,10 @@ class TestAutoMountLayer:
             'parallelization': parallelization,
         }
 
-        with copy_test_file("tests/double-compressed-nested-tar.tgz.tgz") as path, open_mount_source(
-            path, **options
-        ) as mountSource:
+        with (
+            copy_test_file("tests/double-compressed-nested-tar.tgz.tgz") as path,
+            open_mount_source(path, **options) as mountSource,
+        ):
             recursivelyMounted = AutoMountLayer(mountSource, **options)
 
             for folder in ['/', '/nested-tar.tar.gz', '/nested-tar.tar.gz/foo', '/nested-tar.tar.gz/foo/fighter']:

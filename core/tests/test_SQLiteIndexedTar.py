@@ -38,9 +38,10 @@ class TestSQLiteIndexedTarParallelized:
 
     @staticmethod
     def test_context_manager(parallelization):
-        with copy_test_file("single-file.tar") as path, SQLiteIndexedTar(
-            path, writeIndex=False, parallelization=parallelization
-        ) as indexedTar:
+        with (
+            copy_test_file("single-file.tar") as path,
+            SQLiteIndexedTar(path, writeIndex=False, parallelization=parallelization) as indexedTar,
+        ):
             assert indexedTar.list('/')
             assert indexedTar.lookup('/')
 
@@ -57,12 +58,15 @@ class TestSQLiteIndexedTarParallelized:
 
     @staticmethod
     def test_tar_bz2_with_parallelization(parallelization):
-        with copy_test_file("2k-recursive-tars.tar.bz2") as path, SQLiteIndexedTar(
-            path,
-            clearIndexCache=True,
-            recursive=False,
-            parallelization=parallelization,
-        ) as file:
+        with (
+            copy_test_file("2k-recursive-tars.tar.bz2") as path,
+            SQLiteIndexedTar(
+                path,
+                clearIndexCache=True,
+                recursive=False,
+                parallelization=parallelization,
+            ) as file,
+        ):
             for folder in ['/', '/mimi']:
                 assert file.lookup(folder)
                 assert file.versions(folder) == 1
@@ -78,12 +82,15 @@ class TestSQLiteIndexedTarParallelized:
 
     @staticmethod
     def test_recursive_tar_bz2_with_parallelization(parallelization):
-        with copy_test_file("2k-recursive-tars.tar.bz2") as path, SQLiteIndexedTar(
-            path,
-            clearIndexCache=True,
-            recursive=True,
-            parallelization=parallelization,
-        ) as file:
+        with (
+            copy_test_file("2k-recursive-tars.tar.bz2") as path,
+            SQLiteIndexedTar(
+                path,
+                clearIndexCache=True,
+                recursive=True,
+                parallelization=parallelization,
+            ) as file,
+        ):
             assert file.list('/')
             assert file.list('/mimi')
 
@@ -99,13 +106,16 @@ class TestSQLiteIndexedTarParallelized:
     @pytest.mark.parametrize("recursive", [False, True])
     @pytest.mark.parametrize("maxRecursionDepth", [None, 0, 1, 2, 3, 4, 5])
     def test_deep_recursive(parallelization, recursive, maxRecursionDepth):
-        with copy_test_file("packed-5-times.tar.gz") as path, SQLiteIndexedTar(
-            path,
-            clearIndexCache=True,
-            recursive=recursive,
-            recursionDepth=maxRecursionDepth,
-            parallelization=parallelization,
-        ) as mountSource:
+        with (
+            copy_test_file("packed-5-times.tar.gz") as path,
+            SQLiteIndexedTar(
+                path,
+                clearIndexCache=True,
+                recursive=recursive,
+                recursionDepth=maxRecursionDepth,
+                parallelization=parallelization,
+            ) as mountSource,
+        ):
             # packed-5-times.tar.gz -> /ufo_03.tar/ufo_02.tar/ufo_01.tar/ufo_00.tar/ufo
             maxDepth = 5  # 4 TAR archives + 1 compression layer
             recursionDepth = (maxDepth if recursive else 0) if maxRecursionDepth is None else maxRecursionDepth
@@ -193,11 +203,14 @@ class TestSQLiteIndexedTarParallelized:
 
     @staticmethod
     def test_compressed_tar(parallelization):
-        with copy_test_file("packed-5-times.tar.gz") as path, SQLiteIndexedTar(
-            path,
-            clearIndexCache=True,
-            parallelization=parallelization,
-        ) as mountSource:
+        with (
+            copy_test_file("packed-5-times.tar.gz") as path,
+            SQLiteIndexedTar(
+                path,
+                clearIndexCache=True,
+                parallelization=parallelization,
+            ) as mountSource,
+        ):
             assert mountSource.list('/')
 
             # See test_deep_recursive for recursion depth discussion.
@@ -385,9 +398,10 @@ class TestSQLiteIndexedTarParallelized:
     @staticmethod
     def test_multithreaded_reading(parallelization):
         parallelism = parallelization * 6  # Need a bit more parallelism to trigger bugs easier
-        with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, concurrent.futures.ThreadPoolExecutor(
-            parallelism
-        ) as pool:
+        with (
+            tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile,
+            concurrent.futures.ThreadPoolExecutor(parallelism) as pool,
+        ):
             repeatCount = 10000
 
             with tarfile.open(name=tmpTarFile.name, mode="w:gz") as tarFile:
@@ -535,9 +549,11 @@ class TestSQLiteIndexedTarParallelized:
 
         # Create a TAR large in size as well as file count
         tarPath = os.path.join(tmpdir, "foo.tar")
-        with copy_test_file(
-            "tar-with-300-folders-with-1000-files-0B-files.tar.bz2"
-        ) as path, rapidgzip.IndexedBzip2File(path) as file, open(tarPath, 'wb') as extracted:
+        with (
+            copy_test_file("tar-with-300-folders-with-1000-files-0B-files.tar.bz2") as path,
+            rapidgzip.IndexedBzip2File(path) as file,
+            open(tarPath, 'wb') as extracted,
+        ):
             while True:
                 data = file.read(1024 * 1024)
                 if not data:

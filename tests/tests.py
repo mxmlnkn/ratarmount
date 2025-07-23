@@ -32,9 +32,10 @@ def make_folder(tarArchive, folderName):
     tarArchive.addfile(tinfo, io.BytesIO())
 
 
-with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile, tempfile.NamedTemporaryFile(
-    suffix=".sqlite"
-) as tmpIndexFile:
+with (
+    tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile,
+    tempfile.NamedTemporaryFile(suffix=".sqlite") as tmpIndexFile,
+):
     with tarfile.open(name=tmpTarFile.name, mode="w:gz") as tarFile:
         create_file(tarFile, "./README.md", "hello world")
         make_folder(tarFile, "./src")

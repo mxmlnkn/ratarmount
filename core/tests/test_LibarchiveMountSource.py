@@ -54,9 +54,10 @@ class TestLibarchiveMountSource:
     @staticmethod
     @pytest.mark.parametrize('compression', ['7z', 'rar', 'zip'])
     def test_transform(compression):
-        with copy_test_file('folder-symlink.' + compression) as path, LibarchiveMountSource(
-            path, transform=("(.)/(.)", r"\1_\2")
-        ) as mountSource:
+        with (
+            copy_test_file('folder-symlink.' + compression) as path,
+            LibarchiveMountSource(path, transform=("(.)/(.)", r"\1_\2")) as mountSource,
+        ):
             for folder in ['/', '/foo', '/foo_fighter']:
                 fileInfo = mountSource.lookup(folder)
                 assert fileInfo
@@ -83,9 +84,10 @@ class TestLibarchiveMountSource:
     # @pytest.mark.parametrize("compression", ["7z", "rar", "zip"])
     @pytest.mark.parametrize('compression', ['zip'])
     def test_password(compression):
-        with copy_test_file('encrypted-nested-tar.' + compression) as path, LibarchiveMountSource(
-            path, passwords=['foo']
-        ) as mountSource:
+        with (
+            copy_test_file('encrypted-nested-tar.' + compression) as path,
+            LibarchiveMountSource(path, passwords=['foo']) as mountSource,
+        ):
             for folder in ['/', '/foo', '/foo/fighter']:
                 fileInfo = mountSource.lookup(folder)
                 assert fileInfo
@@ -107,9 +109,10 @@ class TestLibarchiveMountSource:
     @staticmethod
     @pytest.mark.parametrize('compression', ['bz2', 'gz', 'lrz', 'lz4', 'lzip', 'lzma', 'lzo', 'xz', 'Z', 'zst'])
     def test_stream_compressed(compression):
-        with copy_test_file('simple.' + compression) as path, LibarchiveMountSource(
-            path, passwords=['foo']
-        ) as mountSource:
+        with (
+            copy_test_file('simple.' + compression) as path,
+            LibarchiveMountSource(path, passwords=['foo']) as mountSource,
+        ):
             for folder in ['/']:
                 fileInfo = mountSource.lookup(folder)
                 assert fileInfo
@@ -150,9 +153,10 @@ class TestLibarchiveMountSource:
                 assert len(actualZeros) == len(expectedZeros)
                 assert actualZeros == expectedZeros
 
-            with mountSource.open(mountSource.lookup('zeros-32-MiB.txt')) as fileWithZeros, mountSource.open(
-                mountSource.lookup('spaces-32-MiB.txt')
-            ) as fileWithSpaces:
+            with (
+                mountSource.open(mountSource.lookup('zeros-32-MiB.txt')) as fileWithZeros,
+                mountSource.open(mountSource.lookup('spaces-32-MiB.txt')) as fileWithSpaces,
+            ):
                 expectedSpaces = b' ' * (lineSize - 1) + b'\n'
                 expectedZeros = b'0' * (lineSize - 1) + b'\n'
 
