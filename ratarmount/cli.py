@@ -405,6 +405,12 @@ For further information, see the ReadMe on the project's homepage:
         help='Specify a regex pattern and a replacement string, which will be applied via Python\'s re module '
              'to the full paths of all archive files.')
 
+    advancedGroup.add_argument(
+        '--control-interface', action=argparse.BooleanOptionalAction, default=False,
+        help='If enabled, adds a hidden /.ratarmount-control folder inside the mount point, which contains '
+             'special files to communicate with the FUSE-providing ratarmount process. '
+             '`/.ratarmount-control/output` to get log and error output of the running process.')
+
     # Positional Arguments
 
     positionalGroup.add_argument(

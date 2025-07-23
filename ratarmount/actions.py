@@ -378,7 +378,7 @@ def process_parsed_arguments(args) -> int:
     if '://' not in lastArgument and (os.path.isdir(lastArgument) or not os.path.exists(lastArgument)):
         args.mount_point = lastArgument
         args.mount_source = args.mount_source[:-1]
-    if not args.mount_source and not args.write_overlay:
+    if not args.mount_source and not args.write_overlay and not args.control_interface:
         raise argparse.ArgumentTypeError(
             "You must at least specify one path to a valid TAR file or union mount source directory!"
         )
@@ -546,6 +546,7 @@ def create_fuse_mount(args) -> None:
         indexMinimumFileCount        = args.index_minimum_file_count,
         logFile                      = args.log_file,
         enableFileVersions           = args.file_versions,
+        controlInterface             = args.control_interface,
     ) as fuseOperationsObject:
         # fmt: on
         try:

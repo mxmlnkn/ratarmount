@@ -17,6 +17,7 @@ Usage: ratarmount [-h] [-r | --recursive | --no-recursive] [-u] [-P PARALLELIZAT
                   [--union-mount-cache-timeout UNION_MOUNT_CACHE_TIMEOUT]
                   [--index-minimum-file-count INDEX_MINIMUM_FILE_COUNT]
                   [--transform REGEX_PATTERN REPLACEMENT]
+                  [--control-interface | --no-control-interface]
                   mount_source [mount_source ...] [mount_point]
 
 With ratarmount, you can:
@@ -172,6 +173,11 @@ Output Options:
                         highest. (default: 1)
 
 Advanced Options:
+  --control-interface, --no-control-interface
+                        If enabled, adds a hidden /.ratarmount-control folder inside the mount
+                        point, which contains special files to communicate with the
+                        FUSE-providing ratarmount process. `/.ratarmount-control/output` to get
+                        log and error output of the running process. (default: False)
   --disable-union-mount
                         Mounts all specified archives in equally named subfolders under the
                         mount point. (default: False)
