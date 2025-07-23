@@ -442,7 +442,7 @@ class FuseMount(fuse.Operations):
                 os.lseek(openedFile, offset, os.SEEK_SET)
                 return os.read(openedFile, size)
 
-            openedFile.seek(offset, os.SEEK_SET)
+            openedFile.seek(offset)
             return openedFile.read(size)
 
         # As far as I understand FUSE and my own file handle cache, this should never happen. But you never know.
