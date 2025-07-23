@@ -306,7 +306,7 @@ class FuseMount(fuse.Operations):
             pystd.close()  # Also closes pystdFileno and makes it reusable.
         os.dup2(file.fileno(), pystdFileno)
 
-        sys.stdout = file
+        setattr(sys, name, file)
 
     @overrides(fuse.Operations)
     def init(self, path) -> None:
