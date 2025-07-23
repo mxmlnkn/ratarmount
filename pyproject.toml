@@ -23,6 +23,11 @@ classifiers = [
     "Operating System :: MacOS",
     "Operating System :: Unix",
     "Programming Language :: Python :: 3",
+    # I am unsure about the semantic of these. For actualy compatibility, there is 'requires-python'.
+    # These are only informational, and therefore I think it should be fine to list older Python versions,
+    # which do not work with the current version of this project, but for which there exists older versions
+    # of this project that are still installable and usable.
+    "Programming Language :: Python :: 3.6",
     "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -30,13 +35,15 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: System :: Archiving",
     "Topic :: System :: Archiving :: Compression",
     "Topic :: System :: Filesystems",
     "Topic :: Utilities",
 ]
 urls = {Homepage = "https://github.com/mxmlnkn/ratarmount"}
-requires-python = ">= 3.7"
+# Require Python 3.9. argparse.BooleanOptionalAction was the straw that broke the camel's back.
+requires-python = ">= 3.9"
 dependencies = [
     # https://pip.pypa.io/en/stable/reference/requirement-specifiers/
     # https://packaging.python.org/en/latest/glossary/#term-Requirement-Specifier
