@@ -280,7 +280,7 @@ class FuseMount(fuse.Operations):
     def __del__(self) -> None:
         self._close()
 
-    def _add_new_handle(self, handle, flags):
+    def _add_new_handle(self, handle, flags: int) -> int:
         # Note that fh in fuse_common.h is 64-bit and Python also supports 64-bit (long integers) out of the box.
         # So, there should practically be no overflow and file handle reuse possible.
         self.lastFileHandle += 1
@@ -404,7 +404,7 @@ class FuseMount(fuse.Operations):
         return self._lookup(path).linkname
 
     @overrides(fuse.Operations)
-    def open(self, path: str, flags: int):
+    def open(self, path: str, flags: int) -> int:
         """Returns file handle of opened path."""
 
         fileInfo = self._lookup(path)
@@ -421,7 +421,7 @@ class FuseMount(fuse.Operations):
             raise fuse.FuseOSError(errno.EIO) from exception
 
     @overrides(fuse.Operations)
-    def release(self, path: str, fh):
+    def release(self, path: str, fh) -> int:
         if fh not in self.openedFiles:
             raise fuse.FuseOSError(errno.ESTALE)
 
