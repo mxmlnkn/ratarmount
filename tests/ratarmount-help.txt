@@ -156,6 +156,10 @@ Advanced Options:
   --disable-union-mount
                         Mounts all specified archives in equally named subfolders under the
                         mount point. (default: False)
+  --file-versions, --no-file-versions
+                        Enables special <file-path>.versions/ folders to access different file
+                        versions if there are multiple in the archive or overlapping file paths
+                        for union mounting. (default: True)
   --index-minimum-file-count INDEX_MINIMUM_FILE_COUNT
                         Create indexes for archives with fewer than this limit of files in
                         memory instead of creating a .index.sqlite file. This is currently not

@@ -182,7 +182,8 @@ class FuseMount(fuse.Operations):
         if join_threads is not None:
             join_threads()
 
-        self.mountSource = FileVersionLayer(self.mountSource)
+        if options.get('enableFileVersions', True):
+            self.mountSource = FileVersionLayer(self.mountSource)
 
         # Maps handles to either opened I/O objects or os module file handles for the writeOverlay and the open flags.
         self.openedFiles: dict[int, tuple[int, Union[IO[bytes], int]]] = {}
