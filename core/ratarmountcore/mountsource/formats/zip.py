@@ -7,7 +7,7 @@ import sys
 import tarfile
 import zipfile
 from timeit import default_timer as timer
-from typing import IO, Any, Dict, List, Optional, Tuple, Union
+from typing import IO, Any, Optional, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
@@ -30,12 +30,12 @@ class ZipMountSource(SQLiteIndexMountSource):
         writeIndex             : bool                      = False,
         clearIndexCache        : bool                      = False,
         indexFilePath          : Optional[str]             = None,
-        indexFolders           : Optional[List[str]]       = None,
+        indexFolders           : Optional[list[str]]       = None,
         encoding               : str                       = tarfile.ENCODING,
         verifyModificationTime : bool                      = False,
         printDebug             : int                       = 0,
         indexMinimumFileCount  : int                       = 1000,
-        transform              : Optional[Tuple[str, str]] = None,
+        transform              : Optional[tuple[str, str]] = None,
         **options
     ) -> None:
         # fmt: on
@@ -98,7 +98,7 @@ class ZipMountSource(SQLiteIndexMountSource):
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
         self.index.store_metadata(argumentsMetadata, self.archiveFilePath)
 
-    def _convert_to_row(self, info: "zipfile.ZipInfo") -> Tuple:
+    def _convert_to_row(self, info: "zipfile.ZipInfo") -> tuple:
         mtime = datetime.datetime(*info.date_time, tzinfo=datetime.timezone.utc).timestamp() if info.date_time else 0
 
         # According to section 4.5.7 in the .ZIP file format specification, links are supported:
@@ -132,7 +132,7 @@ class ZipMountSource(SQLiteIndexMountSource):
         dataOffset = 0
 
         # fmt: off
-        fileInfo : Tuple = (
+        fileInfo : tuple = (
             path              ,  # 0  : path
             name              ,  # 1  : file name
             info.header_offset,  # 2  : header offset
@@ -217,7 +217,7 @@ class ZipMountSource(SQLiteIndexMountSource):
         # https://github.com/python/cpython/blob/a87c46eab3c306b1c5b8a072b7b30ac2c50651c0/Lib/zipfile/__init__.py#L1569
         return self.fileObject.open(info, 'r')  # https://github.com/pauldmccarthy/indexed_gzip/issues/85
 
-    def _check_metadata(self, metadata: Dict[str, Any]) -> None:
+    def _check_metadata(self, metadata: dict[str, Any]) -> None:
         """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
         SQLiteIndex.check_archive_stats(self.archiveFilePath, metadata, self.verifyModificationTime)
 

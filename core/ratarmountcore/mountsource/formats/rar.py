@@ -1,10 +1,12 @@
+import builtins
 import contextlib
 import datetime
 import os
 import stat
 import sys
 import time
-from typing import IO, Dict, Iterable, List, Optional, Union
+from collections.abc import Iterable
+from typing import IO, Optional, Union
 
 from ratarmountcore.formats import FileFormatID, replace_format_check
 from ratarmountcore.mountsource import FileInfo, MountSource, create_root_file_info
@@ -134,7 +136,7 @@ class RarMountSource(MountSource):
         return filePath
 
     @overrides(MountSource)
-    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], dict[str, FileInfo]]]:
         path = path.strip('/')
         if path:
             path += '/'
@@ -147,7 +149,7 @@ class RarMountSource(MountSource):
         }
 
     @overrides(MountSource)
-    def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+    def list_mode(self, path: str) -> Optional[Union[Iterable[str], dict[str, int]]]:
         path = path.strip('/')
         if path:
             path += '/'
@@ -159,7 +161,7 @@ class RarMountSource(MountSource):
             if self._get_name(path, normalizedPath)
         }
 
-    def _lookups(self, path: str) -> List[FileInfo]:
+    def _lookups(self, path: str) -> builtins.list[FileInfo]:
         # If we have a fileInfo for the given directory path, then everything is fine.
         pathAsDir = path.strip('/') + '/'
         if pathAsDir == '/':

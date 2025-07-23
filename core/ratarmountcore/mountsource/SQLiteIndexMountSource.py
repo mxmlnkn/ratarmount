@@ -1,8 +1,10 @@
 # pylint: disable=abstract-method
 
+import builtins
 import shutil
 import tempfile
-from typing import IO, Any, Callable, Dict, Iterable, List, Optional, Union
+from collections.abc import Iterable
+from typing import IO, Any, Callable, Optional, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.SQLiteIndex import SQLiteIndex
@@ -14,7 +16,7 @@ class SQLiteIndexMountSource(MountSource):
         self,
         index: Union[SQLiteIndex, str, IO[bytes]],
         clearIndexCache: bool = False,
-        checkMetadata: Optional[Callable[[Dict[str, Any]], None]] = None,
+        checkMetadata: Optional[Callable[[dict[str, Any]], None]] = None,
         printDebug: int = 0,
         **_,
     ) -> None:
@@ -86,11 +88,11 @@ class SQLiteIndexMountSource(MountSource):
         raise NotImplementedError
 
     @overrides(MountSource)
-    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], dict[str, FileInfo]]]:
         return self.index.list(path)
 
     @overrides(MountSource)
-    def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+    def list_mode(self, path: str) -> Optional[Union[Iterable[str], dict[str, int]]]:
         return self.index.list_mode(path)
 
     @overrides(MountSource)
@@ -99,7 +101,7 @@ class SQLiteIndexMountSource(MountSource):
         return len(versions) if isinstance(versions, dict) else 0
 
     @overrides(MountSource)
-    def list_xattr(self, fileInfo: FileInfo) -> List[str]:
+    def list_xattr(self, fileInfo: FileInfo) -> builtins.list[str]:
         return self.index.list_xattr(fileInfo)
 
     @overrides(MountSource)

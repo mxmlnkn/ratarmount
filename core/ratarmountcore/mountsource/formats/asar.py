@@ -6,7 +6,7 @@ import stat
 import tarfile
 import threading
 from timeit import default_timer as timer
-from typing import IO, Any, Dict, List, Optional, Tuple, Union, cast
+from typing import IO, Any, Optional, Union, cast
 
 from ratarmountcore.formats import find_asar_header
 from ratarmountcore.mountsource import FileInfo, MountSource
@@ -71,12 +71,12 @@ class ASARMountSource(SQLiteIndexMountSource):
         writeIndex             : bool                      = False,
         clearIndexCache        : bool                      = False,
         indexFilePath          : Optional[str]             = None,
-        indexFolders           : Optional[List[str]]       = None,
+        indexFolders           : Optional[list[str]]       = None,
         encoding               : str                       = tarfile.ENCODING,
         verifyModificationTime : bool                      = False,
         printDebug             : int                       = 0,
         indexMinimumFileCount  : int                       = 1000,
-        transform              : Optional[Tuple[str, str]] = None,
+        transform              : Optional[tuple[str, str]] = None,
         **options
     ) -> None:
         self.isFileObject           = not isinstance(fileOrPath, str)
@@ -147,7 +147,7 @@ class ASARMountSource(SQLiteIndexMountSource):
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
         self.index.store_metadata(argumentsMetadata, self.archiveFilePath)
 
-    def _convert_to_row(self, fullPath, entry: Dict[str, Any], dataOffset: int) -> Tuple:
+    def _convert_to_row(self, fullPath, entry: dict[str, Any], dataOffset: int) -> tuple:
         path, name = SQLiteIndex.normpath(self.transform(fullPath)).rsplit("/", 1)
 
         isFile = 'offset' in entry and 'size' in entry
@@ -159,7 +159,7 @@ class ASARMountSource(SQLiteIndexMountSource):
         size = int(entry.get("size", "0"))
 
         # fmt: off
-        fileInfo : Tuple = (
+        fileInfo : tuple = (
             path              ,  # 0  : path
             name              ,  # 1  : file name
             0                 ,  # 2  : header offset
@@ -247,7 +247,7 @@ class ASARMountSource(SQLiteIndexMountSource):
         assert isinstance(extendedFileInfo, SQLiteIndexedTarUserData)
         return self._open_stencil(extendedFileInfo.offset, fileInfo.size, buffering)
 
-    def _check_metadata(self, metadata: Dict[str, Any]) -> None:
+    def _check_metadata(self, metadata: dict[str, Any]) -> None:
         """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
         SQLiteIndex.check_archive_stats(self.archiveFilePath, metadata, self.verifyModificationTime)
 

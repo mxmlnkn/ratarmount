@@ -1,6 +1,8 @@
+import builtins
 import os
 import stat
-from typing import IO, Any, Dict, Iterable, List, Optional, Union
+from collections.abc import Iterable
+from typing import IO, Any, Optional, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.utils import overrides
@@ -121,7 +123,7 @@ class FolderMountSource(MountSource):
         return self._stats_to_file_info(os.lstat(realpath), path.lstrip('/'), linkname)
 
     @overrides(MountSource)
-    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], dict[str, FileInfo]]]:
         realpath = self._realpath(path)
         if not os.path.isdir(realpath):
             return None
@@ -132,7 +134,7 @@ class FolderMountSource(MountSource):
         }
 
     @overrides(MountSource)
-    def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+    def list_mode(self, path: str) -> Optional[Union[Iterable[str], dict[str, int]]]:
         realpath = self._realpath(path)
         if not os.path.isdir(realpath):
             return None
@@ -164,11 +166,11 @@ class FolderMountSource(MountSource):
             raise ValueError(f"Specified path '{realpath}' is not a file that can be read!") from e
 
     @overrides(MountSource)
-    def statfs(self) -> Dict[str, Any]:
+    def statfs(self) -> dict[str, Any]:
         return self._statfs.copy()
 
     @overrides(MountSource)
-    def list_xattr(self, fileInfo: FileInfo) -> List[str]:
+    def list_xattr(self, fileInfo: FileInfo) -> builtins.list[str]:
         return os.listxattr(self.get_file_path(fileInfo), follow_symlinks=False) if hasattr(os, 'listxattr') else []
 
     @overrides(MountSource)

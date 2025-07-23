@@ -14,8 +14,9 @@ import threading
 import time
 import traceback
 import urllib.parse
+from collections.abc import Generator, Iterable
 from timeit import default_timer as timer
-from typing import IO, Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union, cast
+from typing import IO, Any, Callable, Optional, Union, cast
 
 with contextlib.suppress(ImportError):
     import rapidgzip
@@ -74,8 +75,8 @@ class _TarFileMetadataReader:
     def __init__(
         self,
         parent: 'SQLiteIndexedTar',
-        setFileInfos: Callable[[List[Tuple]], None],
-        setxattrs: Callable[[List[Tuple]], None],
+        setFileInfos: Callable[[list[tuple]], None],
+        setxattrs: Callable[[list[tuple]], None],
         updateProgressBar: Callable[[], None],
         recursionDepth: int,
     ):
@@ -200,7 +201,7 @@ class _TarFileMetadataReader:
         transform        : Callable[[str], str],
         recursionDepth   : int,
         printDebug       : int,
-    ) -> Tuple[List[Tuple], List[Tuple], bool, Optional[bool]]:
+    ) -> tuple[list[tuple], list[tuple], bool, Optional[bool]]:
         # fmt: on
         """Postprocesses a TarInfo object into one or multiple FileInfo tuples."""
 
@@ -243,7 +244,7 @@ class _TarFileMetadataReader:
         #       but others should throw errors, like GNUTYPE_SPARSE which is b'S'.
         #       When looking at the generated index, those values get silently converted to 0?
         # fmt: off
-        fileInfo : Tuple = (
+        fileInfo : tuple = (
             path                                            ,  # 0  : path
             name                                            ,  # 1  : file name
             offsetHeader                                    ,  # 2  : header offset
@@ -307,7 +308,7 @@ class _TarFileMetadataReader:
         return pax_size
 
     @staticmethod
-    def find_tar_file_offsets(fileObject: IO[bytes], ignoreZeros: bool) -> Generator[Tuple[int, bytes], None, None]:
+    def find_tar_file_offsets(fileObject: IO[bytes], ignoreZeros: bool) -> Generator[tuple[int, bytes], None, None]:
         """
         Generator which yields offsets in the given TAR suitable for splitting the file into sub TARs.
         Also returns the type of the TAR metadata block at the returned offset for convenience.
@@ -394,7 +395,7 @@ class _TarFileMetadataReader:
 
         return []
 
-    def _process_serial(self, fileObject: IO[bytes], pathPrefix: str, streamOffset: int) -> Iterable[Tuple]:
+    def _process_serial(self, fileObject: IO[bytes], pathPrefix: str, streamOffset: int) -> Iterable[tuple]:
         """
         Opens the given fileObject using the tarfile module, iterates over all files converting their metadata to
         FileInfo tuples and inserting those into the database in a chunked manner using the given _set_file_infos.
@@ -406,9 +407,9 @@ class _TarFileMetadataReader:
         loadedTarFile: Any = self._open_tar(fileObject)
 
         # Iterate over files inside TAR and add them to the database
-        fileInfos: List[Tuple] = []
-        xattrs: List[Tuple] = []
-        filesToMountRecursively: List[Tuple] = []
+        fileInfos: list[tuple] = []
+        xattrs: list[tuple] = []
+        filesToMountRecursively: list[tuple] = []
 
         # thread_time is twice as fast, which can shave off 10% of time in some tests but it is not as "correct"
         # because it does not count the sleep time of the thread, e.g., caused by waiting for I/O or even waiting
@@ -482,7 +483,7 @@ class _TarFileMetadataReader:
 
         return filesToMountRecursively
 
-    def process(self, fileObject: IO[bytes], pathPrefix: str, streamOffset: int) -> Iterable[Tuple]:
+    def process(self, fileObject: IO[bytes], pathPrefix: str, streamOffset: int) -> Iterable[tuple]:
         """
         Iterates over all files inside the given fileObject TAR and inserts their metadata into the database using
         the given _set_file_infos.
@@ -521,7 +522,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         writeIndex                   : bool                              = False,
         clearIndexCache              : bool                              = False,
         indexFilePath                : Optional[str]                     = None,
-        indexFolders                 : Optional[List[str]]               = None,
+        indexFolders                 : Optional[list[str]]               = None,
         recursive                    : bool                              = False,
         gzipSeekPointSpacing         : int                               = DEFAULT_GZIP_SEEK_POINT_SPACING,
         encoding                     : str                               = tarfile.ENCODING,
@@ -529,12 +530,12 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         ignoreZeros                  : bool                              = False,
         verifyModificationTime       : bool                              = False,
         parallelization              : int                               = 1,
-        parallelizations             : Optional[Dict[str, int]]          = None,
+        parallelizations             : Optional[dict[str, int]]          = None,
         isGnuIncremental             : Optional[bool]                    = None,
         printDebug                   : int                               = 0,
-        transformRecursiveMountPoint : Optional[Tuple[str, str]]         = None,
-        transform                    : Optional[Tuple[str, str]]         = None,
-        prioritizedBackends          : Optional[List[str]]               = None,
+        transformRecursiveMountPoint : Optional[tuple[str, str]]         = None,
+        transform                    : Optional[tuple[str, str]]         = None,
+        prioritizedBackends          : Optional[list[str]]               = None,
         indexMinimumFileCount        : int                               = 0,
         recursionDepth               : Optional[int]                     = None,
         # pylint: disable=unused-argument
@@ -614,7 +615,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         self.hasBeenAppendedTo            = False
         self._recursionDepth              = -1
         # fmt: on
-        self.prioritizedBackends: List[str] = [] if prioritizedBackends is None else prioritizedBackends
+        self.prioritizedBackends: list[str] = [] if prioritizedBackends is None else prioritizedBackends
         self.maxRecursionDepth = determine_recursion_depth(recursive=recursive, recursionDepth=recursionDepth)
         self.parallelizations = copy.deepcopy(parallelizations) if parallelizations else {}
         if '' not in self.parallelizations:
@@ -641,7 +642,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         self._fileNameIsURL = re.match('[A-Za-z0-9]*://', self.tarFileName) is not None
 
         # If no fileObject given, then self.tarFileName is the path to the archive to open.
-        self._fileObjectsToCloseOnDel: List[IO[bytes]] = []
+        self._fileObjectsToCloseOnDel: list[IO[bytes]] = []
         if not fileObject:
             fileObject = open(self.tarFileName, 'rb')
             self._fileObjectsToCloseOnDel.append(fileObject)
@@ -1181,7 +1182,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         return self.tarFileObject.read(size)
 
     @overrides(MountSource)
-    def statfs(self) -> Dict[str, Any]:
+    def statfs(self) -> dict[str, Any]:
         return {
             'f_bsize': self.blockSize,
             'f_frsize': self.blockSize,
@@ -1223,7 +1224,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
         return pastEndOffset
 
-    def _try_to_mark_as_appended(self, storedStats: Dict[str, Any], archiveStats: os.stat_result):
+    def _try_to_mark_as_appended(self, storedStats: dict[str, Any], archiveStats: os.stat_result):
         """
         Raises an exception if it makes no sense to only try to go over the new appended data alone
         else sets self.hasBeenAppendedTo to True.
@@ -1301,7 +1302,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             print("[Info] Archive has probably been appended to because it is larger and more recent.")
         self.hasBeenAppendedTo = True
 
-    def _check_metadata(self, metadata: Dict[str, Any]) -> None:
+    def _check_metadata(self, metadata: dict[str, Any]) -> None:
         # self._isGnuIncremental may be initialized during metadata check because it is required for some checks.
         # But, if the subsequent checks fail, then we want to restore the initial value.
         isGnuIncremental = self._isGnuIncremental
@@ -1311,7 +1312,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             self._isGnuIncremental = isGnuIncremental
             raise e
 
-    def _check_metadata2(self, metadata: Dict[str, Any]) -> None:
+    def _check_metadata2(self, metadata: dict[str, Any]) -> None:
         """
         Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible.
         Returns normally and sets self.index.hasBeenAppendedTo to True if the size of the archive increased

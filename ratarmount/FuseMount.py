@@ -4,7 +4,7 @@ import errno
 import os
 import sys
 import traceback
-from typing import IO, Any, Dict, List, Optional, Tuple, Union
+from typing import IO, Any, Optional, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource
 
@@ -45,7 +45,7 @@ class FuseMount(fuse.Operations):
     # ratarmountcore, StenciledFile, and other layers they have to go through.
     MINIMUM_BLOCK_SIZE = 256 * 1024
 
-    def __init__(self, pathToMount: Union[str, List[str]], mountPoint: str, **options) -> None:
+    def __init__(self, pathToMount: Union[str, list[str]], mountPoint: str, **options) -> None:
         self.printDebug: int = int(options.get('printDebug', 0))
         self.writeOverlay: Optional[WritableFolderMountSource] = None
         self.overlayPath: Optional[str] = None
@@ -90,7 +90,7 @@ class FuseMount(fuse.Operations):
         if not pathToMount:
             raise ValueError("No paths to mount given!")
         # Take care that bind-mounting folders to itself works
-        mountSources: List[Tuple[str, MountSource]] = []
+        mountSources: list[tuple[str, MountSource]] = []
         self.mountPointFd: Optional[int] = None
         self.selfBindMount: Optional[FolderMountSource] = None
 
@@ -124,8 +124,7 @@ class FuseMount(fuse.Operations):
                     # Strip a single file://, not any more because URL chaining is supported by fsspec.
                     if options['indexFilePath'].count('://') == 1:
                         fileURLPrefix = 'file://'
-                        if indexFilePath.startswith(fileURLPrefix):
-                            indexFilePath = indexFilePath[len(fileURLPrefix) :]
+                        indexFilePath = indexFilePath.removeprefix(fileURLPrefix)
                     if '://' not in indexFilePath:
                         indexFilePath = os.path.realpath(options['indexFilePath'])
 
@@ -156,7 +155,7 @@ class FuseMount(fuse.Operations):
                 return UnionMountSource([x[1] for x in mountSources], **options)
 
             # Create unique keys.
-            submountSources: Dict[str, MountSource] = {}
+            submountSources: dict[str, MountSource] = {}
             suffix = 1
             for key, mountSource in mountSources:
                 if key in submountSources:
@@ -184,7 +183,7 @@ class FuseMount(fuse.Operations):
         self.mountSource = FileVersionLayer(self.mountSource)
 
         # Maps handles to either opened I/O objects or os module file handles for the writeOverlay and the open flags.
-        self.openedFiles: Dict[int, Tuple[int, Union[IO[bytes], int]]] = {}
+        self.openedFiles: dict[int, tuple[int, Union[IO[bytes], int]]] = {}
         self.lastFileHandle: int = 0  # It will be incremented before being returned. It can't hurt to never return 0.
 
         if self.overlayPath:
@@ -362,7 +361,7 @@ class FuseMount(fuse.Operations):
         return statDict
 
     @overrides(fuse.Operations)
-    def getattr(self, path: str, fh=None) -> Dict[str, Any]:
+    def getattr(self, path: str, fh=None) -> dict[str, Any]:
         return self._file_info_to_dict(self._lookup(path))
 
     @overrides(fuse.Operations)

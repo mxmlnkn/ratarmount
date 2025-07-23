@@ -14,7 +14,7 @@ import time
 import urllib.request
 import zipfile
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Optional
 
 from ratarmountcore.compressions import strip_suffix_from_archive
 from ratarmountcore.utils import RatarmountError, determine_recursion_depth, remove_duplicates_stable
@@ -45,7 +45,7 @@ def has_fuse_non_empty_support() -> bool:
     return False  # On macOS, fusermount does not exist and macfuse also seems to complain with nonempty option.
 
 
-def parse_requirement(requirement: str) -> Optional[Tuple[str, List[str], Optional[str]]]:
+def parse_requirement(requirement: str) -> Optional[tuple[str, list[str], Optional[str]]]:
     # https://packaging.python.org/en/latest/specifications/name-normalization/
     # Match only valid project name and avoid cruft like extras and requirements, e.g.,
     # indexed_gzip >= 1.6.3, != 1.9.4; python_version < '3.8'
@@ -61,11 +61,11 @@ def parse_requirement(requirement: str) -> Optional[Tuple[str, List[str], Option
 
 
 def print_metadata_recursively(
-    packages: Dict[str, Set[str]],
+    packages: dict[str, set[str]],
     doWithDistribution: Callable[[Any], None],
     doOnNewLevel: Optional[Callable[[int], None]] = None,
     level: int = 0,
-    processedPackages: Optional[Set[str]] = None,
+    processedPackages: Optional[set[str]] = None,
 ):
     if processedPackages is None:
         processedPackages = set()
@@ -75,7 +75,7 @@ def print_metadata_recursively(
     if doOnNewLevel:
         doOnNewLevel(level)
 
-    requirements: Dict[str, Set[str]] = {}
+    requirements: dict[str, set[str]] = {}
     for package, enabledExtras in sorted(packages.items()):
         # For now, packages specified with different extra will result in the latter being omitted.
         if package in processedPackages:
@@ -409,7 +409,7 @@ def process_parsed_arguments(args) -> int:
                 return os.path.realpath(path)
             raise e
 
-    mountSources: List[str] = []
+    mountSources: list[str] = []
     for path in args.mount_source:
         fixedPath = check_mount_source(path)
         # Skip neighboring duplicates

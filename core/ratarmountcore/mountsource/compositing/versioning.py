@@ -1,7 +1,9 @@
+import builtins
 import enum
 import os
 import stat
-from typing import IO, Any, Dict, Iterable, List, Optional, Tuple, Union
+from collections.abc import Iterable
+from typing import IO, Any, Optional, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.utils import overrides
@@ -27,7 +29,7 @@ class FileVersionLayer(MountSource):
     def __init__(self, mountSource: MountSource):
         self.mountSource: MountSource = mountSource
 
-    def _decode_versions_path_api(self, filePath: str) -> Optional[Tuple[str, bool, int]]:
+    def _decode_versions_path_api(self, filePath: str) -> Optional[tuple[str, bool, int]]:
         """
         Do a loop over the parent path parts to resolve possible versions in parent folders.
         Note that multiple versions of a folder always are union mounted. So, for the path to a file
@@ -178,11 +180,11 @@ class FileVersionLayer(MountSource):
         return [str(version + 1) for version in range(self.mountSource.versions(path))]
 
     @overrides(MountSource)
-    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], dict[str, FileInfo]]]:
         return self._list_wrapper(self.mountSource.list, path)
 
     @overrides(MountSource)
-    def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+    def list_mode(self, path: str) -> Optional[Union[Iterable[str], dict[str, int]]]:
         return self._list_wrapper(self.mountSource.list_mode, path)
 
     @overrides(MountSource)
@@ -251,7 +253,7 @@ class FileVersionLayer(MountSource):
             fileInfo.userdata.append(fileType)
 
     @overrides(MountSource)
-    def get_mount_source(self, fileInfo: FileInfo) -> Tuple[str, MountSource, FileInfo]:
+    def get_mount_source(self, fileInfo: FileInfo) -> tuple[str, MountSource, FileInfo]:
         fileType = fileInfo.userdata.pop()
         try:
             if fileType == FileType.VERSIONS_FOLDER:
@@ -261,7 +263,7 @@ class FileVersionLayer(MountSource):
             fileInfo.userdata.append(fileType)
 
     @overrides(MountSource)
-    def list_xattr(self, fileInfo: FileInfo) -> List[str]:
+    def list_xattr(self, fileInfo: FileInfo) -> builtins.list[str]:
         fileType = fileInfo.userdata.pop()
         try:
             if fileType == FileType.VERSIONS_FOLDER:
@@ -285,7 +287,7 @@ class FileVersionLayer(MountSource):
         self.mountSource.__exit__(exception_type, exception_value, exception_traceback)
 
     @overrides(MountSource)
-    def statfs(self) -> Dict[str, Any]:
+    def statfs(self) -> dict[str, Any]:
         return self.mountSource.statfs()
 
     def join_threads(self):

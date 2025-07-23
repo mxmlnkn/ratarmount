@@ -27,7 +27,7 @@ import enum
 import struct
 import tarfile
 import zipfile
-from typing import IO, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import IO, Callable, Optional, Union
 
 
 class FileFormatID(enum.Enum):
@@ -88,7 +88,7 @@ def is_tar(fileobj: IO[bytes], encoding: str = tarfile.ENCODING) -> bool:
     return False
 
 
-def find_asar_header(fileobj: IO[bytes]) -> Tuple[int, int, int]:
+def find_asar_header(fileobj: IO[bytes]) -> tuple[int, int, int]:
     """Return triple (start of header JSON, size of header JSON, start of file objects)"""
     # https://github.com/electron/asar/issues/128
     # https://github.com/electron/asar
@@ -265,7 +265,7 @@ def _check_zstandard_header(fileobj: IO[bytes]) -> bool:
 @dataclasses.dataclass
 class FileFormatInfo:
     # Extensions without the initial '.'
-    extensions: List[str]
+    extensions: list[str]
     # If the first bytes of a format are constant, then they should be stated here.
     # This is used to build a lookup table for faster format detection as a first stage to thin down
     # the formats to actually call checkHeader for.
@@ -280,7 +280,7 @@ class FileFormatInfo:
     checkHeader: Optional[Callable[[IO[bytes]], bool]] = None
 
 
-ARCHIVE_FORMATS: Dict[FileFormatID, FileFormatInfo] = {
+ARCHIVE_FORMATS: dict[FileFormatID, FileFormatInfo] = {
     # "Normal" Archive formats with compression
     FID.SEVEN_ZIP: FileFormatInfo(['7z', '7zip'], b'7z\xbc\xaf\x27\x1c'),
     FID.RAR: FileFormatInfo(['rar'], b'Rar!\x1a\x07'),
@@ -315,7 +315,7 @@ ARCHIVE_FORMATS: Dict[FileFormatID, FileFormatInfo] = {
     FID.WARC: FileFormatInfo(['warc'], b'WARC/1.'),
 }
 
-COMPRESSION_FORMATS: Dict[FileFormatID, FileFormatInfo] = {
+COMPRESSION_FORMATS: dict[FileFormatID, FileFormatInfo] = {
     FID.BZIP2: FileFormatInfo(['bz2', 'bzip2'], b'BZh', _is_bzip2),
     FID.GZIP: FileFormatInfo(['gz', 'gzip'], b'\x1f\x8b'),
     FID.XZ: FileFormatInfo(['xz'], b"\xfd7zXZ\x00"),
@@ -357,8 +357,8 @@ for _formatInfo in FileFormatID:
 # at least 2 B of constant magic and if the table was implemented in contiguous memory, it would be nicely
 # addressable by a 16-bit index (the 2 B). Statistically, this cuts down the number of expensive checkHeader
 # calls by 65536.
-_MAGIC_BYTES_TO_FORMATS: Dict[bytes, List[FileFormatID]] = {}
-_FORMATS_WITHOUT_MAGIC_BYTES: List[FileFormatID] = []
+_MAGIC_BYTES_TO_FORMATS: dict[bytes, list[FileFormatID]] = {}
+_FORMATS_WITHOUT_MAGIC_BYTES: list[FileFormatID] = []
 
 
 def recompute_cached_magic_bytes():
@@ -393,7 +393,7 @@ def might_be_format(fileobj: IO[bytes], fid: Union[FileFormatID, FileFormatInfo]
     return bool(formatInfo.magicBytes or formatInfo.checkHeader)
 
 
-def detect_formats(fileobj: IO[bytes]) -> Set[FileFormatID]:
+def detect_formats(fileobj: IO[bytes]) -> set[FileFormatID]:
     oldOffset = fileobj.tell()
     try:
         firstTwoBytes = fileobj.read(2)

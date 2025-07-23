@@ -7,7 +7,6 @@ import os
 import sys
 import tarfile
 from pathlib import Path
-from typing import Dict, List
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -20,8 +19,8 @@ from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar  # noqa: E40
 @dataclasses.dataclass
 class SampleArchive:
     path: Path
-    folders: List[str]
-    files: Dict[str, bytes]
+    folders: list[str]
+    files: dict[str, bytes]
 
 
 def _create_file(tarArchive, name, contents):

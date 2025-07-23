@@ -4,7 +4,8 @@ import os
 import stat
 import threading
 import time
-from typing import IO, Any, Dict, Iterable, Optional, Union, cast
+from collections.abc import Iterable
+from typing import IO, Any, Optional, Union, cast
 
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.StenciledFile import RawStenciledFile, StenciledFile
@@ -68,7 +69,7 @@ class SingleFileMountSource(MountSource):
         # fmt: on
 
     @overrides(MountSource)
-    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], dict[str, FileInfo]]]:
         pathWithSlash = (path.strip('/') + '/').lstrip('/')  # append / to be able to use startswith correctly
         if self.path.startswith(pathWithSlash):
             return [self.path[len(pathWithSlash) :].split('/', maxsplit=1)[0]]
@@ -117,7 +118,7 @@ class SingleFileMountSource(MountSource):
         return True
 
     @overrides(MountSource)
-    def statfs(self) -> Dict[str, Any]:
+    def statfs(self) -> dict[str, Any]:
         return self._statfs.copy()
 
     @overrides(MountSource)

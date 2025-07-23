@@ -1,7 +1,8 @@
 import io
 import os
 import stat
-from typing import IO, Dict, Iterable, Optional, Union
+from collections.abc import Iterable
+from typing import IO, Optional, Union
 
 try:
     import pygit2
@@ -84,7 +85,7 @@ class GitMountSource(MountSource):
     def exists(self, path: str) -> bool:
         return self._look_up_path(path) is not None
 
-    def _list(self, path: str, onlyMode: bool) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def _list(self, path: str, onlyMode: bool) -> Optional[Union[Iterable[str], dict[str, FileInfo]]]:
         tree = self._look_up_path(path)
         if not isinstance(tree, pygit2.Tree):
             return None
@@ -99,11 +100,11 @@ class GitMountSource(MountSource):
         }
 
     @overrides(MountSource)
-    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], dict[str, FileInfo]]]:
         return self._list(path, onlyMode=False)
 
     @overrides(MountSource)
-    def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+    def list_mode(self, path: str) -> Optional[Union[Iterable[str], dict[str, int]]]:
         return self._list(path, onlyMode=True)
 
     @overrides(MountSource)

@@ -4,7 +4,7 @@ import stat
 import sys
 import tarfile
 from timeit import default_timer as timer
-from typing import IO, Any, Dict, List, Optional, Tuple, Union
+from typing import IO, Any, Optional, Union
 
 from ratarmountcore.formats import FileFormatID, replace_format_check
 from ratarmountcore.mountsource import FileInfo, MountSource
@@ -58,7 +58,7 @@ try:
         def __init__(self, offset: int = 0, maxSize: int = sys.maxsize):
             self._offset = offset
             self._maxSize = maxSize
-            self.products: Dict[str, CachedFile] = {}
+            self.products: dict[str, CachedFile] = {}
 
         def create(self, filename) -> Py7zIO:
             product = CachedFile(self._offset, self._maxSize)
@@ -88,7 +88,7 @@ class Py7zrMountSource(SQLiteIndexMountSource):
         writeIndex             : bool                      = False,
         clearIndexCache        : bool                      = False,
         indexFilePath          : Optional[str]             = None,
-        indexFolders           : Optional[List[str]]       = None,
+        indexFolders           : Optional[list[str]]       = None,
         encoding               : str                       = tarfile.ENCODING,
         verifyModificationTime : bool                      = False,
         printDebug             : int                       = 0,
@@ -157,13 +157,13 @@ class Py7zrMountSource(SQLiteIndexMountSource):
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
         self.index.store_metadata(argumentsMetadata, self.archiveFilePath)
 
-    def _convert_to_row(self, info) -> Tuple:
+    def _convert_to_row(self, info) -> tuple:
         mode = 0o777 | (stat.S_IFDIR if info.is_directory else stat.S_IFREG)
         mtime = info.creationtime.timestamp()
         path, name = SQLiteIndex.normpath(info.filename).rsplit("/", 1)
 
         # fmt: off
-        fileInfo : Tuple = (
+        fileInfo : tuple = (
             path              ,  # 0  : path
             name              ,  # 1  : file name
             0                 ,  # 2  : header offset
@@ -240,7 +240,7 @@ class Py7zrMountSource(SQLiteIndexMountSource):
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
         return open_in_memory(self.fileObject, fileInfo.linkname)
 
-    def _check_metadata(self, metadata: Dict[str, Any]) -> None:
+    def _check_metadata(self, metadata: dict[str, Any]) -> None:
         """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
         SQLiteIndex.check_archive_stats(self.archiveFilePath, metadata, self.verifyModificationTime)
 

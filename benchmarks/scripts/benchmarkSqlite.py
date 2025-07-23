@@ -7,7 +7,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -346,7 +346,7 @@ keyToLabel = {
 }
 
 
-def extract_values_from_block(block: str) -> Dict[str, Any]:
+def extract_values_from_block(block: str) -> dict[str, Any]:
     namemap = {schema: label for label, schema in schemas.items()}
 
     values = {}
@@ -375,7 +375,7 @@ def extract_values_from_log(path: str):
     return [extract_values_from_block(block) for block in Path(path).read_text(encoding='utf-8').split('\n\n') if block]
 
 
-def plot_summary(logFiles: List[str]):
+def plot_summary(logFiles: list[str]):
     values = [values for logFile in logFiles for values in extract_values_from_log(logFile)]
     names = sorted({x['name'] for x in values if re.sub(', (unique|duplicate) rows$', '', x['name']) in schemas})
     if not names:
@@ -390,7 +390,7 @@ def plot_summary(logFiles: List[str]):
         axes = [ax]
         keys = ['tinsert']
 
-    labelToColor: Dict[str, Any] = {}
+    labelToColor: dict[str, Any] = {}
 
     def plot(ax, x, y, label, **kwargs):
         match = re.match('(.*), (unique|duplicate) rows$', label)
@@ -504,7 +504,7 @@ def plot_summary(logFiles: List[str]):
     fig.savefig("sqlite primary key benchmark sizes over row count.png")
 
 
-def get_schemas_to_benchmark() -> List[Tuple[str, str, bool]]:
+def get_schemas_to_benchmark() -> list[tuple[str, str, bool]]:
     schemasToBenchmark = []
     for label, schema in schemas.items():
         schemasToBenchmark.append((label + ', unique rows', schema, False))
@@ -513,11 +513,11 @@ def get_schemas_to_benchmark() -> List[Tuple[str, str, bool]]:
     return schemasToBenchmark
 
 
-def plot_operation_measurements(labelAndPath: List[Tuple[str, str]], targetFileName: str):
+def plot_operation_measurements(labelAndPath: list[tuple[str, str]], targetFileName: str):
     if not labelAndPath:
         return
 
-    labelToColor: Dict[str, Any] = {}
+    labelToColor: dict[str, Any] = {}
 
     def plot(ax, x, y, label, **kwargs):
         match = re.match('(.*), (unique|duplicate) rows$', label)

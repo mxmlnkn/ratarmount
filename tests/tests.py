@@ -9,7 +9,6 @@ import stat
 import sys
 import tarfile
 import tempfile
-from typing import Dict
 
 if __name__ == '__main__' or __package__ is not None:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../core')))
@@ -47,7 +46,7 @@ with (
 
     print("Created temp tar:", tmpTarFile.name)
 
-    testKwargs: Dict[str, Dict] = {
+    testKwargs: dict[str, dict] = {
         "file paths": {'fileObject': None, 'tarFileName': tmpTarFile.name},
         "file objects": {'fileObject': open(tmpTarFile.name, "rb"), 'tarFileName': "tarFileName"},
         "file objects with no fileno": {

@@ -1,9 +1,11 @@
+import builtins
 import os
 import re
 import stat
 import traceback
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import IO, Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import IO, Any, Optional, Union
 
 from ratarmountcore.compressions import strip_suffix_from_archive
 from ratarmountcore.mountsource import FileInfo, MountSource, merge_statfs
@@ -46,7 +48,7 @@ class AutoMountLayer(MountSource):
         # Disable false positive introduced when updating pylint from 2.6 to 2.12.
         # It now thinks that the assignment is to AutoMountLayer instead of self.mounted.
         # pylint: disable=used-before-assignment
-        self.mounted: Dict[str, AutoMountLayer.MountInfo] = {
+        self.mounted: dict[str, AutoMountLayer.MountInfo] = {
             '/': AutoMountLayer.MountInfo(mountSource, rootFileInfo, 0)
         }
 
@@ -76,11 +78,11 @@ class AutoMountLayer(MountSource):
 
             foldersToWalk = newFoldersToWalk
 
-    def _simply_find_mounted(self, path: str) -> Tuple[str, str]:
+    def _simply_find_mounted(self, path: str) -> tuple[str, str]:
         """See _find_mounted. This is split off to avoid convoluted recursions during lazy mounting."""
 
         leftPart = path
-        rightParts: List[str] = []
+        rightParts: list[str] = []
         while '/' in leftPart:
             if leftPart in self.mounted:
                 return leftPart, '/' + '/'.join(rightParts)
@@ -200,7 +202,7 @@ class AutoMountLayer(MountSource):
 
         return mountPoint
 
-    def _find_mounted(self, path: str) -> Tuple[str, str]:
+    def _find_mounted(self, path: str) -> tuple[str, str]:
         """
         Returns the mount point, which can be found in self.mounted, and the rest of the path.
         Basically, it splits path at the appropriate mount point boundary.
@@ -296,14 +298,14 @@ class AutoMountLayer(MountSource):
         return files
 
     @overrides(MountSource)
-    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], dict[str, FileInfo]]]:
         mountPoint, pathInMountPoint = self._find_mounted(path)
         return self._append_mount_points(
             path, self.mounted[mountPoint].mountSource.list(pathInMountPoint), onlyMode=False
         )
 
     @overrides(MountSource)
-    def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+    def list_mode(self, path: str) -> Optional[Union[Iterable[str], dict[str, int]]]:
         mountPoint, pathInMountPoint = self._find_mounted(path)
         return self._append_mount_points(
             path, self.mounted[mountPoint].mountSource.list_mode(pathInMountPoint), onlyMode=True
@@ -328,7 +330,7 @@ class AutoMountLayer(MountSource):
         return mountSource.read(sourceFileInfo, size, offset)
 
     @overrides(MountSource)
-    def list_xattr(self, fileInfo: FileInfo) -> List[str]:
+    def list_xattr(self, fileInfo: FileInfo) -> builtins.list[str]:
         mountPoint = fileInfo.userdata[-1]
         assert isinstance(mountPoint, str)
         if fileInfo == self.mounted[mountPoint].rootFileInfo:
@@ -348,7 +350,7 @@ class AutoMountLayer(MountSource):
         return mountSource.get_xattr(sourceFileInfo, key)
 
     @overrides(MountSource)
-    def get_mount_source(self, fileInfo: FileInfo) -> Tuple[str, MountSource, FileInfo]:
+    def get_mount_source(self, fileInfo: FileInfo) -> tuple[str, MountSource, FileInfo]:
         mountPoint = fileInfo.userdata[-1]
         assert isinstance(mountPoint, str)
         mountSource = self.mounted[mountPoint].mountSource
@@ -360,7 +362,7 @@ class AutoMountLayer(MountSource):
         return os.path.join(mountPoint, deeperMountPoint.lstrip('/')), deeperMountSource, deeperFileInfo
 
     @overrides(MountSource)
-    def statfs(self) -> Dict[str, Any]:
+    def statfs(self) -> dict[str, Any]:
         return merge_statfs(
             [mountInfo.mountSource.statfs() for _, mountInfo in self.mounted.items()], printDebug=self.printDebug
         )

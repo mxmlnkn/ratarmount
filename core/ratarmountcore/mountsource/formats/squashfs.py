@@ -9,7 +9,7 @@ import stat
 import tarfile
 import zlib
 from timeit import default_timer as timer
-from typing import IO, Any, Dict, List, Optional, Tuple, Union
+from typing import IO, Any, Optional, Union
 
 try:
     import deflate
@@ -149,7 +149,7 @@ class SquashFSFile(io.RawIOBase):
         self._lastBlockIndex = inode.data // self._block_size
 
         self._blockList = []
-        self._dataToBlockOffset: Dict[int, int] = {}  # block offset may be negative (-size) for sparse blocks
+        self._dataToBlockOffset: dict[int, int] = {}  # block offset may be negative (-size) for sparse blocks
         self._compressedBlockOffsets = []
         if inode.blocks:
             self._blockList = [
@@ -395,12 +395,12 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         writeIndex             : bool                      = False,
         clearIndexCache        : bool                      = False,
         indexFilePath          : Optional[str]             = None,
-        indexFolders           : Optional[List[str]]       = None,
+        indexFolders           : Optional[list[str]]       = None,
         encoding               : str                       = tarfile.ENCODING,
         verifyModificationTime : bool                      = False,
         printDebug             : int                       = 0,
         indexMinimumFileCount  : int                       = 1000,
-        transform              : Optional[Tuple[str, str]] = None,
+        transform              : Optional[tuple[str, str]] = None,
         **options
     ) -> None:
         # fmt: on
@@ -474,7 +474,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
         self.index.store_metadata(argumentsMetadata, self.archiveFilePath)
 
-    def _convert_to_row(self, inodeOffset: int, info: "PySquashfsImage.file.File") -> Tuple:  # type: ignore
+    def _convert_to_row(self, inodeOffset: int, info: "PySquashfsImage.file.File") -> tuple:  # type: ignore
         mode = info.mode
         linkname = ""
         if info.is_symlink:
@@ -493,7 +493,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         fileSize = info.size if info.is_file else 0
 
         # fmt: off
-        fileInfo : Tuple = (
+        fileInfo : tuple = (
             path              ,  # 0  : path
             name              ,  # 1  : file name
             inodeOffset       ,  # 2  : header offset
@@ -571,7 +571,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         return self.image.open(self.image.read_inode(extendedFileInfo.offsetheader))
 
     @overrides(MountSource)
-    def statfs(self) -> Dict[str, Any]:
+    def statfs(self) -> dict[str, Any]:
         blockSize = 512
         with contextlib.suppress(Exception):
             blockSize = os.fstat(self.rawFileObject.fileno()).st_blksize
@@ -587,7 +587,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
             'f_namemax': 256,
         }
 
-    def _check_metadata(self, metadata: Dict[str, Any]) -> None:
+    def _check_metadata(self, metadata: dict[str, Any]) -> None:
         """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
         SQLiteIndex.check_archive_stats(self.archiveFilePath, metadata, self.verifyModificationTime)
 

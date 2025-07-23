@@ -9,7 +9,8 @@ import tempfile
 import time
 import traceback
 import urllib.parse
-from typing import Any, Callable, Dict, List, Mapping, Tuple
+from collections.abc import Mapping
+from typing import Any, Callable
 
 from ratarmountcore.formats import is_tar
 from ratarmountcore.mountsource import FileInfo, MountSource
@@ -66,7 +67,7 @@ class WritableFolderMountSource(fuse.Operations):
         assert databaseMountSource.root == self.root
 
     @staticmethod
-    def _get_statfs_for_folder(path: str) -> Dict[str, Any]:
+    def _get_statfs_for_folder(path: str) -> dict[str, Any]:
         result = os.statvfs(path)
         return {
             key: getattr(result, key)
@@ -110,7 +111,7 @@ class WritableFolderMountSource(fuse.Operations):
         self._statfs = self._get_statfs_for_folder(self.root)
 
     @staticmethod
-    def _split_path(path: str) -> Tuple[str, str]:
+    def _split_path(path: str) -> tuple[str, str]:
         result = ('/' + os.path.normpath(path).lstrip('/')).rsplit('/', 1)
         assert len(result) == 2
         return result[0], result[1]
@@ -158,7 +159,7 @@ class WritableFolderMountSource(fuse.Operations):
         else:
             self.sqlConnection.execute('DELETE FROM "files" WHERE (path,name) == (?,?)', (folder, name))
 
-    def list_deleted(self, path: str) -> List[str]:
+    def list_deleted(self, path: str) -> list[str]:
         """Return list of files marked as deleted in the given path."""
         result = self.sqlConnection.execute(
             'SELECT name FROM "files" WHERE path == (?) AND deleted == 1', (path.rstrip('/'),)
@@ -175,7 +176,7 @@ class WritableFolderMountSource(fuse.Operations):
         )
         return bool(result.fetchone()[0])
 
-    def _set_metadata(self, path: str, metadata: Dict[str, Any]):
+    def _set_metadata(self, path: str, metadata: dict[str, Any]):
         if not metadata:
             raise ValueError("Need arguments to know what to update.")
 
@@ -213,7 +214,7 @@ class WritableFolderMountSource(fuse.Operations):
             (folder, name, sfi.mtime, sfi.mode, sfi.uid, sfi.gid, False),
         )
 
-    def _set_file_metadata(self, path: str, applyMetadataToFile: Callable[[str], None], metadata: Dict[str, Any]):
+    def _set_file_metadata(self, path: str, applyMetadataToFile: Callable[[str], None], metadata: dict[str, Any]):
         folder, name = self._split_path(path)
 
         existsInMetadata = self.sqlConnection.execute(
@@ -299,9 +300,10 @@ class WritableFolderMountSource(fuse.Operations):
         else:
             self._ensure_parent_exists(new)
 
-            with self.mountSource.open(self.mountSource.lookup(old)) as sourceObject, open(
-                self._realpath(new), 'wb'
-            ) as targetObject:
+            with (
+                self.mountSource.open(self.mountSource.lookup(old)) as sourceObject,
+                open(self._realpath(new), 'wb') as targetObject,
+            ):
                 shutil.copyfileobj(sourceObject, targetObject)
 
             self._mark_as_deleted(old)

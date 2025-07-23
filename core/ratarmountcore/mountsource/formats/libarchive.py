@@ -11,7 +11,7 @@ import stat
 import sys
 import tarfile
 from timeit import default_timer as timer
-from typing import IO, Any, Callable, Dict, List, Optional, Tuple, Union, cast
+from typing import IO, Any, Callable, Optional, Union, cast
 
 from ratarmountcore.compressions import COMPRESSION_BACKENDS
 from ratarmountcore.formats import FILE_FORMATS
@@ -40,7 +40,7 @@ class ArchiveEntry:
         self.eof = laffi.read_next_header2(self._archive, self._entry) == laffi.ARCHIVE_EOF
         self.encoding = encoding
         self.entry_index = entry_index
-        self._fileInfoRow: Optional[Tuple] = None
+        self._fileInfoRow: Optional[tuple] = None
 
     def __del__(self):
         laffi.entry_free(self._entry)
@@ -101,7 +101,7 @@ class ArchiveEntry:
 
         return path
 
-    def convert_to_row(self, entryCount: int, transform: Callable[[str], str], path: Optional[str] = None) -> Tuple:
+    def convert_to_row(self, entryCount: int, transform: Callable[[str], str], path: Optional[str] = None) -> tuple:
         # The data logic may only be evaluated once because determining the size may require reading the whole file!
         if self._fileInfoRow is not None:
             return self._fileInfoRow
@@ -182,7 +182,7 @@ class IterableArchive:
         self,
         file: Union[str, IO[bytes]],
         encoding='utf-8',
-        passwords: Optional[List[Union[str, bytes]]] = None,
+        passwords: Optional[list[Union[str, bytes]]] = None,
         bufferSize=1024 * 1024,
         printDebug: int = 0,
     ):
@@ -247,7 +247,7 @@ class IterableArchive:
         if not allowArchives and not self.filter_names():
             raise ArchiveError("When not looking for archives, there must be at least one filter!")
 
-    def _set_passwords(self, passwords: List[Union[str, bytes]]):
+    def _set_passwords(self, passwords: list[Union[str, bytes]]):
         try:
             for password in passwords:
                 laffi.read_add_passphrase(self._archive, password.encode() if isinstance(password, str) else password)
@@ -329,7 +329,7 @@ class IterableArchive:
 class IterableArchiveCache:
     def __init__(self, cacheSize: int = 5):
         self.cacheSize = cacheSize
-        self._cache: List[IterableArchive] = []
+        self._cache: list[IterableArchive] = []
 
     def insert(self, archive: IterableArchive):
         self._cache.append(archive)
@@ -351,7 +351,7 @@ class LibarchiveFile(io.RawIOBase):
         file,
         entry_index,
         fileSize,
-        passwords: Optional[List[str]] = None,
+        passwords: Optional[list[str]] = None,
         printDebug: int = 0,
         archiveCache: Optional[IterableArchiveCache] = None,
     ):
@@ -509,11 +509,11 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
         writeIndex             : bool                      = False,
         clearIndexCache        : bool                      = False,
         indexFilePath          : Optional[str]             = None,
-        indexFolders           : Optional[List[str]]       = None,
+        indexFolders           : Optional[list[str]]       = None,
         encoding               : str                       = tarfile.ENCODING,
         verifyModificationTime : bool                      = False,
         printDebug             : int                       = 0,
-        transform              : Optional[Tuple[str, str]] = None,
+        transform              : Optional[tuple[str, str]] = None,
         indexMinimumFileCount  : int                       = 0,
         tarFileName            : Optional[str]             = None,
         **options
@@ -680,7 +680,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
             ),
         )
 
-    def _check_metadata(self, metadata: Dict[str, Any]) -> None:
+    def _check_metadata(self, metadata: dict[str, Any]) -> None:
         """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
         SQLiteIndex.check_archive_stats(self.archiveFilePath, metadata, self.verifyModificationTime)
 

@@ -9,8 +9,9 @@ import pathlib
 import platform
 import sys
 import types
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Dict, Generic, Iterable, List, Optional, TypeVar, Union, get_type_hints
+from typing import Generic, Optional, TypeVar, Union, get_type_hints
 
 
 class RatarmountError(Exception):
@@ -91,8 +92,8 @@ class LRUCache(Generic[KeyType, ValueType]):
     # E.g. copy would return a dicft instead of LRUCache and so on.
     def __init__(self, size: int = 10):
         self.size = size
-        self.lastUsed: List[KeyType] = []
-        self.data: Dict[KeyType, ValueType] = {}
+        self.lastUsed: list[KeyType] = []
+        self.data: dict[KeyType, ValueType] = {}
 
     def _refresh(self, key: KeyType):
         if key in self.lastUsed:

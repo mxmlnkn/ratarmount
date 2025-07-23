@@ -8,7 +8,7 @@ import stat
 import sys
 import tarfile
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 
 import pytest
 
@@ -23,8 +23,8 @@ from ratarmountcore.mountsource.MountSource import MountSource  # noqa: E402
 @dataclasses.dataclass
 class SampleArchive:
     path: Path
-    folders: List[str]
-    files: Dict[str, bytes]
+    folders: list[str]
+    files: dict[str, bytes]
 
 
 def _create_file(tarArchive, name, contents):

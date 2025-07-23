@@ -1,7 +1,9 @@
+import builtins
 import os
 import stat
 import time
-from typing import IO, Any, Dict, Iterable, List, Optional, Set, Tuple, Union
+from collections.abc import Iterable
+from typing import IO, Any, Optional, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource, create_root_file_info, merge_statfs
 from ratarmountcore.utils import overrides
@@ -10,7 +12,7 @@ from ratarmountcore.utils import overrides
 class UnionMountSource(MountSource):
     def __init__(
         self,
-        mountSources: List[MountSource],
+        mountSources: list[MountSource],
         printDebug: int = 0,
         maxCacheDepth: int = 1024,
         maxCacheEntries: int = 100000,
@@ -31,9 +33,9 @@ class UnionMountSource(MountSource):
             and it shouldn't take minutes! Note that there always can be an edge case with hundred
             thousands of files in one folder, which can take an arbitrary amount of time to cache.
         """
-        self.mountSources: List[MountSource] = mountSources
+        self.mountSources: list[MountSource] = mountSources
         self.printDebug = printDebug
-        self.folderCache: Dict[str, List[MountSource]] = {"/": self.mountSources}
+        self.folderCache: dict[str, list[MountSource]] = {"/": self.mountSources}
         self.folderCacheDepth = 0  # depth 1 means, we only cached top-level directories.
         self.rootFileInfo = create_root_file_info(userdata=[None])
 
@@ -48,14 +50,14 @@ class UnionMountSource(MountSource):
 
         self.folderCache = {"/": [m for m in self.mountSources if m.is_immutable()]}
 
-        lastFolderCache: Dict[str, List[MountSource]] = self.folderCache.copy()
+        lastFolderCache: dict[str, list[MountSource]] = self.folderCache.copy()
 
         for depth in range(1, maxCacheDepth):
             # This intermediary structure is used because:
             #   1. We need to only iterate over the newly added folders in the next step
             #   2. We always want to (atomically) merge results for one folder depth so that we can be sure
             #      that if a folder of a cached depth can not be found in the cache that it does not exist at all.
-            newFolderCache: Dict[str, List[MountSource]] = {}
+            newFolderCache: dict[str, list[MountSource]] = {}
 
             for folder, mountSources in lastFolderCache.items():
                 for mountSource in mountSources:
@@ -147,7 +149,7 @@ class UnionMountSource(MountSource):
         return sum(mountSource.versions(path) for mountSource in self.mountSources)
 
     def _list(self, path: str, onlyMode: bool):
-        files: Optional[Union[Set[str], Dict[str, FileInfo], Dict[str, int]]] = None
+        files: Optional[Union[set[str], dict[str, FileInfo], dict[str, int]]] = None
 
         for mountSource in reversed(self.mountSources):
             result = mountSource.list_mode(path) if onlyMode else mountSource.list(path)
@@ -174,14 +176,14 @@ class UnionMountSource(MountSource):
         return files
 
     @overrides(MountSource)
-    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], dict[str, FileInfo]]]:
         """
         Returns the set of all folder contents over all mount sources or None if the path was found in none of them.
         """
         return self._list(path, onlyMode=False)
 
     @overrides(MountSource)
-    def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+    def list_mode(self, path: str) -> Optional[Union[Iterable[str], dict[str, int]]]:
         """
         Returns the set of all folder contents over all mount sources or None if the path was found in none of them.
         """
@@ -206,7 +208,7 @@ class UnionMountSource(MountSource):
             fileInfo.userdata.append(mountSource)
 
     @overrides(MountSource)
-    def list_xattr(self, fileInfo: FileInfo) -> List[str]:
+    def list_xattr(self, fileInfo: FileInfo) -> builtins.list[str]:
         mountSource = fileInfo.userdata.pop()
         try:
             return mountSource.list_xattr(fileInfo) if isinstance(mountSource, MountSource) else []
@@ -222,7 +224,7 @@ class UnionMountSource(MountSource):
             fileInfo.userdata.append(mountSource)
 
     @overrides(MountSource)
-    def get_mount_source(self, fileInfo: FileInfo) -> Tuple[str, MountSource, FileInfo]:
+    def get_mount_source(self, fileInfo: FileInfo) -> tuple[str, MountSource, FileInfo]:
         sourceFileInfo = fileInfo.clone()
         mountSource = sourceFileInfo.userdata.pop()
 
@@ -234,7 +236,7 @@ class UnionMountSource(MountSource):
         return mountSource.get_mount_source(sourceFileInfo)
 
     @overrides(MountSource)
-    def statfs(self) -> Dict[str, Any]:
+    def statfs(self) -> dict[str, Any]:
         return merge_statfs([mountSource.statfs() for mountSource in self.mountSources], printDebug=self.printDebug)
 
     @overrides(MountSource)

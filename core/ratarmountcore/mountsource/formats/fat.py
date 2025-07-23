@@ -2,7 +2,8 @@ import errno
 import io
 import os
 import stat
-from typing import IO, Dict, Iterable, Optional, Union, cast
+from collections.abc import Iterable
+from typing import IO, Optional, Union, cast
 
 from ratarmountcore.formats import FileFormatID, replace_format_check
 from ratarmountcore.mountsource import FileInfo, MountSource
@@ -102,7 +103,7 @@ class FATMountSource(MountSource):
         return [str(entry) for entry in directories + files]
 
     @overrides(MountSource)
-    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], dict[str, FileInfo]]]:
         # TODO I think with the low-level API, we could also get the FileInfos
         return self._list(path)
 
