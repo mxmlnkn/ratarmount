@@ -260,7 +260,7 @@ class FuseMount(fuse.Operations):
     def __del__(self) -> None:
         self._close()
 
-    def _add_new_handle(self, handle, flags):
+    def _add_new_handle(self, handle, flags: int) -> int:
         # Note that fh in fuse_common.h is 64-bit and Python also supports 64-bit (long integers) out of the box.
         # So, there should practically be no overflow and file handle reuse possible.
         self.lastFileHandle += 1

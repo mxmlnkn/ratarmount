@@ -236,7 +236,7 @@ class WritableFolderMountSource(fuse.Operations):
             print("[Info] Caught exception when trying to apply metadata to real file.")
             print("[Info] It was applied in the metadata database!")
 
-    def update_file_info(self, path: str, fileInfo: FileInfo):
+    def update_file_info(self, path: str, fileInfo: FileInfo) -> FileInfo:
         folder, name = self._split_path(path)
         row = self.sqlConnection.execute(
             """SELECT * FROM "files" WHERE "path" == (?) AND "name" == (?);""", (folder, name)
