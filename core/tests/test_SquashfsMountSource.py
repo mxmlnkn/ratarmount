@@ -98,9 +98,10 @@ class TestSquashfsMountSource:
     @staticmethod
     @pytest.mark.parametrize('compression', compressionsToTest)
     def test_transform(compression):
-        with copy_test_file(f'folder-symlink.{compression}.squashfs') as path, SquashFSMountSource(
-            path, transform=("(.)/(.)", r"\1_\2")
-        ) as mountSource:
+        with (
+            copy_test_file(f'folder-symlink.{compression}.squashfs') as path,
+            SquashFSMountSource(path, transform=("(.)/(.)", r"\1_\2")) as mountSource,
+        ):
             for folder in ['/', '/foo', '/foo_fighter']:
                 fileInfo = mountSource.lookup(folder)
                 assert fileInfo

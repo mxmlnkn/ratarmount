@@ -129,9 +129,10 @@ class WritableFolderMountSource(fuse.Operations):
 
     def _ensure_file_is_modifiable(self, path):
         self._ensure_parent_exists(path)
-        with self.mountSource.open(self.mountSource.lookup(path)) as sourceObject, open(
-            self._realpath(path), 'wb'
-        ) as targetObject:
+        with (
+            self.mountSource.open(self.mountSource.lookup(path)) as sourceObject,
+            open(self._realpath(path), 'wb') as targetObject,
+        ):
             shutil.copyfileobj(sourceObject, targetObject)
 
     def _open(self, path: str, mode):
@@ -459,9 +460,10 @@ def commit_overlay(writeOverlay: str, tarFile: str, encoding: str = tarfile.ENCO
                 add_to_deletion_file(deletionListFile, f"{path}/{name}".lstrip('/'))
 
     # Delete all files to be replaced with other files
-    with open(deletionList, 'a', encoding=encoding) as deletionListFile, open(
-        appendList, 'a', encoding=encoding
-    ) as appendListFile:
+    with (
+        open(deletionList, 'a', encoding=encoding) as deletionListFile,
+        open(appendList, 'a', encoding=encoding) as appendListFile,
+    ):
         # For temporary SQLite file suffixes, see https://www.sqlite.org/tempfiles.html
         suffixes = ['', '-journal', '-shm', '-wal']
         toBeIgnored = [WritableFolderMountSource.hiddenDatabaseName + suffix for suffix in suffixes]

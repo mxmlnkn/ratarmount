@@ -31,9 +31,12 @@ def copy_test_file(relativePathOrName):
                     if not os.path.isfile(found_path):
                         continue
 
-                    with open(found_path, 'rb') as file, contextlib.suppress(Exception), backend.open(
-                        file
-                    ) as decompressed, open(path, 'wb') as target:
+                    with (
+                        open(found_path, 'rb') as file,
+                        contextlib.suppress(Exception),
+                        backend.open(file) as decompressed,
+                        open(path, 'wb') as target,
+                    ):
                         shutil.copyfileobj(decompressed, target)
                         break
 

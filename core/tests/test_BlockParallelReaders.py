@@ -83,9 +83,12 @@ class TestParallelXZReader:
 
     @staticmethod
     def _test_sequential_reading(archivePath: str, bufferSize: int, parallelization: int):
-        with xz.open(archivePath, 'rb') as serialFile, (
-            lzma.open(archivePath) if parallelization == 1 else ParallelXZReader(archivePath, parallelization)
-        ) as parallelFile:
+        with (
+            xz.open(archivePath, 'rb') as serialFile,
+            (
+                lzma.open(archivePath) if parallelization == 1 else ParallelXZReader(archivePath, parallelization)
+            ) as parallelFile,
+        ):
             bytesRead = 0
             while True:
                 serialData = serialFile.read(bufferSize)
@@ -101,9 +104,12 @@ class TestParallelXZReader:
 
     @staticmethod
     def _test_random_reads(archivePath: str, samples: int, parallelization: int):
-        with xz.open(archivePath, 'rb') as serialFile, (
-            lzma.open(archivePath) if parallelization == 1 else ParallelXZReader(archivePath, parallelization)
-        ) as parallelFile:
+        with (
+            xz.open(archivePath, 'rb') as serialFile,
+            (
+                lzma.open(archivePath) if parallelization == 1 else ParallelXZReader(archivePath, parallelization)
+            ) as parallelFile,
+        ):
             if hasattr(parallelFile, 'blockBoundaries'):
                 size = parallelFile.blockBoundaries[-1]
             else:
@@ -208,9 +214,12 @@ class TestParallelZstdReader:
 
         archivePath = str(archivePathLike)
 
-        with indexed_zstd.IndexedZstdFile(archivePath) as serialFile, (
-            SeekableZstd(archivePath) if parallelization == 1 else ParallelZstdReader(archivePath, parallelization)
-        ) as parallelFile:
+        with (
+            indexed_zstd.IndexedZstdFile(archivePath) as serialFile,
+            (
+                SeekableZstd(archivePath) if parallelization == 1 else ParallelZstdReader(archivePath, parallelization)
+            ) as parallelFile,
+        ):
             bytesRead = 0
             while True:
                 serialData = serialFile.read(bufferSize)
@@ -231,9 +240,12 @@ class TestParallelZstdReader:
 
         archivePath = str(archivePathLike)
 
-        with indexed_zstd.IndexedZstdFile(archivePath) as serialFile, (
-            SeekableZstd(archivePath) if parallelization == 1 else ParallelZstdReader(archivePath, parallelization)
-        ) as parallelFile:
+        with (
+            indexed_zstd.IndexedZstdFile(archivePath) as serialFile,
+            (
+                SeekableZstd(archivePath) if parallelization == 1 else ParallelZstdReader(archivePath, parallelization)
+            ) as parallelFile,
+        ):
             if hasattr(parallelFile, 'blockBoundaries'):
                 size = parallelFile.blockBoundaries[-1]
             else:
