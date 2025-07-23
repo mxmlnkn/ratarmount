@@ -2,7 +2,7 @@
 
 The AppImages can be downloaded, made executable with `chmod u+x *.AppImage`, and executed directly to start ratarmount.
 
-There are also usability helper for AppImages such as [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher) and [AM](https://github.com/ivan-hc/AM).
+There are also usability helpers for AppImages such as [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher) and [AM](https://github.com/ivan-hc/AM).
 
 If the AppImage is too slow to start up or to reduce memory overhead for the AppImage itself, the AppImage can also be manually unpacked and installed:
 

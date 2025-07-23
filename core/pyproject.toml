@@ -45,10 +45,59 @@ classifiers = [
     "Topic :: System :: Filesystems",
     "Topic :: Utilities",
 ]
-requires-python = ">= 3.7"
-dependencies = [
-    'importlib-metadata; python_version < "3.8.0"',
-]
+# Require Python 3.9. argparse.BooleanOptionalAction was the straw that broke the camel's back.
+# But these are also features that I wanted to use for a long time or sound useful:
+# Python 3.7:
+#  - dataclasses
+#  - time.time_ns
+#  - python -X dev
+#  - contextlib.nullcontext
+#  - pathlib.Path.is_mount()
+#  - sqlite3.Connection.backup
+#  - subprocess.run(capture_output=...)
+#  - ZipFile(compressLevel=...)
+# Python 3.8:
+#  - walrus operator :=
+#  - position-only parameters! def f(a, b, /, c, d, *, e, f):
+#  - f'{user=}' to format f'user={user}', well only useful for debug output, which should not be committed
+#  - dict().reversed()
+#  - importlib.metadata
+#  - @functools.cached_property
+#  - mmap.mmap.madvise
+#  - typing.Final, typing.Protocol
+# Python 3.9:
+#  - dict |=
+#  - typing generics! Dict -> dict, List -> list, Set -> set
+#    - Seems difficult to use, i.e., may require from __future__ import annotations and may not work with mypy:
+#      https://peps.python.org/pep-0585/
+#      https://docs.python.org/3/library/stdtypes.html#types-genericalias
+#  - str.removeprefix(prefix) and str.removesuffix(suffix)
+#  - pathlib.Path.readlink()
+#  - argparse.BooleanOptionalAction
+#  - Parenthesized context managers
+requires-python = ">= 3.9"
+# Python 3.10:
+#  - match statement
+#  - typing.Union -> X | Y
+#  - https://typing.python.org/en/latest/spec/aliases.html#type-aliases
+#  - https://typing.python.org/en/latest/spec/narrowing.html#typeguard
+#  - bisect.bisect(key=...)
+#  - @dataclass(kw_only=True)
+# Python 3.11:
+#  - Self type
+#  - Starred unpacking expressions can now be used in for statements
+#  - sqlite3.Connection.serialize/deserialize
+#  - sqlite3.Connection.blobopen
+# Python 3.12:
+#  - distutils removed
+#  - sys.monitoring
+#  - @typing.override, typing.TypedDict
+#  - itertools.batched
+#  - tempfile.NamedTemporaryFile(delete_on_close=...)
+# Python 3.13:
+#  - optional Free-threaded CPython and JIT compiler
+#  - argparse add_argument(deprecated=...)
+#  - os.process_cpu_count()
 dynamic = ["version"]
 
 [project.readme]
@@ -59,27 +108,21 @@ content-type = "text/markdown"
 Homepage = "https://github.com/mxmlnkn/ratarmount/ratarmountcore"
 
 [project.optional-dependencies]
+# https://peps.python.org/pep-0508/ Dependency specification for Python Software Packages
 full = [
-    "indexed_gzip >= 1.6.3, < 2.0; python_version >= '3.8'",
-    # https://github.com/pauldmccarthy/indexed_gzip/issues/167
-    "indexed_gzip >= 1.6.3, != 1.9.4; python_version < '3.8'",
+    "indexed_gzip ~= 1.7",
     'indexed_zstd >= 1.3.1, < 2.0; sys_platform=="darwin"',
     'indexed_zstd >= 1.2.2, < 2.0; platform_system!="Windows"',
     "libarchive-c ~= 5.1, < 6.0",
     "python-xz ~= 0.4.0",
     "rapidgzip >= 0.13.1",
     "rarfile ~= 4.1",
-    # https://github.com/miurahr/py7zr/issues/640
-    "py7zr ~= 1.0; python_version >= '3.9'",
+    "py7zr ~= 1.0",
     "PySquashfsImage == 0.9.0",
     "lz4 ~= 4.0.0",
     "python-lzo ~= 1.0",
-    # https://peps.python.org/pep-0508/
     # Need at least 0.23.0 for Python 3.13 support.
     # https://github.com/indygreg/python-zstandard/issues/223
-    # The old zstandard-python versions for Python < 3.8 are untested because they are EOL.
-    "zstandard ~= 0.20.0; python_version == '3.6'",
-    "zstandard ~= 0.21.0; python_version == '3.7'",
     # With Python 3.14, I get ImportError: cannot import name 'ByteString' from 'typing' via
     # zstandard/__init__.py:21.
     # https://github.com/indygreg/python-zstandard/issues/238
@@ -87,8 +130,7 @@ full = [
     # With Python 3.14, when building the wheel, I get:
     # /usr/bin/ld: cannot find /tmp/tmpcuw21d78/bin/isa-l.a: No such file or directory
     'isal ~= 1.0; python_version < "3.14.0"',
-    'fast_zip_decryption; python_version >= "3.8.0"',
-    'fastzipfile; python_version < "3.8.0"',
+    'fast_zip_decryption',
     "pygit2",
     # fsspec:
     "requests",
@@ -100,14 +142,7 @@ full = [
     "smbprotocol",
     "dropboxdrivefs",
     "fsspec",
-    # With Python 3.7, I get this error:
-    # File "/opt/hostedtoolcache/Python/3.7.17/x64/lib/python3.7/site-packages/ipfsspec/async_ipfs.py", line 173
-    #   if ipfsspec_gateways := os.environ.get("IPFSSPEC_GATEWAYS", ""):
-    #                        ^
-    # for ipfsspec 0.5.0 :(. Well, I can't complain. I messed up proper requires-python myself.
-    # The := operator was introduced in Python 3.8.
-    "ipfsspec < 0.5.0; python_version < '3.8'",
-    "ipfsspec; python_version >= '3.8'",
+    "ipfsspec",
     "s3fs",
     "webdav4",
     #"gcsfs",  # untested
@@ -115,11 +150,7 @@ full = [
 ]
 bzip2 = ["rapidgzip >= 0.13.1"]
 git = ["pygit2"]
-gzip = [
-    "indexed_gzip >= 1.6.3, < 2.0; python_version >= '3.8'",
-    # https://github.com/pauldmccarthy/indexed_gzip/issues/167
-    "indexed_gzip >= 1.6.3, != 1.9.4; python_version < '3.8'",
-]
+gzip = ["indexed_gzip ~= 1.7"]
 fsspec = ["fsspec"]
 fsspec-backends = [
     # Copy-pasted from fsspec[full] list. Some were excluded because they are too unproportionally large.
@@ -132,14 +163,7 @@ fsspec-backends = [
     "smbprotocol",
     "dropboxdrivefs",
     "fsspec",
-    # With Python 3.7, I get this error:
-    # File "/opt/hostedtoolcache/Python/3.7.17/x64/lib/python3.7/site-packages/ipfsspec/async_ipfs.py", line 173
-    #   if ipfsspec_gateways := os.environ.get("IPFSSPEC_GATEWAYS", ""):
-    #                        ^
-    # for ipfsspec 0.5.0 :(. Well, I can't complain. I messed up proper requires-python myself.
-    # The := operator was introduced in Python 3.8.
-    "ipfsspec < 0.5.0; python_version < '3.8'",
-    "ipfsspec; python_version >= '3.8'",
+    "ipfsspec",
     "s3fs",
     "webdav4",
     #"gcsfs",  # untested
@@ -161,12 +185,8 @@ squashfs = [
     "PySquashfsImage == 0.9.0",
     "lz4 ~= 4.0.0",
     "python-lzo ~= 1.0",
-    # https://peps.python.org/pep-0508/
     # Need at least 0.23.0 for Python 3.13 support.
     # https://github.com/indygreg/python-zstandard/issues/223
-    # The old zstandard-python versions for Python < 3.8 are untested because they are EOL.
-    "zstandard ~= 0.20.0; python_version == '3.6'",
-    "zstandard ~= 0.21.0; python_version == '3.7'",
     # With Python 3.14, I get ImportError: cannot import name 'ByteString' from 'typing' via
     # zstandard/__init__.py:21.
     # https://github.com/indygreg/python-zstandard/issues/238
@@ -176,23 +196,19 @@ squashfs = [
     'isal ~= 1.0; python_version < "3.14.0"',
 ]
 xz = ["python-xz ~= 0.4.0"]
-zip = [
-    'fast_zip_decryption; python_version >= "3.8.0"',
-    'fastzipfile; python_version < "3.8.0"',
-]
+zip = ["fast_zip_decryption"]
 zstd = [
     'indexed_zstd >= 1.3.1, < 2.0; sys_platform=="darwin"',
     'indexed_zstd >= 1.2.2, < 2.0; platform_system!="Windows"',
 ]
 7z = [
     "libarchive-c ~= 5.1, < 6.0",
-    # https://github.com/miurahr/py7zr/issues/640
-    "py7zr ~= 1.0; python_version >= '3.9'",
+    "py7zr ~= 1.0",
 ]
 # Bundled with fix because of https://github.com/nathanhi/pyfatfs/issues/41
 fat = []
 # Not part of 'full' because it does exact pinning for its dependencies, which does lead to dependency conflicts.
-ext4 = ['ext4 ~= 1.1; python_version >= "3.9.0"']
+ext4 = ['ext4 ~= 1.1']
 # All optional dependencies of asyncssh via sshfs. I have not yet needed any of these.
 # Half of these are installed anyway via other dependencies.
 full-ssh = [

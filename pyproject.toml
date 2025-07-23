@@ -42,7 +42,8 @@ classifiers = [
     "Topic :: Utilities",
 ]
 urls = {Homepage = "https://github.com/mxmlnkn/ratarmount"}
-requires-python = ">= 3.7"
+# Require Python 3.9. argparse.BooleanOptionalAction was the straw that broke the camel's back.
+requires-python = ">= 3.9"
 dependencies = [
     # https://pip.pypa.io/en/stable/reference/requirement-specifiers/
     # https://packaging.python.org/en/latest/glossary/#term-Requirement-Specifier

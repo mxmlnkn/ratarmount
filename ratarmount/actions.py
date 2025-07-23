@@ -1,6 +1,7 @@
 import argparse
 import contextlib
 import importlib
+import importlib.metadata
 import json
 import os
 import re
@@ -16,7 +17,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from ratarmountcore.compressions import strip_suffix_from_archive
-from ratarmountcore.utils import RatarmountError, determine_recursion_depth, imeta, remove_duplicates_stable
+from ratarmountcore.utils import RatarmountError, determine_recursion_depth, remove_duplicates_stable
 
 with contextlib.suppress(ImportError):
     import rarfile
@@ -82,8 +83,8 @@ def print_metadata_recursively(
         processedPackages.add(package)
 
         try:
-            distribution = imeta.distribution(package)
-        except imeta.PackageNotFoundError:
+            distribution = importlib.metadata.distribution(package)
+        except importlib.metadata.PackageNotFoundError:
             # Will happen for uninstalled optional or Python version dependent files and built-in modules, such as:
             #   fastzipfile, argparse, ...
             continue

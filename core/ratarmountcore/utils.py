@@ -12,15 +12,6 @@ import types
 from pathlib import Path
 from typing import Dict, Generic, Iterable, List, Optional, TypeVar, Union, get_type_hints
 
-try:
-    import importlib.metadata
-except ImportError:
-    import importlib_metadata
-
-    imeta: types.ModuleType = importlib_metadata
-else:
-    imeta = importlib.metadata
-
 
 class RatarmountError(Exception):
     """Base exception for ratarmount module."""
@@ -276,6 +267,8 @@ def find_module_version(moduleOrName: Union[str, types.ModuleType]) -> Optional[
 
     moduleFilePath = getattr(module, '__file__', None)
     if moduleFilePath:
+        import importlib.metadata as imeta  # noqa: E402  # Based on -X importtime seems to be pretty slow.
+
         for distribution in imeta.distributions():
             try:
                 if distribution_contains_file(distribution, moduleFilePath) and 'Version' in distribution.metadata:
