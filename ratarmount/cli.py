@@ -1,6 +1,7 @@
 # PYTHON_ARGCOMPLETE_OK
 
 # We explicitly do want to import everything as late as possible here in order to speed up calls by argcomplete!
+# And also to avoid recursion with FuseMount!
 # pylint: disable=import-outside-toplevel
 
 import argparse
@@ -114,6 +115,7 @@ Examples:
  - ratarmount github://mxmlnkn:ratarmount@v0.15.2/tests/single-file.tar mountpoint
  - AWS_ACCESS_KEY_ID=aaaaaaaaaaaaaaaaaaaa AWS_SECRET_ACCESS_KEY=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \\
    ratarmount s3://127.0.0.1/bucket/single-file.tar mounted
+ - ratarmount --control-interface mounted
 
 For further information, see the ReadMe on the project's homepage:
 

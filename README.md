@@ -749,3 +749,21 @@ ratarmount file.tar.gz.00 mounted
 ls -la mounted
 # 1.0M  1MiB.dat
 ```
+
+
+# Mount Point Control Interface
+
+The FUSE mount contains a special hidden `.ratarmount-control` folder with special files inside it.
+
+ - `.ratarmount-control/output`: Contains the errors and log output of the ratarmount process.
+   Especially useful when it runs in the background. Alternatively, `-f` can be used to keep it in the foreground.
+ - `.ratarmount-control/command`: Command line invocations can be written into this file to invoke another ratarmount subprocess. Command lines must start with `ratarmount<delimiter>`, where `<delimiter>` can be ` ` (space), `\n` (newline), or `\0` (null byte).
+
+For example, try:
+
+```bash
+ratarmount --control-interface mounted
+echo "ratarmount -d 3 $PWD/tests/single-file.tar $HOME/mounted" > mounted/.ratarmount-control/command
+sleep 1
+cat mounted/.ratarmount-control/command
+```

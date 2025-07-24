@@ -2,6 +2,7 @@ import argparse
 import contextlib
 import importlib
 import importlib.metadata
+import inspect
 import json
 import os
 import re
@@ -330,7 +331,21 @@ def unmount(mountPoint: str, printDebug: int = 0) -> None:
                 print(f"[Warning] umount {mountPoint} failed with: {exception}")
 
 
+def is_inside_fuse_context() -> bool:
+    for frame_info in inspect.stack():
+        frame = frame_info.frame
+        cls = frame.f_locals.get('cls', type(frame.f_locals.get('self', None)))
+        if inspect.isclass(cls) and issubclass(cls, fuse.Operations):
+            return True
+    return False
+
+
 def process_parsed_arguments(args) -> int:
+    # We have to take care not to call into ourself by accessing paths inside the mount point from the
+    # FUSE-providing process! This also includes is.path.ismount!
+    if is_inside_fuse_context():
+        raise RuntimeError("A FUSE mount must not be created from another FUSE mount. Start a new subprocess!")
+
     if args.unmount:
         # args.mount_source suffices because it eats all arguments and args.mount_point is always empty by default.
         mountPoints = [mountPoint for mountPoint in args.mount_source if mountPoint] if args.mount_source else []
@@ -360,39 +375,15 @@ def process_parsed_arguments(args) -> int:
 
         return 1 if errorPrinted else 0
 
-    args.gzipSeekPointSpacing = int(args.gzip_seek_point_spacing * 1024 * 1024)
-
-    if (args.strip_recursive_tar_extension or args.transform_recursive_mount_point) and determine_recursion_depth(
-        recursive=args.recursive, recursion_depth=args.recursion_depth
-    ) <= 0:
-        print("[Warning] The options --strip-recursive-tar-extension and --transform-recursive-mount-point")
-        print("[Warning] only have an effect when used with recursive mounting.")
-
-    if args.transform_recursive_mount_point:
-        args.transform_recursive_mount_point = tuple(args.transform_recursive_mount_point)
-
     # This is a hack but because we have two positional arguments (and want that reflected in the auto-generated help),
-    # all positional arguments, including the mountpath will be parsed into the tar file path's namespace and we have to
+    # all positional arguments, including the mountpath will be parsed into args.mount_source and we have to
     # manually separate them depending on the type.
     lastArgument = args.mount_source[-1]
     if '://' not in lastArgument and (os.path.isdir(lastArgument) or not os.path.exists(lastArgument)):
         args.mount_point = lastArgument
         args.mount_source = args.mount_source[:-1]
     if not args.mount_source and not args.write_overlay and not args.control_interface:
-        raise argparse.ArgumentTypeError(
-            "You must at least specify one path to a valid TAR file or union mount source directory!"
-        )
-
-    # Sanitize different ways to specify passwords into a simple list
-    # Better initialize it before calling check_mount_source, which might use args.passwords in the future.
-    args.passwords = []
-    if args.password:
-        args.passwords.append(args.password.encode())
-
-    if args.password_file:
-        args.passwords.extend(Path(args.password_file).read_bytes().split(b'\n'))
-
-    args.passwords = remove_duplicates_stable(args.passwords)
+        raise argparse.ArgumentTypeError("You must specify at least one path to a valid archive or folder!")
 
     # Manually check that all specified TARs and folders exist
     def check_mount_source(path):
@@ -420,9 +411,39 @@ def process_parsed_arguments(args) -> int:
         mountSources.append(fixedPath)
     args.mount_source = mountSources
 
+    # This can only be called after post-processing all required args members!
+    if args.commit_overlay:
+        if len(args.mount_source) != 1:
+            raise RatarmountError("Currently, only modifications to a single TAR may be committed.")
+
+        commit_overlay(args.write_overlay, args.mount_source[0], encoding=args.encoding, printDebug=args.debug)
+        return 0
+
     for path in args.mount_source:
         if args.mount_source.count(path) > 1:
             raise argparse.ArgumentTypeError(f"Path may not appear multiple times at different locations: {path}")
+
+    args.gzipSeekPointSpacing = int(args.gzip_seek_point_spacing * 1024 * 1024)
+
+    if (args.strip_recursive_tar_extension or args.transform_recursive_mount_point) and determine_recursion_depth(
+        recursive=args.recursive, recursion_depth=args.recursion_depth
+    ) <= 0:
+        print("[Warning] The options --strip-recursive-tar-extension and --transform-recursive-mount-point")
+        print("[Warning] only have an effect when used with recursive mounting.")
+
+    if args.transform_recursive_mount_point:
+        args.transform_recursive_mount_point = tuple(args.transform_recursive_mount_point)
+
+    # Sanitize different ways to specify passwords into a simple list
+    # Better initialize it before calling check_mount_source, which might use args.passwords in the future.
+    args.passwords = []
+    if args.password:
+        args.passwords.append(args.password.encode())
+
+    if args.password_file:
+        args.passwords.extend(Path(args.password_file).read_bytes().split(b'\n'))
+
+    args.passwords = remove_duplicates_stable(args.passwords)
 
     # Automatically generate a default mount path
     if not args.mount_point:
@@ -489,18 +510,14 @@ def process_parsed_arguments(args) -> int:
         else []
     )
 
-    if args.commit_overlay:
-        if len(args.mount_source) != 1:
-            raise RatarmountError("Currently, only modifications to a single TAR may be committed.")
-
-        commit_overlay(args.write_overlay, args.mount_source[0], encoding=args.encoding, printDebug=args.debug)
-        return 0
-
     create_fuse_mount(args)  # Throws on errors.
     return 0
 
 
 def create_fuse_mount(args) -> None:
+    if is_inside_fuse_context():
+        raise RuntimeError("A FUSE mount must not be created from another FUSE mount. Start a new subprocess!")
+
     # Convert the comma separated list of key[=value] options into a dictionary for fusepy
     fusekwargs = (
         dict(option.split('=', 1) if '=' in option else (option, True) for option in args.fuse.split(','))
@@ -514,6 +531,7 @@ def create_fuse_mount(args) -> None:
     if os.path.isdir(args.mount_point) and os.listdir(args.mount_point) and has_fuse_non_empty_support():
         fusekwargs['nonempty'] = True
 
+    # Import late to avoid recursion and overhead during argcomplete!
     from .FuseMount import FuseMount  # pylint: disable=import-outside-toplevel
 
     # fmt: off

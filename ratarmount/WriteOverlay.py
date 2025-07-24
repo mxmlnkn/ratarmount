@@ -1,4 +1,5 @@
 import errno
+import functools
 import os
 import shutil
 import sqlite3
@@ -18,6 +19,32 @@ from ratarmountcore.mountsource.formats.folder import FolderMountSource
 from ratarmountcore.utils import RatarmountError, overrides
 
 from .fuse import fuse
+
+
+def check_ignored_prefixes(parameter_name: str = 'path'):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            if not self.ignoredPrefixes:
+                return func(self, *args, **kwargs)
+
+            if parameter_name in kwargs:
+                path = kwargs[parameter_name]
+            elif args:
+                # We assume that the first parameter is the one to be checked.
+                path = args[0]
+            else:
+                return func(self, *args, **kwargs)
+
+            # Check if path starts with any ignored prefix.
+            if any(path.startswith(prefix) for prefix in self.ignoredPrefixes):
+                raise FileNotFoundError(f"Accessing forbidden folder: {path}")
+
+            return func(self, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 class WritableFolderMountSource(fuse.Operations):
@@ -41,7 +68,7 @@ class WritableFolderMountSource(fuse.Operations):
 
     hiddenDatabaseName = '.ratarmount.overlay.sqlite'
 
-    def __init__(self, path: str, mountSource: MountSource) -> None:
+    def __init__(self, path: str, mountSource: MountSource, ignoredPrefixes: Optional[list[str]] = None) -> None:
         if os.path.exists(path):
             if not os.path.isdir(path):
                 raise ValueError("Overlay path must be a folder!")
@@ -52,6 +79,11 @@ class WritableFolderMountSource(fuse.Operations):
         self.mountSource = mountSource
         self.sqlConnection = self._open_sql_db(os.path.join(path, self.hiddenDatabaseName))
         self._statfs = self._get_statfs_for_folder(self.root)
+        self.ignoredPrefixes = (
+            [os.path.normpath('/' + prefix.strip('/')) + '/' for prefix in ignoredPrefixes]
+            if ignoredPrefixes is not None
+            else []
+        )
 
         # Add table if necessary
         tables = [row[0] for row in self.sqlConnection.execute('SELECT name FROM sqlite_master WHERE type = "table";')]
@@ -260,10 +292,12 @@ class WritableFolderMountSource(fuse.Operations):
     # Metadata modification
 
     @overrides(fuse.Operations)
+    @check_ignored_prefixes('path')
     def chmod(self, path: str, mode: int):
         self._set_file_metadata(path, lambda p: os.chmod(p, mode), {'mode': mode})
 
     @overrides(fuse.Operations)
+    @check_ignored_prefixes('path')
     def chown(self, path: str, uid: int, gid: int):
         data = {}
         if uid != -1:
@@ -277,6 +311,7 @@ class WritableFolderMountSource(fuse.Operations):
         self._set_file_metadata(path, lambda p: None, data)
 
     @overrides(fuse.Operations)
+    @check_ignored_prefixes('path')
     def utimens(self, path: str, times: Optional[tuple[int, int]] = None):
         """Argument "times" is a (atime, mtime) tuple. If "times" is None, use the current time."""
 
@@ -313,10 +348,12 @@ class WritableFolderMountSource(fuse.Operations):
     # Links
 
     @overrides(fuse.Operations)
+    @check_ignored_prefixes('target')
     def symlink(self, target: str, source: str):
         os.symlink(source, self._realpath(target))
 
     @overrides(fuse.Operations)
+    @check_ignored_prefixes('target')
     def link(self, target: str, source: str):
         # Can only hardlink to files which are also in the overlay folder.
         overlaySource = self._realpath(source)
@@ -330,11 +367,13 @@ class WritableFolderMountSource(fuse.Operations):
     # Folders
 
     @overrides(fuse.Operations)
+    @check_ignored_prefixes('path')
     def mkdir(self, path: str, mode: int):
         self._open(path, mode | stat.S_IFDIR)
         os.mkdir(self._realpath(path), mode)
 
     @overrides(fuse.Operations)
+    @check_ignored_prefixes('path')
     def rmdir(self, path: str):
         if not self.mountSource.exists(path) or self.is_deleted(path):
             raise fuse.FuseOSError(errno.ENOENT)
@@ -357,6 +396,7 @@ class WritableFolderMountSource(fuse.Operations):
     # Files
 
     @overrides(fuse.Operations)
+    @check_ignored_prefixes('path')
     def open(self, path: str, flags: int):
         # if flags & os.O_CREAT != 0:  # I hope that FUSE simple calls create in this case.
         #    self._open(path)   # what would the default mode even be?
@@ -370,11 +410,13 @@ class WritableFolderMountSource(fuse.Operations):
         return os.open(self._realpath(path), flags)
 
     @overrides(fuse.Operations)
+    @check_ignored_prefixes('path')
     def create(self, path: str, mode: int, fi=None):
         self._open(path, mode)
         return os.open(self._realpath(path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
 
     @overrides(fuse.Operations)
+    @check_ignored_prefixes('path')
     def unlink(self, path: str):
         # Note that despite the name this is called for removing both, files and links.
 
@@ -393,11 +435,13 @@ class WritableFolderMountSource(fuse.Operations):
             self._mark_as_deleted(path)
 
     @overrides(fuse.Operations)
+    @check_ignored_prefixes('path')
     def mknod(self, path: str, mode: int, dev: int):
         self._ensure_parent_exists(path)
         os.mknod(self._realpath(path), mode, dev)
 
     @overrides(fuse.Operations)
+    @check_ignored_prefixes('path')
     def truncate(self, path: str, length: int, fh=None):
         self._ensure_file_is_modifiable(path)
         os.truncate(self._realpath(path), length)
@@ -405,6 +449,7 @@ class WritableFolderMountSource(fuse.Operations):
     # Actual writing
 
     @overrides(fuse.Operations)
+    @check_ignored_prefixes('path')
     def write(self, path: str, data, offset: int, fh):
         os.lseek(fh, offset, 0)
         return os.write(fh, data)
@@ -412,14 +457,17 @@ class WritableFolderMountSource(fuse.Operations):
     # Flushing
 
     @overrides(fuse.Operations)
+    @check_ignored_prefixes('path')
     def flush(self, path: str, fh):
         return os.fsync(fh)
 
     @overrides(fuse.Operations)
+    @check_ignored_prefixes('path')
     def fsync(self, path: str, datasync: int, fh):
         return os.fsync(fh) if datasync == 0 else os.fdatasync(fh)
 
     @overrides(fuse.Operations)
+    @check_ignored_prefixes('path')
     def statfs(self, path: str):
         return self._statfs.copy()
 

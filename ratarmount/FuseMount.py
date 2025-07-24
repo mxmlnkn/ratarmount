@@ -3,10 +3,12 @@ import ctypes
 import errno
 import io
 import os
+import subprocess
 import sys
 import tempfile
+import time
 import traceback
-from typing import IO, Any, Callable, Optional, Union
+from typing import IO, Any, Callable, Optional, Union, cast
 
 from ratarmountcore.mountsource import FileInfo, MountSource
 
@@ -23,6 +25,60 @@ from ratarmountcore.utils import ceil_div, determine_recursion_depth, overrides
 
 from .fuse import fuse
 from .WriteOverlay import WritableFolderMountSource
+
+
+def split_command_line(command: bytes, name: bytes = b'ratarmount') -> list[str]:
+    if not command.startswith(name):
+        raise ValueError(f"Command must start with: {name.decode()}")
+
+    if command == name:
+        return [name.decode()]
+
+    delimiter = command[len(name) : len(name) + 1]
+    command = command[len(name) + 1 :]
+    if delimiter not in (b'\0', b'\n', b' '):
+        raise ValueError(f"Command must start with {name.decode()} followed by null, newline, or space as delimiter.")
+
+    # Check for the common case, i.e., when using 'echo' to write to this file instead of printf,
+    # which adds an unwanted newline, implying an '\n' argument. If that is really wanted, then
+    # add another '\n' because only one trailing '\n' will be stripped.
+    if delimiter == b' ' and command and command[-1] == ord('\n'):
+        command = command[:-1]
+
+    return [part.decode() for part in command.split(delimiter)]
+
+
+class CommandFile(io.RawIOBase):
+    def __init__(self, callback: Callable[[list[str]], Any]):
+        self._buffer = bytearray()
+        self._callback = callback
+
+    def writable(self) -> bool:
+        return True
+
+    def write(self, data):
+        if self.closed:  # pylint: disable=using-constant-test  # Bug?
+            raise ValueError("I/O operation on closed file.")
+        self._buffer.extend(data)
+        return len(data)
+
+    def close(self):
+        if self.closed:  # pylint: disable=using-constant-test  # Bug?
+            return
+
+        try:
+            super().close()
+            if not self._buffer:
+                return
+
+            arguments = split_command_line(bytes(self._buffer))
+            self._callback(arguments)
+        except Exception as exception:
+            traceback.print_exc()
+            raise ValueError from exception
+
+    def tell(self):
+        return len(self._buffer)
 
 
 class FuseMount(fuse.Operations):
@@ -52,20 +108,33 @@ class FuseMount(fuse.Operations):
     use_ns = True
 
     def __init__(self, pathToMount: Union[str, list[str]], mountPoint: str, **options) -> None:
+        self.mountPoint = os.path.realpath(mountPoint)
+        self.mountPointFd: Optional[int] = None
+        self.mountPointWasCreated = False
+        self.selfBindMount: Optional[FolderMountSource] = None
+
         self.printDebug: int = int(options.get('printDebug', 0))
         self.writeOverlay: Optional[WritableFolderMountSource] = None
         self.overlayPath: Optional[str] = None
+
         # Maps handles to either opened I/O objects or os module file handles for the writeOverlay and the open flags.
         self.openedFiles: dict[int, tuple[int, Union[IO[bytes], int]]] = {}
         self.lastFileHandle: int = 0  # It will be incremented before being returned. It can't hurt to never return 0.
+
         self.logFile: Optional[IO[str]] = None
+        # Log file location to be used when enableControlInterface is True but self.logFile is not set by the user.
+        self._tmpLogFile: Optional[Any] = None
+        self._enableControlInterface = bool(options.pop('controlInterface', False))
+        self._controlLayerPrefix = "/.ratarmount-control/"
+        # Ratarmount subprocesses started via /.ratarmount-control/command. Will be terminated on close.
+        self._subprocesses: list[subprocess.Popen] = []
 
         # Only open the log file at the end shortly before it is needed to not end up with an empty file on error.
+        # Read it from 'options' as soon as possible to not forward it as a MountSource options.
         logFilePath: str = options.pop('logFile', '')
         if logFilePath:
             logFilePath = os.path.realpath(logFilePath)
 
-        self.mountPoint = os.path.realpath(mountPoint)
         # This check is important for the self-bind test below, which assumes a folder.
         if os.path.exists(self.mountPoint) and not os.path.isdir(self.mountPoint):
             raise ValueError(f"Mount point '{self.mountPoint}' must either not exist or be a directory!")
@@ -95,13 +164,8 @@ class FuseMount(fuse.Operations):
                 os.makedirs(self.overlayPath, exist_ok=True)
             pathToMount.append(self.overlayPath)
 
-        assert isinstance(pathToMount, list)
-        if not pathToMount:
-            raise ValueError("No paths to mount given!")
         # Take care that bind-mounting folders to itself works
         mountSources: list[tuple[str, MountSource]] = []
-        self.mountPointFd: Optional[int] = None
-        self.selfBindMount: Optional[FolderMountSource] = None
 
         for path in pathToMount:
             if os.path.realpath(path) != self.mountPoint:
@@ -161,15 +225,13 @@ class FuseMount(fuse.Operations):
 
         # Open log file.
         openLog: Optional[Callable[[int], IO[bytes]]] = None
-        self._tmpLogFile: Optional[Any] = None
-        self.enableControlInterface = bool(options.pop('controlInterface', False))
-        if not logFilePath and self.enableControlInterface:
+        if not logFilePath and self._enableControlInterface:
             self._tmpLogFile = tempfile.NamedTemporaryFile('w+', encoding='utf-8', suffix='.ratarmount.log')
             logFilePath = self._tmpLogFile.name
         if logFilePath:
             self.logFile = open(logFilePath, "w+", buffering=1, encoding='utf-8')
 
-            def _get_log(buffering: int = 0) -> IO[bytes]:
+            def _get_log(_buffering: int = 0) -> IO[bytes]:
                 if self.logFile is None:
                     raise RuntimeError("Log file has not been initialized!")
                 self.logFile.seek(0)
@@ -177,12 +239,20 @@ class FuseMount(fuse.Operations):
                 # to support this case of "write UTF-8", "read bytes" with some kind of adapter class.
                 # Normally, the log should not grow to more than a dozen megabytes. Somehow adding a limit
                 # to that would be much more useful.
-                return io.BytesIO(self.logFile.read().encode())
+                # Using BufferedReader effectively removes the writable()==True implementation of BytesIO,
+                # so that the file permission will be correct in SingleFileMountSource!
+                return io.BufferedReader(cast(io.RawIOBase, io.BytesIO(self.logFile.read().encode())))
 
             openLog = _get_log
 
-        if self.enableControlInterface and openLog:
-            controlLayer = RemovePrefixMountSource(".ratarmount-control", SingleFileMountSource('output', openLog))
+        if self._enableControlInterface:
+            controlFiles = [
+                SingleFileMountSource('command', (lambda _: cast(IO[bytes], CommandFile(self._parse_command))))
+            ]
+            if openLog:
+                controlFiles.append(SingleFileMountSource('output', openLog))
+
+            controlLayer = RemovePrefixMountSource(self._controlLayerPrefix, UnionMountSource(controlFiles))
             mountSources.append(('/', controlLayer))
 
         def create_multi_mount() -> MountSource:
@@ -200,6 +270,9 @@ class FuseMount(fuse.Operations):
                 else:
                     submountSources[key] = mountSource
             return SubvolumesMountSource(submountSources, printDebug=self.printDebug)
+
+        if not mountSources:
+            raise ValueError("Mount point is empty! Either specify some input files or enable the control interface!")
 
         self.mountSource: MountSource = mountSources[0][1] if len(mountSources) == 1 else create_multi_mount()
 
@@ -219,7 +292,12 @@ class FuseMount(fuse.Operations):
             join_threads()
 
         if self.overlayPath:
-            self.writeOverlay = WritableFolderMountSource(self.overlayPath, self.mountSource)
+            ignoredPrefixes: list[str] = []
+            if self._enableControlInterface:
+                ignoredPrefixes.append(self._controlLayerPrefix)
+            self.writeOverlay = WritableFolderMountSource(
+                self.overlayPath, self.mountSource, ignoredPrefixes=ignoredPrefixes
+            )
 
             self.chmod = self.writeOverlay.chmod
             self.chown = self.writeOverlay.chown
@@ -234,10 +312,8 @@ class FuseMount(fuse.Operations):
             self.rmdir = self.writeOverlay.rmdir
 
             self.mknod = self.writeOverlay.mknod
-            self.truncate = self.writeOverlay.truncate
 
         # Create mount point if it does not exist
-        self.mountPointWasCreated = False
         if mountPoint and not os.path.exists(mountPoint):
             os.mkdir(mountPoint)
             self.mountPointWasCreated = True
@@ -274,6 +350,34 @@ class FuseMount(fuse.Operations):
                 if self.printDebug >= 1:
                     print("[Warning] Failed to close log file because of:", exception)
 
+        # Terminate or kill all ratarmount subprocesses.
+        if subprocesses := getattr(self, '_subprocesses', None):
+            try:
+                for process in subprocesses:
+                    with contextlib.suppress(Exception):
+                        if process.poll() is None:
+                            process.terminate()
+
+                tStartTerminate = time.time()
+                for process in subprocesses:
+                    with contextlib.suppress(Exception):
+                        process.wait(timeout=max(0, tStartTerminate + 2 - time.time()))
+
+                tStartTerminate = time.time()
+                for process in subprocesses:
+                    try:
+                        if process.poll() is None:
+                            process.kill()
+                            process.wait(timeout=max(0, tStartTerminate + 2 - time.time()))
+                    except Exception as exception:
+                        if self.printDebug >= 1:
+                            print("[Warning] Failed to terminate ratarmount subprocesses because of:", exception)
+
+                self._subprocesses.clear()
+            except Exception as exception:
+                if self.printDebug >= 1:
+                    print("[Warning] Failed to terminate ratarmount subprocesses because of:", exception)
+
         try:
             if tmpLogFile := getattr(self, '_tmpLogFile', None):
                 tmpLogFile.close()
@@ -309,6 +413,34 @@ class FuseMount(fuse.Operations):
 
     def __del__(self) -> None:
         self._close()
+
+    def _parse_command(self, args: list[str]) -> None:
+        try:
+            if len(self._subprocesses) > 100:
+                # Filter finished processes.
+                self._subprocesses = [process for process in self._subprocesses if process.poll() is None]
+
+            # Start command in subprocess to avoid lockups when calling into the FUSE point provided by this process.
+            # Change working directory to / to avoid any potential issues with relative paths and non-dismountable
+            # fusermounts in case the current working directory is the inside the FUSE mount.
+            # Subprocesses will be terminated when this FuseMount instance is closed. If '-f' is not specified,
+            # then the started subprocess will itself start another daemonized subprocess, which will NOT be closed
+            # when this FuseMount instance is closed.
+            self._subprocesses.append(
+                subprocess.Popen(
+                    [sys.executable, '-m', 'ratarmount', *args],
+                    cwd='/',
+                    stdout=self.logFile or subprocess.PIPE,
+                    stderr=self.logFile or subprocess.PIPE,
+                    text=True,
+                    bufsize=1,
+                )
+            )
+
+        except Exception as exception:
+            print("[Error]", exception)
+            if self.printDebug >= 3:
+                traceback.print_exc()
 
     def _add_new_handle(self, handle, flags: int) -> int:
         # Note that fh in fuse_common.h is 64-bit and Python also supports 64-bit (long integers) out of the box.
@@ -504,10 +636,29 @@ class FuseMount(fuse.Operations):
             return self._add_new_handle(self.writeOverlay.create(path, mode, fi), 0)
         raise fuse.FuseOSError(errno.EROFS)
 
+    @fuse.overrides(fuse.Operations)
+    def truncate(self, path: str, length: int, fh: Optional[int] = None) -> int:
+        # The existence of this method is sufficient. Without this, the 'write' callback would not be called by
+        # libfuse because it seems to think that the file system is not writable, and the control layer would not work.
+        if self._enableControlInterface and path.startswith(self._controlLayerPrefix):
+            return 0  # Simply return success without doing anything.
+        if self.writeOverlay:
+            return self.writeOverlay.truncate(path, length, fh)
+        raise fuse.FuseOSError(errno.EROFS)
+
     @overrides(fuse.Operations)
-    def write(self, path: str, data, offset: int, fh):
+    def write(self, path: str, data, offset: int, fh) -> int:
         if not self.writeOverlay or not self._is_write_overlay_handle(fh):
             flags, openedFile = self.openedFiles[fh]
+
+            # Normally, a simple 'writable' test should be sufficient, but I am not sure that ALL backends
+            # correctly return False for 'writable' on file objects. And if not that would lead to bugs with the
+            # write overlay. This means, I would have to extend the write overlay test for all archive formats!
+            if not isinstance(openedFile, int) and openedFile.writable() and isinstance(openedFile, CommandFile):
+                if openedFile.seekable() and openedFile.tell() != offset:
+                    openedFile.seek(offset)
+                return openedFile.write(data)
+
             if self.writeOverlay and not isinstance(openedFile, int) and (flags & (os.O_WRONLY | os.O_RDWR)):
                 openedFile.close()
                 self.openedFiles[fh] = (flags, self.writeOverlay.open(path, flags))
