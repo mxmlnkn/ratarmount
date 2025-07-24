@@ -41,7 +41,7 @@ checkFileInTARForeground()
         returnError "$LINENO" 'Failed to create temporary directory'
     MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
 
-    $RATARMOUNT_CMD -c -f -d 3 "$archive" "$mountFolder" >ratarmount.stdout.log 2>ratarmount.stderr.log &
+    $RATARMOUNT_CMD -c -f "$archive" "$mountFolder" >ratarmount.stdout.log 2>ratarmount.stderr.log &
     waitForMountpoint "$mountFolder" || returnError 'Waiting for mountpoint timed out!'
     # Beware with matching because the randomly-generated temporary file name did already
     # lead to a false positive for: /tmp/tmp.lq1FWaRnWe, which contains "WaRn"!

@@ -6,13 +6,14 @@
 import argparse
 import contextlib
 import json
+import logging
 import math
 import os
 import sys
 import tarfile
 import tempfile
 import traceback
-from typing import Optional
+from typing import Any, Optional
 
 from ratarmountcore.utils import RatarmountError, get_xdg_cache_home
 
@@ -386,6 +387,38 @@ For further information, see the ReadMe on the project's homepage:
     return parser.parse_args(rawArgs)
 
 
+def configure_logging(debug: int) -> None:
+    level = logging.ERROR
+    if debug >= 3:
+        level = logging.DEBUG
+    elif debug >= 2:
+        level = logging.INFO
+    elif debug >= 1:
+        level = logging.WARNING
+
+    logging.addLevelName(logging.ERROR, '[Error]')
+    logging.addLevelName(logging.WARNING, '[Warning]')
+    logging.addLevelName(logging.INFO, '[Info]')
+    logging.addLevelName(logging.DEBUG, '[Debug]')
+    logging.addLevelName(logging.CRITICAL, '[Fatal]')
+
+    handlers: list[Any] = []
+    logFormat = '%(levelname)s %(name)s: %(message)s'
+
+    logging.basicConfig(level=level, format=logFormat, handlers=handlers if handlers else None)
+
+    # Suppress "warning" output by the asyncio module that seems to me more like debug / tracing output:
+    # Warning: asyncio: Executing <Task pending name='Task-1' base_events.py:1994
+    #      coro=<_runner() running at /python3.12/site-packages/fsspec/asyn.py:56>
+    #      wait_for=<Future pendingcb=[
+    #      BaseSelectorEventLoop._sock_write_done(6, handle=<Handle BaseS...events.py:317>)(), Task.task_wakeup()]
+    #      created at /python3.12/asyncio/base_events.py:448>
+    #      cb=[_chain_future.<locals>._call_set_state() at /python3.12/asyncio/futures.py:396]
+    #      created at /python3.12/asyncio/tasks.py:695> took 0.132 seconds
+    if debug <= 2:
+        logging.getLogger("asyncio").setLevel(logging.ERROR)
+
+
 def cli(rawArgs: Optional[list[str]] = None) -> int:
     """
     Command line interface for ratarmount. Call with args = [ '--help' ] for a description.
@@ -404,6 +437,8 @@ def cli(rawArgs: Optional[list[str]] = None) -> int:
                 debug = int(tmpArgs[i + 1])
             except ValueError:
                 continue
+
+    configure_logging(debug)
 
     try:
         args = _parse_args(rawArgs)
