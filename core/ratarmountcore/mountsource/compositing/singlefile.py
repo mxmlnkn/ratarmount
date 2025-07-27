@@ -5,13 +5,14 @@ import stat
 import threading
 import time
 from collections.abc import Iterable
-from typing import IO, Any, Optional, Union, cast
+from typing import IO, Any, Optional, Union, cast, final
 
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.StenciledFile import RawStenciledFile, StenciledFile
 from ratarmountcore.utils import overrides
 
 
+@final
 class SingleFileMountSource(MountSource):
     """MountSource exposing a single file as a mount source."""
 
@@ -29,7 +30,7 @@ class SingleFileMountSource(MountSource):
                  because opening file objects via this mount source will add additional buffering if not disabled.
         """
         self.path = os.path.normpath('/' + path).lstrip('/')
-        if self.path.endswith('/') or not self.path:
+        if not self.path or '/' in self.path:
             raise ValueError("File object must belong to a non-folder path!")
 
         self.fileObjectLock = threading.Lock()
@@ -70,15 +71,11 @@ class SingleFileMountSource(MountSource):
 
     @overrides(MountSource)
     def list(self, path: str) -> Optional[Union[Iterable[str], dict[str, FileInfo]]]:
-        pathWithSlash = (path.strip('/') + '/').lstrip('/')  # append / to be able to use startswith correctly
-        if self.path.startswith(pathWithSlash):
-            return [self.path[len(pathWithSlash) :].split('/', maxsplit=1)[0]]
-        return None
+        return [self.path] if not path or path == '/' else None
 
     @overrides(MountSource)
     def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
-        pathWithSlash = (path.strip('/') + '/').lstrip('/')  # append / to be able to use startswith correctly
-        if self.path.startswith(pathWithSlash):
+        if not path or path == '/':
             # fmt: off
             return FileInfo(
                 size     = 0,

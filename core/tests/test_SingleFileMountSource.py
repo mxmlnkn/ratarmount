@@ -15,7 +15,7 @@ from ratarmountcore.mountsource.compositing.singlefile import SingleFileMountSou
 
 class TestSingleFileMountSource:
     @staticmethod
-    @pytest.mark.parametrize('path', ["foo", "/foo", "folder/foo", "/folder/./foo", "/a/b/c/foo"])
+    @pytest.mark.parametrize('path', ["foo", "/foo", "/folder/../foo"])
     def test_single_file(path: str):
         contents = b"bar"
         ms = SingleFileMountSource(path, io.BytesIO(contents))
