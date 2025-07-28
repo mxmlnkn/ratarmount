@@ -5,7 +5,7 @@ import stat
 import threading
 import time
 from collections.abc import Iterable
-from typing import IO, Any, Optional, Union, cast, final
+from typing import IO, Any, Callable, Optional, Union, cast, final
 
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.StenciledFile import RawStenciledFile, StenciledFile
@@ -24,7 +24,7 @@ class SingleFileMountSource(MountSource):
     # It could be emulated with UnionMountSource or by extending SingleFileMountSource to support multiple files,
     # but then it would add inconsistencies when these multiple files have different full paths / implied parents...
 
-    def __init__(self, path: str, fileobj: IO[bytes]):
+    def __init__(self, path: str, fileobj: Union[IO[bytes], Callable[[int], IO[bytes]]]):
         """
         fileobj: The given file object to be mounted. It may be advisable for this file object to be unbuffered
                  because opening file objects via this mount source will add additional buffering if not disabled.
@@ -33,16 +33,48 @@ class SingleFileMountSource(MountSource):
         if not self.path or '/' in self.path:
             raise ValueError("File object must belong to a non-folder path!")
 
-        self.fileObjectLock = threading.Lock()
-        self.fileobj = fileobj
-        self.mtime = int(time.time())
-        self.size: int = self.fileobj.seek(0, io.SEEK_END)
+        self.mtime = time.time()
+        self._size: Optional[int] = None
+        self._statfs = {}
+        self._file_object: Optional[IO[bytes]] = None
+
+        if callable(fileobj):
+            self._open_file = fileobj
+            return
+
+        # Construct an file-opener callable from an existing file object.
+
+        self._size = fileobj.seek(0, io.SEEK_END)
+        self._file_lock = threading.Lock()
+        self._file_object = fileobj
+
+        def open_shared_file(buffering: int):
+            if not self._file_object:
+                raise RuntimeError("No file object to open!")
+            if self._size is None:
+                raise RuntimeError("File size should have been initialized!")
+
+            # Use StenciledFile so that the returned file objects can be independently seeked!
+            if buffering == 0:
+                return cast(
+                    IO[bytes],
+                    RawStenciledFile(fileStencils=[(self._file_object, 0, self._size)], fileObjectLock=self._file_lock),
+                )
+            return cast(
+                IO[bytes],
+                StenciledFile(
+                    fileStencils=[(self._file_object, 0, self._size)],
+                    fileObjectLock=self._file_lock,
+                    bufferSize=io.DEFAULT_BUFFER_SIZE if buffering <= 0 else buffering,
+                ),
+            )
+
+        self._open_file = open_shared_file
 
         fileno = None
         with contextlib.suppress(Exception):
-            fileno = self.fileobj.fileno()
+            fileno = fileobj.fileno()
 
-        self._statfs = {}
         if fileno is not None:
             statfs = os.fstat(fileno)
             self._statfs = {
@@ -55,16 +87,24 @@ class SingleFileMountSource(MountSource):
                 'f_favail': 0,
             }
 
-    def _create_file_info(self):
+    def _get_size(self) -> int:
+        if self._size is None:
+            with self._open_file(-1) as file:
+                if file.seekable():
+                    return file.seek(0, io.SEEK_END)
+            return 0
+        return self._size
+
+    def _create_file_info(self, size: int, mode: int):
         # This must be a function and cannot be cached into a member in order to avoid userdata being a shared list!
         # fmt: off
         return FileInfo(
-            size     = self.size,
+            size     = size,
             mtime    = self.mtime,
-            mode     = int(0o777 | stat.S_IFREG),
+            mode     = 0o777 | mode,
             linkname = '',
-            uid      = 0,
-            gid      = 0,
+            uid      = os.getuid(),
+            gid      = os.getgid(),
             userdata = [],
         )
         # fmt: on
@@ -76,39 +116,16 @@ class SingleFileMountSource(MountSource):
     @overrides(MountSource)
     def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         if not path or path == '/':
-            # fmt: off
-            return FileInfo(
-                size     = 0,
-                mtime    = self.mtime,
-                mode     = int(0o777 | stat.S_IFDIR),
-                linkname = '',
-                uid      = 0,
-                gid      = 0,
-                userdata = [],
-            )
-            # fmt: on
-
-        return self._create_file_info() if path.strip('/') == self.path else None
+            return self._create_file_info(size=0, mode=stat.S_IFDIR)
+        if path.strip('/') == self.path:
+            return self._create_file_info(size=self._get_size(), mode=stat.S_IFREG)
+        return None
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
-        if fileInfo != self._create_file_info():
+        if fileInfo != self._create_file_info(size=fileInfo.size, mode=stat.S_IFREG):
             raise ValueError("Only files may be opened!")
-
-        # Use StenciledFile so that the returned file objects can be independently seeked!
-        if buffering == 0:
-            return cast(
-                IO[bytes],
-                RawStenciledFile(fileStencils=[(self.fileobj, 0, self.size)], fileObjectLock=self.fileObjectLock),
-            )
-        return cast(
-            IO[bytes],
-            StenciledFile(
-                fileStencils=[(self.fileobj, 0, self.size)],
-                fileObjectLock=self.fileObjectLock,
-                bufferSize=io.DEFAULT_BUFFER_SIZE if buffering <= 0 else buffering,
-            ),
-        )
+        return self._open_file(buffering)
 
     @overrides(MountSource)
     def is_immutable(self) -> bool:
@@ -120,8 +137,9 @@ class SingleFileMountSource(MountSource):
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
-        self.fileobj.close()
+        if self._file_object:
+            self._file_object.close()
 
     def join_threads(self):
-        if hasattr(self.fileobj, 'join_threads'):
-            self.fileobj.join_threads()
+        if hasattr(self._file_object, 'join_threads'):
+            self._file_object.join_threads()
