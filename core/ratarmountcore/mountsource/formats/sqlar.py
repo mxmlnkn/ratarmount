@@ -4,7 +4,7 @@ import sqlite3
 import sys
 import tempfile
 import urllib.parse
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import IO, Any, Optional, Union
 
 from ratarmountcore.formats import FileFormatID, replace_format_check
@@ -151,7 +151,9 @@ class SQLARMountSource(MountSource):
     _SQLITE_FILEINFO_COLUMNS = "rowid, mode, mtime, sz, CASE WHEN sz=-1 THEN data ELSE '' END"
     _MAGIC_BYTES = b'SQLite format 3\x00'
 
-    def __init__(self, fileOrPath: Union[str, IO[bytes]], passwords: Optional[list[bytes]] = None, **options) -> None:
+    def __init__(
+        self, fileOrPath: Union[str, IO[bytes]], passwords: Optional[Sequence[bytes]] = None, **options
+    ) -> None:
         self._temporaryFilePath: Optional[Any] = None
 
         magicBytes = b""
@@ -200,7 +202,7 @@ class SQLARMountSource(MountSource):
             }
 
     @staticmethod
-    def _quick_check_file(fileObject: IO[bytes], name: str, passwords: Optional[list[bytes]]) -> bytes:
+    def _quick_check_file(fileObject: IO[bytes], name: str, passwords: Optional[Sequence[bytes]]) -> bytes:
         try:
             magicBytes = fileObject.read(len(SQLARMountSource._MAGIC_BYTES))
         finally:
@@ -223,7 +225,7 @@ class SQLARMountSource(MountSource):
         return result and result[0]
 
     @staticmethod
-    def _find_password(uriPath: str, passwords: list[bytes], salt: bytes):
+    def _find_password(uriPath: str, passwords: Sequence[bytes], salt: bytes):
         for password in passwords:
             # Do the key derivation manually in order to support all characters in passwords, even " and ;.
             # https://stackoverflow.com/a/79657272

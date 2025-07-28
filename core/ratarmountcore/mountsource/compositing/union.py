@@ -2,7 +2,7 @@ import builtins
 import os
 import stat
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import IO, Any, Optional, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource, create_root_file_info, merge_statfs
@@ -12,7 +12,7 @@ from ratarmountcore.utils import overrides
 class UnionMountSource(MountSource):
     def __init__(
         self,
-        mountSources: list[MountSource],
+        mountSources: Sequence[MountSource],
         printDebug: int = 0,
         maxCacheDepth: int = 1024,
         maxCacheEntries: int = 100000,
@@ -33,7 +33,7 @@ class UnionMountSource(MountSource):
             and it shouldn't take minutes! Note that there always can be an edge case with hundred
             thousands of files in one folder, which can take an arbitrary amount of time to cache.
         """
-        self.mountSources: list[MountSource] = mountSources
+        self.mountSources: list[MountSource] = list(mountSources)
         self.printDebug = printDebug
         self.folderCache: dict[str, list[MountSource]] = {"/": self.mountSources}
         self.folderCacheDepth = 0  # depth 1 means, we only cached top-level directories.

@@ -1,6 +1,7 @@
 import bisect
 import contextlib
 import io
+from collections.abc import Sequence
 from typing import IO, Callable, Optional
 
 from .utils import FixedRawIOBase, overrides
@@ -17,7 +18,7 @@ class RawStenciledFile(FixedRawIOBase):
 
     def __init__(
         self,
-        fileStencils: list[tuple[IO, int, int]],
+        fileStencils: Sequence[tuple[IO, int, int]],
         fileObjectLock=None,
     ) -> None:
         """
@@ -175,7 +176,7 @@ class RawStenciledFile(FixedRawIOBase):
 
 
 class RawJoinedFileFromFactory(io.RawIOBase):
-    def __init__(self, file_object_factories: list[Callable[[], IO[bytes]]], file_lock=None) -> None:
+    def __init__(self, file_object_factories: Sequence[Callable[[], IO[bytes]]], file_lock=None) -> None:
         """
         Similar to StenciledFile but instead of joining a list of file objects, which neccessitates keeping all
         files open, this class opens each file on demand and only keeps one file open. This is useful to avoid
@@ -315,7 +316,7 @@ class RawJoinedFileFromFactory(io.RawIOBase):
 
 class StenciledFile(io.BufferedReader):
     def __init__(
-        self, fileStencils: list[tuple[IO, int, int]], fileObjectLock=None, bufferSize=io.DEFAULT_BUFFER_SIZE
+        self, fileStencils: Sequence[tuple[IO, int, int]], fileObjectLock=None, bufferSize=io.DEFAULT_BUFFER_SIZE
     ) -> None:
         """
         bufferSize: Gets forwarded to io.BufferedReader.__init__ buffer_size argument and has the same semantic,
@@ -325,7 +326,7 @@ class StenciledFile(io.BufferedReader):
 
 
 class JoinedFile(io.BufferedReader):
-    def __init__(self, file_objects: list[IO], file_lock=None, buffer_size: int = io.DEFAULT_BUFFER_SIZE) -> None:
+    def __init__(self, file_objects: Sequence[IO], file_lock=None, buffer_size: int = io.DEFAULT_BUFFER_SIZE) -> None:
         sizes = [fobj.seek(0, io.SEEK_END) for fobj in file_objects]
         for fobj, size in zip(file_objects, sizes):
             if size is None:
@@ -337,7 +338,10 @@ class JoinedFile(io.BufferedReader):
 
 class JoinedFileFromFactory(io.BufferedReader):
     def __init__(
-        self, file_object_factories: list[Callable[[], IO]], file_lock=None, buffer_size: int = io.DEFAULT_BUFFER_SIZE
+        self,
+        file_object_factories: Sequence[Callable[[], IO]],
+        file_lock=None,
+        buffer_size: int = io.DEFAULT_BUFFER_SIZE,
     ) -> None:
         """
         Similar to JoinedFile but instead of joining a list of file objects, which neccessitates keeping all

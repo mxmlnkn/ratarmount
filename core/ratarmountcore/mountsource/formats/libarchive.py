@@ -10,6 +10,7 @@ import re
 import stat
 import sys
 import tarfile
+from collections.abc import Sequence
 from timeit import default_timer as timer
 from typing import IO, Any, Callable, Optional, Union, cast
 
@@ -179,7 +180,7 @@ class IterableArchive:
         self,
         file: Union[str, IO[bytes]],
         encoding='utf-8',
-        passwords: Optional[list[Union[str, bytes]]] = None,
+        passwords: Optional[Sequence[Union[str, bytes]]] = None,
         bufferSize=1024 * 1024,
         printDebug: int = 0,
     ):
@@ -244,7 +245,7 @@ class IterableArchive:
         if not allowArchives and not self.filter_names():
             raise ArchiveError("When not looking for archives, there must be at least one filter!")
 
-    def _set_passwords(self, passwords: list[Union[str, bytes]]):
+    def _set_passwords(self, passwords: Sequence[Union[str, bytes]]):
         try:
             for password in passwords:
                 laffi.read_add_passphrase(self._archive, password.encode() if isinstance(password, str) else password)
@@ -348,7 +349,7 @@ class LibarchiveFile(io.RawIOBase):
         file,
         entry_index,
         fileSize,
-        passwords: Optional[list[str]] = None,
+        passwords: Optional[Sequence[str]] = None,
         printDebug: int = 0,
         archiveCache: Optional[IterableArchiveCache] = None,
     ):
@@ -506,7 +507,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
         writeIndex             : bool                      = False,
         clearIndexCache        : bool                      = False,
         indexFilePath          : Optional[str]             = None,
-        indexFolders           : Optional[list[str]]       = None,
+        indexFolders           : Optional[Sequence[str]]   = None,
         encoding               : str                       = tarfile.ENCODING,
         verifyModificationTime : bool                      = False,
         printDebug             : int                       = 0,

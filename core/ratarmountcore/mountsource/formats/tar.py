@@ -14,7 +14,7 @@ import threading
 import time
 import traceback
 import urllib.parse
-from collections.abc import Generator, Iterable
+from collections.abc import Generator, Iterable, Sequence
 from timeit import default_timer as timer
 from typing import IO, Any, Callable, Optional, Union, cast
 
@@ -519,7 +519,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         writeIndex                   : bool                              = False,
         clearIndexCache              : bool                              = False,
         indexFilePath                : Optional[str]                     = None,
-        indexFolders                 : Optional[list[str]]               = None,
+        indexFolders                 : Optional[Sequence[str]]           = None,
         recursive                    : bool                              = False,
         gzipSeekPointSpacing         : int                               = DEFAULT_GZIP_SEEK_POINT_SPACING,
         encoding                     : str                               = tarfile.ENCODING,
@@ -1112,7 +1112,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             # fmt: on
             self.index.set_file_info(fileInfo)
 
-    def _open_stencil(self, fileStencils: list[tuple[IO, int, int]], buffering: int) -> IO[bytes]:
+    def _open_stencil(self, fileStencils: Sequence[tuple[IO, int, int]], buffering: int) -> IO[bytes]:
         bufferSize = self.blockSize if buffering == -1 else buffering
         if bufferSize == 0:
             return cast(IO[bytes], RawStenciledFile(fileStencils, self.fileObjectLock))

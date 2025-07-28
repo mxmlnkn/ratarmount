@@ -11,6 +11,7 @@ import tempfile
 import time
 import traceback
 import urllib.parse
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Any, AnyStr, Callable, Optional, Union
@@ -257,7 +258,7 @@ class SQLiteIndex:
     def __init__(
         self,
         indexFilePath: Optional[str],
-        indexFolders: Optional[list[str]] = None,
+        indexFolders: Optional[Sequence[str]] = None,
         archiveFilePath: Optional[str] = None,
         *,  # force all parameters after to be keyword-only
         encoding: str = tarfile.ENCODING,
@@ -335,7 +336,7 @@ class SQLiteIndex:
     @staticmethod
     def get_possible_index_file_paths(
         indexFilePath: Optional[str],
-        indexFolders: Optional[list[str]] = None,
+        indexFolders: Optional[Sequence[str]] = None,
         archiveFilePath: Optional[str] = None,
         ignoreCurrentFolder: bool = False,
     ) -> list[str]:
@@ -608,7 +609,7 @@ class SQLiteIndex:
             )
 
     @staticmethod
-    def check_metadata_arguments(metadata: dict, arguments, argumentsToCheck: list[str]):
+    def check_metadata_arguments(metadata: dict, arguments, argumentsToCheck: Sequence[str]):
         # Check arguments used to create the found index.
         # These are only warnings and not forcing a rebuild by default.
         # TODO: Add option to force index rebuild on metadata mismatch?
@@ -1025,7 +1026,7 @@ class SQLiteIndex:
         )
         return self._row_to_file_info(row) if row else None
 
-    def setxattrs(self, rows: builtins.list[tuple[int, str, bytes]]):
+    def setxattrs(self, rows: Sequence[tuple[int, str, bytes]]):
         self.get_connection().executemany('INSERT OR REPLACE INTO "xattrs" VALUES (?,?,?)', rows)
 
     def list_xattr(self, fileInfo: FileInfo) -> builtins.list[str]:
@@ -1114,7 +1115,7 @@ class SQLiteIndex:
             [(p[0], p[1], offsetheader, offset) for p in paths],
         )
 
-    def set_file_infos(self, rows: builtins.list[tuple]) -> None:
+    def set_file_infos(self, rows: Sequence[tuple]) -> None:
         if not rows:
             return
 

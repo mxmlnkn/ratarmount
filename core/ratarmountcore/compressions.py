@@ -6,7 +6,7 @@ import platform
 import struct
 import sys
 import traceback
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import IO, Any, Callable, Optional, cast
 
 from .BlockParallelReaders import ParallelXZReader
@@ -156,8 +156,8 @@ COMPRESSION_BACKENDS: dict[str, CompressionBackendInfo] = {
 
 def find_available_backend(
     compression: FileFormatID,
-    enabledBackends: Optional[list[str]] = None,
-    prioritizedBackends: Optional[list[str]] = None,
+    enabledBackends: Optional[Sequence[str]] = None,
+    prioritizedBackends: Optional[Sequence[str]] = None,
 ) -> Optional[CompressionBackendInfo]:
     if prioritizedBackends is None:
         prioritizedBackends = []
@@ -343,7 +343,7 @@ def get_gzip_info(fileobj: IO[bytes]) -> Optional[tuple[str, int]]:
 
 def detect_compression(
     fileobj: IO[bytes],
-    prioritizedBackends: Optional[list[str]] = None,
+    prioritizedBackends: Optional[Sequence[str]] = None,
     printDebug: int = 0,
 ) -> Optional[FileFormatID]:
     # isinstance(fileobj, io.IOBase) does not work for everything, e.g., for paramiko.sftp_file.SFTPFile
@@ -409,7 +409,7 @@ def detect_compression(
 def use_rapidgzip(
     fileobj: IO[bytes],
     gzipSeekPointSpacing: int = 16 * 1024 * 1024,
-    prioritizedBackends: Optional[list[str]] = None,
+    prioritizedBackends: Optional[Sequence[str]] = None,
     printDebug: int = 0,
 ) -> bool:
     if fileobj is None:
@@ -458,8 +458,8 @@ def open_compressed_file(
     fileobj: IO[bytes],
     gzipSeekPointSpacing: int = 16 * 1024 * 1024,
     parallelizations: Optional[dict[str, int]] = None,
-    enabledBackends: Optional[list[str]] = None,
-    prioritizedBackends: Optional[list[str]] = None,
+    enabledBackends: Optional[Sequence[str]] = None,
+    prioritizedBackends: Optional[Sequence[str]] = None,
     printDebug: int = 0,
 ) -> tuple[Any, Optional[IO[bytes]], Optional[FileFormatID]]:
     """
