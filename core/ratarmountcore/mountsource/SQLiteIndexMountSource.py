@@ -17,7 +17,6 @@ class SQLiteIndexMountSource(MountSource):
         index: Union[SQLiteIndex, str, IO[bytes]],
         clearIndexCache: bool = False,
         checkMetadata: Optional[Callable[[dict[str, Any]], None]] = None,
-        printDebug: int = 0,
         **_,
     ) -> None:
         self.indexFilePath = ""
@@ -45,9 +44,7 @@ class SQLiteIndexMountSource(MountSource):
                 self.indexFilePath = self._temporaryFile.name
 
             # Encoding is only used for set_file_infos, so we are fine not forwarding it.
-            self.index = SQLiteIndex(
-                indexFilePath=self.indexFilePath, indexFolders=[], deleteInvalidIndexes=False, printDebug=printDebug
-            )
+            self.index = SQLiteIndex(indexFilePath=self.indexFilePath, indexFolders=[], deleteInvalidIndexes=False)
             self.index.open_existing(checkMetadata=checkMetadata, readOnly=True)
             if not self.index.index_is_loaded():
                 raise RatarmountError(f"Specified file {self.indexFilePath} is not a valid Ratarmount index.")

@@ -4,6 +4,7 @@ import importlib
 import importlib.metadata
 import inspect
 import json
+import logging
 import os
 import re
 import shutil
@@ -26,6 +27,8 @@ with contextlib.suppress(ImportError):
 from .CLIHelpers import check_input_file_type
 from .fuse import fuse
 from .WriteOverlay import commit_overlay
+
+logger = logging.getLogger(__name__)
 
 
 def has_fuse_non_empty_support() -> bool:
@@ -281,20 +284,18 @@ def print_oss_attributions() -> None:
         print(f"# {name}\n\n{homepage}\n\n\n```\n{licenseContents}\n```\n\n")
 
 
-def unmount(mountPoint: str, printDebug: int = 0) -> None:
+def unmount(mountPoint: str) -> None:
     # Do not test with os.path.ismount or anything other because if the FUSE process was killed without
     # unmounting, then any file system query might return with errors.
     # https://github.com/python/cpython/issues/96328#issuecomment-2027458283
 
     try:
         subprocess.run(["fusermount", "-u", mountPoint], check=True, capture_output=True)
-        if printDebug >= 2:
-            print("[Info] Successfully called fusermount -u.")
+        logger.info("Successfully called fusermount -u.")
         return
     except Exception as exception:
-        if printDebug >= 2:
-            print(f"[Warning] fusermount -u {mountPoint} failed with: {exception}")
-        if printDebug >= 3:
+        logger.info("fusermount -u %s failed with: %s", mountPoint, exception)
+        if logger.isEnabledFor(logging.DEBUG):
             subprocess.run(["fusermount", "-V", mountPoint], check=False)
 
     # If called from AppImage, then try to call the user-installed fusermount because FUSE might require
@@ -311,24 +312,20 @@ def unmount(mountPoint: str, printDebug: int = 0) -> None:
             if fusermountPath != binaryPath and os.path.isfile(binaryPath) and os.access(binaryPath, os.X_OK):
                 try:
                     subprocess.run([binaryPath, "-u", mountPoint], check=True, capture_output=True)
-                    if printDebug >= 2:
-                        print(f"[Info] Successfully called {binaryPath} -u '{mountPoint}'.")
+                    logger.info("Successfully called %s -u '%s'.", binaryPath, mountPoint)
                     return
                 except Exception as exception:
-                    if printDebug >= 2:
-                        print(f"[Warning] {fusermountPath} -u {mountPoint} failed with: {exception}")
-                    if printDebug >= 3:
+                    logger.info("%s -u %s failed with: %s", fusermountPath, mountPoint, exception)
+                    if logger.isEnabledFor(logging.DEBUG):
                         subprocess.run([fusermountPath, "-V", mountPoint], check=False)
 
     if os.path.ismount(mountPoint):
         try:
             subprocess.run(["umount", mountPoint], check=True, capture_output=True)
-            if printDebug >= 2:
-                print(f"[Info] Successfully called umount -u '{mountPoint}'.")
+            logger.info("Successfully called umount -u '%s'.", mountPoint)
             return
         except Exception as exception:
-            if printDebug >= 2:
-                print(f"[Warning] umount {mountPoint} failed with: {exception}")
+            logger.info("umount %s failed with: %s", mountPoint, exception)
 
 
 def is_inside_fuse_context() -> bool:
@@ -353,7 +350,7 @@ def process_parsed_arguments(args) -> int:
             raise argparse.ArgumentTypeError("Unmounting requires a path to the mount point!")
 
         for mountPoint in mountPoints:
-            unmount(mountPoint, printDebug=args.debug)
+            unmount(mountPoint)
 
         # Unmounting might take some time and I had cases where fusermount returned exit code 1.
         # and still unmounted it successfully. It would be nice to automate this but it seems impossible to do
@@ -368,10 +365,12 @@ def process_parsed_arguments(args) -> int:
                 if not os.path.ismount(mountPoint):
                     continue
                 if not errorPrinted:
-                    print("[Error] Failed to unmount the given mount point. Alternatively, the process providing ")
-                    print("[Error] the mount point can be looked for and killed, e.g., with this command:")
+                    logger.error(
+                        "Failed to unmount the given mount point. Alternatively, the process providing the "
+                        "mount point can be looked for and killed, e.g., with this command:"
+                    )
                     errorPrinted = True
-                print(f"""[Error]     pkill --full 'ratarmount.*{mountPoint}' -G "$( id -g )" --newest""")
+                logger.error("""    pkill --full 'ratarmount.*{%s}' -G "$( id -g )" --newest""", mountPoint)
 
         return 1 if errorPrinted else 0
 
@@ -388,7 +387,7 @@ def process_parsed_arguments(args) -> int:
     # Manually check that all specified TARs and folders exist
     def check_mount_source(path):
         try:
-            return check_input_file_type(path, printDebug=args.debug)
+            return check_input_file_type(path)
         except argparse.ArgumentTypeError as e:
             if not os.path.exists(path):
                 raise e
@@ -405,8 +404,7 @@ def process_parsed_arguments(args) -> int:
         fixedPath = check_mount_source(path)
         # Skip neighboring duplicates
         if mountSources and mountSources[-1] == fixedPath:
-            if args.debug >= 2:
-                print(f"[Info] Skip duplicate mount source: {fixedPath}")
+            logger.info("Skip duplicate mount source: %s", fixedPath)
             continue
         mountSources.append(fixedPath)
     args.mount_source = mountSources
@@ -428,8 +426,10 @@ def process_parsed_arguments(args) -> int:
     if (args.strip_recursive_tar_extension or args.transform_recursive_mount_point) and determine_recursion_depth(
         recursive=args.recursive, recursion_depth=args.recursion_depth
     ) <= 0:
-        print("[Warning] The options --strip-recursive-tar-extension and --transform-recursive-mount-point")
-        print("[Warning] only have an effect when used with recursive mounting.")
+        logger.warning(
+            "The options --strip-recursive-tar-extension and --transform-recursive-mount-point only have an "
+            "effect when used with recursive mounting."
+        )
 
     if args.transform_recursive_mount_point:
         args.transform_recursive_mount_point = tuple(args.transform_recursive_mount_point)
@@ -469,8 +469,7 @@ def process_parsed_arguments(args) -> int:
                 "Please explicitly specify a mount point. See --help."
             )
 
-        if args.debug >= 2:
-            print(f"[Info] No mount point specified. Automatically inferred: {args.mount_point}")
+        logger.info("No mount point specified. Automatically inferred: %s", args.mount_point)
 
     args.mount_point = os.path.abspath(args.mount_point)
 
@@ -553,7 +552,6 @@ def create_fuse_mount(args) -> None:
         parallelizations             = args.parallelizations,
         isGnuIncremental             = args.gnu_incremental,
         writeOverlay                 = args.write_overlay,
-        printDebug                   = int(args.debug),
         transformRecursiveMountPoint = args.transform_recursive_mount_point,
         transform                    = args.transform,
         prioritizedBackends          = args.prioritizedBackends,

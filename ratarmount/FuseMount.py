@@ -2,6 +2,7 @@ import contextlib
 import ctypes
 import errno
 import io
+import logging
 import os
 import subprocess
 import sys
@@ -25,6 +26,8 @@ from ratarmountcore.utils import ceil_div, determine_recursion_depth, overrides
 
 from .fuse import fuse
 from .WriteOverlay import WritableFolderMountSource
+
+logger = logging.getLogger(__name__)
 
 
 def split_command_line(command: bytes, name: bytes = b'ratarmount') -> list[str]:
@@ -113,7 +116,6 @@ class FuseMount(fuse.Operations):
         self.mountPointWasCreated = False
         self.selfBindMount: Optional[FolderMountSource] = None
 
-        self.printDebug: int = int(options.get('printDebug', 0))
         self.writeOverlay: Optional[WritableFolderMountSource] = None
         self.overlayPath: Optional[str] = None
 
@@ -269,7 +271,7 @@ class FuseMount(fuse.Operations):
                     submountSources[f"{key}.{suffix}"] = mountSource
                 else:
                     submountSources[key] = mountSource
-            return SubvolumesMountSource(submountSources, printDebug=self.printDebug)
+            return SubvolumesMountSource(submountSources)
 
         if not mountSources:
             raise ValueError("Mount point is empty! Either specify some input files or enable the control interface!")
@@ -321,7 +323,7 @@ class FuseMount(fuse.Operations):
         statResults = os.lstat(self.mountPoint)
         self.mountPointInfo = {key: getattr(statResults, key) for key in dir(statResults) if key.startswith('st_')}
 
-        if self.printDebug >= 1:
+        if logger.isEnabledFor(logging.WARNING):
             print("Created mount point at:", self.mountPoint)
 
     def __enter__(self):
@@ -340,15 +342,19 @@ class FuseMount(fuse.Operations):
                 if sys.stderr == logFile:
                     sys.stderr = sys.__stderr__
             except Exception as exception:
-                if self.printDebug >= 1:
-                    print("[Warning] Failed to restore stdout and stderr because of:", exception)
+                logger.warning(
+                    "Failed to restore stdout and stderr because of: %s",
+                    exception,
+                    exc_info=logger.isEnabledFor(logging.DEBUG),
+                )
 
             try:
                 logFile.close()
                 self.logFile = None
             except Exception as exception:
-                if self.printDebug >= 1:
-                    print("[Warning] Failed to close log file because of:", exception)
+                logger.warning(
+                    "Failed to close log file because of: %s", exception, exc_info=logger.isEnabledFor(logging.DEBUG)
+                )
 
         # Terminate or kill all ratarmount subprocesses.
         if subprocesses := getattr(self, '_subprocesses', None):
@@ -370,13 +376,19 @@ class FuseMount(fuse.Operations):
                             process.kill()
                             process.wait(timeout=max(0, tStartTerminate + 2 - time.time()))
                     except Exception as exception:
-                        if self.printDebug >= 1:
-                            print("[Warning] Failed to terminate ratarmount subprocesses because of:", exception)
+                        logger.warning(
+                            "Failed to terminate ratarmount subprocesses because of: %s",
+                            exception,
+                            exc_info=logger.isEnabledFor(logging.DEBUG),
+                        )
 
                 self._subprocesses.clear()
             except Exception as exception:
-                if self.printDebug >= 1:
-                    print("[Warning] Failed to terminate ratarmount subprocesses because of:", exception)
+                logger.warning(
+                    "Failed to terminate ratarmount subprocesses because of: %s",
+                    exception,
+                    exc_info=logger.isEnabledFor(logging.DEBUG),
+                )
 
         try:
             if tmpLogFile := getattr(self, '_tmpLogFile', None):
@@ -389,8 +401,11 @@ class FuseMount(fuse.Operations):
                 os.rmdir(self.mountPoint)
                 self.mountPoint = ""
         except Exception as exception:
-            if self.printDebug >= 1:
-                print("[Warning] Failed to remove the created mount point directory because of:", exception)
+            logger.warning(
+                "Failed to remove the created mount point directory because of: %s",
+                exception,
+                exc_info=logger.isEnabledFor(logging.DEBUG),
+            )
 
         try:
             mountPointFd = getattr(self, 'mountPointFd', None)
@@ -398,18 +413,22 @@ class FuseMount(fuse.Operations):
                 os.close(mountPointFd)
                 self.mountPointFd = None
         except Exception as exception:
-            if self.printDebug >= 1:
-                print("[Warning] Failed to close mount point folder descriptor because of:", exception)
+            logger.warning(
+                "Failed to close mount point folder descriptor because of: %s",
+                exception,
+                exc_info=logger.isEnabledFor(logging.DEBUG),
+            )
 
         try:
             # If there is some exception in the constructor, then some members may not exist!
             if hasattr(self, 'mountSource'):
                 self.mountSource.__exit__(None, None, None)
         except Exception as exception:
-            if self.printDebug >= 1:
-                print("[Warning] Failed to tear down root mount source because of:", exception)
-            if self.printDebug >= 3:
-                traceback.print_exc()
+            logger.warning(
+                "Failed to tear down root mount source because of: %s",
+                exception,
+                exc_info=logger.isEnabledFor(logging.DEBUG),
+            )
 
     def __del__(self) -> None:
         self._close()
@@ -438,9 +457,7 @@ class FuseMount(fuse.Operations):
             )
 
         except Exception as exception:
-            print("[Error]", exception)
-            if self.printDebug >= 3:
-                traceback.print_exc()
+            logger.error("Exception: %s", exception, exc_info=logger.isEnabledFor(logging.DEBUG))
 
     def _add_new_handle(self, handle, flags: int) -> int:
         # Note that fh in fuse_common.h is 64-bit and Python also supports 64-bit (long integers) out of the box.
@@ -494,8 +511,7 @@ class FuseMount(fuse.Operations):
     @overrides(fuse.Operations)
     def init(self, path: str) -> None:
         if self.logFile:
-            if self.printDebug >= 2:
-                print("[Info] Redirecting further output into:", self.logFile)
+            logger.info("Redirecting further output into: %s", self.logFile)
             self._redirect_output('stdout', self.logFile)
             self._redirect_output('stderr', self.logFile)
 
@@ -580,8 +596,9 @@ class FuseMount(fuse.Operations):
             # > The argument flags must include one of the following access modes: O_RDONLY, O_WRONLY, or O_RDWR.
             return self._add_new_handle(self.mountSource.open(fileInfo, buffering=0), flags)
         except Exception as exception:
-            traceback.print_exc()
-            print("Caught exception when trying to open file.", fileInfo)
+            logger.error(
+                "Caught exception when trying to open file: %s", fileInfo, exc_info=logger.isEnabledFor(logging.DEBUG)
+            )
             raise fuse.FuseOSError(errno.EIO) from exception
 
     @overrides(fuse.Operations)
@@ -610,16 +627,18 @@ class FuseMount(fuse.Operations):
             return openedFile.read(size)
 
         # As far as I understand FUSE and my own file handle cache, this should never happen. But you never know.
-        if self.printDebug >= 1:
-            print("[Warning] Given file handle does not exist. Will open file before reading which might be slow.")
+        logger.warning("Given file handle does not exist. Will open file before reading which might be slow.")
 
         fileInfo = self._lookup(path)
 
         try:
             return self.mountSource.read(fileInfo, size, offset)
         except Exception as exception:
-            traceback.print_exc()
-            print("Caught exception when trying to read data from underlying TAR file! Returning errno.EIO.")
+            logger.error(
+                "Caught exception %s when trying to read data from underlying TAR file! Returning errno.EIO.",
+                exception,
+                exc_info=logger.isEnabledFor(logging.DEBUG),
+            )
             raise fuse.FuseOSError(errno.EIO) from exception
 
     # Methods for the write overlay which require file handle translations
@@ -715,8 +734,8 @@ class FuseMount(fuse.Operations):
         if position:
             # Specifically do not raise ENOSYS because libfuse will then disable getxattr calls wholly from now on,
             # but I think that small values should still work as long as position is 0.
-            print(f"[Warning] Getxattr was called with position != 0 forh path '{path}' and key '{name}'.")
-            print("[Warning] Please report this as an issue to the ratarmount project with details to reproduce this.")
+            logger.warning("Getxattr was called with position != 0 for path '%s' and key '%s'.", path, name)
+            logger.warning("Please report this as an issue to the ratarmount project with details to reproduce this.")
             raise fuse.FuseOSError(errno.EOPNOTSUPP)
 
         value = self.mountSource.get_xattr(self._lookup(path), name)

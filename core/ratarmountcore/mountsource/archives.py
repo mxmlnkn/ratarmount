@@ -1,5 +1,5 @@
 import dataclasses
-import traceback
+import logging
 from typing import IO, Any, Callable, Optional, Union
 
 from ratarmountcore.formats import FileFormatID
@@ -25,6 +25,9 @@ except (ImportError, AttributeError):
 FID = FileFormatID
 
 
+logger = logging.getLogger(__name__)
+
+
 def _open_tar_mount_source(fileOrPath: Union[str, IO[bytes]], **options) -> MountSource:
     if isinstance(fileOrPath, str):
         if 'tarFileName' in options:
@@ -39,26 +42,21 @@ def _open_libarchive_mount_source(fileOrPath: Union[str, IO[bytes]], **options) 
     if libarchive is None:
         return None
 
-    printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
-
     try:
-        if printDebug >= 2:
-            print("[Info] Trying to open archive with libarchive backend.")
+        logger.info("Trying to open archive with libarchive backend.")
         return LibarchiveMountSource(fileOrPath, **options)
     except Exception as exception:
-        if printDebug >= 2:
-            print("[Info] Checking for libarchive file raised an exception:", exception)
-        if printDebug >= 3:
-            traceback.print_exc()
+        logger.info(
+            "Checking for libarchive file raised an exception: %s",
+            exception,
+            exc_info=logger.isEnabledFor(logging.DEBUG),
+        )
     finally:
         try:
             if hasattr(fileOrPath, 'seek'):
                 fileOrPath.seek(0)  # type: ignore
         except Exception as exception:
-            if printDebug >= 1:
-                print("[Info] seek(0) raised an exception:", exception)
-            if printDebug >= 2:
-                traceback.print_exc()
+            logger.warning("seek(0) raised an exception: %s", exception, exc_info=logger.isEnabledFor(logging.DEBUG))
     return None
 
 

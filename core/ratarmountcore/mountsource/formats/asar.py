@@ -1,5 +1,6 @@
 import contextlib
 import json
+import logging
 import os
 import re
 import stat
@@ -14,6 +15,8 @@ from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSo
 from ratarmountcore.SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
 from ratarmountcore.StenciledFile import RawStenciledFile, StenciledFile
 from ratarmountcore.utils import overrides
+
+logger = logging.getLogger(__name__)
 
 
 # https://www.electronjs.org/docs/latest/glossary#asar
@@ -74,7 +77,6 @@ class ASARMountSource(SQLiteIndexMountSource):
         indexFolders           : Optional[list[str]]       = None,
         encoding               : str                       = tarfile.ENCODING,
         verifyModificationTime : bool                      = False,
-        printDebug             : int                       = 0,
         indexMinimumFileCount  : int                       = 1000,
         transform              : Optional[tuple[str, str]] = None,
         **options
@@ -84,7 +86,6 @@ class ASARMountSource(SQLiteIndexMountSource):
         self.archiveFilePath        = fileOrPath if isinstance(fileOrPath, str) else None
         self.encoding               = encoding
         self.verifyModificationTime = verifyModificationTime
-        self.printDebug             = printDebug
         self.options                = options
         self.transformPattern       = transform
         # fmt: on
@@ -109,7 +110,6 @@ class ASARMountSource(SQLiteIndexMountSource):
                 indexFolders=indexFolders,
                 archiveFilePath=self.archiveFilePath,
                 encoding=self.encoding,
-                printDebug=self.printDebug,
                 indexMinimumFileCount=indexMinimumFileCount,
                 backendName='ASARMountSource',
             ),
@@ -181,7 +181,7 @@ class ASARMountSource(SQLiteIndexMountSource):
         return fileInfo
 
     def _create_index(self) -> None:
-        if self.printDebug >= 1:
+        if logger.isEnabledFor(logging.WARNING):
             print(f"Creating offset dictionary for {self.archiveFilePath} ...")
         t0 = timer()
 
@@ -213,13 +213,12 @@ class ASARMountSource(SQLiteIndexMountSource):
             self.index.set_file_infos(fileInfos)
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
-        if self.printDebug >= 2:
-            print("Resorting files by path ...")
+        logger.info("Resorting files by path ...")
 
         self.index.finalize()
 
         t1 = timer()
-        if self.printDebug >= 1:
+        if logger.isEnabledFor(logging.WARNING):
             print(f"Creating offset dictionary for {self.archiveFilePath} took {t1 - t0:.2f}s")
 
     @overrides(SQLiteIndexMountSource)

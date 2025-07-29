@@ -1,6 +1,7 @@
 import contextlib
 import datetime
 import json
+import logging
 import re
 import stat
 import sys
@@ -22,6 +23,9 @@ except (ImportError, Exception):
         import fastzipfile  # pylint: disable=unused-import  # noqa: F401
 
 
+logger = logging.getLogger(__name__)
+
+
 class ZipMountSource(SQLiteIndexMountSource):
     # fmt: off
     def __init__(
@@ -33,7 +37,6 @@ class ZipMountSource(SQLiteIndexMountSource):
         indexFolders           : Optional[list[str]]       = None,
         encoding               : str                       = tarfile.ENCODING,
         verifyModificationTime : bool                      = False,
-        printDebug             : int                       = 0,
         indexMinimumFileCount  : int                       = 1000,
         transform              : Optional[tuple[str, str]] = None,
         **options
@@ -47,7 +50,6 @@ class ZipMountSource(SQLiteIndexMountSource):
         self.archiveFilePath        = fileOrPath if isinstance(fileOrPath, str) else None
         self.encoding               = encoding
         self.verifyModificationTime = verifyModificationTime
-        self.printDebug             = printDebug
         self.options                = options
         self.transformPattern       = transform
         # fmt: on
@@ -67,7 +69,6 @@ class ZipMountSource(SQLiteIndexMountSource):
                 indexFolders=indexFolders,
                 archiveFilePath=self.archiveFilePath,
                 encoding=self.encoding,
-                printDebug=self.printDebug,
                 indexMinimumFileCount=indexMinimumFileCount,
                 backendName='ZipMountSource',
             ),
@@ -154,7 +155,7 @@ class ZipMountSource(SQLiteIndexMountSource):
         return fileInfo
 
     def _create_index(self) -> None:
-        if self.printDebug >= 1:
+        if logger.isEnabledFor(logging.WARNING):
             print(f"Creating offset dictionary for {self.archiveFilePath} ...")
         t0 = timer()
 
@@ -162,13 +163,12 @@ class ZipMountSource(SQLiteIndexMountSource):
         self.index.set_file_infos([self._convert_to_row(info) for info in self.fileObject.infolist()])
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
-        if self.printDebug >= 2:
-            print("Resorting files by path ...")
+        logger.info("Resorting files by path ...")
 
         self.index.finalize()
 
         t1 = timer()
-        if self.printDebug >= 1:
+        if logger.isEnabledFor(logging.WARNING):
             print(f"Creating offset dictionary for {self.archiveFilePath} took {t1 - t0:.2f}s")
 
     @staticmethod

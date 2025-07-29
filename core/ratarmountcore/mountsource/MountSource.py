@@ -1,11 +1,14 @@
 import builtins
 import dataclasses
+import logging
 import os
 import stat
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from typing import IO, Any, Optional, Union
+
+logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
@@ -150,7 +153,7 @@ def create_root_file_info(userdata: list[Any]):
     # fmt: on
 
 
-def merge_statfs(values: Iterable[dict[str, Any]], printDebug: int = 0):
+def merge_statfs(values: Iterable[dict[str, Any]]):
     result = {}
     for statfs in values:
         for key, value in statfs.items():
@@ -166,6 +169,6 @@ def merge_statfs(values: Iterable[dict[str, Any]], printDebug: int = 0):
                 result[key] = min(result[key], value)
                 continue
 
-            if result[key] != value and printDebug >= 1:
-                print(f"[Warning] Failed to merge statfs values ({value}, {result[key]}) for key: {key}.")
+            if result[key] != value:
+                logger.warning("Failed to merge statfs values (%s, %s) for key: %s.", value, result[key], key)
     return result

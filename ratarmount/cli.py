@@ -13,7 +13,6 @@ import os
 import sys
 import tarfile
 import tempfile
-import traceback
 from typing import Any, Optional
 
 from ratarmountcore.utils import RatarmountError, get_xdg_cache_home
@@ -49,6 +48,9 @@ else:
     RichConsole = None  # type: ignore
     RichHandler = None  # type: ignore
     RichTheme = None  # type: ignore
+
+
+logger = logging.getLogger(__name__)
 
 
 class _CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):
@@ -538,8 +540,6 @@ def cli(rawArgs: Optional[list[str]] = None) -> int:
 
         return process_parsed_arguments(args)
     except (FileNotFoundError, RatarmountError, argparse.ArgumentTypeError, ValueError) as exception:
-        print("[Error]", exception)
-        if debug >= 3:
-            traceback.print_exc()
+        logger.error("Exception: %s", exception, exc_info=logger.isEnabledFor(logging.DEBUG))
 
     return 1

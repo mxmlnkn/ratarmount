@@ -1,11 +1,11 @@
 import concurrent.futures
 import dataclasses
 import itertools
+import logging
 import os
 import platform
 import struct
 import sys
-import traceback
 from collections.abc import Iterable, Sequence
 from typing import IO, Any, Callable, Optional, cast
 
@@ -22,6 +22,8 @@ from .utils import (
     is_latin_hex_alpha,
     is_on_slow_drive,
 )
+
+logger = logging.getLogger(__name__)
 
 try:
     import indexed_gzip
@@ -346,28 +348,25 @@ def get_gzip_info(fileobj: IO[bytes]) -> Optional[tuple[str, int]]:
 
 
 def detect_compression(
-    fileobj: IO[bytes],
-    prioritizedBackends: Optional[Sequence[str]] = None,
-    printDebug: int = 0,
+    fileobj: IO[bytes], prioritizedBackends: Optional[Sequence[str]] = None
 ) -> Optional[FileFormatID]:
     # isinstance(fileobj, io.IOBase) does not work for everything, e.g., for paramiko.sftp_file.SFTPFile
     # because it does not inherit from io.IOBase. Therefore, do duck-typing and test for required methods.
     expectedMethods = ['seekable', 'seek', 'read', 'tell']
     isNotFileObject = any(not hasattr(fileobj, method) for method in expectedMethods)
     if isNotFileObject or not fileobj.seekable():
-        if printDebug >= 2:
-            seekable = None if isNotFileObject else fileobj.seekable()
-            print(
-                f"[Warning] Cannot detect compression for given Python object {fileobj} "
-                f"because it does not look like a file object or is not seekable ({seekable})."
-            )
-        if printDebug >= 3:
-            print(dir(fileobj))
+        logger.info(
+            "Cannot detect compression for given Python object %s "
+            "because it does not look like a file object or is not seekable (%s).",
+            fileobj,
+            None if isNotFileObject else fileobj.seekable(),
+        )
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug("Object attributes: %s", dir(fileobj))
             for name in ['readable', 'seekable', 'writable', 'closed', 'tell']:
                 method = getattr(fileobj, name, None)
                 if method is not None:
-                    print(f"  fileobj.{name}:", method() if callable(method) else method)
-            traceback.print_exc()
+                    logger.debug("  fileobj.%s: %s", name, method() if callable(method) else method)
         return None
 
     oldOffset = fileobj.tell()
@@ -378,12 +377,12 @@ def detect_compression(
         backend = find_available_backend(compressionId, prioritizedBackends=prioritizedBackends)
         # If no appropriate module exists, then don't do any further checks.
         if not backend:
-            if printDebug >= 1:
-                print(
-                    f"[Warning] A given file with magic bytes for {compressionId.name} could not be opened because "
-                    "no appropriate Python module could be loaded. Are some dependencies missing? To install "
-                    "ratarmountcore with all dependencies do: python3 -m pip install --user ratarmountcore[full]"
-                )
+            logger.warning(
+                "A given file with magic bytes for %s could not be opened because "
+                "no appropriate Python module could be loaded. Are some dependencies missing? To install "
+                "ratarmountcore with all dependencies do: python3 -m pip install --user ratarmountcore[full]",
+                compressionId.name,
+            )
             return None
 
         try:
@@ -399,12 +398,13 @@ def detect_compression(
             compressedFileobj.close()
             fileobj.seek(oldOffset)
             return compressionId
-        except Exception as e:
-            if printDebug >= 2:
-                print(f"[Warning] A given file with magic bytes for {compressionId} could not be opened because:")
-                print(e)
-            if printDebug >= 3:
-                traceback.print_exc()
+        except Exception as exception:
+            logger.info(
+                "A given file with magic bytes for %s could not be opened because: %s",
+                compressionId,
+                exception,
+                exc_info=logger.isEnabledFor(logging.DEBUG),
+            )
             fileobj.seek(oldOffset)
 
     return None
@@ -414,14 +414,13 @@ def use_rapidgzip(
     fileobj: IO[bytes],
     gzipSeekPointSpacing: int = 16 * 1024 * 1024,
     prioritizedBackends: Optional[Sequence[str]] = None,
-    printDebug: int = 0,
 ) -> bool:
     if fileobj is None:
         return False
 
     if 'rapidgzip' not in sys.modules:
-        print("[Warning] Cannot use rapidgzip for access to gzip file because it is not installed. Try:")
-        print("[Warning]     python3 -m pip install --user rapidgzip")
+        logger.warning("Cannot use rapidgzip for access to gzip file because it is not installed. Try:")
+        logger.warning("    python3 -m pip install --user rapidgzip")
         return False
 
     # Check whether indexed_gzip might have a higher priority than rapidgzip if both are listed.
@@ -446,13 +445,14 @@ def use_rapidgzip(
     isRealFile = hasattr(fileobj, 'name') and fileobj.name and os.path.isfile(fileobj.name)
     hasMultipleChunks = isRealFile and os.stat(fileobj.name).st_size >= 4 * gzipSeekPointSpacing
     if not hasMultipleChunks:
-        if printDebug >= 2:
-            print("[Info] Do not reopen with rapidgzip backend because:")
+        if logger.isEnabledFor(logging.INFO):
+            logger.info("Do not reopen with rapidgzip backend because:")
             if not isRealFile:
-                print("[Info]  - the file to open is a recursive file, which limits the usability of ")
-                print("[Info]    parallel decompression.")
+                logger.info(
+                    " - the file to open is a recursive file, which limits the usability of parallel decompression."
+                )
             if not hasMultipleChunks:
-                print("[Info]  - is too small to qualify for parallel decompression.")
+                logger.info(" - is too small to qualify for parallel decompression.")
         return False
 
     return True
@@ -464,16 +464,14 @@ def open_compressed_file(
     parallelizations: Optional[dict[str, int]] = None,
     enabledBackends: Optional[Sequence[str]] = None,
     prioritizedBackends: Optional[Sequence[str]] = None,
-    printDebug: int = 0,
 ) -> tuple[Any, Optional[IO[bytes]], Optional[FileFormatID]]:
     """
     Opens a file possibly undoing the compression.
     Returns (tar_file_obj, raw_file_obj, compression).
     raw_file_obj will be none if compression is None.
     """
-    compression = detect_compression(fileobj, prioritizedBackends=prioritizedBackends, printDebug=printDebug)
-    if printDebug >= 3:
-        print(f"[Info] Detected compression {compression} for file object:", fileobj)
+    compression = detect_compression(fileobj, prioritizedBackends=prioritizedBackends)
+    logger.debug("Detected compression %s for file object: %s", compression, fileobj)
     if not compression:
         return fileobj, None, compression
 
@@ -502,12 +500,7 @@ def open_compressed_file(
         parallelizations = {}
 
     if compression == FID.GZIP:
-        if use_rapidgzip(
-            fileobj,
-            gzipSeekPointSpacing=gzipSeekPointSpacing,
-            prioritizedBackends=prioritizedBackends,
-            printDebug=printDebug,
-        ):
+        if use_rapidgzip(fileobj, gzipSeekPointSpacing=gzipSeekPointSpacing, prioritizedBackends=prioritizedBackends):
             isRealFile = hasattr(fileobj, 'name') and fileobj.name and os.path.isfile(fileobj.name)
             parallelization = (
                 1
@@ -516,13 +509,16 @@ def open_compressed_file(
                     'rapidgzip-gzip', parallelizations.get('rapidgzip', parallelizations.get('', 1))
                 )
             )
-            if printDebug >= 3:
-                print(
-                    f"[Info] Parallelization to use for rapidgzip backend: {parallelization}, "
-                    f"slow drive detected: {is_on_slow_drive(fileobj.name)}"
-                )
+            logger.debug(
+                "Parallelization to use for rapidgzip backend: %d, slow drive detected: %s",
+                parallelization,
+                is_on_slow_drive(fileobj.name),
+            )
             decompressedFileObject = rapidgzip.RapidgzipFile(
-                fileobj, parallelization=parallelization, verbose=printDebug >= 2, chunk_size=gzipSeekPointSpacing
+                fileobj,
+                parallelization=parallelization,
+                verbose=logger.isEnabledFor(logging.INFO),
+                chunk_size=gzipSeekPointSpacing,
             )
         else:
             # The buffer size must be much larger than the spacing or else there will be large performance penalties
@@ -556,10 +552,11 @@ def open_compressed_file(
     else:
         decompressedFileObject = backend.open(fileobj)
 
-    if printDebug >= 3:
-        print(
-            f"[Info] Undid {compression} file compression by using: {type(decompressedFileObject).__name__} "
-            f"with parallelization={parallelization}"
-        )
+    logger.debug(
+        "Undid %s file compression by using: %s with parallelization=%d",
+        compression,
+        type(decompressedFileObject).__name__,
+        parallelization,
+    )
 
     return decompressedFileObject, fileobj, compression

@@ -1,6 +1,7 @@
 import argparse
 import contextlib
 import importlib
+import logging
 import os
 import sys
 
@@ -20,7 +21,10 @@ except ImportError:
     sqlcipher3 = None  # type: ignore
 
 
-def check_input_file_type(path: str, printDebug: int = 0) -> str:
+logger = logging.getLogger(__name__)
+
+
+def check_input_file_type(path: str) -> str:
     """Raises an exception if it is not an accepted archive format else returns the real path."""
 
     splitURI = path.split('://')
@@ -57,16 +61,18 @@ def check_input_file_type(path: str, printDebug: int = 0) -> str:
                 # Determining if there are many frames in zstd is O(1) with is_multiframe
                 is_multiframe = getattr(zstdFile, 'is_multiframe', None)
                 if is_multiframe and not is_multiframe() and os.stat(path).st_size > 1024 * 1024:
-                    print(f"[Warning] The specified file '{path}'")
-                    print("[Warning] is compressed using zstd but only contains one zstd frame. This makes it ")
-                    print("[Warning] impossible to use true seeking! Please (re)compress your TAR using multiple ")
-                    print("[Warning] frames in order for ratarmount to do be able to do fast seeking to requested ")
-                    print("[Warning] files. Else, each file access will decompress the whole TAR from the beginning!")
-                    print("[Warning] You can try out t2sz for creating such archives:")
-                    print("[Warning] https://github.com/martinellimarco/t2sz")
-                    print("[Warning] Here you can find a simple bash script demonstrating how to do this:")
-                    print("[Warning] https://github.com/mxmlnkn/ratarmount#xz-and-zst-files")
-                    print()
+                    logger.warning(
+                        "The specified file '%s' is compressed using zstd but only contains one zstd frame."
+                        "This makes it impossible to use true seeking! Please (re)compress your TAR using multiple "
+                        "frames in order for ratarmount to do be able to do fast seeking to requested files. "
+                        "Else, each file access will decompress the whole TAR from the beginning!",
+                        path,
+                    )
+                    logger.warning("You can try out t2sz for creating such archives:")
+                    logger.warning("    https://github.com/martinellimarco/t2sz")
+                    logger.warning("Here you can find a simple bash script demonstrating how to do this:")
+                    logger.warning("    https://github.com/mxmlnkn/ratarmount#xz-and-zst-files")
+                    logger.warning("")
             except Exception:
                 pass
 
@@ -97,11 +103,13 @@ def check_input_file_type(path: str, printDebug: int = 0) -> str:
             if sqlcipher3 is not None and path.lower().endswith(".sqlar") and is_random(fileobj.read(4096)):
                 return path
 
-            if printDebug >= 2:
-                print(f"Archive '{path}' (format: {sorted(fid.name for fid in formats)}) cannot be opened!")
-
-            if printDebug >= 1:
-                print("[Info] Supported compressions:", sorted(fid.name for fid in supportedCompressions))
+            if logger.isEnabledFor(logging.WARNING):
+                logger.warning(
+                    "Archive '%s' (format: %s) cannot be opened. Supported compressions: %s",
+                    path,
+                    sorted(fid.name for fid in formats),
+                    sorted(fid.name for fid in supportedCompressions),
+                )
 
             raise argparse.ArgumentTypeError(f"Archive '{path}' cannot be opened!")
 
@@ -124,11 +132,9 @@ def check_input_file_type(path: str, printDebug: int = 0) -> str:
                     ) from exception
                 except Exception as exception:
                     if module == 'libarchive':
-                        print(
-                            "[Warning] It seems that the libarchive backend is not available. Try installing it with:"
-                        )
-                        print("[Warning]  - apt install libarchive13")
-                        print("[Warning]  - yum install libarchive")
+                        logger.warning("It seems that the libarchive backend is not available. Try installing it with:")
+                        logger.warning(" - apt install libarchive13")
+                        logger.warning(" - yum install libarchive")
                     raise argparse.ArgumentTypeError(
                         f"Cannot open a {','.join(intersectingFormats)} archive '{fileobj.name}' "
                         f"without module: {module}. Importing the module raised an exception: {exception}"

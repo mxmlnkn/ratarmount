@@ -1,5 +1,6 @@
 import contextlib
 import json
+import logging
 import os
 import re
 import shutil
@@ -9,7 +10,6 @@ import sys
 import tarfile
 import tempfile
 import time
-import traceback
 import urllib.parse
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -42,6 +42,8 @@ from .utils import (
     find_module_version,
 )
 from .version import __version__
+
+logger = logging.getLogger(__name__)
 
 
 def get_sqlite_tables(connection: sqlite3.Connection):
@@ -262,7 +264,6 @@ class SQLiteIndex:
         archiveFilePath: Optional[str] = None,
         *,  # force all parameters after to be keyword-only
         encoding: str = tarfile.ENCODING,
-        printDebug: int = 0,
         preferMemory: bool = False,
         indexMinimumFileCount: int = 0,
         backendName: str = '',
@@ -292,7 +293,6 @@ class SQLiteIndex:
             opened as file objects but may be useful for any archive given via a file object.
         """
 
-        self.printDebug = printDebug
         self.sqlConnection: Optional[sqlite3.Connection] = None
         # Will hold the actually opened valid path to an index file
         self.indexFilePath: Optional[str] = None
@@ -326,11 +326,11 @@ class SQLiteIndex:
         # Guard this feature for Python >= 3.6 because it uses sqlite3.Connection.backup, which was only
         # introduced in Python 3.7!
         if self.indexMinimumFileCount > 0 and not indexFilePath and sys.version_info[0:2] >= (3, 7):
-            if self.printDebug >= 3:
-                print(
-                    f"[Info] Because of the given positive index minimum file count ({self.indexMinimumFileCount}) "
-                    "and because no explicit index file path is given, try to open an SQLite database in memory first."
-                )
+            logger.debug(
+                "Because of the given positive index minimum file count (%s) "
+                "and because no explicit index file path is given, try to open an SQLite database in memory first.",
+                self.indexMinimumFileCount,
+            )
             self.preferMemory = True
 
     @staticmethod
@@ -404,14 +404,12 @@ class SQLiteIndex:
     def open_writable(self):
         if self.possibleIndexFilePaths and not self.preferMemory:
             for indexPath in self.possibleIndexFilePaths:
-                if SQLiteIndex._path_is_writable(
-                    indexPath, printDebug=self.printDebug
-                ) and SQLiteIndex._path_can_be_used_for_sqlite(indexPath, printDebug=self.printDebug):
+                if SQLiteIndex._path_is_writable(indexPath) and SQLiteIndex._path_can_be_used_for_sqlite(indexPath):
                     self.indexFilePath, self.sqlConnection = SQLiteIndex._open_path(indexPath)
                     break
         else:
-            if self.printDebug >= 3 and self.preferMemory:
-                print("[Info] Create new index in memory because memory is to be preferred, e.g., for small archives.")
+            if self.preferMemory:
+                logger.debug("Create new index in memory because memory is to be preferred, e.g., for small archives.")
             self.indexFilePath, self.sqlConnection = SQLiteIndex._open_path(':memory:')
 
         if not self.index_is_loaded():
@@ -456,11 +454,8 @@ class SQLiteIndex:
         try:
             connection.executescript(SQLiteIndex._CREATE_VERSIONS_TABLE)
         except Exception as exception:
-            print("[Warning] There was an error when adding metadata information. Index loading might not work.")
-            if self.printDebug >= 2:
-                print(exception)
-            if self.printDebug >= 3:
-                traceback.print_exc()
+            logger.error("There was an error when adding metadata information. Index loading might not work.")
+            logger.info("Exception: %s", exception, exc_info=logger.isEnabledFor(logging.DEBUG))
 
         try:
 
@@ -493,11 +488,8 @@ class SQLiteIndex:
 
             connection.executemany('INSERT OR REPLACE INTO "versions" VALUES (?,?,?,?,?)', versions)
         except Exception as exception:
-            print("[Warning] There was an error when adding version information.")
-            if self.printDebug >= 2:
-                print(exception)
-            if self.printDebug >= 3:
-                traceback.print_exc()
+            logger.error("There was an error when adding version information.")
+            logger.info("Exception: %s", exception, exc_info=logger.isEnabledFor(logging.DEBUG))
 
     def _store_file_metadata(self, filePath: AnyStr) -> None:
         """Adds some consistency meta information to recognize the need to update the cached TAR index"""
@@ -508,12 +500,9 @@ class SQLiteIndex:
             )
             self.store_metadata_key_value("tarstats", serializedTarStats)
         except Exception as exception:
-            print("[Warning] There was an error when adding file metadata.")
-            print("[Warning] Automatic detection of changed TAR files during index loading might not work.")
-            if self.printDebug >= 2:
-                print(exception)
-            if self.printDebug >= 3:
-                traceback.print_exc()
+            logger.error("There was an error when adding file metadata.")
+            logger.error("Automatic detection of changed TAR files during index loading might not work.")
+            logger.info("Exception: %s", exception, exc_info=logger.isEnabledFor(logging.DEBUG))
 
     def store_metadata_key_value(self, key: AnyStr, value: Union[str, bytes]) -> None:
         connection = self.get_connection()
@@ -522,10 +511,9 @@ class SQLiteIndex:
         try:
             connection.execute('INSERT OR REPLACE INTO "metadata" VALUES (?,?)', (key, value))
         except Exception as exception:
-            if self.printDebug >= 2:
-                print(exception)
-            print("[Warning] There was an error when adding argument metadata.")
-            print("[Warning] Automatic detection of changed arguments files during index loading might not work.")
+            logger.error("There was an error when adding argument metadata.")
+            logger.error("Automatic detection of changed arguments files during index loading might not work.")
+            logger.info("Exception: %s", exception, exc_info=logger.isEnabledFor(logging.DEBUG))
 
         connection.commit()
 
@@ -556,19 +544,18 @@ class SQLiteIndex:
         if not firstFile:
             return
 
-        if self.printDebug >= 2:
-            print(
-                "[Info] The index contains no backend name. Therefore, will try to open the first file as "
-                "an integrity check."
-            )
+        logger.info(
+            "The index contains no backend name. Therefore, will try to open the first file as an integrity check."
+        )
         try:
             with openByPath(firstFile[0] + '/' + firstFile[1]) as file:
                 file.read(1)
         except Exception as exception:
-            if self.printDebug >= 2:
-                print("[Info] Trying to open the first file raised an exception:", exception)
-            if self.printDebug >= 3:
-                traceback.print_exc()
+            logger.info(
+                "Trying to open the first file raised an exception: %s",
+                exception,
+                exc_info=logger.isEnabledFor(logging.DEBUG),
+            )
             raise InvalidIndexError("Integrity check of opening the first file failed.") from exception
 
     @staticmethod
@@ -619,11 +606,13 @@ class SQLiteIndex:
             if arg in metadata and hasattr(arguments, arg) and metadata[arg] != getattr(arguments, arg)
         ]
         if differingArgs:
-            print("[Warning] The arguments used for creating the found index differ from the arguments ")
-            print("[Warning] given for mounting the archive now. In order to apply these changes, ")
-            print("[Warning] recreate the index using the --recreate-index option!")
+            logger.warning(
+                "The arguments used for creating the found index differ from the arguments "
+                "given for mounting the archive now. In order to apply these changes, "
+                "recreate the index using the --recreate-index option!"
+            )
             for arg, oldState, newState in differingArgs:
-                print(f"[Warning] {arg}: index: {oldState}, current: {newState}")
+                logger.warning("%s: index: %s, current: %s", arg, oldState, newState)
 
     def check_metadata_backend(self, metadata: dict):
         # When opening an index without a backend via SQLiteIndexMountSource directly, it should not be checked.
@@ -643,7 +632,7 @@ class SQLiteIndex:
         return self.get_connection().execute("""SELECT version FROM versions WHERE name == 'index';""").fetchone()[0]
 
     @staticmethod
-    def _path_is_writable(path: str, printDebug: int = 0) -> bool:
+    def _path_is_writable(path: str) -> bool:
         # Writing indexes to remote filesystems currently not supported and we need to take care that URLs
         # are not interpreted as local file paths, i.e., creating an ftp: folder with a user:password@host subfolder.
         if '://' in path:
@@ -661,19 +650,16 @@ class SQLiteIndex:
             return True
 
         except PermissionError:
-            if printDebug >= 3:
-                print(f"Insufficient permissions to write to: {path}")
+            logger.debug("Insufficient permissions to write to: %s", exc_info=logger.isEnabledFor(logging.DEBUG))
 
         except OSError:
-            if printDebug >= 2:
-                traceback.print_exc()
-                print("Could not create file:", path)
+            logger.info("Could not create file: %s", path, exc_info=True)
 
         return False
 
     @staticmethod
-    def _path_can_be_used_for_sqlite(path: str, printDebug: int = 0) -> bool:
-        if not SQLiteIndex._path_is_writable(path, printDebug):
+    def _path_can_be_used_for_sqlite(path: str) -> bool:
+        if not SQLiteIndex._path_is_writable(path):
             return False
 
         fileExisted = os.path.isfile(path)
@@ -688,9 +674,7 @@ class SQLiteIndex:
             connection.close()
             return True
         except sqlite3.OperationalError:
-            if printDebug >= 2:
-                traceback.print_exc()
-                print("Could not create SQLite database at:", path)
+            logger.debug("Could not create SQLite database at: %s", path, exc_info=True)
         finally:
             if not fileExisted and os.path.isfile(path):
                 SQLiteIndex._unchecked_remove(path)
@@ -708,7 +692,7 @@ class SQLiteIndex:
         try:
             os.remove(path)
         except Exception:
-            print("[Warning] Could not remove:", path)
+            logger.warning("Could not remove: %s", path, exc_info=logger.isEnabledFor(logging.DEBUG))
 
     @staticmethod
     def _open_sql_db(path: AnyStr, **kwargs) -> sqlite3.Connection:
@@ -732,10 +716,10 @@ class SQLiteIndex:
         return sqlConnection
 
     @staticmethod
-    def _open_path(indexFilePath: Optional[str], printDebug: int = 0) -> tuple[str, sqlite3.Connection]:
+    def _open_path(indexFilePath: Optional[str]) -> tuple[str, sqlite3.Connection]:
         indexFilePath = indexFilePath or ':memory:'
 
-        if printDebug >= 1:
+        if logger.isEnabledFor(logging.WARNING):
             print("Creating new SQLite index database at", indexFilePath)
 
         sqlConnection = SQLiteIndex._open_sql_db(indexFilePath)
@@ -761,9 +745,8 @@ class SQLiteIndex:
         self.sqlConnection = SQLiteIndex._open_sql_db(f"file:{uriPath}?mode=ro", uri=True, check_same_thread=False)
 
     def _reload_index_on_disk(self):
-        if self.printDebug >= 2:
-            print("[Info] Try to reopen SQLite database on disk at:", self.indexFilePath)
-            print("other index paths:", self.possibleIndexFilePaths)
+        logger.info("Try to reopen SQLite database on disk at: %s", self.indexFilePath)
+        logger.info("other index paths: %s", self.possibleIndexFilePaths)
         if not self.indexFilePath or self.indexFilePath != ':memory:' or not self.sqlConnection:
             return
 
@@ -771,14 +754,12 @@ class SQLiteIndex:
         self.preferMemory = False
         self.open_writable()
         if oldIndexFilePath == self.indexFilePath:
-            if self.printDebug >= 3:
-                print(f"[Info] Tried to write the database to disk but found no other path than: {self.indexFilePath}")
+            logger.info("Tried to write the database to disk but found no other path than: %s", self.indexFilePath)
             self.sqlConnection.close()
             self.indexFilePath, self.sqlConnection = oldIndexFilePath, oldSqlConnection
             return
 
-        if self.printDebug >= 3:
-            print(f"[Info] Back up database from {oldIndexFilePath} -> {self.indexFilePath}")
+        logger.debug("Back up database from %s -> %s", oldIndexFilePath, self.indexFilePath)
         oldSqlConnection.commit()
         oldSqlConnection.backup(self.sqlConnection)
         oldSqlConnection.close()
@@ -1125,11 +1106,12 @@ class SQLiteIndex:
             and self.indexFilePath == ':memory:'
             and self.preferMemory
         ):
-            if self.printDebug >= 3:
-                print(
-                    f"[Info] Exceeded file count threshold ({self._insertedRowCount} > {self.indexMinimumFileCount}) "
-                    "for metadata held in memory. Will try to reopen the database on disk."
-                )
+            logger.info(
+                "Exceeded file count threshold (%s > %s) for metadata held in memory. "
+                "Will try to reopen the database on disk.",
+                self._insertedRowCount,
+                self.indexMinimumFileCount,
+            )
             self.preferMemory = False
             self._reload_index_on_disk()
 
@@ -1160,12 +1142,15 @@ class SQLiteIndex:
         try:
             connection.execute('INSERT OR REPLACE INTO "files" VALUES (' + ','.join('?' * len(row)) + ');', row)
         except UnicodeEncodeError:
-            print("[Warning] Problem caused by file name encoding when trying to insert this row:", row)
-            print("[Warning] The file name will now be stored with the bad character being escaped")
-            print("[Warning] instead of being correctly interpreted.")
-            print("[Warning] Please specify a suitable file name encoding using, e.g., --encoding iso-8859-1!")
-            print("[Warning] A list of possible encodings can be found here:")
-            print("[Warning] https://docs.python.org/3/library/codecs.html#standard-encodings")
+            logger.warning("Problem caused by file name encoding when trying to insert this row: %s", row)
+            logger.warning(
+                "The file name will now be stored with the bad character being escaped instead of being correctly "
+                "interpreted. Please specify a suitable file name encoding using, e.g., --encoding iso-8859-1!"
+            )
+            logger.warning(
+                "A list of possible encodings can be found here: "
+                "https://docs.python.org/3/library/codecs.html#standard-encodings"
+            )
 
             checkedRow = []
             for x in list(row):  # check strings
@@ -1177,8 +1162,8 @@ class SQLiteIndex:
             connection.execute(
                 'INSERT OR REPLACE INTO "files" VALUES (' + ','.join('?' * len(row)) + ');', tuple(checkedRow)
             )
-            print("[Warning] The escaped inserted row is now:", row)
-            print()
+            logger.warning("The escaped inserted row is now: %s", row)
+            logger.warning("")
 
             self._try_add_parent_folders(self._escape_invalid_characters(row[0], self.encoding), row[2], row[3])
             return
@@ -1210,13 +1195,12 @@ class SQLiteIndex:
             try:
                 os.remove(self.indexFilePath)
             except Exception as exception:
-                if self.printDebug >= 1:
-                    print(
-                        "[Warning] Failed to remove temporarily downloaded and/or extracted index file at:",
-                        self.indexFilePath,
-                        "because of:",
-                        exception,
-                    )
+                logger.warning(
+                    "Failed to remove temporarily downloaded and/or extracted index file at: %s because of: %s",
+                    self.indexFilePath,
+                    exception,
+                    exc_info=logger.isEnabledFor(logging.DEBUG),
+                )
 
         if hasattr(self, 'indexFilePath') and hasattr(self, 'indexFilePathDeleteOnClose'):
             self.indexFilePath = indexFilePath
@@ -1247,14 +1231,13 @@ class SQLiteIndex:
         temporaryFolder = os.environ.get("RATARMOUNT_INDEX_TMPDIR", None)
 
         def _undo_compression(file):
-            compression = detect_compression(file, printDebug=self.printDebug)
+            compression = detect_compression(file)
             if not compression or not any(
                 (compression in backend.formats) for backend in COMPRESSION_BACKENDS.values()
             ):
                 return None
 
-            if self.printDebug >= 2:
-                print(f"[Info] Detected {compression}-compressed index.")
+            logger.info("Detected %s-compressed index.", compression)
 
             backend = find_available_backend(compression)
             if not backend:
@@ -1344,9 +1327,9 @@ class SQLiteIndex:
                 or len(versions['index']) < 2
                 or versions['index'][1] < 2
             ):
-                print("[Warning] The found outdated index does not contain any sparse file information.")
-                print("[Warning] The index will also miss data about multiple versions of a file.")
-                print("[Warning] Please recreate the index if you have problems with those.")
+                logger.warning("The found outdated index does not contain any sparse file information.")
+                logger.warning("The index will also miss data about multiple versions of a file.")
+                logger.warning("Please recreate the index if you have problems with those.")
 
             if 'metadata' in tables:
                 metadata = dict(self.sqlConnection.execute('SELECT * FROM metadata;'))
@@ -1372,13 +1355,13 @@ class SQLiteIndex:
                     indexVersionTuple = _to_version_tuple(indexVersion)
                     indexAPIVersionTuple = _to_version_tuple(SQLiteIndex.__version__)
                     if indexVersionTuple and indexAPIVersionTuple and indexVersionTuple > indexAPIVersionTuple:
-                        print("[Warning] The loaded index was created with a newer version of ratarmount.")
-                        print("[Warning] If there are any problems, please update ratarmount or recreate the index")
-                        print("[Warning] with this ratarmount version using the --recreate-index option!")
+                        logger.warning("The loaded index was created with a newer version of ratarmount.")
+                        logger.warning("If there are any problems, please update ratarmount or recreate the index")
+                        logger.warning("with this ratarmount version using the --recreate-index option!")
             except Exception:
                 pass
 
-        if self.printDebug >= 1:
+        if logger.isEnabledFor(logging.WARNING):
             message = "Successfully loaded offset dictionary from " + str(indexFilePath)
             if temporaryIndexFilePath != indexFilePath:
                 message += " temporarily downloaded/decompressed into: " + str(temporaryIndexFilePath)
@@ -1402,31 +1385,32 @@ class SQLiteIndex:
         except MismatchingIndexError as e:
             raise e
         except Exception as exception:
-            if self.printDebug >= 3:
-                traceback.print_exc()
+            logger.info("Exception: %s", exception, exc_info=logger.isEnabledFor(logging.DEBUG))
+            logger.warning("Could not load file: %s", indexFilePath)
+            logger.warning("Some likely reasons for not being able to load the index file:")
+            logger.warning("  - The index file has incorrect read permissions")
+            logger.warning("  - The index file is incomplete because ratarmount was killed during index creation")
+            logger.warning("  - The index file was detected to contain errors because of known bugs of older versions")
+            logger.warning("  - The index file got corrupted because of:")
+            logger.warning("    - The program exited while it was still writing the index because of:")
+            logger.warning("      - the user sent SIGINT to force the program to quit")
+            logger.warning("      - an internal error occurred while writing the index")
+            logger.warning("      - the disk filled up while writing the index")
+            logger.warning("    - Rare lowlevel corruptions caused by hardware failure")
 
-            print("[Warning] Could not load file:", indexFilePath)
-            print("[Info] Exception:", exception)
-            print("[Info] Some likely reasons for not being able to load the index file:")
-            print("[Info]   - The index file has incorrect read permissions")
-            print("[Info]   - The index file is incomplete because ratarmount was killed during index creation")
-            print("[Info]   - The index file was detected to contain errors because of known bugs of older versions")
-            print("[Info]   - The index file got corrupted because of:")
-            print("[Info]     - The program exited while it was still writing the index because of:")
-            print("[Info]       - the user sent SIGINT to force the program to quit")
-            print("[Info]       - an internal error occurred while writing the index")
-            print("[Info]       - the disk filled up while writing the index")
-            print("[Info]     - Rare lowlevel corruptions caused by hardware failure")
-
-            print("[Info] This might force a time-costly index recreation, so if it happens often")
-            print("       and mounting is slow, try to find out why loading fails repeatedly,")
-            print("       e.g., by opening an issue on the public github page.")
+            logger.warning("This might force a time-costly index recreation, so if it happens often")
+            logger.warning("and mounting is slow, try to find out why loading fails repeatedly,")
+            logger.warning("e.g., by opening an issue on the public github page.")
 
             try:
                 if self.deleteInvalidIndexes and '://' not in indexFilePath:
                     os.remove(indexFilePath)
             except OSError:
-                print("[Warning] Failed to remove corrupted old cached index file:", indexFilePath)
+                logger.warning(
+                    "Failed to remove corrupted old cached index file: %s",
+                    indexFilePath,
+                    exc_info=logger.isEnabledFor(logging.DEBUG),
+                )
 
         return self.index_is_loaded()
 
@@ -1440,18 +1424,18 @@ class SQLiteIndex:
         Else it will force creation and store the block offsets of the compression backend into a new table.
         """
         if compression and (not self.indexFilePath or self.indexFilePath == ':memory:'):
-            if self.indexMinimumFileCount != 0 and self.printDebug >= 2:
-                print(
-                    f"[Info] Will try to reopen the database on disk even though the file count threshold "
-                    f"({self.indexMinimumFileCount}) might not be exceeded ({self._insertedRowCount}) because "
-                    f"the archive is compressed."
+            if self.indexMinimumFileCount != 0:
+                logger.info(
+                    "Will try to reopen the database on disk even though the file count threshold "
+                    "(%s) might not be exceeded (%s) because the archive is compressed.",
+                    self.indexMinimumFileCount,
+                    self._insertedRowCount,
                 )
             self._reload_index_on_disk()
 
         if not self.indexFilePath or self.indexFilePath == ':memory:':
-            if self.printDebug >= 2:
-                print("[Info] Will skip storing compression seek data because the database is in memory.")
-                print("[Info] If the database is in memory, then this data will not be read anyway.")
+            logger.info("Will skip storing compression seek data because the database is in memory.")
+            logger.info("If the database is in memory, then this data will not be read anyway.")
             return
 
         # This should be called after the TAR file index is complete (loaded or created).
@@ -1463,8 +1447,10 @@ class SQLiteIndex:
             setBlockOffsets = getattr(fileObject, 'set_block_offsets', None)
             getBlockOffsets = getattr(fileObject, 'block_offsets', None)
             if not setBlockOffsets or not getBlockOffsets:
-                print("[Warning] The given file object misses the expected methods for getting/setting")
-                print("[Warning] the block offsets. Subsequent loads might be slow.")
+                logger.warning(
+                    "The given file object misses the expected methods for getting/setting the block offsets. "
+                    "Subsequent loads might be slow."
+                )
                 return
 
             table_name = ''
@@ -1480,15 +1466,14 @@ class SQLiteIndex:
                     setBlockOffsets(offsets)
                     return
                 except Exception as exception:
-                    if self.printDebug >= 2:
-                        print(
-                            f"[Info] Could not load {compression.name} block offset data. Will create it from scratch."
-                        )
-                        print(exception)
-                    if self.printDebug >= 3:
-                        traceback.print_exc()
+                    logger.info(
+                        "Could not load %s block offset data because of %s. Will create it from scratch.",
+                        compression.name,
+                        exception,
+                        exc_info=logger.isEnabledFor(logging.DEBUG),
+                    )
             else:
-                print(f"[Info] The index does not yet contain {compression.name} block offset data. Will write it out.")
+                logger.info("The index does not yet contain %s block offset data. Will write it out.", compression.name)
 
             tables = get_sqlite_tables(db)
             if table_name in tables:
@@ -1509,11 +1494,9 @@ class SQLiteIndex:
                 if self._load_gzip_index(fileObject, 'gzipindexes' if 'gzipindexes' in tables else 'gzipindex'):
                     return
 
-                if self.printDebug >= 2:
-                    print("[Info] Could not load gzip block offset data. Will create it from scratch.")
+                logger.info("Could not load gzip block offset data. Will create it from scratch.")
             else:
-                if self.printDebug >= 2:
-                    print("[Info] The index does not yet contain gzip block offset data. Will write it out.")
+                logger.info("The index does not yet contain gzip block offset data. Will write it out.")
 
             self._store_gzip_index(fileObject)
             return
@@ -1558,27 +1541,26 @@ class SQLiteIndex:
             # calculated. For C, there actually is an incremental blob reading interface but not for Python:
             #   https://www.sqlite.org/c3ref/blob_open.html
             #   https://bugs.python.org/issue24905
-            if self.printDebug >= 3:
-                print(f"[Info] Loading gzip block offsets took {time.time() - t0:.2f}s")
+            logger.debug("Loading gzip block offsets took %.s2fs", time.time() - t0)
 
             return True
 
         except Exception as exception:
-            if self.printDebug >= 1:
-                print(
-                    "[Warning] Encountered exception when trying to load gzip block offsets from database",
-                    exception,
-                )
-            if self.printDebug >= 3:
-                traceback.print_exc()
+            logger.warning(
+                "Encountered exception when trying to load gzip block offsets from database %s",
+                exception,
+                exc_info=logger.isEnabledFor(logging.DEBUG),
+            )
 
         return False
 
     def _store_gzip_index(self, fileObject: IO[bytes]):
         exportIndex = getattr(fileObject, 'export_index', None)
         if not exportIndex:
-            print("[Warning] The given file object misses the expected methods for getting/setting")
-            print("[Warning] the block offsets. Subsequent loads might be slow.")
+            logger.warning(
+                "The given file object misses the expected methods for getting/setting the block offsets. "
+                "Subsequent loads might be slow."
+            )
             return
 
         # Transparently force index to be built if not already done so. build_full_index was buggy for me.
@@ -1607,18 +1589,21 @@ class SQLiteIndex:
         except (indexed_gzip.ZranError, RuntimeError, ValueError) as exception:
             db.execute('DROP TABLE IF EXISTS "gzipindexes"')
 
-            print("[Warning] The GZip index required for seeking could not be written to the database!")
-            print("[Info] This might happen when you are out of space in your temporary file and at the")
-            print("[Info] the index file location. The gzipindex size takes roughly 32kiB per 4MiB of")
-            print("[Info] uncompressed(!) bytes (0.8% of the uncompressed data) by default.")
+            logger.warning(
+                "The gzip index required for seeking could not be written to the database!"
+                "This might happen when you are out of space in your temporary file and at the index file location. "
+                "The gzip index size takes roughly 32kiB per 4MiB of uncompressed(!) bytes "
+                "(0.8% of the uncompressed data) by default."
+            )
 
             raise RatarmountError("Could not wrote out the gzip seek database.") from exception
 
         blobCount = db.execute('SELECT COUNT(*) FROM gzipindexes;').fetchone()[0]
         if blobCount == 0:
-            if self.printDebug >= 2:
-                print("[Warning] Did not write out any gzip seek data. This should only happen if the gzip ")
-                print("[Warning] size is smaller than the gzip seek point spacing.")
+            logger.warning(
+                "Did not write out any gzip seek data. This should only happen if the gzip size is smaller "
+                "than the gzip seek point spacing."
+            )
         elif blobCount == 1:
             # For downwards compatibility
             db.execute('DROP TABLE IF EXISTS "gzipindex";')

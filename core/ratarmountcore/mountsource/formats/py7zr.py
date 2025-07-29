@@ -1,5 +1,6 @@
 import io
 import json
+import logging
 import stat
 import sys
 import tarfile
@@ -80,6 +81,9 @@ except ImportError:
     py7zr = None  # type: ignore
 
 
+logger = logging.getLogger(__name__)
+
+
 class Py7zrMountSource(SQLiteIndexMountSource):
     # fmt: off
     def __init__(
@@ -91,14 +95,12 @@ class Py7zrMountSource(SQLiteIndexMountSource):
         indexFolders           : Optional[list[str]]       = None,
         encoding               : str                       = tarfile.ENCODING,
         verifyModificationTime : bool                      = False,
-        printDebug             : int                       = 0,
         indexMinimumFileCount  : int                       = 1000,
         **options
     ) -> None:
         self.archiveFilePath        = fileOrPath if isinstance(fileOrPath, str) else None
         self.encoding               = encoding
         self.verifyModificationTime = verifyModificationTime
-        self.printDebug             = printDebug
         self.options                = options
         # fmt: on
 
@@ -126,7 +128,6 @@ class Py7zrMountSource(SQLiteIndexMountSource):
                 indexFolders=indexFolders,
                 archiveFilePath=self.archiveFilePath,
                 encoding=self.encoding,
-                printDebug=self.printDebug,
                 indexMinimumFileCount=indexMinimumFileCount,
                 backendName='Py7zrMountSource',
             ),
@@ -186,7 +187,7 @@ class Py7zrMountSource(SQLiteIndexMountSource):
         return fileInfo
 
     def _create_index(self) -> None:
-        if self.printDebug >= 1:
+        if logger.isEnabledFor(logging.WARNING):
             print(f"Creating offset dictionary for {self.archiveFilePath} ...")
         t0 = timer()
 
@@ -194,13 +195,12 @@ class Py7zrMountSource(SQLiteIndexMountSource):
         self.index.set_file_infos([self._convert_to_row(info) for info in self.fileObject.list()])
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
-        if self.printDebug >= 2:
-            print("Resorting files by path ...")
+        logger.info("Resorting files by path ...")
 
         self.index.finalize()
 
         t1 = timer()
-        if self.printDebug >= 1:
+        if logger.isEnabledFor(logging.WARNING):
             print(f"Creating offset dictionary for {self.archiveFilePath} took {t1 - t0:.2f}s")
 
     @staticmethod

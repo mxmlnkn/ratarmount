@@ -3,6 +3,7 @@ import copy
 import inspect
 import io
 import json
+import logging
 import math
 import os
 import re
@@ -12,7 +13,6 @@ import sys
 import tarfile
 import threading
 import time
-import traceback
 import urllib.parse
 from collections.abc import Generator, Iterable, Sequence
 from timeit import default_timer as timer
@@ -44,6 +44,8 @@ BLOCK_SIZE = 512
 # Note that the number of decimal digits for UINT64_MAX is ceil[64*ln(2)/ln(10)] = 20.
 _PAX_HEADER_LENGTH_PREFIX_REGEX = re.compile(b"([0-9]{1,20}) ")
 _PAX_HEADER_SIZE_KEYWORD = re.compile(br" size=([0-9]{1,20})\n")
+
+logger = logging.getLogger(__name__)
 
 
 # Patch https://github.com/python/cpython/issues/136602
@@ -88,7 +90,7 @@ class _TarFileMetadataReader:
         self._lastUpdateTime = time.time()
 
     @staticmethod
-    def _get_tar_prefix(fileObject: IO[bytes], tarInfo: tarfile.TarInfo, printDebug: int) -> Optional[bytes]:
+    def _get_tar_prefix(fileObject: IO[bytes], tarInfo: tarfile.TarInfo) -> Optional[bytes]:
         """Get the actual prefix as stored in the TAR."""
 
         # Offsets taken from https://en.wikipedia.org/wiki/Tar_(computing)#UStar_format
@@ -119,10 +121,11 @@ class _TarFileMetadataReader:
             return extract_prefix(tarInfo.offset)
 
         except Exception as exception:
-            if printDebug >= 1:
-                print("[Warning] Encountered exception when trying to get TAR prefix", exception)
-            if printDebug >= 3:
-                traceback.print_exc()
+            logger.warning(
+                "Encountered exception when trying to get TAR prefix: %s",
+                exception,
+                exc_info=logger.isEnabledFor(logging.DEBUG),
+            )
 
         finally:
             fileObject.seek(oldPosition)
@@ -148,7 +151,7 @@ class _TarFileMetadataReader:
         # fmt: on
 
     @staticmethod
-    def _fix_incremental_backup_name_prefixes(fileObject: IO[bytes], tarInfo: tarfile.TarInfo, printDebug: int):
+    def _fix_incremental_backup_name_prefixes(fileObject: IO[bytes], tarInfo: tarfile.TarInfo):
         """
         Tarfile joins the TAR prefix with the file path.
         However, for incremental TARs, the prefix is an octal timestamp and should be ignored.
@@ -162,7 +165,7 @@ class _TarFileMetadataReader:
         fixedPath = None
         prefix, name = tarInfo.name.split('/', 1)
 
-        realPrefix = _TarFileMetadataReader._get_tar_prefix(fileObject, tarInfo, printDebug)
+        realPrefix = _TarFileMetadataReader._get_tar_prefix(fileObject, tarInfo)
         encodedPrefix = prefix.encode('utf8', 'surrogateescape')
 
         # For names longer than 100B, GNU tar will store it using a ././@LongLink named file.
@@ -179,12 +182,10 @@ class _TarFileMetadataReader:
         if realPrefix and realPrefix.startswith(encodedPrefix + b"\0"):
             fixedPath = name
 
-        if fixedPath is None and printDebug >= 1:
-            print(f"[Warning] ignored prefix '{encodedPrefix!r}' because it was not found in TAR header prefix.")
-            print("[Warning]", realPrefix[:30] if realPrefix else realPrefix)
-            print(f"[Info] TAR header offset: {tarInfo.offset}, type: {tarInfo.type!s}")
-            print("[Info] name:", tarInfo.name)
-            print()
+        if fixedPath is None:
+            logger.warning("ignored prefix '%s' because it was not found in TAR header prefix.", encodedPrefix)
+            logger.warning("%s", realPrefix[:30] if realPrefix else realPrefix)
+            logger.info("TAR header offset: %s, type: %s, name: %s", tarInfo.offset, tarInfo.type, tarInfo.name)
 
         if fixedPath is not None:
             tarInfo.name = fixedPath
@@ -200,21 +201,17 @@ class _TarFileMetadataReader:
         mountRecursively : bool,
         transform        : Callable[[str], str],
         recursionDepth   : int,
-        printDebug       : int,
     ) -> tuple[list[tuple], list[tuple], bool, Optional[bool]]:
         # fmt: on
         """Postprocesses a TarInfo object into one or multiple FileInfo tuples."""
 
         if tarInfo.type == b'D' and not isGnuIncremental:
             isGnuIncremental = True
-            if printDebug >= 1:
-                print(f"[Warning] A folder metadata entry ({tarInfo.name}) for GNU incremental archives")
-                print("[Warning] was encountered but this archive was not automatically recognized as such!")
-                print("[Warning] Please call ratarmount with the --gnu-incremental flag if there are problems.")
-                print()
+            logger.warning("A folder metadata entry (%s) for GNU incremental archives was encountered but this archive was not automatically recognized as such!", tarInfo.name)
+            logger.warning("Please call ratarmount with the --gnu-incremental flag if there are problems.")
 
         if isGnuIncremental:
-            _TarFileMetadataReader._fix_incremental_backup_name_prefixes(fileObject, tarInfo, printDebug)
+            _TarFileMetadataReader._fix_incremental_backup_name_prefixes(fileObject, tarInfo)
 
         offsetHeader = streamOffset + tarInfo.offset
 
@@ -380,13 +377,14 @@ class _TarFileMetadataReader:
         try:
             # Note that with ignore_zeros = True, no invalid header issues or similar will be raised even for
             # non TAR files!?
+            # fmt: off
             return tarfile.open(
                 fileobj      = fileObject,
                 mode         = 'r:',
                 ignore_zeros = self._parent.ignoreZeros,
                 encoding     = self._parent.encoding,
             )
-            # fmt:on
+            # fmt: on
         except tarfile.ReadError:
             pass
 
@@ -457,7 +455,6 @@ class _TarFileMetadataReader:
                         mountRecursively=self._recursionDepth < self._parent.maxRecursionDepth,
                         transform=self._parent.transform,
                         recursionDepth=self._recursionDepth,
-                        printDebug=self._parent.printDebug,
                     )
                 )
 
@@ -492,12 +489,10 @@ class _TarFileMetadataReader:
 
         except tarfile.ReadError as e:
             if 'unexpected end of data' in str(e):
-                print(
-                    "[Warning] The TAR file is incomplete. Ratarmount will work but some files might be cut off. "
-                    "If the TAR file size changes, ratarmount will recreate the index during the next mounting."
-                )
-                if self._parent.printDebug >= 3:
-                    traceback.print_exc()
+                logger.warning(
+                    "The TAR file is incomplete. Ratarmount will work but some files might be cut off. "
+                    "If the TAR file size changes, ratarmount will recreate the index during the next mounting.",
+                    exc_info=logger.isEnabledFor(logging.DEBUG))
 
         return []
 
@@ -529,7 +524,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         parallelization              : int                               = 1,
         parallelizations             : Optional[dict[str, int]]          = None,
         isGnuIncremental             : Optional[bool]                    = None,
-        printDebug                   : int                               = 0,
         transformRecursiveMountPoint : Optional[tuple[str, str]]         = None,
         transform                    : Optional[tuple[str, str]]         = None,
         prioritizedBackends          : Optional[list[str]]               = None,
@@ -606,7 +600,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         self.ignoreZeros                  = ignoreZeros
         self.verifyModificationTime       = verifyModificationTime
         self.gzipSeekPointSpacing         = gzipSeekPointSpacing
-        self.printDebug                   = printDebug
         self.isFileObject                 = fileObject is not None
         self._isGnuIncremental            = isGnuIncremental
         self.hasBeenAppendedTo            = False
@@ -662,12 +655,10 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 backend for backend, info in COMPRESSION_BACKENDS.items() if info.delegatedArchiveBackend == 'tarfile'
             ],
             prioritizedBackends=self.prioritizedBackends,
-            printDebug=self.printDebug,
         )
         self.isTar = might_be_format(self.tarFileObject, FileFormatID.TAR)
         if not self.isTar:
-            if printDebug >= 3:
-                print(f"[Info] File object {self.tarFileObject} from {self.tarFileName} is not a TAR.")
+            logger.debug("File object %s from %s is not a TAR.", self.tarFileObject, self.tarFileName)
             if not self.rawFileObject:
                 raise RatarmountError(f"File object ({fileObject!s}) could not be opened as a TAR file!")
 
@@ -707,13 +698,13 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             and len(getattr(self.tarFileObject, 'block_boundaries', (0, 0))) <= 1
             and self._archiveFileSize > 1024 * 1024
         ):
-            print(f"[Warning] The specified file '{self.tarFileName}'")
-            print("[Warning] is compressed using xz but only contains one xz block. This makes it ")
-            print("[Warning] impossible to use true seeking! Please (re)compress your TAR using pixz")
-            print("[Warning] (see https://github.com/vasi/pixz) in order for ratarmount to do be able ")
-            print("[Warning] to do fast seeking to requested files.")
-            print("[Warning] As it is, each file access will decompress the whole TAR from the beginning!")
-            print()
+            logger.warning(
+                "The specified file '%s' is compressed using xz but only contains one xz block. "
+                "This makes it impossible to use true seeking! Please (re)compress your TAR using pixz "
+                "(see https://github.com/vasi/pixz) in order for ratarmount to do be able to do fast seeking "
+                "to requested files. As it is, each file access will decompress the whole TAR from the beginning!",
+                self.tarFileName,
+            )
 
         if indexFolders is None:
             indexFolders = ['', os.path.join("~", ".ratarmount")]
@@ -731,7 +722,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 indexFolders=indexFolders,
                 archiveFilePath=archiveFilePath,
                 encoding=self.encoding,
-                printDebug=self.printDebug,
                 indexMinimumFileCount=indexMinimumFileCount,
                 backendName='SQLiteIndexedTar',
                 ignoreCurrentFolder=self.isFileObject and self._fileNameIsURL,
@@ -773,7 +763,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 return
 
             self.index.close()
-            print("[Warning] The loaded index does not match the archive. Will recreate it.")
+            logger.warning("The loaded index does not match the archive. Will recreate it.")
 
         # TODO This does and did not work correctly for recursive TARs because the outermost layer will change
         #      None to a hard value and from then on it would have been fixed to that value even when called
@@ -797,12 +787,12 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             self._store_metadata()
             self.index.reload_index_read_only()
 
-        if self.printDebug >= 1 and self.index.indexFilePath and os.path.isfile(self.index.indexFilePath):
+        if logger.isEnabledFor(logging.WARNING) and self.index.indexFilePath and os.path.isfile(self.index.indexFilePath):
             # The 0-time is legacy for the automated tests
-            # fmt: off
-            print("Writing out TAR index to", self.index.indexFilePath, "took 0s",
-                  "and is sized", os.stat( self.index.indexFilePath ).st_size, "B")
-            # fmt: on
+            print(
+                "Writing out TAR index to", self.index.indexFilePath, "took 0s",
+                "and is sized", os.stat( self.index.indexFilePath ).st_size, "B"
+            )
 
     def __del__(self):
         if hasattr(self, '_fileObjectsToCloseOnDel'):
@@ -826,8 +816,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 # It seems to be possible to create mixtures of incremental archives and normal contents,
                 # therefore do not check that all files must have the mtime prefix.
                 if typeFlag == b'D':
-                    if self.printDebug >= 1:
-                        print("[Info] Detected GNU incremental TAR.")
+                    logger.info("Detected GNU incremental TAR.")
                     return True
 
                 nMaxToTry -= 1
@@ -835,10 +824,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                     break
 
         except Exception as exception:
-            if self.printDebug >= 3:
-                print("[Info] TAR was not recognized as GNU incremental TAR because of exception", exception)
-            if self.printDebug >= 3:
-                traceback.print_exc()
+            logger.debug("TAR was not recognized as GNU incremental TAR because of exception: %s", exception, exc_info=True)
         finally:
             fileObject.seek(oldPos)
 
@@ -905,13 +891,10 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             if value > 0:
                 progressBar.update(value)
         except Exception as exception:
-            if self.printDebug >= 1:
-                print("An exception occurred when trying to update the progress bar:", exception)
-            if self.printDebug >= 3:
-                traceback.print_exc()
+            logger.warning("An exception occurred when trying to update the progress bar: %s", exception, exc_info=logger.isEnabledFor(logging.DEBUG))
 
     def _create_index(self, fileObject: IO[bytes], streamOffset: int = 0) -> None:
-        if self.printDebug >= 1:
+        if logger.isEnabledFor(logging.WARNING):
             print(f"Creating offset dictionary for {self.tarFileName} ...")
         t0 = timer()
 
@@ -929,13 +912,12 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             self._update_progress_bar(progressBar, fileObject)
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
-        if self.printDebug >= 2:
-            print("Resorting files by path ...")
+        logger.info("Resorting files by path ...")
 
         self.index.finalize()
 
         t1 = timer()
-        if self.printDebug >= 1:
+        if logger.isEnabledFor(logging.WARNING):
             print(f"Creating offset dictionary for {self.tarFileName} took {t1 - t0:.2f}s")
 
     def _create_index_recursively(
@@ -1049,8 +1031,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         # In that case add that itself to the file index. This will be ignored when called recursively
         # because the table will at least contain the recursive file to mount itself, i.e., file_count > 0
         if self.index.file_count() == 0:
-            if self.printDebug >= 3:
-                print(f"Did not find any file in the given TAR: {self.tarFileName}. Assuming a compressed file.")
+            logger.debug("Did not find any file in the given TAR: %s. Assuming a compressed file.", self.tarFileName)
 
             # For some reason, this happens for single-file.iso.
             # Tarfile does not raise an error but also does not find any files.
@@ -1081,10 +1062,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                     if info:
                         fname, mtime = info
                 except Exception:
-                    if self.printDebug >= 2:
-                        print("[Info] Could not determine an original gzip file name probably because it is not a gzip")
-                    if self.printDebug >= 3:
-                        traceback.print_exc()
+                    logger.info("Could not determine an original gzip file name probably because it is not a gzip", exc_info=logger.isEnabledFor(logging.DEBUG))
                 finally:
                     # TODO Why does tell return negative numbers!? Problem with indexed_gzip?
                     self.rawFileObject.seek(max(0, oldPos))
@@ -1338,8 +1316,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         if self.index.get_index_version() != SQLiteIndex.__version__:
             raise InvalidIndexError("Cannot append to index of different versions!")
 
-        if self.printDebug >= 2:
-            print("[Info] Archive has probably been appended to because it is larger and more recent.")
+        logger.info("Archive has probably been appended to because it is larger and more recent.")
         self.hasBeenAppendedTo = True
 
     def _check_metadata(self, metadata: dict[str, Any]) -> None:
@@ -1387,11 +1364,10 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 try:
                     with RawStenciledFile(fileStencils=[fileStencil]) as file:
                         if file.read(1025) != b"\0" * 1024:
-                            if self.printDebug >= 2:
-                                print(
-                                    "[Info] Probably has been appended to because no EOF zero-byte blocks could "
-                                    f"be found at offset: {pastEndOffset}"
-                                )
+                            logger.info(
+                                "Probably has been appended to because no EOF zero-byte blocks could "
+                                "be found at offset: %s", pastEndOffset
+                            )
                             self._try_to_mark_as_appended(storedStats, tarStats)
                 finally:
                     self.tarFileObject.seek(oldOffset)
@@ -1494,7 +1470,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                         mountRecursively=False,
                         transform=self.transform,
                         recursionDepth=0,
-                        printDebug=self.printDebug,
                     )
 
                     if not realFileInfos:
@@ -1521,11 +1496,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                     if commonSize > 14:
                         storedFileInfo[14] = realFileInfo[14]  # recursion depth
                     if storedFileInfo[:commonSize] != list(realFileInfo)[:commonSize]:
-                        if self.printDebug >= 3:
-                            print("[Info] Stored file info:")
-                            print("[Info]", storedFileInfo)
-                            print("[Info] differs from recomputed one:")
-                            print("[Info]", realFileInfo)
+                        logger.debug("Stored file info: %s differs from recomputed one: %s", storedFileInfo, realFileInfo)
                         return False
 
             return True
@@ -1534,10 +1505,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             return False
         finally:
             self.tarFileObject.seek(oldOffset)
-
-            if self.printDebug >= 2:
-                t1 = time.time()
-                print(f"[Info] Verifying metadata for {rowCount} files took {t1 - t0:.3f} s")
+            logger.info("Verifying metadata for %s files took %.3f s", rowCount, time.time() - t0)
 
         return False
 

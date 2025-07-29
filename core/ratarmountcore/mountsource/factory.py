@@ -2,11 +2,11 @@
 # Disable pylint errors. See https://github.com/fsspec/filesystem_spec/issues/1678
 
 import http
+import logging
 import os
 import re
 import stat
 import sys
-import traceback
 import warnings
 from collections.abc import Iterable
 from pathlib import Path
@@ -64,6 +64,9 @@ try:
 
 except ImportError:
     FixedDropboxDriveFileSystem = None  # type: ignore
+
+
+logger = logging.getLogger(__name__)
 
 
 def _open_git_mount_source(url: str) -> Union[MountSource, IO[bytes], str]:
@@ -124,14 +127,13 @@ def _open_sshfs_mount_source(url: str) -> Union[MountSource, IO[bytes], str]:
     return fs.open(path) if fs.isfile(path) else FSSpecMountSource(fs, path)
 
 
-def try_open_url(url, printDebug: int) -> Union[MountSource, IO[bytes], str]:
+def try_open_url(url) -> Union[MountSource, IO[bytes], str]:
     splitURI = url.split('://', 1)
     protocol = splitURI[0] if len(splitURI) > 1 else ''
     if not protocol:
         raise RatarmountError(f"Expected to be called with URL containing :// but got: {url}")
 
-    if printDebug >= 3:
-        print(f"[Info] Try to open URL: {url}")
+    logger.debug("Try to open URL: %s", url)
 
     if protocol == 'file':
         return splitURI[1]
@@ -147,8 +149,7 @@ def try_open_url(url, printDebug: int) -> Union[MountSource, IO[bytes], str]:
             "An fsspec URL was detected but fsspec is not installed. Install it with: pip install ratarmount[fsspec]"
         )
 
-    if printDebug >= 3:
-        print("[Info] Try to open with fsspec")
+    logger.debug("Try to open with fsspec")
 
     if protocol == 'ftp' and sys.version_info < (3, 9):
         url_to_fs = fsspec.url_to_fs if hasattr(fsspec, 'url_to_fs') else fsspec.core.url_to_fs
@@ -184,8 +185,7 @@ def try_open_url(url, printDebug: int) -> Union[MountSource, IO[bytes], str]:
                 connection.request("HEAD", "/")
                 return bool(connection.getresponse())
             except Exception as exception:
-                if printDebug >= 3:
-                    print("[Info] Determined WebDAV URL to not use HTTP instead HTTPS because of:", exception)
+                logger.debug("Determined WebDAV URL to not use HTTP instead HTTPS because of: %s", exception)
                 return False
 
         transportProtocol = "https" if check_for_https(baseURL) else "http"
@@ -216,8 +216,7 @@ def try_open_url(url, printDebug: int) -> Union[MountSource, IO[bytes], str]:
         url_to_fs = fsspec.url_to_fs if hasattr(fsspec, 'url_to_fs') else fsspec.core.url_to_fs
         fileSystem, path = url_to_fs(url)
 
-    if printDebug >= 3:
-        print("[Info] Opened filesystem:", fileSystem)
+    logger.debug("Opened filesystem: %s", fileSystem)
 
     # Note that http:// URLs are always files. Folders are only regex-parsed HTML files!
     # By checking with isdir instead of isfile, we give isdir a higher precedence.
@@ -273,10 +272,8 @@ def find_backends_by_extension(fileName: str) -> list[str]:
 
 
 def open_mount_source(fileOrPath: Union[str, IO[bytes], os.PathLike], **options) -> MountSource:
-    printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
-
     if isinstance(fileOrPath, str) and '://' in fileOrPath:
-        openedURL = try_open_url(fileOrPath, printDebug=printDebug)
+        openedURL = try_open_url(fileOrPath)
 
         # If the URL pointed to a folder, return a MountSource, else open the returned file object as an archive.
         if isinstance(openedURL, MountSource):
@@ -330,32 +327,30 @@ def open_mount_source(fileOrPath: Union[str, IO[bytes], os.PathLike], **options)
             continue
         triedBackends.add(name)
         if name not in ARCHIVE_BACKENDS:
-            if printDebug >= 1:
-                print(f"[Info] Skipping unknown archive backend: {name}")
+            logger.warning("Skipping unknown archive backend: %s", name)
             continue
 
         try:
-            if printDebug >= 3:
-                print(f"[Info] Try to open with {name}")
+            logger.debug("Try to open with: %s", name)
             result = ARCHIVE_BACKENDS[name].open(fileOrPath, **options)
             if result:
-                if printDebug >= 2:
-                    print(f"[Info] Opened archive with {name} backend.")
+                logger.info("Opened archive with %s backend.", name)
                 return result
         except Exception as exception:
-            if printDebug >= 2:
-                print(f"[Info] Trying to open with {name} raised an exception:", exception)
-            if printDebug >= 3:
-                traceback.print_exc()
+            logger.info(
+                "Trying to open with %s raised an exception: %s",
+                name,
+                exception,
+                exc_info=logger.isEnabledFor(logging.DEBUG),
+            )
 
             try:
                 if hasattr(fileOrPath, 'seek'):
                     fileOrPath.seek(0)  # type: ignore
             except Exception as seekException:
-                if printDebug >= 1:
-                    print("[Info] seek(0) raised an exception:", seekException)
-                if printDebug >= 2:
-                    traceback.print_exc()
+                logger.warning(
+                    "seek(0) raised an exception: %s", seekException, exc_info=logger.isEnabledFor(logging.DEBUG)
+                )
 
     if joinedFileName and not isinstance(fileOrPath, (str, os.PathLike)):
         return SingleFileMountSource(joinedFileName, fileOrPath)

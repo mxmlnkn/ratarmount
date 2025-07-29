@@ -3,6 +3,7 @@
 import contextlib
 import io
 import json
+import logging
 import os
 import re
 import stat
@@ -72,6 +73,8 @@ from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
 from ratarmountcore.SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
 from ratarmountcore.utils import overrides
+
+logger = logging.getLogger(__name__)
 
 
 class IsalZlibDecompressor(Compressor):
@@ -398,7 +401,6 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         indexFolders           : Optional[list[str]]       = None,
         encoding               : str                       = tarfile.ENCODING,
         verifyModificationTime : bool                      = False,
-        printDebug             : int                       = 0,
         indexMinimumFileCount  : int                       = 1000,
         transform              : Optional[tuple[str, str]] = None,
         **options
@@ -424,7 +426,6 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         self.archiveFilePath        = fileOrPath if isinstance(fileOrPath, str) else None
         self.encoding               = encoding
         self.verifyModificationTime = verifyModificationTime
-        self.printDebug             = printDebug
         self.options                = options
         self.transformPattern       = transform
         # fmt: on
@@ -441,7 +442,6 @@ class SquashFSMountSource(SQLiteIndexMountSource):
                 indexFolders=indexFolders,
                 archiveFilePath=self.archiveFilePath,
                 encoding=self.encoding,
-                printDebug=self.printDebug,
                 indexMinimumFileCount=indexMinimumFileCount,
                 backendName='SquashFSMountSource',
             ),
@@ -515,7 +515,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         return fileInfo
 
     def _create_index(self) -> None:
-        if self.printDebug >= 1:
+        if logger.isEnabledFor(logging.WARNING):
             print(f"Creating offset dictionary for {self.archiveFilePath} ...")
         t0 = timer()
 
@@ -528,13 +528,12 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         self.index.set_file_infos(fileInfos)
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
-        if self.printDebug >= 2:
-            print("Resorting files by path ...")
+        logger.info("Resorting files by path ...")
 
         self.index.finalize()
 
         t1 = timer()
-        if self.printDebug >= 1:
+        if logger.isEnabledFor(logging.WARNING):
             print(f"Creating offset dictionary for {self.archiveFilePath} took {t1 - t0:.2f}s")
 
     def close(self) -> None:

@@ -8,12 +8,11 @@ from ratarmountcore.utils import overrides
 
 
 class SubvolumesMountSource(MountSource):
-    def __init__(self, mountSources: dict[str, MountSource], printDebug: int = 0) -> None:
+    def __init__(self, mountSources: dict[str, MountSource]) -> None:
         """
         mountSources : List of mount sources to mount as subfolders.
         """
         self.mountSources: dict[str, MountSource] = mountSources
-        self.printDebug = printDebug
 
         for name in self.mountSources:
             if not name:

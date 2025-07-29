@@ -1,8 +1,8 @@
 import builtins
+import logging
 import os
 import re
 import stat
-import traceback
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import IO, Any, Optional, Union
@@ -15,6 +15,8 @@ from ratarmountcore.mountsource.formats.folder import FolderMountSource
 from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar, SQLiteIndexedTarUserData
 from ratarmountcore.StenciledFile import JoinedFileFromFactory
 from ratarmountcore.utils import RatarmountError, determine_recursion_depth, overrides
+
+logger = logging.getLogger(__name__)
 
 
 class AutoMountLayer(MountSource):
@@ -41,7 +43,6 @@ class AutoMountLayer(MountSource):
         self.options = options
         self.maxRecursionDepth: int = determine_recursion_depth(**options)
         self.lazyMounting: bool = self.options.get('lazyMounting', False)
-        self.printDebug = int(options.get("printDebug", 0)) if isinstance(options.get("printDebug", 0), int) else 0
 
         rootFileInfo = mountSource.lookup('/')
         assert rootFileInfo
@@ -217,11 +218,10 @@ class AutoMountLayer(MountSource):
                     tarFileName=pathInsideParentMountPoint.rsplit('/', 1)[-1],
                     **options,
                 )
-        except Exception as e:
-            print("[Warning] Mounting of '" + path + "' failed because of:", e)
-            if self.printDebug >= 3:
-                traceback.print_exc()
-            print()
+        except Exception as exception:
+            logger.warning(
+                "Mounting of '%s' failed because of: %s", path, exception, exc_info=logger.isEnabledFor(logging.DEBUG)
+            )
             return None
 
         rootFileInfo = archiveFileInfo.clone()
@@ -233,9 +233,7 @@ class AutoMountLayer(MountSource):
         # TODO What if the mount point already exists, e.g., because stripRecursiveTarExtension is true and there
         #      are multiple archives with the same name but different extensions?
         self.mounted[mountPoint] = mountInfo
-        if self.printDebug >= 2:
-            print("Recursively mounted:", mountPoint)
-            print()
+        logger.info("Recursively mounted: %s", mountPoint)
 
         return mountPoint
 
@@ -400,9 +398,7 @@ class AutoMountLayer(MountSource):
 
     @overrides(MountSource)
     def statfs(self) -> dict[str, Any]:
-        return merge_statfs(
-            [mountInfo.mountSource.statfs() for _, mountInfo in self.mounted.items()], printDebug=self.printDebug
-        )
+        return merge_statfs([mountInfo.mountSource.statfs() for _, mountInfo in self.mounted.items()])
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):

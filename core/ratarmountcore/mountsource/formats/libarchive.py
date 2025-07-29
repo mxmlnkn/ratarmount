@@ -5,6 +5,7 @@ import contextlib
 import ctypes
 import io
 import json
+import logging
 import os
 import re
 import stat
@@ -32,6 +33,9 @@ try:
     import py7zr  # pylint: disable=unused-import
 except ImportError:
     py7zr = None  # type: ignore
+
+
+logger = logging.getLogger(__name__)
 
 
 class ArchiveEntry:
@@ -182,10 +186,8 @@ class IterableArchive:
         encoding='utf-8',
         passwords: Optional[Sequence[Union[str, bytes]]] = None,
         bufferSize=1024 * 1024,
-        printDebug: int = 0,
     ):
         self.encoding = encoding
-        self.printDebug = printDebug
         self.bufferSize = bufferSize
         self._file = file
         self._entryIndex = 0  # A consecutive number to identify entries even if they have the same name.
@@ -200,9 +202,8 @@ class IterableArchive:
             self._set_passwords(passwords or [])
             self._try_to_open(allowArchives=True)
         except ArchiveError as exception:
-            if self.printDebug >= 2:
-                print(f"[Info] Was not able to open {self._file} as given archive. Try to undo compressions next.")
-                print(f"[Info] Exception: {exception}")
+            logger.info("Was not able to open %s as given archive. Try to undo compressions next.", self._file)
+            logger.info("Exception: %s", exception, exc_info=logger.isEnabledFor(logging.DEBUG))
             try:
                 laffi.read_free(self._archive)
                 self._archive = laffi.read_new()
@@ -227,8 +228,7 @@ class IterableArchive:
                 laffi.get_read_format_function(formatToEnable)(self._archive)
             except ValueError as exception:
                 # Ignore exceptions from formats that are not supported such as "rar5" in manylinux2014.
-                if self.printDebug >= 3:
-                    print(f"[Warning] Failed to enable format {formatToEnable} because of: {exception}")
+                logger.debug("Failed to enable format %s because of: %s", formatToEnable, exception, exc_info=True)
 
         if isinstance(self._file, str):
             laffi.read_open_filename_w(self._archive, self._file, os.stat(self._file).st_blksize)
@@ -300,14 +300,13 @@ class IterableArchive:
             return None
 
         self._entry = ArchiveEntry(self._archive, entry_index=self._entryIndex, encoding=self.encoding)
-        if self._entryIndex == 0 and self.printDebug >= 2:
+        if self._entryIndex == 0 and logger.isEnabledFor(logging.INFO):
             format_name = laffi.format_name(self._archive)
             if isinstance(format_name, bytes):
                 format_name = format_name.decode()
             # We need to try and read the first entry before format_name returns anything other than 'none'.
-            print(
-                f"[Info] Successfully opened type '{format_name}' with libarchive. "
-                f"Using filters: {self.filter_names()}"
+            logger.info(
+                "Successfully opened type '%s' with libarchive. Using filters: %s", format_name, self.filter_names()
             )
 
         self._entryIndex += 1
@@ -350,7 +349,6 @@ class LibarchiveFile(io.RawIOBase):
         entry_index,
         fileSize,
         passwords: Optional[Sequence[str]] = None,
-        printDebug: int = 0,
         archiveCache: Optional[IterableArchiveCache] = None,
     ):
         io.RawIOBase.__init__(self)
@@ -358,7 +356,6 @@ class LibarchiveFile(io.RawIOBase):
         self.fileSize = fileSize
         self.entry_index = entry_index
         self.passwords = passwords
-        self.printDebug = printDebug
         self._archiveCache = archiveCache
         self._archive = None
         self._entry = None
@@ -374,7 +371,7 @@ class LibarchiveFile(io.RawIOBase):
 
         self._archive = self._archiveCache.take(self.entry_index)
         if self._archive is None:
-            self._archive = IterableArchive(self.file, passwords=self.passwords, printDebug=self.printDebug)
+            self._archive = IterableArchive(self.file, passwords=self.passwords)
 
         while True:
             self._entry = self._archive.next_entry()
@@ -510,7 +507,6 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
         indexFolders           : Optional[Sequence[str]]   = None,
         encoding               : str                       = tarfile.ENCODING,
         verifyModificationTime : bool                      = False,
-        printDebug             : int                       = 0,
         transform              : Optional[tuple[str, str]] = None,
         indexMinimumFileCount  : int                       = 0,
         tarFileName            : Optional[str]             = None,
@@ -520,7 +516,6 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
         self.fileOrPath             = fileOrPath
         self.encoding               = encoding
         self.verifyModificationTime = verifyModificationTime
-        self.printDebug             = printDebug
         self.options                = options
         self.transformPattern       = transform
         self.passwords              = options.get("passwords", [])
@@ -555,7 +550,6 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                 indexFolders=indexFolders,
                 archiveFilePath=self.archiveFilePath,
                 encoding=self.encoding,
-                printDebug=self.printDebug,
                 indexMinimumFileCount=indexMinimumFileCount,
                 backendName='LibarchiveMountSource',
             ),
@@ -587,7 +581,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                 self.index.reload_index_read_only()
 
     def _create_index(self) -> None:
-        if self.printDebug >= 1:
+        if logger.isEnabledFor(logging.WARNING):
             print(f"Creating offset dictionary for {self.archiveFilePath} ...")
         t0 = timer()
 
@@ -596,7 +590,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
         triedToOpen = False
         fileInfos = []
         gotAnyEntry = False
-        with IterableArchive(self.fileOrPath, passwords=self.passwords, printDebug=self.printDebug) as archive:
+        with IterableArchive(self.fileOrPath, passwords=self.passwords) as archive:
             while True:
                 entry = archive.next_entry()
                 if entry is None:
@@ -627,9 +621,9 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                         # Very special case to delegate to py7zr somewhat smartly for encrypted 7z archives.
                         if entry.format_name() == b'7-Zip' and self.passwords and "py7zr" in sys.modules:
                             raise exception
-                        if 'encrypt' in str(exception).lower() and self.printDebug >= 1:
-                            print("[Warning] The file contents are encrypted but not the file hierarchy!")
-                            print("[Warning] Specify a password with --password to also view file contents!")
+                        if 'encrypt' in str(exception).lower():
+                            logger.warning("The file contents are encrypted but not the file hierarchy!")
+                            logger.warning("Specify a password with --password to also view file contents!")
                     triedToOpen = True
 
                 if len(fileInfos) > 1000:
@@ -642,13 +636,12 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                 raise ArchiveError("Supposedly detected a TAR with no entries in it. Rejecting it as unknown format!")
 
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
-        if self.printDebug >= 2:
-            print("Resorting files by path ...")
+        logger.info("Resorting files by path ...")
 
         self.index.finalize()
 
-        t1 = timer()
-        if self.printDebug >= 1:
+        if logger.isEnabledFor(logging.WARNING):
+            t1 = timer()
             print(f"Creating offset dictionary for {self.archiveFilePath} took {t1 - t0:.2f}s")
 
     def _store_metadata(self) -> None:
@@ -673,7 +666,6 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                 tarFileInfo.offsetheader,
                 fileSize=fileInfo.size,
                 passwords=self.passwords,
-                printDebug=self.printDebug,
                 archiveCache=self._archiveCache,
             ),
         )

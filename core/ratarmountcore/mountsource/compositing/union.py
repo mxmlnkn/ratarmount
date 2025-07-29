@@ -1,4 +1,5 @@
 import builtins
+import logging
 import os
 import stat
 import time
@@ -8,12 +9,13 @@ from typing import IO, Any, Optional, Union
 from ratarmountcore.mountsource import FileInfo, MountSource, create_root_file_info, merge_statfs
 from ratarmountcore.utils import overrides
 
+logger = logging.getLogger(__name__)
+
 
 class UnionMountSource(MountSource):
     def __init__(
         self,
         mountSources: Sequence[MountSource],
-        printDebug: int = 0,
         maxCacheDepth: int = 1024,
         maxCacheEntries: int = 100000,
         maxSecondsToCache: float = 60,
@@ -34,7 +36,6 @@ class UnionMountSource(MountSource):
             thousands of files in one folder, which can take an arbitrary amount of time to cache.
         """
         self.mountSources: list[MountSource] = list(mountSources)
-        self.printDebug = printDebug
         self.folderCache: dict[str, list[MountSource]] = {"/": self.mountSources}
         self.folderCacheDepth = 0  # depth 1 means, we only cached top-level directories.
         self.rootFileInfo = create_root_file_info(userdata=[None])
@@ -45,7 +46,7 @@ class UnionMountSource(MountSource):
     def _build_folder_cache(self, maxCacheDepth: int, maxCacheEntries: int, maxSecondsToCache: float) -> None:
         t0 = time.time()
 
-        if self.printDebug >= 1:
+        if logger.isEnabledFor(logging.WARNING):
             print(f"Building cache for union mount (timeout after {maxSecondsToCache}s)...")
 
         self.folderCache = {"/": [m for m in self.mountSources if m.is_immutable()]}
@@ -90,7 +91,7 @@ class UnionMountSource(MountSource):
 
         t1 = time.time()
 
-        if self.printDebug >= 1:
+        if logger.isEnabledFor(logging.WARNING):
             print(
                 f"Cached mount sources for {len(self.folderCache)} folders up to a depth of "
                 f"{self.folderCacheDepth} in {t1 - t0:.3}s for faster union mount."
@@ -237,7 +238,7 @@ class UnionMountSource(MountSource):
 
     @overrides(MountSource)
     def statfs(self) -> dict[str, Any]:
-        return merge_statfs([mountSource.statfs() for mountSource in self.mountSources], printDebug=self.printDebug)
+        return merge_statfs([mountSource.statfs() for mountSource in self.mountSources])
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
