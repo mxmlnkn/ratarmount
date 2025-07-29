@@ -287,3 +287,7 @@ class FileVersionLayer(MountSource):
     @overrides(MountSource)
     def statfs(self) -> Dict[str, Any]:
         return self.mountSource.statfs()
+
+    def join_threads(self):
+        if hasattr(self.mountSource, 'join_threads'):
+            self.mountSource.join_threads()

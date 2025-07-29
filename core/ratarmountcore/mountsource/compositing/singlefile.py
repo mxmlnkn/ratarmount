@@ -123,3 +123,7 @@ class SingleFileMountSource(MountSource):
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
         self.fileobj.close()
+
+    def join_threads(self):
+        if hasattr(self.fileobj, 'join_threads'):
+            self.fileobj.join_threads()
