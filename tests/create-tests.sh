@@ -128,7 +128,7 @@ rar a -ol nested-with-symlink.rar foo
 7z a -snl nested-with-symlink.7z foo
 
 
-rm foo
+rm -rf foo
 tar -xf single-nested-folder.tar
 ( cd foo && ln -s fighter jet; )
 zip -r --symlinks folder-symlink.zip foo
