@@ -231,11 +231,31 @@ class FuseMount(fuse.Operations):
         self._close()
 
     def _close(self) -> None:
+        logFile = getattr(self, 'logFile', None)
+        if logFile:
+            try:
+                if sys.stdout == logFile:
+                    sys.stdout = sys.__stdout__
+                if sys.stderr == logFile:
+                    sys.stderr = sys.__stderr__
+            except Exception as exception:
+                if self.printDebug >= 1:
+                    print("[Warning] Failed to restore stdout and stderr because of:", exception)
+
+            try:
+                logFile.close()
+                self.logFile = None
+            except Exception as exception:
+                if self.printDebug >= 1:
+                    print("[Warning] Failed to close log file because of:", exception)
+
         try:
-            if self.mountPointWasCreated:
+            if getattr(self, 'mountPointWasCreated', False) and getattr(self, 'mountPoint', None):
                 os.rmdir(self.mountPoint)
-        except Exception:
-            pass
+                self.mountPoint = ""
+        except Exception as exception:
+            if self.printDebug >= 1:
+                print("[Warning] Failed to remove the created mount point directory because of:", exception)
 
         try:
             mountPointFd = getattr(self, 'mountPointFd', None)
