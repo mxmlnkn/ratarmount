@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This file is mostly for documenting how the test files were created.
 # It is not intended to be executed and likely will not work.
@@ -6,9 +6,12 @@
 
 cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" || { echo 'Failed to cd to test directory!'; exit 1; }
 
-alias tarc='tar -c --owner=user --group=group --numeric'
-# bsdtar creates much smaller TARs by default because it does not round up to 10240 B for weird reasons.
-# bsdtar -c --numeric-owner "$@"
+tarc()
+{
+    tar -c --owner=user --group=group --numeric "$@"
+    # bsdtar creates much smaller TARs by default because it does not round up to 10240 B for weird reasons.
+    # bsdtar -c --numeric-owner "$@"
+}
 
 recreateArchive()
 (
@@ -127,7 +130,7 @@ rar a -ol nested-with-symlink.rar foo
 7z a -snl nested-with-symlink.7z foo
 
 
-rm foo
+rm -rf foo
 tar -xf single-nested-folder.tar
 ( cd foo && ln -s fighter jet; )
 zip -r --symlinks folder-symlink.zip foo
@@ -135,9 +138,9 @@ zip -r --symlinks folder-symlink.zip foo
 rar a -ol folder-symlink.rar foo
 7z a -ol folder-symlink.7z foo
 
-tar -cf- foo | sqfstar -noI -noId -noD -noF -noX folder-symlink.no-compression.squashfs
+tar -cf- foo | sqfstar -force -noI -noId -noD -noF -noX folder-symlink.no-compression.squashfs
 for compression in gzip lzma lzo lz4 xz zstd; do
-    tar -cf- foo | sqfstar -comp "$compression" "folder-symlink.$compression.squashfs"
+    tar -cf- foo | sqfstar -force -comp "$compression" "folder-symlink.$compression.squashfs"
 done
 
 
@@ -373,7 +376,9 @@ lzip -k -o simple{.lzip,}  # Default extension: .lz
 lzop -k simple  # extension .lzo
 compress < simple > simple.Z
 
-wget 'https://raw.githubusercontent.com/iipc/warc-specifications/master/primers/web-archive-formats/hello-world.warc'
+if ! [ -e hello-world.warc ]; then
+    wget 'https://github.com/iipc/warc-specifications/raw/be2ac9e0af22eb0ac50fef691ece7417932fcdb3/primers/web-archive-formats/hello-world.warc'
+fi
 
 # Libarchive-supported archive formats
 # sudo apt install binutils lcab genisoimage
@@ -413,20 +418,34 @@ tar --numeric-owner --xattrs -cf file-with-attribute.gnu.tar foo
 
 # sqlar
 # Alternatively, this also works: sqlite3 folder.sqlar -Ac folder
-name='sqlar-src-4824e73896'
-wget "https://www.sqlite.org/sqlar/tarball/4824e73896/${name}.tar.gz"
-tar -xf "${name}.tar.gz"
-(
-    # sqlar checks against '..' in the path and prints an error! At least something.
-    cd -- "$name" && sed -i 's|-Werror||g' Makefile && make &&
-    tar -xf ../nested-tar.tar &&
-    ./sqlar ../nested-tar-compressed.sqlar foo/ &&
-    ./sqlar ../nested-tar-trailing-slash.sqlar foo/ &&
-    ./sqlar ../nested-tar-denormal.sqlar .///./foo/.//.// &&
-    ./sqlar -n ../nested-tar.sqlar foo/
-)
+if ! command -v sqlar 2>/dev/null; then
+    # download and build sqlar
+    name='sqlar-src-4824e73896'
+    wget "https://www.sqlite.org/sqlar/tarball/4824e73896/${name}.tar.gz"
+    tar -xf "${name}.tar.gz"
+    (
+        cd -- "$name" &&
+        sed -i 's|-Werror||g' Makefile &&
+        make
+    )
+    export PATH="$PATH:$PWD/$name"
+fi
+if command -v sqlar 2>/dev/null; then
+    # run sqlar
+    (
+        # sqlar checks against '..' in the path and prints an error! At least something.
+        cd -- "$name" &&
+        tar -xf ../nested-tar.tar &&
+        sqlar ../nested-tar-compressed.sqlar foo/ &&
+        sqlar ../nested-tar-trailing-slash.sqlar foo/ &&
+        sqlar ../nested-tar-denormal.sqlar .///./foo/.//.// &&
+        sqlar -n ../nested-tar.sqlar foo/
+    )
+fi
 
-python3 -m pip install sqlcipher3-binary
+if ! python3 -c "import sqlcipher3" 2>/dev/null; then
+    python3 -m pip install sqlcipher3-binary
+fi
 # This unfortunately does not work :(
 #cp nested-tar{,-encrypted}.sqlar
 #python3 -c '
@@ -534,15 +553,25 @@ done
 rmdir "$mountPoint"
 
 # SAR
-sudo apt-get install npm --no-install-recommends
-sudo npm install -g n
-sudo n latest  # 24.1.0
-npx @electron/asar --help
-npx @electron/asar pack non-existing empty.asar
+if ! command -v asar 2>/dev/null; then
+    if ! command -v npm 2>/dev/null; then
+        sudo apt install npm --no-install-recommends
+    fi
+    if ! command -v node 2>/dev/null; then
+        # TODO? use "sudo apt install nodejs"
+        # install node to /usr/local/bin/
+        sudo npx n latest  # 24.1.0
+    fi
+    # avoid the "Ok to proceed? (y)" dialog of npx
+    npm install @electron/asar
+    function asar() { npx @electron/asar "$@"; }
+fi
+asar --help
+asar pack non-existing empty.asar
 # For some reason asar removes the top-level folder, so we need to nest it -.-
 mkdir foodir
 mv foo foodir
-npx @electron/asar pack foodir nested-tar.asar
+asar pack foodir nested-tar.asar
 
 # Skippable frame in LZ4
 printf '\x5a\x2a\x4d\x18\x03\x00\x00\x00\x00\x00\x00' > nested-tar.skippable-frame.lz4
