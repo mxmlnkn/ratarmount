@@ -6,7 +6,10 @@ if ! [ -e single-file.tar ]; then
     exit 1
 fi
 
-alias tarc='tar -c --owner=user --group=group --numeric'
+tarc()
+{
+    tar -c --owner=user --group=group --numeric "$@"
+}
 
 recreateArchive()
 (
