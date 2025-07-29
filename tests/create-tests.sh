@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 
+if [ -e tests/single-file.tar ]; then
+    echo "changing workdir to ratarmount/tests/"
+    cd tests
+fi
+
 if ! [ -e single-file.tar ]; then
     echo "error: missing test file single-file.tar"
-    echo "you have to run this script in ratarmount/tests/"
+    echo "you have to run this script in ratarmount/"
     exit 1
 fi
 
