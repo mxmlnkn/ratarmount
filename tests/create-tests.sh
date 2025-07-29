@@ -69,7 +69,7 @@ mkdir super-nested-archive
     mkisofs -lJR -o miso.iso foo bar
 
     mkdir files
-    mv -- * files
+    ls | grep -v -x files | xargs mv -t files
 
     # Create archives of archives
     tarc -f  tar-with-archives.tar     -- files
