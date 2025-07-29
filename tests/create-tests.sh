@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+if ! [ -e single-file.tar ]; then
+    echo "error: missing test file single-file.tar"
+    echo "you have to run this script in ratarmount/tests/"
+    exit 1
+fi
+
 alias tarc='tar -c --owner=user --group=group --numeric'
 
 recreateArchive()
