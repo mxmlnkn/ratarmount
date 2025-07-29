@@ -199,8 +199,8 @@ class SQLARMountSource(MountSource):
             return magicBytes
         message = name + " is not an SQLAR file."
         if sqlcipher3 is None and passwords:
-            message += " Passwords have been ignored because sqlcipher3 is not installed."
-            message += " Please install with 'pip install sqlcipher3-binary' or 'pip install sqlcipher3-wheels'."
+            message += " Passwords have been ignored because sqlcipher3 and cryptography are not installed."
+            message += " Please install with 'pip install sqlcipher3-binary cryptography' or 'pip install sqlcipher3-wheels cryptography'."
         if sqlcipher3 is not None and not passwords:
             message += " Please specify passwords if it is an encrypted SQLAR."
         raise ValueError(message)
