@@ -136,9 +136,9 @@ zip -r --symlinks folder-symlink.zip foo
 rar a -ol folder-symlink.rar foo
 7z a -ol folder-symlink.7z foo
 
-tar -cf- foo | sqfstar -noI -noId -noD -noF -noX folder-symlink.no-compression.squashfs
+tar -cf- foo | sqfstar -force -noI -noId -noD -noF -noX folder-symlink.no-compression.squashfs
 for compression in gzip lzma lzo lz4 xz zstd; do
-    tar -cf- foo | sqfstar -comp "$compression" "folder-symlink.$compression.squashfs"
+    tar -cf- foo | sqfstar -force -comp "$compression" "folder-symlink.$compression.squashfs"
 done
 
 
