@@ -526,15 +526,10 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         for inodeOffset, info in self.image:
             fileInfos.append(self._convert_to_row(inodeOffset, info))
         self.index.set_file_infos(fileInfos)
-
-        # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
-        logger.info("Resorting files by path ...")
-
         self.index.finalize()
 
-        t1 = timer()
         if logger.isEnabledFor(logging.WARNING):
-            print(f"Creating offset dictionary for {self.archiveFilePath} took {t1 - t0:.2f}s")
+            print(f"Creating offset dictionary for {self.archiveFilePath} took {timer() - t0:.2f}s")
 
     def close(self) -> None:
         if hasattr(self, 'rawFileObject'):

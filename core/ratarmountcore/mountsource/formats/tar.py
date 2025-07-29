@@ -911,14 +911,10 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             # Call one last time to ensure that it is updated with the most recent value.
             self._update_progress_bar(progressBar, fileObject)
 
-        # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
-        logger.info("Resorting files by path ...")
-
         self.index.finalize()
 
-        t1 = timer()
         if logger.isEnabledFor(logging.WARNING):
-            print(f"Creating offset dictionary for {self.tarFileName} took {t1 - t0:.2f}s")
+            print(f"Creating offset dictionary for {self.tarFileName} took {timer() - t0:.2f}s")
 
     def _create_index_recursively(
         self, fileObject: IO[bytes], progressBar: ProgressBar, pathPrefix: str, streamOffset: int, recursionDepth: int

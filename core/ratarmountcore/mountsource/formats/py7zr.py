@@ -193,15 +193,10 @@ class Py7zrMountSource(SQLiteIndexMountSource):
 
         self.index.ensure_intermediary_tables()
         self.index.set_file_infos([self._convert_to_row(info) for info in self.fileObject.list()])
-
-        # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
-        logger.info("Resorting files by path ...")
-
         self.index.finalize()
 
-        t1 = timer()
         if logger.isEnabledFor(logging.WARNING):
-            print(f"Creating offset dictionary for {self.archiveFilePath} took {t1 - t0:.2f}s")
+            print(f"Creating offset dictionary for {self.archiveFilePath} took {timer() - t0:.2f}s")
 
     @staticmethod
     def _find_password(openFile, passwords):

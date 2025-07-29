@@ -810,6 +810,9 @@ class SQLiteIndex:
             PRAGMA optimize;
         """
 
+        # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
+        logger.info("Resorting files by path ...")
+
         self.get_connection().executescript(cleanUpDatabase)
 
     def file_count(self) -> int:

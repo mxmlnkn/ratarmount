@@ -635,14 +635,10 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
             elif not gotAnyEntry and archive.format_name() == b'tar':
                 raise ArchiveError("Supposedly detected a TAR with no entries in it. Rejecting it as unknown format!")
 
-        # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
-        logger.info("Resorting files by path ...")
-
         self.index.finalize()
 
         if logger.isEnabledFor(logging.WARNING):
-            t1 = timer()
-            print(f"Creating offset dictionary for {self.archiveFilePath} took {t1 - t0:.2f}s")
+            print(f"Creating offset dictionary for {self.archiveFilePath} took {timer() - t0:.2f}s")
 
     def _store_metadata(self) -> None:
         argumentsToSave = ['encoding', 'transformPattern']
