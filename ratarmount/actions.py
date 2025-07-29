@@ -398,6 +398,8 @@ def process_parsed_arguments(args) -> int:
         try:
             return check_input_file_type(path, printDebug=args.debug)
         except argparse.ArgumentTypeError as e:
+            if not os.path.exists(path):
+                raise e
             if (
                 os.path.isdir(path)
                 or zipfile.is_zipfile(path)
