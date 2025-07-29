@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 alias tarc='tar -c --owner=user --group=group --numeric'
 
