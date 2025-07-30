@@ -264,6 +264,7 @@ class SQLiteIndex:
         indexMinimumFileCount: int = 0,
         backendName: str = '',
         ignoreCurrentFolder: bool = False,
+        deleteInvalidIndexes: bool = True,
     ):
         """
         indexFilePath
@@ -294,7 +295,8 @@ class SQLiteIndex:
         self.indexFilePath: Optional[str] = None
         # This is true if the index file found was compressed or an URL and had to be downloaded
         # and/or extracted into a temporary folder.
-        self.indexFilePathDeleteOnClose: bool = False
+        self.indexFilePathDeleteOnClose = False
+        self.deleteInvalidIndexes = deleteInvalidIndexes
         self.encoding = encoding
         self.possibleIndexFilePaths = SQLiteIndex.get_possible_index_file_paths(
             indexFilePath,
@@ -1416,7 +1418,7 @@ class SQLiteIndex:
             print("       e.g., by opening an issue on the public github page.")
 
             try:
-                if '://' not in indexFilePath:
+                if self.deleteInvalidIndexes and '://' not in indexFilePath:
                     os.remove(indexFilePath)
             except OSError:
                 print("[Warning] Failed to remove corrupted old cached index file:", indexFilePath)
