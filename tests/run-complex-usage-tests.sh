@@ -819,7 +819,7 @@ checkWriteOverlayWithArchivedFiles()
 
     verifyCheckSum "$mountFolder" 'foo/fighter/ufo' 'tests/nested-tar.tar' 2709a3348eb2c52302a7606ecf5860bc ||
         returnError "$LINENO" 'Mismatching checksum'
-    verifyCheckSum "$mountFolder" 'foo/lighter.tar' 'tests/nested-tar.tar' 2a06cc391128d74e685a6cb7cfe9f94d ||
+    verifyCheckSum "$mountFolder" 'foo/lighter.tar' 'tests/nested-tar.tar' 4dfaddf7e55e48097d34e03936223a50 ||
         returnError "$LINENO" 'Mismatching checksum'
 
     # Checks for modifying files "in the" archive (this requires special handling to simulate modifications!)
@@ -854,7 +854,7 @@ checkWriteOverlayWithArchivedFiles()
     ## Append to archived file
 
     printf '%512s' ' ' | tr ' ' '\0' >> "$mountFolder/foo/lighter.tar"
-    verifyCheckSum "$mountFolder" 'foo/lighter.tar' 'tests/nested-tar.tar' 7a534382c5b51762f072fe0d3a916e29 ||
+    verifyCheckSum "$mountFolder" 'foo/lighter.tar' 'tests/nested-tar.tar' 142dbf2d6d51e138c859274f07011235 ||
         returnError "$LINENO" 'Mismatching checksum'
 
     # Roll back modification for further tests

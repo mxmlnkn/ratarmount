@@ -1,6 +1,8 @@
 #!/bin/bash
 
 alias tarc='tar -c --owner=user --group=group --numeric'
+# bsdtar creates much smaller TARs by default because it does not round up to 10240 B for weird reasons.
+# bsdtar -c --numeric-owner "$@"
 
 recreateArchive()
 (
@@ -404,13 +406,17 @@ bsdtar --numeric-owner --xattrs -cf file-with-attribute.bsd.tar foo
 tar --numeric-owner --xattrs -cf file-with-attribute.gnu.tar foo
 
 # sqlar
+# Alternatively, this also works: sqlite3 folder.sqlar -Ac folder
 name='sqlar-src-4824e73896'
 wget "https://www.sqlite.org/sqlar/tarball/4824e73896/${name}.tar.gz"
 tar -xf "${name}.tar.gz"
 (
+    # sqlar checks against '..' in the path and prints an error! At least something.
     cd -- "$name" && sed -i 's|-Werror||g' Makefile && make &&
     tar -xf ../nested-tar.tar &&
     ./sqlar ../nested-tar-compressed.sqlar foo/ &&
+    ./sqlar ../nested-tar-trailing-slash.sqlar foo/ &&
+    ./sqlar ../nested-tar-denormal.sqlar .///./foo/.//.// &&
     ./sqlar -n ../nested-tar.sqlar foo/
 )
 

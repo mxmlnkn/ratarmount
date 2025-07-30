@@ -128,6 +128,10 @@ pytestedTests+=(
 
     2709a3348eb2c52302a7606ecf5860bc tests/nested-tar.sqlar                       foo/fighter/ufo
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar.sqlar                       foo/lighter.tar/fighter/bar
+    2709a3348eb2c52302a7606ecf5860bc tests/nested-tar-trailing-slash.sqlar        foo/fighter/ufo
+    2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar-trailing-slash.sqlar        foo/lighter.tar/fighter/bar
+    2709a3348eb2c52302a7606ecf5860bc tests/nested-tar-denormal.sqlar              foo/fighter/ufo
+    2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar-denormal.sqlar              foo/lighter.tar/fighter/bar
     2709a3348eb2c52302a7606ecf5860bc tests/nested-tar-compressed.sqlar            foo/fighter/ufo
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar-compressed.sqlar            foo/lighter.tar/fighter/bar
 

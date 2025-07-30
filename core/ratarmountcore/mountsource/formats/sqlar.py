@@ -188,6 +188,16 @@ class SQLARMountSource(MountSource):
 
         self.options = options
 
+        # Check for denormal names and store a normalized list if necessary.
+        self._files: dict[str, int] = {}
+        if any(
+            os.path.normpath(name.lstrip('/')) != name for name, in self.connection.execute("SELECT name FROM sqlar;")
+        ):
+            self._files = {
+                os.path.normpath(name.lstrip('/')): rowid
+                for name, rowid in self.connection.execute("SELECT name,rowid FROM sqlar ORDER BY rowid;")
+            }
+
     @staticmethod
     def _quick_check_file(fileObject: IO[bytes], name: str, passwords: Optional[List[bytes]]) -> bytes:
         try:
@@ -264,8 +274,29 @@ class SQLARMountSource(MountSource):
     def is_immutable(self) -> bool:
         return True
 
+    def _list_names(self, path: str) -> Optional[Iterable[str]]:
+        if not self._files:
+            return None
+
+        path = path.lstrip('/')
+        if path and not path.endswith('/'):
+            path = path + '/'
+
+        # Use list instead of set to keep the order.
+        names = []
+        for name in self._files:
+            if not name.startswith(path):
+                continue
+            name = name[len(path) :].split('/', maxsplit=1)[0]
+            if name not in names:
+                names.append(name)
+        return names
+
     @overrides(MountSource)
     def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+        if self._files:
+            return self._list_names(path)
+
         pathGlob = "*" if path == "/" else path.strip("/") + "/*"
         return {
             name: SQLARMountSource._convert_to_file_info(rowid, mode, mtime, size, linkname)
@@ -278,6 +309,9 @@ class SQLARMountSource(MountSource):
 
     @overrides(MountSource)
     def list_mode(self, path: str) -> Optional[Union[Iterable[str], Dict[str, int]]]:
+        if self._files:
+            return self._list_names(path)
+
         pathGlob = "*" if path == "/" else path.strip("/") + "/*"
         return dict(
             self.connection.execute(
@@ -291,9 +325,21 @@ class SQLARMountSource(MountSource):
         if path == "/":
             return create_root_file_info([-1])
 
-        result = self.connection.execute(
-            f"SELECT {SQLARMountSource._SQLITE_FILEINFO_COLUMNS} FROM sqlar WHERE name=(?)", (path.strip("/"),)
-        ).fetchone()
+        if self._files:
+            path = path.lstrip('/')
+            # We assume here that all parent folders to files appear in the table.
+            if path not in self._files:
+                return None
+            rowid = self._files[path]
+
+            result = self.connection.execute(
+                f"SELECT {SQLARMountSource._SQLITE_FILEINFO_COLUMNS} FROM sqlar WHERE rowid=(?)", (rowid,)
+            ).fetchone()
+        else:
+            result = self.connection.execute(
+                f"SELECT {SQLARMountSource._SQLITE_FILEINFO_COLUMNS} FROM sqlar WHERE name=(?)", (path.strip("/"),)
+            ).fetchone()
+
         return self._convert_to_file_info(*result) if result else None
 
     @overrides(MountSource)

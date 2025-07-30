@@ -49,7 +49,10 @@ class TestSQLARMountSource:
                 assert file.read() == b'iriya\n'
 
             with mountSource.open(mountSource.lookup('/foo/lighter.tar')) as file:
-                assert hashlib.md5(file.read()).hexdigest() == "2a06cc391128d74e685a6cb7cfe9f94d"
+                if 'encrypted' in path:
+                    assert hashlib.md5(file.read()).hexdigest() == "2a06cc391128d74e685a6cb7cfe9f94d"
+                else:
+                    assert hashlib.md5(file.read()).hexdigest() == "4dfaddf7e55e48097d34e03936223a50"
 
     # TODO Does not use SQLiteIndex backend because it is already a SQLite database and it would seem redundant.
     #      Therefore 'transform' does not work.
