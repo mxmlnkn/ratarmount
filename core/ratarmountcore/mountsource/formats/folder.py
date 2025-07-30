@@ -58,7 +58,7 @@ class FolderMountSource(MountSource):
 
     def _realpath(self, path: str) -> str:
         """Path given relative to folder root. Leading '/' is acceptable"""
-        return os.path.join(self.root, path.lstrip(os.path.sep))
+        return os.path.join(self.root, *path.strip('/').split('/'))
 
     @staticmethod
     def _stats_to_file_info(stats: os.stat_result, path: str, linkname: str):

@@ -99,13 +99,24 @@ class TestUnionMountSource:
     @staticmethod
     def _check_file(mountSource, path, version, contents=None):
         fileInfo = mountSource.lookup(path, version)
-        assert fileInfo is not None
+        assert fileInfo, f"Path: {path}"
         if contents is not None:
             # The MountSource interface only allows to open files in binary mode, which returns bytes not string.
             if isinstance(contents, str):
                 contents = contents.encode()
             with mountSource.open(fileInfo) as file:
                 assert file.read() == contents
+
+    @staticmethod
+    def test_unite_one_archive(sample_tar_a):
+        union = UnionMountSource([SQLiteIndexedTar(sample_tar_a.path)])
+
+        assert union.is_immutable()
+
+        for path in sample_tar_a.folders:
+            TestUnionMountSource._check_file(union, path, 0, None)
+        for path, contents in sample_tar_a.files.items():
+            TestUnionMountSource._check_file(union, path, 0, contents)
 
     @staticmethod
     def test_unite_two_folders(sample_folder_a, sample_folder_b):
@@ -147,14 +158,17 @@ class TestUnionMountSource:
 
     @staticmethod
     def test_unite_folder_and_archive_and_update_folder(sample_tar_a, sample_folder_a):
-        union = UnionMountSource([SQLiteIndexedTar(sample_tar_a.path), FolderMountSource(sample_folder_a.path)])
+        archive = SQLiteIndexedTar(sample_tar_a.path)
+        folder = FolderMountSource(sample_folder_a.path)
+        union = UnionMountSource([archive, folder])
         for path in sample_tar_a.folders + sample_folder_a.folders:
             TestUnionMountSource._check_file(union, path, 0, None)
         for path, contents in sample_folder_a.files.items():
             TestUnionMountSource._check_file(union, path, 0, contents)
         for path, contents in sample_tar_a.files.items():
-            print("patH:", path)
             TestUnionMountSource._check_file(union, path, 0 if path not in sample_folder_a.files else 1, contents)
+
+        assert not union.is_immutable()
 
         contents = b"atarashii iriya\n"
         (sample_folder_a.path / "ufo2").write_bytes(contents)
@@ -167,3 +181,53 @@ class TestUnionMountSource:
         TestUnionMountSource._check_file(union, "/subfolder2", 0, None)
         TestUnionMountSource._check_file(union, "/subfolder2/world", 0, contents)
         TestUnionMountSource._check_file(union, "/subfolder3/world", 0, contents)
+
+        for path in ["/", ""]:
+            fileInfo = union.lookup(path)
+            assert fileInfo, f"Path: {path}"
+            assert union.get_mount_source(fileInfo) == ("/", union, fileInfo)
+
+        # Test versions
+
+        assert union.versions("/") == 2
+        assert union.versions("") == 2
+        assert union.versions("/NON_EXISTING") == 0
+        assert union.versions("subfolder") == 2
+        assert union.versions("/subfolder") == 2
+        assert union.versions("ufo") == 2
+        assert union.versions("/ufo") == 2
+        assert union.versions("ufo2") == 1
+        assert union.versions("/ufo2") == 1
+
+        # Test list
+
+        rootFiles = ["README.md", "subfolder", "subfolder2", "subfolder3", "ufo", "ufo2"]
+        assert sorted(union.list("/").keys()) == rootFiles
+        assert sorted(union.list("").keys()) == rootFiles
+        assert sorted(union.list("/subfolder").keys()) == ["world"]
+        assert sorted(union.list("/subfolder2").keys()) == ["world"]
+        assert sorted(union.list("/subfolder3").keys()) == ["world"]
+
+        # Test files in folder, which has higher precedence than the archive.
+        for path in ["/ufo", "/ufo2", "ufo2", "/subfolder2", "subfolder2", "/subfolder2/world"]:
+            fileInfo = union.lookup(path)
+            assert fileInfo, f"Path: {path}"
+            result = union.get_mount_source(fileInfo)
+            fileInfo.userdata.pop()
+            assert result == ("/", folder, fileInfo)
+
+        # Test files exclusively in archive.
+        for path in ["/README.md", "README.md"]:
+            fileInfo = union.lookup(path)
+            assert fileInfo, f"Path: {path}"
+            result = union.get_mount_source(fileInfo)
+            fileInfo.userdata.pop()
+            assert result == ("/", archive, fileInfo)
+
+        # Test files that exist in both.
+        for path in ["/ufo", "ufo", "subfolder/world", "/subfolder/world"]:
+            fileInfo = union.lookup(path, fileVersion=1)
+            assert fileInfo, f"Path: {path}"
+            result = union.get_mount_source(fileInfo)
+            fileInfo.userdata.pop()
+            assert result == ("/", archive, fileInfo)

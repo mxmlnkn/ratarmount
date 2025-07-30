@@ -29,7 +29,7 @@ class SubvolumesMountSource(MountSource):
 
     @overrides(MountSource)
     def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
-        if path == '/':
+        if not path.strip('/'):
             return self.rootFileInfo.clone()
 
         if '/' not in path.lstrip('/'):
@@ -49,7 +49,7 @@ class SubvolumesMountSource(MountSource):
 
     @overrides(MountSource)
     def versions(self, path: str) -> int:
-        if path == '/':
+        if not path.strip('/'):
             return 1
 
         result = self._find_mount_source(path)
@@ -60,7 +60,7 @@ class SubvolumesMountSource(MountSource):
         return self.mountSources[subvolume].versions(subpath)
 
     def _list(self, path: str, onlyMode: bool):
-        if path == '/':
+        if not path.strip('/'):
             return dict.fromkeys(self.mountSources.keys(), self.rootFileInfo.mode if onlyMode else self.rootFileInfo)
 
         result = self._find_mount_source(path)

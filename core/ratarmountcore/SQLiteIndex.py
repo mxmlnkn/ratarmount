@@ -866,6 +866,7 @@ class SQLiteIndex:
     @staticmethod
     def _query_normpath(path: str):
         # os.path.normpath also collapses /../ into / and, because we prepend /, ../ gets collapsed to /.
+        # Note that normpath does not collapse leading double slash, but all other number of leading slashes!
         # This effect is good to have for inserting rows but not for querying rows.
         return '/' + os.path.normpath(path if path.startswith('../') else '/' + path).lstrip('/')
 
@@ -979,10 +980,11 @@ class SQLiteIndex:
         path : full path to file where '/' denotes TAR's root, e.g., '/', or '/foo'
         """
 
+        path = self._query_normpath(path)
         if path == '/':
             return {'/': create_root_file_info(userdata=[SQLiteIndexedTarUserData(0, 0, False, False, True, 0)])}
 
-        path, name = self._query_normpath(path).rsplit('/', 1)
+        path, name = path.rsplit('/', 1)
         rows = self.get_connection().execute(
             'SELECT * FROM "files" WHERE "path" == (?) AND "name" == (?) ORDER BY "offsetheader" ASC', (path, name)
         )
@@ -1001,10 +1003,11 @@ class SQLiteIndex:
         if not isinstance(fileVersion, int):
             raise RatarmountError("The specified file version must be an integer!")
 
+        path = self._query_normpath(path)
         if path == '/':
             return create_root_file_info(userdata=[SQLiteIndexedTarUserData(0, 0, False, False, True, 0)])
 
-        path, name = self._query_normpath(path).rsplit('/', 1)
+        path, name = path.rsplit('/', 1)
         row = (
             self.get_connection()
             .execute(

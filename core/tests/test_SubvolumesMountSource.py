@@ -4,10 +4,11 @@
 import dataclasses
 import io
 import os
+import stat
 import sys
 import tarfile
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import pytest
 
@@ -16,6 +17,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from ratarmountcore.mountsource.compositing.subvolumes import SubvolumesMountSource  # noqa: E402
 from ratarmountcore.mountsource.formats.folder import FolderMountSource  # noqa: E402
 from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar  # noqa: E402
+from ratarmountcore.mountsource.MountSource import MountSource  # noqa: E402
 
 
 @dataclasses.dataclass
@@ -98,10 +100,16 @@ def fixture_sample_tar_b(tmp_path):
 
 class TestSubvolumesMountSource:
     @staticmethod
-    def _check_file(mountSource, path, version, contents=None):
+    def _check_file(mountSource: MountSource, path: str, version: int, contents: Optional[bytes] = None):
         fileInfo = mountSource.lookup(path, version)
-        assert fileInfo is not None
-        if contents is not None:
+        assert fileInfo, f"Path: {path}"
+
+        if contents is None:
+            assert stat.S_ISDIR(fileInfo.mode)
+        else:
+            assert not stat.S_ISDIR(fileInfo.mode)
+            assert stat.S_ISREG(fileInfo.mode)
+
             # The MountSource interface only allows to open files in binary mode, which returns bytes not string.
             if isinstance(contents, str):
                 contents = contents.encode()
@@ -113,6 +121,8 @@ class TestSubvolumesMountSource:
         union = SubvolumesMountSource(
             {"folderA": FolderMountSource(sample_folder_a.path), "folderB": FolderMountSource(sample_folder_b.path)}
         )
+
+        assert union.lookup("folderC") is None
 
         # Check folders
         for path in sample_folder_a.folders:
@@ -130,9 +140,9 @@ class TestSubvolumesMountSource:
 
     @staticmethod
     def test_unite_two_folders_and_update_one(sample_folder_a, sample_folder_b):
-        union = SubvolumesMountSource(
-            {"folderA": FolderMountSource(sample_folder_a.path), "folderB": FolderMountSource(sample_folder_b.path)}
-        )
+        folderA = FolderMountSource(sample_folder_a.path)
+        folderB = FolderMountSource(sample_folder_b.path)
+        union = SubvolumesMountSource({"folderA": folderA, "folderB": folderB})
 
         contents = b"atarashii iriya\n"
         (sample_folder_a.path / "ufo2").write_bytes(contents)
@@ -147,6 +157,37 @@ class TestSubvolumesMountSource:
         TestSubvolumesMountSource._check_file(union, "folderA/subfolder2/world", 0, contents)
         TestSubvolumesMountSource._check_file(union, "folderA/subfolder3/world", 0, contents)
         TestSubvolumesMountSource._check_file(union, "folderA/second-world", 0, contents)
+
+        # Test versions
+
+        assert union.versions("/") == 1
+        assert union.versions("") == 1
+        assert union.versions("/NON_EXISTING") == 0
+        assert union.versions("folderA/ufo") == 1
+        assert union.versions("folderA/ufo2") == 1
+        assert union.versions("folderB/ufo") == 1
+
+        # Test list
+
+        assert sorted(union.list("/").keys()) == ["folderA", "folderB"]
+        assert sorted(union.list("").keys()) == ["folderA", "folderB"]
+        assert sorted(union.list("/folderB").keys()) == ["subfolder", "ufo"]
+        assert sorted(union.list("/folderB/subfolder").keys()) == []
+        assert sorted(union.list("/folderA").keys()) == [
+            "second-world",
+            "subfolder",
+            "subfolder2",
+            "subfolder3",
+            "ufo",
+            "ufo2",
+        ]
+
+        # Test get_mount_source
+
+        for folder in ["/", ""]:
+            fileInfo = union.lookup(folder)
+            assert fileInfo, f"Folder: {folder}"
+            assert union.get_mount_source(fileInfo) == ("/", union, fileInfo)
 
     @staticmethod
     def test_unite_two_archives(sample_tar_a, sample_tar_b):
