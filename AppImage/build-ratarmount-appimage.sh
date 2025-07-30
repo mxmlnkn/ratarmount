@@ -314,14 +314,91 @@ function trimAppImage()
     #     grep -v -E "lib(c|m|pthread|stdc[+][+]|gcc_s|z|dl)[.]so"' {} \;
     #find "$APP_DIR/usr/lib/" -name 'libicu*.so*' -delete
 
-    find "$APP_DIR" -type d -empty -print0 | xargs -0 -I{} rmdir -- {}
-    find "$APP_DIR" -type d -empty -print0 | xargs -0 -I{} rmdir -- {}
-    find "$APP_DIR" -name '__pycache__' -print0 | xargs -0 rm -r
-
     if [ "$APPIMAGE_VARIANT" == 'slim' ]; then
+        find "$APP_DIR" -name '__pycache__' -print0 | xargs -0 rm -r
+
         find "$APP_PYTHON_LIB/site-packages/" -name '*.so' -size +128k -print0 | xargs -0 strip --strip-debug
         find "${APP_DIR}/" -name '*.so' -size +128k -print0 | xargs -0 strip --strip-debug
+    else
+        # Add compiled bytecode for faster speedup. https://docs.python.org/3/glossary.html#term-bytecode states:
+        # > This “intermediate language” is said to run on a virtual machine that executes the machine code
+        # > corresponding to each bytecode. Do note that bytecodes are not expected to work between different
+        # > Python virtual machines, nor to be stable between Python releases.
+        # Ergo, as long as we create the bytecode with the bundled Python interpreter, then it seems fine to me.
+        # And even if not, I would assume mismatching bytecode to be ignored as it often is accidentally bundled
+        # or simply left over after an update.
+        # Some solutions such as PyInstaller seem to always bundle the bytecode and even offer to remove the original
+        # source code: https://pyinstaller.org/en/stable/operating-mode.html#hiding-the-source-code
+        #
+        # Benchmarks with ratarmount 1.1.1:
+        #
+        # Repack it to show that the repacking itself is not the cause of the speedup.
+        #   ./ratarmount-1.1.1-slim-x86_64.AppImage --appimage-extract
+        #   ARCH=x86_64 appimagetool --comp zstd --mksquashfs-opt -Xcompression-level \
+        #       --mksquashfs-opt 22 --mksquashfs-opt -b --mksquashfs-opt 256K --no-appstream \
+        #       squashfs-root ratarmount-repacked.AppImage
+        #   time ./ratarmount-repacked.AppImage                       # 1.056s 0.969s 0.953s 1.020s 1.008s
+        #   stat -c %s ./ratarmount-repacked.AppImage                 # 13048312
+        #
+        # With bytecode:
+        #   squashfs-root/usr/bin/python3 -I -m compileall squashfs-root/opt/python3*/lib/
+        #   appimagetool ...
+        #   time ./ratarmount-compiled.AppImage                       # 0.365s 0.401s 0.392s 0.342s 0.431s
+        #   stat -c %s ./ratarmount-compiled.AppImage                 # 17615352
+        #  -> 2-3x faster, +35 % size (13.0 -> 17.6) MB
+        #
+        # Repeat with full version and actual mounting, i.e., expensive fsspec is imported.
+        #   time ./ratarmount-full-repacked.AppImage mounted mounted  # 3.273s 3.222s 3.255s 3.392s 3.258s
+        #   stat -c %s ./ratarmount-full-repacked.AppImage            # 63678968
+        # With bytecode:
+        #   time ./ratarmount-full-compiled.AppImage mounted mounted  # 1.361s 1.107s 1.237s 1.102s 1.314s
+        #   stat -c %s ./ratarmount-full-compiled.AppImage            # 76659192
+        #  -> 2-3x faster, + 20.3% size (63.7 -> 76.7) MB
+        #
+        # Tradeoffs when compiling only a subset of .py files with:
+        # find squashfs-root/ -iname '*.py' -size +128k -print0 | xargs -0 squashfs-root/usr/bin/python -I -m py_compile
+        # full version:
+        #   Cutoff  Image Size  Startup Times
+        #   0       76659192    0.570s 0.605s 0.623s 0.567s 0.554s
+        #   16K     72911352    0.838s 0.833s 0.774s 0.755s 0.705s
+        #   64K     67549688    1.035s 1.082s 1.048s 1.030s 1.018s
+        #   128K    65522168    1.202s 1.206s 1.167s 1.214s 1.187s
+        #   inf     63678968    1.398s 1.436s 1.447s 1.378s 1.373s
+        # slim version:
+        #   Cutoff  Image Size  Startup Times
+        #   0       17611256    0.422s 0.390s 0.420s 0.381s 0.343s
+        #   16K     16497144    0.541s 0.518s 0.504s 0.568s 0.543s
+        #   64K     14502392    0.702s 0.713s 0.787s 0.746s 0.754s
+        #   128K    13482488    0.892s 0.903s 0.889s 0.889s 0.894s
+        #   inf     13048312    1.022s 1.021s 1.052s 1.020s 1.011s
+        #  -> Note that slim only has 2 files larger than 128 KiB: _pydecimal.py and typing_extensions.py
+        #
+        # du -b $( find "$APP_PYTHON_LIB" -iname '*.py' ) | sort -nr | head -20
+        #   227283  "$APP_PYTHON_LIB"/_pydecimal.py
+        #   157408  "$APP_PYTHON_LIB"/site-packages/typing_extensions.py
+        #   127125  "$APP_PYTHON_LIB"/inspect.py
+        #   118836  "$APP_PYTHON_LIB"/typing.py
+        #   112444  "$APP_PYTHON_LIB"/tarfile.py
+        #   111120  "$APP_PYTHON_LIB"/email/_header_value_parser.py
+        #   109175  "$APP_PYTHON_LIB"/site-packages/Cryptodome/SelfTest/PublicKey/test_import_ECC.py -> unused?
+        #   106749  "$APP_PYTHON_LIB"/doctest.py                                                     -> unused?
+        #   105004  "$APP_PYTHON_LIB"/site-packages/rarfile.py
+        #   103515  "$APP_PYTHON_LIB"/urllib/request.py
+        #   101155  "$APP_PYTHON_LIB"/argparse.py
+        #   96395   "$APP_PYTHON_LIB"/site-packages/Cryptodome/Util/number.py
+        #   93593   "$APP_PYTHON_LIB"/_pyio.py
+        #   92087   "$APP_PYTHON_LIB"/_pydatetime.py
+        #   88895   "$APP_PYTHON_LIB"/site-packages/psutil/tests/test_linux.py                       -> unused?
+        #   88747   "$APP_PYTHON_LIB"/subprocess.py
+        #   88339   "$APP_PYTHON_LIB"/zipfile/__init__.py
+        #   86668   "$APP_PYTHON_LIB"/site-packages/psutil/__init__.py                               -> unused?
+        #   86028   "$APP_PYTHON_LIB"/site-packages/psutil/_pslinux.py
+        #   83437   "$APP_PYTHON_LIB"/logging/__init__.py
+        "$APP_PYTHON_BIN" -s -m compileall "$APP_PYTHON_LIB"
     fi
+
+    find "$APP_DIR" -type d -empty -print0 | xargs -0 -I{} rmdir -- {}
+    find "$APP_DIR" -type d -empty -print0 | xargs -0 -I{} rmdir -p -- {}
 }
 
 

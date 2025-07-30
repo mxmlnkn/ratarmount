@@ -4,7 +4,7 @@ The AppImages can be downloaded, made executable with `chmod u+x *.AppImage`, an
 
 There are also usability helper for AppImages such as [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher) and [AM](https://github.com/ivan-hc/AM).
 
-If the AppImage is too slow to start up or to reduce memory overhead for the AppImage itself, the Appimage can also be manually unpacked and installed:
+If the AppImage is too slow to start up or to reduce memory overhead for the AppImage itself, the AppImage can also be manually unpacked and installed:
 
  - Extract with `ratarmount-*.AppImage --appimage-extract`
  - The extracted AppImage can be started by executing `squashfs-root/AppRun`.
@@ -20,7 +20,9 @@ Supports: 7z, ASAR, bzip2, EXT4, FAT, gzip, RAR, SQLAR, TAR, XZ, ZIP, zlib, ZSta
 
 Supports:
 
- - all slim formats
- - libarchive (ar, CAB, cpio, grzip, ISO9660, lrzip, LZ4, lzip, LZMA, lzop, RPM, UU, WARC, XAR, Z), SquashFS
- - all remote protocols (ftp://, git://, http://, ssh://, ...)
+ - All slim formats
+ - libarchive backend: ar, CAB, cpio, grzip, ISO9660, lrzip, LZ4, lzip, LZMA, lzop, RPM, UU, WARC, XAR, Z
+ - SquashFS
+ - All remote protocols: ftp://, git://, http://, ssh://, ...
+ - Ships with compiled Python bytecode to speed up startup latency by [2-3x](https://github.com/niess/python-appimage/issues/91#issuecomment-3136560614) at the cost of 20% larger AppImage size.
 
