@@ -5,7 +5,7 @@ cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." || { echo 'Failed to cd to git ro
 source tests/common.sh
 
 
-shellcheck -x tests/run*.sh || returnError "$LINENO" 'shellcheck failed!'
+shellcheck -x tests/run*.sh AppImage/ratarmount-metadata/*.sh || returnError "$LINENO" 'shellcheck failed!'
 
 yamlFiles=()
 while read -r file; do yamlFiles+=( "$file" ); done < <( git ls-tree -r --name-only HEAD | 'grep' '[.]yml$' )
