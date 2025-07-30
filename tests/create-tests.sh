@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# This file is mostly for documenting how the test files were created.
+# It is not intended to be executed and likely will not work.
+# All test files have been committed into the repository.
+
+cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" || { echo 'Failed to cd to test directory!'; exit 1; }
+
 alias tarc='tar -c --owner=user --group=group --numeric'
 # bsdtar creates much smaller TARs by default because it does not round up to 10240 B for weird reasons.
 # bsdtar -c --numeric-owner "$@"
@@ -62,7 +68,7 @@ mkdir super-nested-archive
     mkisofs -lJR -o miso.iso foo bar
 
     mkdir files
-    mv -- * files
+    find . -mindepth 1 -maxdepth 1 -not -name folder -print0 | xargs -0 mv -t files --
 
     # Create archives of archives
     tarc -f  tar-with-archives.tar     -- files
