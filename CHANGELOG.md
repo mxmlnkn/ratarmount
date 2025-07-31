@@ -1,3 +1,10 @@
+# Version 1.1.2 built on 2025-08-01
+
+ - Fix wrong `sys.executable` in AppImage and make AppRun POSIX-compliant to not require bash on the host.
+ - Improve handling of non-existing input files in argument check.
+ - Properly clean up log file on exit.
+ - Standard error output redirection with `--log-file` did not work.
+
 
 # Version 1.1.1 built on 2025-07-23
 
@@ -7,6 +14,7 @@
  - Do not filter chained fsspec protocols as unknown protocol.
  - Return the correct number of blocks for files. This fixes results from `du`.
  - Improve automatic mount point inference.
+
 
 # Version 1.1.0 built on 2025-06-21
 

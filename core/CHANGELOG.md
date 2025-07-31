@@ -1,4 +1,16 @@
 
+# Version 0.9.2 built on 2025-08-01
+
+ - Querying compositing mount sources with empty string instead of `/` did not work correctly.
+ - `SQLARMountSource`: Files with denormal paths did show empty mount points.
+ - `SQLARMountSource`: Also mention cryptography module if missing.
+ - `SQLiteIndexMountSource`: Do not delete SQLite files that are not ratarmount indexes.
+ - Add join_threads to `SingleFileMountSource` and `FileVersionLayer` to avoid hangs when this call is not forwarded.
+ - `SubvolumesMountSource`: `__exit__` did not correctly delegate to held mount sources.
+ - `SubvolumesMountSource`: Normalize path returned by `get_mount_source`.
+ - `SubvolumesMountSource`: Return subvolume root for direct folder access.
+
+
 # Version 0.9.1 built on 2025-07-23
 
 ## Fixes
