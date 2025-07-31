@@ -121,7 +121,7 @@ class SubvolumesMountSource(MountSource):
 
     @overrides(MountSource)
     def is_immutable(self) -> bool:
-        return all(m.is_immutable() for m in self.mountSources.values())
+        return False  # Because we support mount and unmount!
 
     @overrides(MountSource)
     def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:

@@ -9,6 +9,7 @@ import sys
 import tempfile
 import time
 import traceback
+from pathlib import Path
 from typing import IO, Any, Callable, Optional, Union, cast
 
 from ratarmountcore.mountsource import FileInfo, MountSource
@@ -22,8 +23,11 @@ from ratarmountcore.mountsource.compositing.union import UnionMountSource
 from ratarmountcore.mountsource.compositing.versioning import FileVersionLayer
 from ratarmountcore.mountsource.factory import open_mount_source
 from ratarmountcore.mountsource.formats.folder import FolderMountSource
-from ratarmountcore.utils import ceil_div, determine_recursion_depth, overrides
+from ratarmountcore.utils import ceil_div, determine_recursion_depth, overrides, remove_duplicates_stable
 
+from ratarmount import CLIHelpers
+
+from .cli import create_parser
 from .fuse import fuse
 from .WriteOverlay import WritableFolderMountSource
 
@@ -111,7 +115,7 @@ class FuseMount(fuse.Operations):
     use_ns = True
 
     def __init__(self, pathToMount: Union[str, list[str]], mountPoint: str, **options) -> None:
-        self.mountPoint = os.path.realpath(mountPoint)
+        self.mountPoint = os.path.realpath(mountPoint)  # Strip trailing slashes and normalizes.
         self.mountPointFd: Optional[int] = None
         self.mountPointWasCreated = False
         self.selfBindMount: Optional[FolderMountSource] = None
@@ -130,6 +134,7 @@ class FuseMount(fuse.Operations):
         self._controlLayerPrefix = "/.ratarmount-control/"
         # Ratarmount subprocesses started via /.ratarmount-control/command. Will be terminated on close.
         self._subprocesses: list[subprocess.Popen] = []
+        self._subvolumes: Optional[SubvolumesMountSource] = None
 
         # Only open the log file at the end shortly before it is needed to not end up with an empty file on error.
         # Read it from 'options' as soon as possible to not forward it as a MountSource options.
@@ -153,11 +158,10 @@ class FuseMount(fuse.Operations):
         if hadPathsToMount and not pathToMount:
             raise ValueError("No paths to mount left over after filtering!")
 
-        options['writeIndex'] = True
-
-        # Explicitly enable recursion if it was specified implictily via recursionDepth.
+        # Explicitly enable recursion if it was specified implicitly via recursionDepth.
         if 'recursive' not in options and determine_recursion_depth(**options) > 0:
             options['recursive'] = True
+        options['writeIndex'] = True
 
         # Add write overlay as folder mount source to read from with highest priority.
         if 'writeOverlay' in options and isinstance(options['writeOverlay'], str) and options['writeOverlay']:
@@ -188,42 +192,7 @@ class FuseMount(fuse.Operations):
             # Here we need to ensure that indexes are not tried to being read from or written to our own
             # FUSE mount point.
             if options.get('lazyMounting', False):
-
-                def points_into_mount_point(pathToTest):
-                    return os.path.commonpath([pathToTest, self.mountPoint]) == self.mountPoint
-
-                hasIndexPath = False
-
-                if 'indexFilePath' in options and isinstance(options['indexFilePath'], str):
-                    indexFilePath = options['indexFilePath']
-                    # Strip a single file://, not any more because URL chaining is supported by fsspec.
-                    if options['indexFilePath'].count('://') == 1:
-                        fileURLPrefix = 'file://'
-                        indexFilePath = indexFilePath.removeprefix(fileURLPrefix)
-                    if '://' not in indexFilePath:
-                        indexFilePath = os.path.realpath(options['indexFilePath'])
-
-                    if points_into_mount_point(indexFilePath):
-                        del options['indexFilePath']
-                    else:
-                        options['indexFilePath'] = indexFilePath
-                        hasIndexPath = True
-
-                if 'indexFolders' in options and isinstance(options['indexFolders'], list):
-                    indexFolders = options['indexFolders']
-                    newIndexFolders = []
-                    for folder in indexFolders:
-                        if points_into_mount_point(folder):
-                            continue
-                        newIndexFolders.append(os.path.realpath(folder))
-                    options['indexFolders'] = newIndexFolders
-                    if newIndexFolders:
-                        hasIndexPath = True
-
-                # Force in-memory indexes if no folder remains because the default for no indexFilePath being
-                # specified would be in a file in the same folder as the archive.
-                if not hasIndexPath:
-                    options['indexFilePath'] = ':memory:'
+                self._filter_index_locations_in_fuse_mount(options)
 
         # Open log file.
         openLog: Optional[Callable[[int], IO[bytes]]] = None
@@ -254,29 +223,21 @@ class FuseMount(fuse.Operations):
             if openLog:
                 controlFiles.append(SingleFileMountSource('output', openLog))
 
+            # If there are no inputs, add empty SubvolumesMountSource so that we can dynamically mount stuff!
+            if not mountSources:
+                self._subvolumes = SubvolumesMountSource({})
+                mountSources.append(('/', self._subvolumes))
             controlLayer = RemovePrefixMountSource(self._controlLayerPrefix, UnionMountSource(controlFiles))
             mountSources.append(('/', controlLayer))
-
-        def create_multi_mount() -> MountSource:
-            if not options.get('disableUnionMount', False):
-                return UnionMountSource([x[1] for x in mountSources], **options)
-
-            # Create unique keys.
-            submountSources: dict[str, MountSource] = {}
-            suffix = 1
-            for key, mountSource in mountSources:
-                if key in submountSources:
-                    while f"{key}.{suffix}" in submountSources:
-                        suffix += 1
-                    submountSources[f"{key}.{suffix}"] = mountSource
-                else:
-                    submountSources[key] = mountSource
-            return SubvolumesMountSource(submountSources)
 
         if not mountSources:
             raise ValueError("Mount point is empty! Either specify some input files or enable the control interface!")
 
-        self.mountSource: MountSource = mountSources[0][1] if len(mountSources) == 1 else create_multi_mount()
+        self.mountSource: MountSource = (
+            mountSources[0][1] if len(mountSources) == 1 else self._create_multi_mount(mountSources, options)
+        )
+        if isinstance(self.mountSource, SubvolumesMountSource):
+            self._subvolumes = self.mountSource
 
         if determine_recursion_depth(**options) > 0:
             self.mountSource = AutoMountLayer(self.mountSource, **options)
@@ -433,8 +394,211 @@ class FuseMount(fuse.Operations):
     def __del__(self) -> None:
         self._close()
 
+    def _path_provided_by_us(self, path: str) -> Optional[str]:
+        normpath = os.path.normpath(path)
+        if normpath == self.mountPoint:
+            return ""
+        for separator in ['/', os.path.sep]:
+            subpath = normpath.removeprefix(self.mountPoint + separator)
+            if subpath != normpath:
+                return subpath
+        return None
+
+    def _filter_index_locations_in_fuse_mount(self, options: dict) -> None:
+        hasIndexPath = False
+
+        if 'indexFilePath' in options and isinstance(options['indexFilePath'], str):
+            indexFilePath = options['indexFilePath']
+            # Strip a single file://, not any more because URL chaining is supported by fsspec.
+            if options['indexFilePath'].count('://') == 1:
+                fileURLPrefix = 'file://'
+                indexFilePath = indexFilePath.removeprefix(fileURLPrefix)
+            if '://' not in indexFilePath:
+                indexFilePath = os.path.realpath(options['indexFilePath'])
+
+            if self._path_provided_by_us(indexFilePath) is not None:
+                del options['indexFilePath']
+            else:
+                options['indexFilePath'] = indexFilePath
+                hasIndexPath = True
+
+        if 'indexFolders' in options and isinstance(options['indexFolders'], list):
+            indexFolders = options['indexFolders']
+            newIndexFolders = []
+            for folder in indexFolders:
+                if self._path_provided_by_us(folder) is not None:
+                    continue
+                newIndexFolders.append(os.path.realpath(folder))
+            options['indexFolders'] = newIndexFolders
+            if newIndexFolders:
+                hasIndexPath = True
+
+        # Force in-memory indexes if no folder remains because the default for no indexFilePath being
+        # specified would be in a file in the same folder as the archive.
+        if not hasIndexPath:
+            options['indexFilePath'] = ':memory:'
+
+    @staticmethod
+    def _create_multi_mount(mountSources: list[tuple[str, MountSource]], options: dict) -> MountSource:
+        if not options.get('disableUnionMount', False):
+            return UnionMountSource([x[1] for x in mountSources], **options)
+
+        # Create unique keys.
+        submountSources: dict[str, MountSource] = {}
+        suffix = 1
+        for key, mountSource in mountSources:
+            if key in submountSources:
+                while f"{key}.{suffix}" in submountSources:
+                    suffix += 1
+                submountSources[f"{key}.{suffix}"] = mountSource
+            else:
+                submountSources[key] = mountSource
+        return SubvolumesMountSource(submountSources)
+
+    def mount(self, args) -> None:
+        if not self._subvolumes:
+            raise RuntimeError("Can only dynamically add mounts when using subvolumes!")
+        if not args.mount_point:
+            raise ValueError("Mount point must be explicitly specified!")
+        if not args.mount_source:
+            raise ValueError("At least one input must be specified!")
+        # Optimization to avoid costly MountSource creations and resource issues when it cannot be mounted anyway.
+        if not self._subvolumes.is_mountable(args.mount_point):
+            raise ValueError("Invalid relative mount point! It must not already exist.")
+        if any(self._path_provided_by_us(path) is not None for path in args.mount_source):
+            # TODO In the future it might be possible to mount files "recursively" from our own mount point.
+            #      See the iteration over args.mount_source below and open the file as implemented for
+            #      args.password_file. But, then what do you do if the source gets dismounted?! It would be cursed.
+            raise ValueError("All inputs must be outside the current mount source!")
+
+        CLIHelpers.process_trivial_parsed_arguments(args)
+
+        # Read passwords from file in our mount source or from the real file system.
+        if args.password_file:
+            subpath = self._path_provided_by_us(args.password_file)
+            if subpath is None:
+                args.passwords.extend(Path(args.password_file).read_bytes().split(b'\n'))
+            else:
+                fileInfo = self._lookup('/' + subpath.lstrip('/'))
+                with self.mountSource.open(fileInfo, buffering=0) as file:
+                    args.passwords.extend(file.read().split(b'\n'))
+        args.passwords = remove_duplicates_stable(args.passwords)
+
+        # These parts are essentially lifted and simplified from FuseMount.__init__, but we mount the resulting
+        # mount source into the existing SubvolumesMountSource insteda.
+
+        options = CLIHelpers.parsed_args_to_options(args)
+        options.pop('pathToMount', None)
+        options.pop('mountPoint', None)
+        self._filter_index_locations_in_fuse_mount(options)
+
+        # We have checked at the start of this method that none of args.mount_source points into our FUSE mount!
+        mountSources: list[tuple[str, MountSource]] = [
+            (os.path.basename(path), open_mount_source(path, **options)) for path in args.mount_source
+        ]
+        mountSource: MountSource = (
+            mountSources[0][1] if len(mountSources) == 1 else self._create_multi_mount(mountSources, options)
+        )
+        if determine_recursion_depth(**options) > 0:
+            mountSource = AutoMountLayer(mountSource, **options)
+        # One outermost FileVersionLayer is sufficient.
+        if options.get('enableFileVersions', True) and not isinstance(self.mountSource, FileVersionLayer):
+            mountSource = FileVersionLayer(mountSource)
+
+        self._subvolumes.mount(args.mount_point, mountSource)
+
+    def unmount(self, path: str) -> bool:
+        if not self._subvolumes:
+            return False
+        return bool(self._subvolumes.unmount(path))
+
+    def _process_parsed_arguments(self, args) -> Optional[list[str]]:
+        """
+        Similarly to cli.process_parsed_arguments, this function does some checks and post-processing on
+        args.mount_source especially.
+
+        Raises SystemExit (via sys.exit) when arguments have been fully processed.
+        May return a new list of arguments, e.g., in case of --unmount being a mix of absolute and relative paths.
+        """
+
+        # We need to parse the arguments to test for:
+        #  - relative input paths: forbidden because we do not know from which directory "command" was written to
+        #  - relative mount paths: should be mounted as a subvolume if possible
+        #  - absolute mount paths pointing into our own process: should be mounted as a subvolume if possible
+        #  - absolute input paths pointing into our own process: should simply work thanks to subprocessing
+
+        if args.unmount:
+            # args.mount_source suffices because it eats all arguments and args.mount_point is always empty by default.
+            mountPoints = [mountPoint for mountPoint in args.mount_source if mountPoint] if args.mount_source else []
+            if not mountPoints:
+                raise ValueError("Unmounting requires a path to the mount point!")
+
+            absoluteMountPoints = ["--unmount"]
+            for path in mountPoints:
+                # DO NOT do any filesystem tests on path or else it might deadlock when calling into our own FUSE mount!
+                # normpath does NOT check the filesystem as noted in the documentation, i.e., could lead to wrong
+                # results when there are symbolic links in the path. But this is good for us because it does not
+                # deadlock! See: https://docs.python.org/3/library/os.path.html#os.path.normpath
+                if not os.path.isabs(path):
+                    self.unmount(path)
+                    continue
+
+                subpath = self._path_provided_by_us(path)
+                # If it points to our exact mount path, then it should be unmounted by a subprocess.
+                if subpath and subpath.strip('/'):
+                    self.unmount(subpath)
+                    continue
+
+                absoluteMountPoints.append(path)
+
+            if len(absoluteMountPoints) > 1:
+                return absoluteMountPoints
+            sys.exit(0)
+
+        # Check all that are definitely input arguments.
+        for path in args.mount_source[:-1]:
+            if not os.path.isabs(path) and '://' not in path:
+                raise ValueError(
+                    "Relative input paths are not supported because they would be relative to the current working "
+                    "directory of the daemon, which is / (root)!"
+                )
+
+        if args.commit_overlay:
+            return None
+
+        # See cli.process_parsed_arguments. Check whether last mount_source is the mount point or an input.
+        lastArgument = args.mount_source[-1]
+        if '://' in lastArgument:
+            return None
+
+        if os.path.isabs(lastArgument):
+            subpath = self._path_provided_by_us(lastArgument)
+            # If it exactly points to us, then let the subprocess try to mount over us.
+            # Depending on the FUSE config (allow 'nonempty'), it may work!
+            if subpath is None or not subpath.strip('/'):
+                return None
+
+            # subpath is not None and not empty, i.e., we mount into ourselves!
+            args.mount_point = args.mount_source.pop()
+        else:
+            try:
+                self._lookup(lastArgument)
+                raise ValueError("Relative mount point must not already exist!")
+            except fuse.FuseOSError:
+                pass
+            args.mount_point = args.mount_source.pop()
+
+        self.mount(args)
+        sys.exit(0)
+
     def _parse_command(self, args: list[str]) -> None:
         try:
+            # We need to parse the arguments to test for relative paths or absolute paths pointing into our mount point.
+            # This already processes direct actions such as --help without us having to start a subprocess.
+            parsed = create_parser().parse_args(args)
+            if self._process_parsed_arguments(parsed):
+                return
+
             if len(self._subprocesses) > 100:
                 # Filter finished processes.
                 self._subprocesses = [process for process in self._subprocesses if process.poll() is None]
@@ -456,6 +620,9 @@ class FuseMount(fuse.Operations):
                 )
             )
 
+        except SystemExit:
+            # Happens inside parse_args when called with --help, --version, ...
+            pass
         except Exception as exception:
             logger.error("Exception: %s", exception, exc_info=logger.isEnabledFor(logging.DEBUG))
 

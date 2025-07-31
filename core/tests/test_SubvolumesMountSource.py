@@ -102,21 +102,22 @@ def fixture_sample_tar_b(tmp_path):
 
 class TestSubvolumesMountSource:
     @staticmethod
-    def _check_file(mountSource: MountSource, path: str, version: int, contents: Optional[bytes] = None):
-        fileInfo = mountSource.lookup(path, version)
-        assert fileInfo, f"Path: {path}"
+    def _check_file(mountSource: MountSource, pathToCheck: str, version: int, contents: Optional[bytes] = None):
+        for path in [pathToCheck.lstrip('/'), '/' + pathToCheck.lstrip('/')]:
+            fileInfo = mountSource.lookup(path, version)
+            assert fileInfo, f"Path: {path}"
 
-        if contents is None:
-            assert stat.S_ISDIR(fileInfo.mode)
-        else:
-            assert not stat.S_ISDIR(fileInfo.mode)
-            assert stat.S_ISREG(fileInfo.mode)
+            if contents is None:
+                assert stat.S_ISDIR(fileInfo.mode)
+            else:
+                assert not stat.S_ISDIR(fileInfo.mode)
+                assert stat.S_ISREG(fileInfo.mode)
 
-            # The MountSource interface only allows to open files in binary mode, which returns bytes not string.
-            if isinstance(contents, str):
-                contents = contents.encode()
-            with mountSource.open(fileInfo) as file:
-                assert file.read() == contents
+                # The MountSource interface only allows to open files in binary mode, which returns bytes not string.
+                if isinstance(contents, str):
+                    contents = contents.encode()
+                with mountSource.open(fileInfo) as file:
+                    assert file.read() == contents
 
     @staticmethod
     @pytest.mark.parametrize('paths', [("foo", "/foo"), ("/foo", "//foo"), ("folder/foo", "folder//foo")])
@@ -281,3 +282,15 @@ class TestSubvolumesMountSource:
         TestSubvolumesMountSource._check_file(union, "/folder/subfolder2", 0, None)
         TestSubvolumesMountSource._check_file(union, "/folder/subfolder2/world", 0, contents)
         TestSubvolumesMountSource._check_file(union, "/folder/subfolder3/world", 0, contents)
+
+    @staticmethod
+    def test_simple_mount(sample_tar_a):
+        union = SubvolumesMountSource({})
+        union.mount("folderA", SQLiteIndexedTar(sample_tar_a.path))
+
+        # Check folders
+
+        for path in sample_tar_a.folders:
+            TestSubvolumesMountSource._check_file(union, "folderA/" + path, 0, None)
+        for path, contents in sample_tar_a.files.items():
+            TestSubvolumesMountSource._check_file(union, "folderA/" + path, 0, contents)
