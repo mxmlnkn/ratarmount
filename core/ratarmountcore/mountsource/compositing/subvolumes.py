@@ -22,7 +22,7 @@ class SubvolumesMountSource(MountSource):
         self.rootFileInfo = create_root_file_info(userdata=[None])
 
     def _find_mount_source(self, path: str) -> Optional[Tuple[str, str]]:
-        path = path.lstrip('/')
+        path = path.strip('/')
         subvolume, subpath = path.split('/', maxsplit=1) if '/' in path else [path, ""]
         return (subvolume, '/' + subpath) if subvolume in self.mountSources else None
 
@@ -32,11 +32,9 @@ class SubvolumesMountSource(MountSource):
 
     @overrides(MountSource)
     def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
-        if not path.strip('/'):
+        path = path.strip('/')
+        if not path:
             return self.rootFileInfo.clone()
-
-        if '/' not in path.lstrip('/'):
-            return self.rootFileInfo.clone() if path.lstrip('/') in self.mountSources else None
 
         result = self._find_mount_source(path)
         if result is None:
@@ -52,7 +50,8 @@ class SubvolumesMountSource(MountSource):
 
     @overrides(MountSource)
     def versions(self, path: str) -> int:
-        if not path.strip('/'):
+        path = path.strip('/')
+        if not path:
             return 1
 
         result = self._find_mount_source(path)
@@ -63,7 +62,8 @@ class SubvolumesMountSource(MountSource):
         return self.mountSources[subvolume].versions(subpath)
 
     def _list(self, path: str, onlyMode: bool):
-        if not path.strip('/'):
+        path = path.strip('/')
+        if not path:
             return dict.fromkeys(self.mountSources.keys(), self.rootFileInfo.mode if onlyMode else self.rootFileInfo)
 
         result = self._find_mount_source(path)

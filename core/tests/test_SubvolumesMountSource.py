@@ -142,7 +142,8 @@ class TestSubvolumesMountSource:
     def test_unite_two_folders_and_update_one(sample_folder_a, sample_folder_b):
         folderA = FolderMountSource(sample_folder_a.path)
         folderB = FolderMountSource(sample_folder_b.path)
-        union = SubvolumesMountSource({"folderA": folderA, "folderB": folderB})
+        volumes = {"folderA": folderA, "folderB": folderB}
+        union = SubvolumesMountSource(volumes)
 
         contents = b"atarashii iriya\n"
         (sample_folder_a.path / "ufo2").write_bytes(contents)
@@ -184,17 +185,23 @@ class TestSubvolumesMountSource:
 
         # Test get_mount_source
 
-        for folder in ["/", "", "folderA", "/folderA"]:
+        for folder in ["/", ""]:
             fileInfo = union.lookup(folder)
             assert fileInfo, f"Folder: {folder}"
             assert union.get_mount_source(fileInfo) == ("/", union, fileInfo)
 
-        for path in ["/folderA/ufo2", "folderA/subfolder2"]:
-            fileInfo = union.lookup(path)
-            assert fileInfo, f"Path: {path}"
-            result = union.get_mount_source(fileInfo)
-            fileInfo.userdata.pop()
-            assert result == ('/folderA', folderA, fileInfo)
+        pathsBySubmount = {
+            'folderA': ["folderA", "/folderA", "/folderA/ufo2", "folderA/subfolder2", "folderA/subfolder2/world"],
+            'folderB': ["folderB", "/folderB", "/folderB/ufo", "folderB/subfolder"],
+        }
+        for volume, paths in pathsBySubmount.items():
+            mountSource = volumes[volume]
+            for path in paths:
+                fileInfo = union.lookup(path)
+                assert fileInfo, f"Path: {path}"
+                result = union.get_mount_source(fileInfo)
+                fileInfo.userdata.pop()
+                assert result == ('/' + volume, mountSource, fileInfo)
 
     @staticmethod
     def test_unite_two_archives(sample_tar_a, sample_tar_b):
