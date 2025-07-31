@@ -1,10 +1,10 @@
 import builtins
 import os
 from collections.abc import Iterable
-from typing import IO, Optional, Union
+from typing import IO, Any, Optional, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource, create_root_file_info
-from ratarmountcore.utils import overrides
+from ratarmountcore.utils import RatarmountError, overrides
 
 
 class SubvolumesMountSource(MountSource):
@@ -12,20 +12,112 @@ class SubvolumesMountSource(MountSource):
         """
         mountSources : List of mount sources to mount as subfolders.
         """
-        self.mountSources: dict[str, MountSource] = mountSources
-
-        for name in self.mountSources:
-            if not name:
-                raise ValueError("Mount source names may not be empty!")
-            if '/' in name:
-                raise ValueError(f"Mount source names may not contain slashes! ({name})")
-
+        # Recursive dictionary representing folders. Keys are folder names, i.e., may not contain slashes.
+        self.mountSources: dict[str, Any] = {}
         self.rootFileInfo = create_root_file_info(userdata=[None])
 
-    def _find_mount_source(self, path: str) -> Optional[tuple[str, str]]:
-        path = path.strip('/')
-        subvolume, subpath = path.split('/', maxsplit=1) if '/' in path else [path, ""]
-        return (subvolume, '/' + subpath) if subvolume in self.mountSources else None
+        for path, target in mountSources.items():
+            self.mount(path, target)
+
+    def _get_by_path(self, path: str, create: bool = False) -> Optional[Union[MountSource, dict[str, Any]]]:
+        """Implements recursive lookup in self.mountSources."""
+        folder = self.mountSources
+        for part in path.strip('/').split('/'):
+            if not part:
+                continue
+            if not isinstance(folder, dict):
+                raise RatarmountError(f"Cannot return '{path}' because one of its parents is a mount point!")
+            if part not in folder:
+                if not create:
+                    return None
+                folder[part] = {}
+            folder = folder[part]
+        return folder
+
+    def is_mountable(self, path: str) -> bool:
+        # Ensuring a leading slash before calling normpath has the effect of eating all leading '/..'.
+        parent, name = ('/' + os.path.normpath('/' + path).strip('/')).rsplit('/', maxsplit=1)
+        try:
+            folder = self._get_by_path(parent, create=True)
+        except RatarmountError:
+            return False
+        return bool(name) and folder is not None and isinstance(folder, dict) and (name not in folder)
+
+    def mount(self, path: str, target: MountSource) -> bool:
+        """Adds a mount source at the specified path. Must not overlap with existing mounts. Return true on success."""
+
+        # Ensuring a leading slash before calling normpath has the effect of eating all leading '/..'.
+        parent, name = ('/' + os.path.normpath('/' + path).strip('/')).rsplit('/', maxsplit=1)
+        if not name:
+            raise RatarmountError("Mount points may not be empty!")
+
+        try:
+            folder = self._get_by_path(parent, create=True)
+        except RatarmountError:
+            return False
+
+        if folder is None or not isinstance(folder, dict) or name in folder:
+            raise RatarmountError("Mount point already exists!")
+        folder[name] = target
+        return True
+
+    def unmount(self, path: str) -> Optional[MountSource]:
+        """
+        Removes a mounted path and returns the corresponding object.
+        The caller can then call 'close' on it if necessary!
+        """
+
+        # Ensuring a leading / before calling normpath has the effect of eating all leading '/..'.
+        path = os.path.normpath('/' + path).strip('/')
+
+        parents = [self.mountSources]
+        names: list[str] = []
+        for part in path.strip('/').split('/'):
+            if not part:
+                continue
+            folder = parents[-1]
+            names.append(part)
+            if not isinstance(folder, dict) or part not in folder:
+                return None
+            parents.append(folder[part])
+
+        # Happens if path is '/'.
+        if not names:
+            return None
+
+        mountSource = parents.pop()
+        if not isinstance(mountSource, MountSource):
+            # Might happen when trying to unmount some parent path of an actual mount point.
+            return None
+
+        # Remove the mount source from its parent dictionary.
+        parents.pop().pop(names.pop())
+        # Remove empty parent folders from the recursive dictionary.
+        for folder, name in zip(reversed(parents), reversed(names)):
+            if folder[name]:
+                break
+            folder.pop(name)
+
+        return mountSource
+
+    def _find_mount_source(self, path: str) -> Optional[tuple[str, str, Union[MountSource, dict[str, Any]]]]:
+        """
+        Implements recursive lookup in self.mountSources.
+        Returns (mount point path, path in mount source, mount source).
+        If the path points to a parent mount folder, then will return (path, "", None)
+        """
+
+        folder = self.mountSources
+        parts = path.strip('/').split('/')
+        for i, part in enumerate(parts):
+            if not part:
+                continue
+            if part not in folder:
+                return None
+            folder = folder[part]
+            if isinstance(folder, MountSource):
+                return ('/'.join(parts[: i + 1]), '/' + '/'.join(parts[i + 1 :]), folder)
+        return (path, "", folder)
 
     @overrides(MountSource)
     def is_immutable(self) -> bool:
@@ -33,48 +125,42 @@ class SubvolumesMountSource(MountSource):
 
     @overrides(MountSource)
     def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
-        path = path.strip('/')
-        if not path:
-            return self.rootFileInfo.clone()
-
         result = self._find_mount_source(path)
         if result is None:
             return None
-        subvolume, subpath = result
 
-        fileInfo = self.mountSources[subvolume].lookup(subpath, fileVersion=fileVersion)
+        subvolume, subpath, mounted = result
+        if not isinstance(mounted, MountSource):
+            return self.rootFileInfo.clone()
+
+        fileInfo = mounted.lookup(subpath, fileVersion=fileVersion)
         if isinstance(fileInfo, FileInfo):
             fileInfo.userdata.append(subvolume)
             return fileInfo
-
         return None
 
     @overrides(MountSource)
     def versions(self, path: str) -> int:
-        path = path.strip('/')
-        if not path:
-            return 1
-
         result = self._find_mount_source(path)
         if result is None:
             return 0
-        subvolume, subpath = result
 
-        return self.mountSources[subvolume].versions(subpath)
+        subvolume, subpath, mounted = result
+        if not isinstance(mounted, MountSource):
+            return 1
 
-    def _list(self, path: str, onlyMode: bool):
-        path = path.strip('/')
-        if not path:
-            return dict.fromkeys(self.mountSources.keys(), self.rootFileInfo.mode if onlyMode else self.rootFileInfo)
+        return mounted.versions(subpath)
 
+    def _list(self, path: str, onlyMode: bool) -> Optional[Union[Iterable[str], dict[str, FileInfo]]]:
         result = self._find_mount_source(path)
         if result is None:
             return None
-        subvolume, subpath = result
 
-        return (
-            self.mountSources[subvolume].list_mode(subpath) if onlyMode else self.mountSources[subvolume].list(subpath)
-        )
+        subvolume, subpath, mounted = result
+        if not isinstance(mounted, MountSource):
+            return {name: self.rootFileInfo.mode if onlyMode else self.rootFileInfo.clone() for name in mounted}
+
+        return mounted.list_mode(subpath) if onlyMode else mounted.list(subpath)
 
     @overrides(MountSource)
     def list(self, path: str) -> Optional[Union[Iterable[str], dict[str, FileInfo]]]:

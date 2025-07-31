@@ -14,10 +14,12 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from ratarmountcore.mountsource.compositing.singlefile import SingleFileMountSource  # noqa: E402
 from ratarmountcore.mountsource.compositing.subvolumes import SubvolumesMountSource  # noqa: E402
 from ratarmountcore.mountsource.formats.folder import FolderMountSource  # noqa: E402
 from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar  # noqa: E402
 from ratarmountcore.mountsource.MountSource import MountSource  # noqa: E402
+from ratarmountcore.utils import RatarmountError  # noqa: E402
 
 
 @dataclasses.dataclass
@@ -117,6 +119,12 @@ class TestSubvolumesMountSource:
                 assert file.read() == contents
 
     @staticmethod
+    @pytest.mark.parametrize('paths', [("foo", "/foo"), ("/foo", "//foo"), ("folder/foo", "folder//foo")])
+    def test_duplicate_paths(paths):
+        with pytest.raises(RatarmountError, match="exists"):
+            SubvolumesMountSource({path: SingleFileMountSource("bar", io.BytesIO(b"bar")) for path in paths})
+
+    @staticmethod
     def test_unite_two_folders(sample_folder_a, sample_folder_b):
         union = SubvolumesMountSource(
             {"folderA": FolderMountSource(sample_folder_a.path), "folderB": FolderMountSource(sample_folder_b.path)}
@@ -158,6 +166,13 @@ class TestSubvolumesMountSource:
         TestSubvolumesMountSource._check_file(union, "folderA/subfolder2/world", 0, contents)
         TestSubvolumesMountSource._check_file(union, "folderA/subfolder3/world", 0, contents)
         TestSubvolumesMountSource._check_file(union, "folderA/second-world", 0, contents)
+
+        # Check folders
+
+        for path in sample_folder_a.folders:
+            TestSubvolumesMountSource._check_file(union, "folderA/" + path, 0, None)
+        for path in sample_folder_a.folders + sample_folder_b.folders:
+            TestSubvolumesMountSource._check_file(union, "folderB/" + path, 0, None)
 
         # Test versions
 
@@ -202,6 +217,18 @@ class TestSubvolumesMountSource:
                 result = union.get_mount_source(fileInfo)
                 fileInfo.userdata.pop()
                 assert result == ('/' + volume, mountSource, fileInfo)
+
+        # Test unmounting
+
+        mountSource = union.unmount("folderB")
+        assert isinstance(mountSource, MountSource)
+        assert sorted(union.list("/").keys()) == ["folderA"]
+        union.mount("folderC", mountSource)
+        assert sorted(union.list("/").keys()) == ["folderA", "folderC"]
+        assert union
+
+        for path in sample_folder_a.folders + sample_folder_b.folders:
+            TestSubvolumesMountSource._check_file(union, "folderC/" + path, 0, None)
 
     @staticmethod
     def test_unite_two_archives(sample_tar_a, sample_tar_b):
