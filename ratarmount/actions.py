@@ -538,6 +538,7 @@ def create_fuse_mount(args) -> None:
         transformRecursiveMountPoint = args.transform_recursive_mount_point,
         transform                    = args.transform,
         prioritizedBackends          = args.prioritizedBackends,
+        resolveSymbolicLinks         = bool(args.resolve_symbolic_links),
         disableUnionMount            = args.disable_union_mount,
         maxCacheDepth                = args.union_mount_cache_max_depth,
         maxCacheEntries              = args.union_mount_cache_max_entries,
