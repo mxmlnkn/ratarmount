@@ -1,3 +1,4 @@
+import os
 from typing import IO, Dict, Iterable, List, Optional, Tuple, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource, create_root_file_info
@@ -13,6 +14,8 @@ class SubvolumesMountSource(MountSource):
         self.printDebug = printDebug
 
         for name in self.mountSources:
+            if not name:
+                raise ValueError("Mount source names may not be empty!")
             if '/' in name:
                 raise ValueError(f"Mount source names may not contain slashes! ({name})")
 
@@ -126,7 +129,7 @@ class SubvolumesMountSource(MountSource):
         mountSource = self.mountSources[subvolume]
 
         subpath, subMountSource, subFileInfo = mountSource.get_mount_source(sourceFileInfo)
-        return subvolume + '/' + subpath, subMountSource, subFileInfo
+        return os.path.normpath(f"/{subvolume}/{subpath}"), subMountSource, subFileInfo
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):

@@ -184,10 +184,17 @@ class TestSubvolumesMountSource:
 
         # Test get_mount_source
 
-        for folder in ["/", ""]:
+        for folder in ["/", "", "folderA", "/folderA"]:
             fileInfo = union.lookup(folder)
             assert fileInfo, f"Folder: {folder}"
             assert union.get_mount_source(fileInfo) == ("/", union, fileInfo)
+
+        for path in ["/folderA/ufo2", "folderA/subfolder2"]:
+            fileInfo = union.lookup(path)
+            assert fileInfo, f"Path: {path}"
+            result = union.get_mount_source(fileInfo)
+            fileInfo.userdata.pop()
+            assert result == ('/folderA', folderA, fileInfo)
 
     @staticmethod
     def test_unite_two_archives(sample_tar_a, sample_tar_b):
