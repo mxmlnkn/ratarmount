@@ -12,6 +12,10 @@ from ratarmountcore.StenciledFile import RawStenciledFile, StenciledFile
 from ratarmountcore.utils import overrides
 
 
+def _get_mode(fileobj: IO[bytes]) -> int:
+    return 0o111 | (0o222 if fileobj.writable() else 0) | (0o444 if fileobj.readable() else 0)
+
+
 @final
 class SingleFileMountSource(MountSource):
     """MountSource exposing a single file as a mount source."""
@@ -34,9 +38,9 @@ class SingleFileMountSource(MountSource):
             raise ValueError("File object must belong to a non-folder path!")
 
         self.mtime = time.time()
-        self._size: Optional[int] = None
-        self._statfs = {}
+        self._file_info: Optional[FileInfo] = None
         self._file_object: Optional[IO[bytes]] = None
+        self._statfs = {}
 
         if callable(fileobj):
             self._open_file = fileobj
@@ -44,26 +48,30 @@ class SingleFileMountSource(MountSource):
 
         # Construct an file-opener callable from an existing file object.
 
-        self._size = fileobj.seek(0, io.SEEK_END)
+        self._file_info = self._create_file_info(
+            isdir=False, size=fileobj.seek(0, io.SEEK_END), mode=_get_mode(fileobj)
+        )
         self._file_lock = threading.Lock()
         self._file_object = fileobj
 
         def open_shared_file(buffering: int):
             if not self._file_object:
                 raise RuntimeError("No file object to open!")
-            if self._size is None:
+            if self._file_info is None:
                 raise RuntimeError("File size should have been initialized!")
 
             # Use StenciledFile so that the returned file objects can be independently seeked!
             if buffering == 0:
                 return cast(
                     IO[bytes],
-                    RawStenciledFile(fileStencils=[(self._file_object, 0, self._size)], fileObjectLock=self._file_lock),
+                    RawStenciledFile(
+                        fileStencils=[(self._file_object, 0, self._file_info.size)], fileObjectLock=self._file_lock
+                    ),
                 )
             return cast(
                 IO[bytes],
                 StenciledFile(
-                    fileStencils=[(self._file_object, 0, self._size)],
+                    fileStencils=[(self._file_object, 0, self._file_info.size)],
                     fileObjectLock=self._file_lock,
                     bufferSize=io.DEFAULT_BUFFER_SIZE if buffering <= 0 else buffering,
                 ),
@@ -87,24 +95,38 @@ class SingleFileMountSource(MountSource):
                 'f_favail': 0,
             }
 
-    def _get_size(self) -> int:
-        if self._size is None:
-            with self._open_file(-1) as file:
-                if file.seekable():
-                    return file.seek(0, io.SEEK_END)
-            return 0
-        return self._size
+    def _create_file_info(self, isdir: bool, size: Optional[int] = None, mode: Optional[int] = None):
+        if self._file_info:
+            if size is None:
+                size = self._file_info.size
+            if mode is None:
+                mode = self._file_info.mode & 0o777
 
-    def _create_file_info(self, size: int, mode: int):
-        # This must be a function and cannot be cached into a member in order to avoid userdata being a shared list!
+        if size is None or mode is None:
+            if hasattr(self, '_open_file'):
+                with self._open_file(-1) as file:
+                    if size is None:
+                        size = file.seek(0, io.SEEK_END) if file.seekable() else 0
+                        if size is None:
+                            size = file.tell()
+                        if size is None:
+                            size = 0
+                    if mode is None:
+                        mode = _get_mode(file)
+            else:
+                if size is None:
+                    size = 0
+                if mode is None:
+                    mode = 0o777
+
         # fmt: off
         return FileInfo(
             size     = size,
             mtime    = self.mtime,
-            mode     = 0o777 | mode,
+            mode     = mode | (stat.S_IFDIR if isdir else stat.S_IFREG),
             linkname = '',
-            uid      = os.getuid(),
-            gid      = os.getgid(),
+            uid      = self._file_info.uid if self._file_info else os.getuid(),
+            gid      = self._file_info.gid if self._file_info else os.getgid(),
             userdata = [],
         )
         # fmt: on
@@ -116,14 +138,14 @@ class SingleFileMountSource(MountSource):
     @overrides(MountSource)
     def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         if not path or path == '/':
-            return self._create_file_info(size=0, mode=stat.S_IFDIR)
+            return self._create_file_info(size=0, isdir=True)
         if path.strip('/') == self.path:
-            return self._create_file_info(size=self._get_size(), mode=stat.S_IFREG)
+            return self._create_file_info(isdir=False)
         return None
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
-        if fileInfo != self._create_file_info(size=fileInfo.size, mode=stat.S_IFREG):
+        if fileInfo != self._create_file_info(size=fileInfo.size, mode=fileInfo.mode & 0o777, isdir=False):
             raise ValueError("Only files may be opened!")
         return self._open_file(buffering)
 
