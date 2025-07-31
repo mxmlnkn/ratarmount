@@ -312,10 +312,7 @@ def compress_zstd(filePath: str, outputFilePath: str, frameSize: int, paralleliz
         concurrent.futures.ThreadPoolExecutor(parallelization) as pool,
     ):
         results = []
-        while True:
-            toCompress = file.read(frameSize)
-            if not toCompress:
-                break
+        while toCompress := file.read(frameSize):
             results.append(pool.submit(_compress_zstd, toCompress))
             while len(results) >= parallelization:
                 compressedData = results.pop(0).result()

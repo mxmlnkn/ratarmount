@@ -111,10 +111,7 @@ class ArchiveEntry:
         else:
             buffer = ctypes.create_string_buffer(1024 * 1024)
             size = 0
-            while True:
-                readSize = laffi.read_data(self._archive, buffer, len(buffer))
-                if not readSize:
-                    break
+            while readSize := laffi.read_data(self._archive, buffer, len(buffer)):
                 size += readSize
 
         mode = self.mode() & 0o777

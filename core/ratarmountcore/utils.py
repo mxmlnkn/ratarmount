@@ -295,10 +295,7 @@ class FixedRawIOBase(io.RawIOBase):
         # slower than 4 MiB reads equal to the Lustre-advertised block size.
         # https://github.com/python/cpython/issues/85624
         chunks = []
-        while True:
-            result = self.read()
-            if not result:
-                break
+        while result := self.read():
             chunks.append(result)
         return b"".join(chunks)
 
