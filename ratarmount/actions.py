@@ -1,9 +1,9 @@
 import argparse
 import contextlib
+import functools
 import importlib
 import importlib.metadata
 import inspect
-import json
 import logging
 import os
 import re
@@ -19,12 +19,13 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from ratarmountcore.compressions import strip_suffix_from_archive
-from ratarmountcore.utils import RatarmountError, determine_recursion_depth, remove_duplicates_stable
+from ratarmountcore.utils import RatarmountError, remove_duplicates_stable
 
 with contextlib.suppress(ImportError):
     import rarfile
 
-from .CLIHelpers import check_input_file_type
+from ratarmount import CLIHelpers
+
 from .fuse import fuse
 from .WriteOverlay import commit_overlay
 
@@ -47,6 +48,27 @@ def has_fuse_non_empty_support() -> bool:
         pass
 
     return False  # On macOS, fusermount does not exist and macfuse also seems to complain with nonempty option.
+
+
+def is_inside_fuse_context() -> bool:
+    for frame_info in inspect.stack():
+        frame = frame_info.frame
+        cls = frame.f_locals.get('cls', type(frame.f_locals.get('self', None)))
+        if inspect.isclass(cls) and issubclass(cls, fuse.Operations):
+            return True
+    return False
+
+
+def forbid_call_from_fuse(func):
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        # We have to take care not to call into ourself by accessing paths inside the mount point from the
+        # FUSE-providing process! This also includes is.path.ismount!
+        if is_inside_fuse_context():
+            raise RuntimeError("A FUSE mount must not be created from another FUSE mount. Start a new subprocess!")
+        return func(self, *args, **kwargs)
+
+    return wrapper
 
 
 def parse_requirement(requirement: str) -> Optional[tuple[str, list[str], Optional[str]]]:
@@ -328,66 +350,84 @@ def unmount(mountPoint: str) -> None:
             logger.info("umount %s failed with: %s", mountPoint, exception)
 
 
-def is_inside_fuse_context() -> bool:
-    for frame_info in inspect.stack():
-        frame = frame_info.frame
-        cls = frame.f_locals.get('cls', type(frame.f_locals.get('self', None)))
-        if inspect.isclass(cls) and issubclass(cls, fuse.Operations):
-            return True
-    return False
+@forbid_call_from_fuse
+def unmount_list_checked(mountPoints: list[str]) -> int:
+    if not mountPoints:
+        raise argparse.ArgumentTypeError("Unmounting requires a path to the mount point!")
+
+    for mountPoint in mountPoints:
+        unmount(mountPoint)
+
+    # Unmounting might take some time and I had cases where fusermount returned exit code 1.
+    # and still unmounted it successfully. It would be nice to automate this but it seems impossible to do
+    # reliably, without any regular expression heuristics. /proc/<pid>/fd/5 links to /dev/fuse. This could
+    # be used to reliable detect FUSE-providing processes, but we still wouldn't know which exact mount
+    # point they provide.
+    # This check is done outside of 'unmount' in order to only do one time.sleep for all mount points.
+    errorPrinted = False
+    if any(os.path.ismount(mountPoint) for mountPoint in mountPoints):
+        time.sleep(1)
+        for mountPoint in mountPoints:
+            if not os.path.ismount(mountPoint):
+                continue
+            if not errorPrinted:
+                logger.error(
+                    "Failed to unmount the given mount point. Alternatively, the process providing the "
+                    "mount point can be looked for and killed, e.g., with this command:"
+                )
+                errorPrinted = True
+            logger.error("""    pkill --full 'ratarmount.*{%s}' -G "$( id -g )" --newest""", mountPoint)
+
+    return 1 if errorPrinted else 0
 
 
+@forbid_call_from_fuse
+def determine_mount_point(mount_source: str):
+    mount_point = strip_suffix_from_archive(mount_source)
+
+    if '://' in mount_point:
+        # There will be at least 2 slashes in mount_point, namely from ://.
+        mount_point = mount_point.rsplit('/', 1)[1]
+
+    # Files might not have a standard archive file extension, e.g., chimera files or docx (ZIP) and so on.
+    # Therefore, try to generically strip the file extension.
+    if mount_point == mount_source:
+        # splitext is smarter than split('.') and will not split dots in parent folders!
+        mount_point = os.path.splitext(mount_point)[0]
+
+    # If the file has no extension at all, then add one to get a different mount point:
+    if mount_point == mount_source:
+        mount_point = mount_point + ".mounted"
+
+    if os.path.exists(mount_point) and not os.path.isdir(mount_point):
+        raise argparse.ArgumentTypeError(
+            "No mount point was specified and failed to automatically infer a valid one. "
+            "Please explicitly specify a mount point. See --help."
+        )
+
+    logger.info("No mount point specified. Automatically inferred: %s", mount_point)
+    return mount_point
+
+
+@forbid_call_from_fuse
 def process_parsed_arguments(args) -> int:
-    # We have to take care not to call into ourself by accessing paths inside the mount point from the
-    # FUSE-providing process! This also includes is.path.ismount!
-    if is_inside_fuse_context():
-        raise RuntimeError("A FUSE mount must not be created from another FUSE mount. Start a new subprocess!")
-
     if args.unmount:
         # args.mount_source suffices because it eats all arguments and args.mount_point is always empty by default.
-        mountPoints = [mountPoint for mountPoint in args.mount_source if mountPoint] if args.mount_source else []
-        if not mountPoints:
-            raise argparse.ArgumentTypeError("Unmounting requires a path to the mount point!")
-
-        for mountPoint in mountPoints:
-            unmount(mountPoint)
-
-        # Unmounting might take some time and I had cases where fusermount returned exit code 1.
-        # and still unmounted it successfully. It would be nice to automate this but it seems impossible to do
-        # reliably, without any regular expression heuristics. /proc/<pid>/fd/5 links to /dev/fuse. This could
-        # be used to reliable detect FUSE-providing processes, but we still wouldn't know which exact mount
-        # point they provide.
-        # This check is done outside of 'unmount' in order to only do one time.sleep for all mount points.
-        errorPrinted = False
-        if any(os.path.ismount(mountPoint) for mountPoint in mountPoints):
-            time.sleep(1)
-            for mountPoint in mountPoints:
-                if not os.path.ismount(mountPoint):
-                    continue
-                if not errorPrinted:
-                    logger.error(
-                        "Failed to unmount the given mount point. Alternatively, the process providing the "
-                        "mount point can be looked for and killed, e.g., with this command:"
-                    )
-                    errorPrinted = True
-                logger.error("""    pkill --full 'ratarmount.*{%s}' -G "$( id -g )" --newest""", mountPoint)
-
-        return 1 if errorPrinted else 0
+        return unmount_list_checked([mountPoint for mountPoint in args.mount_source or [] if mountPoint])
 
     # This is a hack but because we have two positional arguments (and want that reflected in the auto-generated help),
     # all positional arguments, including the mountpath will be parsed into args.mount_source and we have to
     # manually separate them depending on the type.
     lastArgument = args.mount_source[-1]
     if '://' not in lastArgument and (os.path.isdir(lastArgument) or not os.path.exists(lastArgument)):
-        args.mount_point = lastArgument
-        args.mount_source = args.mount_source[:-1]
+        args.mount_point = args.mount_source.pop()
     if not args.mount_source and not args.write_overlay and not args.control_interface:
         raise argparse.ArgumentTypeError("You must specify at least one path to a valid archive or folder!")
 
     # Manually check that all specified TARs and folders exist
     def check_mount_source(path):
         try:
-            return check_input_file_type(path)
+            return CLIHelpers.check_input_file_type(path)
         except argparse.ArgumentTypeError as e:
             if not os.path.exists(path):
                 raise e
@@ -417,97 +457,16 @@ def process_parsed_arguments(args) -> int:
         commit_overlay(args.write_overlay, args.mount_source[0], encoding=args.encoding, printDebug=args.debug)
         return 0
 
-    for path in args.mount_source:
-        if args.mount_source.count(path) > 1:
-            raise argparse.ArgumentTypeError(f"Path may not appear multiple times at different locations: {path}")
+    # Automatically generate a default mount path
+    if not args.mount_point:
+        args.mount_point = determine_mount_point(args.mount_source[0]) if args.mount_source else 'mounted'
+    args.mount_point = os.path.realpath(args.mount_point)
 
-    args.gzipSeekPointSpacing = int(args.gzip_seek_point_spacing * 1024 * 1024)
-
-    if (args.strip_recursive_tar_extension or args.transform_recursive_mount_point) and determine_recursion_depth(
-        recursive=args.recursive, recursion_depth=args.recursion_depth
-    ) <= 0:
-        logger.warning(
-            "The options --strip-recursive-tar-extension and --transform-recursive-mount-point only have an "
-            "effect when used with recursive mounting."
-        )
-
-    if args.transform_recursive_mount_point:
-        args.transform_recursive_mount_point = tuple(args.transform_recursive_mount_point)
-
-    # Sanitize different ways to specify passwords into a simple list
-    # Better initialize it before calling check_mount_source, which might use args.passwords in the future.
-    args.passwords = []
-    if args.password:
-        args.passwords.append(args.password.encode())
+    CLIHelpers.process_trivial_parsed_arguments(args)
 
     if args.password_file:
         args.passwords.extend(Path(args.password_file).read_bytes().split(b'\n'))
-
     args.passwords = remove_duplicates_stable(args.passwords)
-
-    # Automatically generate a default mount path
-    if not args.mount_point:
-        args.mount_point = strip_suffix_from_archive(args.mount_source[0])
-
-        if '://' in args.mount_point:
-            # There will be at least 2 slashes in args.mount_point, namely from ://.
-            args.mount_point = args.mount_point.rsplit('/', 1)[1]
-
-        # Files might not have a standard archive file extension, e.g., chimera files or docx (ZIP) and so on.
-        # Therefore, try to generically strip the file extension.
-        if args.mount_point == args.mount_source[0]:
-            # splitext is smarter than split('.') and will not split dots in parent folders!
-            args.mount_point = os.path.splitext(args.mount_point)[0]
-
-        # If the file has no extension at all, then add one to get a different mount point:
-        if args.mount_point == args.mount_source[0]:
-            args.mount_point = args.mount_point + ".mounted"
-
-        if os.path.exists(args.mount_point) and not os.path.isdir(args.mount_point):
-            raise argparse.ArgumentTypeError(
-                "No mount point was specified and failed to automatically infer a valid one. "
-                "Please explicitly specify a mount point. See --help."
-            )
-
-        logger.info("No mount point specified. Automatically inferred: %s", args.mount_point)
-
-    args.mount_point = os.path.abspath(args.mount_point)
-
-    # Preprocess the --index-folders list as a string argument
-    if args.index_folders and isinstance(args.index_folders, str):
-        if args.index_folders[0] == '[':
-            args.index_folders = json.loads(args.index_folders)
-        elif ',' in args.index_folders:
-            args.index_folders = args.index_folders.split(',')
-        else:
-            args.index_folders = [args.index_folders]
-
-    # Check the parallelization argument
-    parallelizations = (
-        {'': args.parallelization}
-        if args.parallelization.isdigit()
-        else dict(kv.split(':') for kv in args.parallelization.split(','))
-    )
-    args.parallelizations = {}
-    defaultParallelization = len(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else os.cpu_count()
-    for backend, parallelizationString in parallelizations.items():
-        # isdigit does will be false if there is a minus sign, which is what we want.
-        if not parallelizationString.isdigit():
-            raise argparse.ArgumentTypeError(
-                f"Parallelization must be non-negative number but got {parallelizationString} for {backend}!"
-            )
-        args.parallelizations[backend] = (
-            defaultParallelization if int(parallelizationString) == 0 else int(parallelizationString)
-        )
-    if '' not in args.parallelizations:
-        args.parallelizations[''] = defaultParallelization
-
-    # Clean backend list
-    args.prioritizedBackends = (
-        [backend for backendString in args.use_backend for backend in backendString.split(',')][::-1]
-        if args.use_backend
-        else []
-    )
 
     create_fuse_mount(args)  # Throws on errors.
     return 0
@@ -533,38 +492,7 @@ def create_fuse_mount(args) -> None:
     # Import late to avoid recursion and overhead during argcomplete!
     from .FuseMount import FuseMount  # pylint: disable=import-outside-toplevel
 
-    # fmt: off
-    with FuseMount(
-        pathToMount                  = args.mount_source,
-        clearIndexCache              = bool(args.recreate_index),
-        recursive                    = bool(args.recursive),
-        recursionDepth               = args.recursion_depth,
-        gzipSeekPointSpacing         = int(args.gzipSeekPointSpacing),
-        mountPoint                   = args.mount_point,
-        encoding                     = args.encoding,
-        ignoreZeros                  = bool(args.ignore_zeros),
-        verifyModificationTime       = bool(args.verify_mtime),
-        stripRecursiveTarExtension   = args.strip_recursive_tar_extension,
-        indexFilePath                = args.index_file,
-        indexFolders                 = args.index_folders,
-        lazyMounting                 = bool(args.lazy),
-        passwords                    = list(args.passwords),
-        parallelizations             = args.parallelizations,
-        isGnuIncremental             = args.gnu_incremental,
-        writeOverlay                 = args.write_overlay,
-        transformRecursiveMountPoint = args.transform_recursive_mount_point,
-        transform                    = args.transform,
-        prioritizedBackends          = args.prioritizedBackends,
-        disableUnionMount            = args.disable_union_mount,
-        maxCacheDepth                = args.union_mount_cache_max_depth,
-        maxCacheEntries              = args.union_mount_cache_max_entries,
-        maxSecondsToCache            = args.union_mount_cache_timeout,
-        indexMinimumFileCount        = args.index_minimum_file_count,
-        logFile                      = args.log_file,
-        enableFileVersions           = args.file_versions,
-        controlInterface             = args.control_interface,
-    ) as fuseOperationsObject:
-        # fmt: on
+    with FuseMount(**CLIHelpers.parsed_args_to_options(args)) as fuseOperationsObject:
         try:
             # Note that this will not detect threads started in shared libraries, only those started via "threading".
             if not args.foreground and len(threading.enumerate()) > 1:

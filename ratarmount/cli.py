@@ -83,7 +83,12 @@ class PrintOSSAttributionShortAction(argparse.Action):
         parser.exit()
 
 
-def create_parser(useColor: bool = True) -> argparse.ArgumentParser:
+def create_parser(useColor: Optional[bool] = True) -> argparse.ArgumentParser:
+    if useColor is None:
+        useColor = RichHandler is not None and any(
+            isinstance(handler, RichHandler) for handler in logging.getLogger().handlers
+        )
+
     parser = argparse.ArgumentParser(
         prog='ratarmount',
         formatter_class=_RichFormatter if useColor and _RichFormatter else _CustomFormatter,  # type: ignore
