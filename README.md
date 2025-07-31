@@ -90,6 +90,7 @@ A complete list of supported formats can be found [here](supported-formats).
 
 You can install ratarmount either by simply downloading the [AppImage](https://github.com/mxmlnkn/ratarmount/releases) or via pip.
 The latter might require [installing additional dependencies](#system-dependencies-for-pip-installation-rarely-necessary).
+The latest nightly build AppImage can be found [here](https://github.com/mxmlnkn/ratarmount/releases/tag/nightly).
 
 ```bash
 pip install ratarmount
