@@ -257,6 +257,7 @@ Examples:
  - ratarmount github://mxmlnkn:ratarmount@v0.15.2/tests/single-file.tar mountpoint
  - AWS_ACCESS_KEY_ID=aaaaaaaaaaaaaaaaaaaa AWS_SECRET_ACCESS_KEY=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
    ratarmount s3://127.0.0.1/bucket/single-file.tar mounted
+ - ratarmount --control-interface mounted
 
 For further information, see the ReadMe on the project's homepage:
 

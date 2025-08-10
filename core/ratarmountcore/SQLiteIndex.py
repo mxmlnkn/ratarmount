@@ -138,7 +138,10 @@ class SQLiteIndex:
     #     an older ratarmount version with a newer index. Probably only if the index was distributed somewhere, i.e.,
     #     it can be reloaded if it was overwritten, I hope.
     #   - Add 'xattrs' table
-    __version__ = '0.6.0'
+    # Version 0.7.0:
+    #   - Add 'gztoolindex' table, which is similar to gzipindex but contains 1+ blobs for a compressed sparsed
+    #     gztool index file format.
+    __version__ = '0.7.0'
 
     MAGIC_BYTES = b'SQLite format 3\x00'  # If it is encrypted, the first 16 B are the (random) salt.
     NUMBER_OF_METADATA_TO_VERIFY = 1000  # shouldn't take more than 1 second according to benchmarks
@@ -1418,7 +1421,7 @@ class SQLiteIndex:
         return self.index_is_loaded()
 
     def clear_compression_offsets(self):
-        for table in ['bzip2blocks', 'gzipindex', 'gzipindexes', 'zstdblocks']:
+        for table in ['bzip2blocks', 'gzipindex', 'gzipindexes', 'gztoolindex', 'zstdblocks']:
             self.get_connection().execute(f"DROP TABLE IF EXISTS {table}")
 
     def synchronize_compression_offsets(self, fileObject: IO[bytes], compression: FileFormatID):
@@ -1491,15 +1494,10 @@ class SQLiteIndex:
             and hasattr(fileObject, 'export_index')
             and compression in [FileFormatID.GZIP, FileFormatID.ZLIB]
         ):
-            tables = get_sqlite_tables(db)
+            if self._load_gzip_index(fileObject):
+                return
 
-            if 'gzipindex' in tables or 'gzipindexes' in tables:
-                if self._load_gzip_index(fileObject, 'gzipindexes' if 'gzipindexes' in tables else 'gzipindex'):
-                    return
-
-                logger.info("Could not load gzip block offset data. Will create it from scratch.")
-            else:
-                logger.info("The index does not yet contain gzip block offset data. Will write it out.")
+            logger.info("The index does not yet contain gzip block offset data. Will write it out.")
 
             self._store_gzip_index(fileObject)
             return
@@ -1512,48 +1510,62 @@ class SQLiteIndex:
             f"Could not load or store block offsets for {compression} probably because adding support was forgotten!"
         )
 
-    def _load_gzip_index(self, fileObject: IO[bytes], table: str) -> bool:
+    def _load_gzip_index(self, fileObject: IO[bytes]) -> bool:
         importIndex = getattr(fileObject, 'import_index', None)
         if not importIndex:
+            # Should not happen.
+            logger.debug("%s does not have an 'import_index' method. Cannot import index.", fileObject)
             return False
 
         connection = self.get_connection()
-        try:
-            t0 = time.time()
-            fileobj = SQLiteBlobsFile(connection, table, 'data', buffer_size=SQLiteIndex._MAX_BLOB_SIZE)
-            if 'rapidgzip' in sys.modules and isinstance(fileObject, rapidgzip.RapidgzipFile):
-                importIndex(fileobj)
-            else:
-                # indexed_gzip 1.5.0 added support for pure Python file objects as arguments for the index!
-                importIndex(fileobj=fileobj)
+        tables = get_sqlite_tables(connection)
+        is_rapidgzip_file = 'rapidgzip' in sys.modules and isinstance(fileObject, rapidgzip.RapidgzipFile)
+        index_tables = [table for table in ['gzipindexes', 'gzipindex'] if table in tables]
+        if 'gztoolindex' in tables:
+            if is_rapidgzip_file:
+                index_tables.insert(0, 'gztoolindex')
+            elif not index_tables:
+                logger.warning("Cannot load existing index because rapidgzip is not used! Please install it.")
+        if not index_tables:
+            return False  # Caller will print a suitable message.
 
-            # SQLiteBlobFile is rather slow to get parts of a large blob by using substr.
-            # Here are some timings for 4x256 MiB blobs:
-            #   buffer size / MiB | time / s
-            #                 512 | 1.94 1.94 1.90 1.92 1.95
-            #                 256 | 1.94 1.98 1.92 2.02 1.91
-            #                 128 | 2.44 2.37 2.38 2.44 2.47
-            #                  64 | 3.51 3.44 3.47 3.47 3.42
-            #                  32 | 5.66 5.71 5.62 5.57 5.61
-            #                  16 | 10.22 9.88 9.73 9.75 9.91
-            # Writing out blobs to file / s         : 9.40 8.71 8.49 10.60 9.13
-            # Importing block offsets from file / s : 0.47 0.46 0.47 0.46 0.41
-            #   => With proper buffer sizes, avoiding writing out the block offsets can be 5x faster!
-            # It seems to me like substr on blobs does not actually support true seeking :/
-            # The blob is probably always loaded fully into memory and only then is the substring being
-            # calculated. For C, there actually is an incremental blob reading interface but not for Python:
-            #   https://www.sqlite.org/c3ref/blob_open.html
-            #   https://bugs.python.org/issue24905
-            logger.debug("Loading gzip block offsets took %.s2fs", time.time() - t0)
+        t0 = time.time()
+        for table in index_tables:
+            try:
+                fileobj = SQLiteBlobsFile(connection, table, 'data', buffer_size=SQLiteIndex._MAX_BLOB_SIZE)
+                if is_rapidgzip_file:
+                    importIndex(fileobj)
+                else:
+                    # indexed_gzip 1.5.0 added support for pure Python file objects as arguments for the index!
+                    importIndex(fileobj=fileobj)
 
-            return True
+                # SQLiteBlobFile is rather slow to get parts of a large blob by using substr.
+                # Here are some timings for 4x256 MiB blobs:
+                #   buffer size / MiB | time / s
+                #                 512 | 1.94 1.94 1.90 1.92 1.95
+                #                 256 | 1.94 1.98 1.92 2.02 1.91
+                #                 128 | 2.44 2.37 2.38 2.44 2.47
+                #                  64 | 3.51 3.44 3.47 3.47 3.42
+                #                  32 | 5.66 5.71 5.62 5.57 5.61
+                #                  16 | 10.22 9.88 9.73 9.75 9.91
+                # Writing out blobs to file / s         : 9.40 8.71 8.49 10.60 9.13
+                # Importing block offsets from file / s : 0.47 0.46 0.47 0.46 0.41
+                #   => With proper buffer sizes, avoiding writing out the block offsets can be 5x faster!
+                # It seems to me like substr on blobs does not actually support true seeking :/
+                # The blob is probably always loaded fully into memory and only then is the substring being
+                # calculated. For C, there actually is an incremental blob reading interface but not for Python:
+                #   https://www.sqlite.org/c3ref/blob_open.html
+                #   https://bugs.python.org/issue24905
+                logger.debug("Loading gzip index took %.2f s", time.time() - t0)
 
-        except Exception as exception:
-            logger.warning(
-                "Encountered exception when trying to load gzip block offsets from database %s",
-                exception,
-                exc_info=logger.isEnabledFor(logging.DEBUG),
-            )
+                return True
+            except Exception as exception:
+                logger.warning(
+                    "Encountered exception when trying to load gzip index from table %s: %s",
+                    table,
+                    exception,
+                    exc_info=logger.isEnabledFor(logging.DEBUG),
+                )
 
         return False
 
@@ -1577,20 +1589,28 @@ class SQLiteIndex:
         # Timings when using WriteSQLiteBlobs to write directly into the SQLite database.
         #   Time / s: 13.029 14.884 14.110 14.229 13.807
 
+        supports_gztool_index = (
+            'rapidgzip' in sys.modules
+            and isinstance(fileObject, rapidgzip.RapidgzipFile)
+            and hasattr(rapidgzip, 'IndexFormat')
+        )
+        table = 'gztoolindex' if supports_gztool_index else 'gzipindexes'
+
         db = self.get_connection()
-        db.execute('DROP TABLE IF EXISTS "gzipindexes"')
-        db.execute('CREATE TABLE gzipindexes ( data BLOB )')
+        db.execute(f'DROP TABLE IF EXISTS "{table}"')
+        db.execute(f'CREATE TABLE {table} ( data BLOB )')
 
         try:
-            with WriteSQLiteBlobs(db, 'gzipindexes', blob_size=SQLiteIndex._MAX_BLOB_SIZE) as gzindex:
-                if 'rapidgzip' in sys.modules and isinstance(fileObject, rapidgzip.RapidgzipFile):
+            with WriteSQLiteBlobs(db, table, blob_size=SQLiteIndex._MAX_BLOB_SIZE) as gzindex:
+                if supports_gztool_index:
                     # See the following link for the exception mapping done by Cython:
                     # https://cython.readthedocs.io/en/latest/src/userguide/wrapping_CPlusPlus.html#exceptions
-                    exportIndex(gzindex)
+                    logger.info("Store gzip index in gztool index file format.")
+                    exportIndex(gzindex, rapidgzip.IndexFormat.GZTOOL)
                 else:
                     exportIndex(fileobj=gzindex)
         except (indexed_gzip.ZranError, RuntimeError, ValueError) as exception:
-            db.execute('DROP TABLE IF EXISTS "gzipindexes"')
+            db.execute(f'DROP TABLE IF EXISTS "{table}"')
 
             logger.warning(
                 "The gzip index required for seeking could not be written to the database!"
@@ -1599,25 +1619,17 @@ class SQLiteIndex:
                 "(0.8% of the uncompressed data) by default."
             )
 
-            raise RatarmountError("Could not wrote out the gzip seek database.") from exception
+            raise RatarmountError("Could not write out the gzip seek database.") from exception
 
-        blobCount = db.execute('SELECT COUNT(*) FROM gzipindexes;').fetchone()[0]
+        blobCount = db.execute(f'SELECT COUNT(*) FROM {table};').fetchone()[0]
         if blobCount == 0:
             logger.warning(
                 "Did not write out any gzip seek data. This should only happen if the gzip size is smaller "
                 "than the gzip seek point spacing."
             )
-        elif blobCount == 1:
+        elif blobCount == 1 and table == 'gzipindexes':
             # For downwards compatibility
             db.execute('DROP TABLE IF EXISTS "gzipindex";')
             db.execute('ALTER TABLE gzipindexes RENAME TO gzipindex;')
 
         db.commit()
-
-    def open_gzip_index(self) -> Optional[SQLiteBlobsFile]:
-        connection = self.get_connection()
-        tables = get_sqlite_tables(connection)
-        if 'gzipindex' in tables or 'gzipindexes' in tables:
-            table = 'gzipindexes' if 'gzipindexes' in tables else 'gzipindex'
-            return SQLiteBlobsFile(connection, table, 'data', buffer_size=SQLiteIndex._MAX_BLOB_SIZE)
-        return None
