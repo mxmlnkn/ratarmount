@@ -178,28 +178,24 @@ def process_parsed_arguments(args) -> int:
     # This is a hack but because we have two positional arguments (and want that reflected in the auto-generated help),
     # all positional arguments, including the mountpath will be parsed into args.mount_source and we have to
     # manually separate them depending on the type.
-    lastArgument = args.mount_source[-1]
-    if '://' not in lastArgument and (os.path.isdir(lastArgument) or not os.path.exists(lastArgument)):
+    lastArgument: Path = args.mount_source[-1]
+    if ('://' not in str(lastArgument) and lastArgument.is_dir()) or not lastArgument.exists():
         args.mount_point = args.mount_source.pop()
     if not args.mount_source and not args.write_overlay and not args.control_interface:
         raise argparse.ArgumentTypeError("You must specify at least one path to a valid archive or folder!")
 
     # Manually check that all specified TARs and folders exist
-    def check_mount_source(path):
+    def check_mount_source(path: Path):
         try:
-            return CLIHelpers.check_input_file_type(path)
+            return Path(CLIHelpers.check_input_file_type(str(path)))
         except argparse.ArgumentTypeError as e:
-            if not os.path.exists(path):
+            if not path.exists():
                 raise e
-            if (
-                os.path.isdir(path)
-                or zipfile.is_zipfile(path)
-                or ('rarfile' in sys.modules and rarfile.is_rarfile(path))
-            ):
-                return os.path.realpath(path)
+            if path.is_dir() or zipfile.is_zipfile(path) or ('rarfile' in sys.modules and rarfile.is_rarfile(path)):
+                return path.resolve()
             raise e
 
-    mountSources: list[str] = []
+    mountSources: list[Path] = []
     for path in args.mount_source:
         fixedPath = check_mount_source(path)
         # Skip neighboring duplicates
@@ -219,7 +215,7 @@ def process_parsed_arguments(args) -> int:
 
     # Automatically generate a default mount path
     if not args.mount_point:
-        args.mount_point = determine_mount_point(args.mount_source[0]) if args.mount_source else 'mounted'
+        args.mount_point = determine_mount_point(str(args.mount_source[0])) if args.mount_source else 'mounted'
     args.mount_point = os.path.realpath(args.mount_point)
 
     CLIHelpers.process_trivial_parsed_arguments(args)
