@@ -569,7 +569,7 @@ These are some possibilities to create seekable ZStandard files:
    </details>
 
 
-# Remote Files
+## Remote Files
 
 The [fsspec](https://github.com/fsspec/filesystem_spec) API backend adds support for mounting many remote archive or folders.
 Please refer to the linked respective backend documentation to see the full configuration options, especially for specifying credentials.
@@ -629,7 +629,7 @@ In such a case, the index file will be downloaded and/or extracted into the defa
 If the default temporary folder has insufficient disk space, it can be changed by setting the `RATARMOUNT_INDEX_TMPDIR` environment variable.
 
 
-# Writable Mounting
+## Writable Mounting
 
 The  `--write-overlay <folder>` option can be used to create a writable mount point.
 The original archive will not be modified.
@@ -732,7 +732,7 @@ The optional [fsspec](https://github.com/fsspec/filesystem_spec) integration is 
     The `compression=None` argument is currently necessary because of [this](https://github.com/pandas-dev/pandas/issues/60028) Pandas bug.
 
 
-# File Joining
+## File Joining
 
 Files with sequentially numbered extensions can be mounted as a joined file.
 If it is an archive, then the joined archive file will be mounted.
@@ -752,7 +752,7 @@ ls -la mounted
 ```
 
 
-# Mount Point Control Interface
+## Mount Point Control Interface
 
 The FUSE mount contains a special hidden `.ratarmount-control` folder with special files inside it.
 
