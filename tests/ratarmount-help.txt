@@ -172,7 +172,7 @@ Output Options:
   --log-file LOG_FILE   Specifies a file to redirect all output into. The redirection only takes
                         effect after the mount point is provided because, without -f, there is
                         no other way to get output after daemonization and forking into the
-                        background. (default: )
+                        background. (default: None)
   -d, --debug DEBUG     Sets the debugging level. Higher means more output. Currently, 3 is the
                         highest. (default: 1)
 
@@ -198,7 +198,7 @@ Advanced Options:
   --password-file PASSWORD_FILE
                         Specify a file with newline separated passwords for RAR and ZIP files.
                         The passwords will be tried out in order of appearance in the file.
-                        (default: )
+                        (default: None)
   --transform REGEX_PATTERN REPLACEMENT
                         Specify a regex pattern and a replacement string, which will be applied
                         via Python's re module to the full paths of all archive files. (default:

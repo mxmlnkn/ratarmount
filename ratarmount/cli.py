@@ -10,6 +10,7 @@ import json
 import logging
 import math
 import os
+import pathlib
 import sys
 import tarfile
 import tempfile
@@ -321,7 +322,7 @@ For further information, see the ReadMe on the project's homepage:
         help='Sets the debugging level. Higher means more output. Currently, 3 is the highest.')
 
     outputGroup.add_argument(
-        '--log-file', type=str, default='',
+        '--log-file', type=pathlib.Path,
         help='Specifies a file to redirect all output into. The redirection only takes effect after the mount point '
              'is provided because, without -f, there is no other way to get output after daemonization and forking '
              'into the background.')
@@ -373,7 +374,7 @@ For further information, see the ReadMe on the project's homepage:
              '>directly< contains history.log.')
 
     advancedGroup.add_argument(
-        '--password-file', type=str, default='',
+        '--password-file', type=pathlib.Path,
         help='Specify a file with newline separated passwords for RAR and ZIP files. '
              'The passwords will be tried out in order of appearance in the file.')
 
@@ -424,13 +425,13 @@ For further information, see the ReadMe on the project's homepage:
     # Positional Arguments
 
     positionalGroup.add_argument(
-        'mount_source', nargs='+',
+        'mount_source', nargs='+', type=pathlib.Path,
         help='The path to the TAR archive to be mounted. '
              'If multiple archives and/or folders are specified, then they will be mounted as if the arguments '
              'coming first were updated with the contents of the archives or folders specified thereafter, '
              'i.e., the list of TARs and folders will be union mounted.')
     positionalGroup.add_argument(
-        'mount_point', nargs='?',
+        'mount_point', nargs='?', type=pathlib.Path,
         help='The path to a folder to mount the TAR contents into. '
              'If no mount path is specified, the TAR will be mounted to a folder of the same name '
              'but without a file extension.')
