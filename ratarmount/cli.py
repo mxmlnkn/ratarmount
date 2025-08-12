@@ -61,7 +61,7 @@ class _CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescr
 
 class PrintVersionAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        from .actions import print_versions
+        from .dependencies import print_versions
 
         print_versions()
         parser.exit()
@@ -69,7 +69,7 @@ class PrintVersionAction(argparse.Action):
 
 class PrintOSSAttributionAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        from .actions import print_oss_attributions
+        from .dependencies import print_oss_attributions
 
         print_oss_attributions()
         parser.exit()
@@ -77,9 +77,9 @@ class PrintOSSAttributionAction(argparse.Action):
 
 class PrintOSSAttributionShortAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        from .actions import print_oss_attributions_short
+        from .dependencies import print_oss_attributions
 
-        print_oss_attributions_short()
+        print_oss_attributions(short=True)
         parser.exit()
 
 
