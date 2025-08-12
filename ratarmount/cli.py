@@ -130,12 +130,13 @@ For further information, see the ReadMe on the project's homepage:
 ''',
     )
 
-    commonGroup = parser.add_argument_group("Optional Arguments")
+    commandsGroup = parser.add_argument_group("Commands")
+    exclusiveCommandsGroup = commandsGroup.add_mutually_exclusive_group()
+    commonGroup = parser.add_argument_group("Mount Options")
     positionalGroup = parser.add_argument_group("Positional Options")
     indexGroup = parser.add_argument_group("Index Options")
     recursionGroup = parser.add_argument_group("Recursion Options")
     tarGroup = parser.add_argument_group("Tar Options")
-    writeGroup = parser.add_argument_group("Write Overlay Options")
     outputGroup = parser.add_argument_group("Output Options")
     advancedGroup = parser.add_argument_group("Advanced Options")
 
@@ -156,17 +157,35 @@ For further information, see the ReadMe on the project's homepage:
         DEFAULT_GZIP_SEEK_POINT_SPACING = SQLiteIndexedTar.DEFAULT_GZIP_SEEK_POINT_SPACING
 
     # fmt: off
-    commonGroup.add_argument(
+    exclusiveCommandsGroup.add_argument(
         '-h', '--help', action='help', default=argparse.SUPPRESS,
         help='Show this help message and exit.')
+
+    exclusiveCommandsGroup.add_argument(
+        '-u', '--unmount', action='store_true',
+        help='Unmount the given mount point(s). Equivalent to calling "fusermount -u" for each mount point.')
+
+    exclusiveCommandsGroup.add_argument(
+        '--commit-overlay', action='store_true', default=False,
+        help='Apply deletions and content modifications done in the write overlay to the archive.')
+
+    exclusiveCommandsGroup.add_argument(
+        '-v', '--version', action=PrintVersionAction, nargs=0, default=argparse.SUPPRESS,
+        help='Print version information and exit.')
+
+    exclusiveCommandsGroup.add_argument(
+        '--oss-attributions-short', action=PrintOSSAttributionShortAction, nargs=0, default=argparse.SUPPRESS,
+        help='Show license identifiers of used libraries.')
+
+    exclusiveCommandsGroup.add_argument(
+        '--oss-attributions', action=PrintOSSAttributionAction, nargs=0, default=argparse.SUPPRESS,
+        help='Show licenses of used libraries.')
+
+    # Common Options
 
     commonGroup.add_argument(
         '-r', '--recursive', action=argparse.BooleanOptionalAction, default=False,
         help='Mount archives inside archives recursively. Same as --recursion-depth -1.')
-
-    commonGroup.add_argument(
-        '-u', '--unmount', action='store_true',
-        help='Unmount the given mount point(s). Equivalent to calling "fusermount -u" for each mount point.')
 
     commonGroup.add_argument(
         '-P', '--parallelization', type=str, default=":1,rapidgzip-bzip2:0",
@@ -177,12 +196,17 @@ For further information, see the ReadMe on the project's homepage:
              '"<backend>:<parallelization>,:<default parallelization>,<backend 2>:<parallelization>,..."')
 
     commonGroup.add_argument(
-        '-v', '--version', action=PrintVersionAction, nargs=0, default=argparse.SUPPRESS,
-        help='Print version information and exit.')
-
-    commonGroup.add_argument(
         '--password', type=str, default='',
         help='Specify a single password which shall be used for RAR and ZIP files.')
+
+    commonGroup.add_argument(
+        '-w', '--write-overlay',
+        help='Specify an existing folder to be used as a write overlay. The folder itself will be union-mounted '
+             'on top such that files in this folder take precedence over all other existing ones. Furthermore, '
+             'all file creations and modifications will be forwarded to files in this folder. '
+             'Modifying a file inside a TAR will copy that file to the overlay folder and apply the modification '
+             'to that writable copy. Deleting files or folders will update the hidden metadata database inside '
+             'the overlay folder.')
 
     # Index Options
 
@@ -290,21 +314,6 @@ For further information, see the ReadMe on the project's homepage:
              'octal modification prefixes. Note that this is only a heuristic derived by testing 1000-10000 file '
              'entries. If you are sure it is an incremental TAR, use --gnu-incremental instead.')
 
-    # Write Overlay Options
-
-    writeGroup.add_argument(
-        '-w', '--write-overlay',
-        help='Specify an existing folder to be used as a write overlay. The folder itself will be union-mounted '
-             'on top such that files in this folder take precedence over all other existing ones. Furthermore, '
-             'all file creations and modifications will be forwarded to files in this folder. '
-             'Modifying a file inside a TAR will copy that file to the overlay folder and apply the modification '
-             'to that writable copy. Deleting files or folders will update the hidden metadata database inside '
-             'the overlay folder.')
-
-    writeGroup.add_argument(
-        '--commit-overlay', action='store_true', default=False,
-        help='Apply deletions and content modifications done in the write overlay to the archive.')
-
     # Output Options
 
     outputGroup.add_argument(
@@ -373,14 +382,6 @@ For further information, see the ReadMe on the project's homepage:
         help='Specify a backend to be used with higher priority for files which might be opened with multiple '
              'backends. Arguments specified last will have the highest priority. A comma-separated list may be '
              f'specified. Possible backends: {backendNames}')
-
-    advancedGroup.add_argument(
-        '--oss-attributions-short', action=PrintOSSAttributionShortAction, nargs=0, default=argparse.SUPPRESS,
-        help='Show license identifiers of used libraries.')
-
-    advancedGroup.add_argument(
-        '--oss-attributions', action=PrintOSSAttributionAction, nargs=0, default=argparse.SUPPRESS,
-        help='Show licenses of used libraries.')
 
     advancedGroup.add_argument(
         '--disable-union-mount', action='store_true', default=False,

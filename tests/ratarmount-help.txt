@@ -1,5 +1,7 @@
-Usage: ratarmount [-h] [-r | --recursive | --no-recursive] [-u] [-P PARALLELIZATION] [-v]
-                  [--password PASSWORD] [-c | --recreate-index | --no-recreate-index]
+Usage: ratarmount
+                  [-h | -u | --commit-overlay | -v | --oss-attributions-short | --oss-attributions]
+                  [-r | --recursive | --no-recursive] [-P PARALLELIZATION] [--password PASSWORD]
+                  [-w WRITE_OVERLAY] [-c | --recreate-index | --no-recreate-index]
                   [--verify-mtime | --no-verify-mtime] [--index-file INDEX_FILE]
                   [--index-folders INDEX_FOLDERS] [--recursion-depth RECURSION_DEPTH]
                   [-l | --lazy | --no-lazy]
@@ -7,10 +9,9 @@ Usage: ratarmount [-h] [-r | --recursive | --no-recursive] [-u] [-P PARALLELIZAT
                   [--transform-recursive-mount-point REGEX_PATTERN REPLACEMENT] [-e ENCODING]
                   [-i | --ignore-zeros | --no-ignore-zeros]
                   [--gnu-incremental | --no-gnu-incremental] [--detect-gnu-incremental]
-                  [-w WRITE_OVERLAY] [--commit-overlay] [-d DEBUG] [--log-file LOG_FILE]
-                  [--color | --no-color] [-o FUSE] [-f | --foreground | --no-foreground]
-                  [-gs GZIP_SEEK_POINT_SPACING] [-p PREFIX] [--password-file PASSWORD_FILE]
-                  [--use-backend USE_BACKEND] [--oss-attributions-short] [--oss-attributions]
+                  [-d DEBUG] [--log-file LOG_FILE] [--color | --no-color] [-o FUSE]
+                  [-f | --foreground | --no-foreground] [-gs GZIP_SEEK_POINT_SPACING]
+                  [-p PREFIX] [--password-file PASSWORD_FILE] [--use-backend USE_BACKEND]
                   [--disable-union-mount] [--file-versions | --no-file-versions]
                   [--union-mount-cache-max-depth UNION_MOUNT_CACHE_MAX_DEPTH]
                   [--union-mount-cache-max-entries UNION_MOUNT_CACHE_MAX_ENTRIES]
@@ -30,7 +31,18 @@ With ratarmount, you can:
   - Remotely mount an archive from the internet via https:// for read-only access
   - And much more
 
-Optional Arguments:
+Commands:
+  --commit-overlay      Apply deletions and content modifications done in the write overlay to
+                        the archive. (default: False)
+  --oss-attributions    Show licenses of used libraries.
+  --oss-attributions-short
+                        Show license identifiers of used libraries.
+  -h, --help            Show this help message and exit.
+  -u, --unmount         Unmount the given mount point(s). Equivalent to calling "fusermount -u"
+                        for each mount point. (default: False)
+  -v, --version         Print version information and exit.
+
+Mount Options:
   --password PASSWORD   Specify a single password which shall be used for RAR and ZIP files.
                         (default: )
   -P, --parallelization PARALLELIZATION
@@ -41,13 +53,18 @@ Optional Arguments:
                         be specified with: "<backend>:<parallelization>,:<default
                         parallelization>,<backend 2>:<parallelization>,..." (default:
                         :1,rapidgzip-bzip2:0)
-  -h, --help            Show this help message and exit.
   -r, --recursive, --no-recursive
                         Mount archives inside archives recursively. Same as --recursion-depth
                         -1. (default: False)
-  -u, --unmount         Unmount the given mount point(s). Equivalent to calling "fusermount -u"
-                        for each mount point. (default: False)
-  -v, --version         Print version information and exit.
+  -w, --write-overlay WRITE_OVERLAY
+                        Specify an existing folder to be used as a write overlay. The folder
+                        itself will be union-mounted on top such that files in this folder take
+                        precedence over all other existing ones. Furthermore, all file creations
+                        and modifications will be forwarded to files in this folder. Modifying a
+                        file inside a TAR will copy that file to the overlay folder and apply
+                        the modification to that writable copy. Deleting files or folders will
+                        update the hidden metadata database inside the overlay folder. (default:
+                        None)
 
 Positional Options:
   mount_source          The path to the TAR archive to be mounted. If multiple archives and/or
@@ -150,19 +167,6 @@ Tar Options:
                         useful when reading archives created with the -A option. (default:
                         False)
 
-Write Overlay Options:
-  --commit-overlay      Apply deletions and content modifications done in the write overlay to
-                        the archive. (default: False)
-  -w, --write-overlay WRITE_OVERLAY
-                        Specify an existing folder to be used as a write overlay. The folder
-                        itself will be union-mounted on top such that files in this folder take
-                        precedence over all other existing ones. Furthermore, all file creations
-                        and modifications will be forwarded to files in this folder. Modifying a
-                        file inside a TAR will copy that file to the overlay folder and apply
-                        the modification to that writable copy. Deleting files or folders will
-                        update the hidden metadata database inside the overlay folder. (default:
-                        None)
-
 Output Options:
   --color, --no-color   Enable or disable colored help and logging output. (default: True)
   --log-file LOG_FILE   Specifies a file to redirect all output into. The redirection only takes
@@ -191,9 +195,6 @@ Advanced Options:
                         applied for TAR files because the file count only becomes known after
                         parsing the archive, for which an index is already created. (default:
                         1000)
-  --oss-attributions    Show licenses of used libraries.
-  --oss-attributions-short
-                        Show license identifiers of used libraries.
   --password-file PASSWORD_FILE
                         Specify a file with newline separated passwords for RAR and ZIP files.
                         The passwords will be tried out in order of appearance in the file.
