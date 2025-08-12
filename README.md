@@ -97,7 +97,7 @@ The latest nightly build AppImage can be found [here](https://github.com/mxmlnkn
 pip install ratarmount
 ```
 
-If you want all features, some of which may possibly result in installation errors on some systems, install with:
+If you want all [features](https://github.com/mxmlnkn/ratarmount/blob/master/pyproject.toml#L60-L76), some of which may possibly result in installation errors on some systems, install with:
 
 ```bash
 pip install ratarmount[full]
