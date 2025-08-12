@@ -4,3 +4,4 @@
 *.dat linguist-language=csv -text
 tests/ratarmount-help.txt linguist-generated
 *.ar binary
+ratarmount/widgets/resources/qresources.rcc linguist-generated
