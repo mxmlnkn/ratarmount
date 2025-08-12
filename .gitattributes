@@ -3,3 +3,4 @@
 # CSV is categorized as data and should therefore be excluded from code statistics.
 *.dat linguist-language=csv -text
 tests/ratarmount-help.txt linguist-generated
+ratarmount/widgets/resources/qresources.rcc linguist-generated

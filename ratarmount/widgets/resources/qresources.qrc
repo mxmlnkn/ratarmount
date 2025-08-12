@@ -1,0 +1,33 @@
+<!--
+Only use this for small files, such as icons that need to be referenced in qss stylesheets.
+Anything larger should preferably be loaded using resources.py.load_resouce via importlib
+because I don't like a megabytes large .py file being loaded into memory on startup.
+Furthermore, that file needs to be committed to avoid a weird build step.
+-->
+<!DOCTYPE RCC><RCC version="1.0">
+<qresource>
+    <!--
+    For reasons beyond me, Qt does not come with a default + and - icons -.-
+    If it was not for the QSS style, I would simply replace color codes inside the SVGs dynamically.
+    But, QSS wants a real resource path.
+    https://bugreports.qt.io/browse/QTBUG-46947
+    -->
+    <file>icons/eject.svg</file>
+    <file>icons/minus.svg</file>
+    <file>icons/plus.svg</file>
+    <file>icons/dark-mode/arrow-down.svg</file>
+    <file>icons/dark-mode/arrow-right.svg</file>
+    <file>icons/dark-mode/arrow-up.svg</file>
+    <file>icons/dark-mode/cross.svg</file>
+    <file>icons/dark-mode/size-grip.svg</file>
+    <file>icons/light-mode/arrow-down.svg</file>
+    <file>icons/light-mode/arrow-right.svg</file>
+    <file>icons/light-mode/arrow-up.svg</file>
+    <file>icons/light-mode/cross.svg</file>
+    <file>icons/light-mode/size-grip.svg</file>
+    <file>icons/moon.svg</file>
+    <file>icons/palette.svg</file>
+    <file>icons/sun.svg</file>
+    <file>ratarmount-static.svg</file>
+</qresource>
+</RCC>

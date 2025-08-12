@@ -332,6 +332,10 @@ benchmarkDecoderBackends()
 # Linting only to be done locally because in CI it is in separate steps
 if [[ -z "$CI" ]]; then
     COLUMNS=98 $RATARMOUNT_CMD --help | sed '/# Metadata Index Cache/,$d' > tests/ratarmount-help.txt
+    if command -v pyside6-rcc &>/dev/null; then
+        pyside6-rcc --binary --compress-algo none ratarmount/widgets/resources/qresources.qrc \
+            -o ratarmount/widgets/resources/qresources.rcc
+    fi
 
     bash tests/run-style-checkers.sh
 fi

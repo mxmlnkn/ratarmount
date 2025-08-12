@@ -50,6 +50,10 @@ dependencies = [
     # https://packaging.python.org/en/latest/specifications/dependency-specifiers/#dependency-specifiers
     "ratarmountcore[7z, bzip2, fat, gzip, rar, xz, zip, zstd] ~= 0.10.0",
     "mfusepy ~= 3.0",
+    # qtpy is small enough and a platform-independent pure-Python wrapper without dependencies that we can simply
+    # require it as a necessary dependency. The actual meat, pyqt or pyside6 may often be already installed on the
+    # system or can be installed with the optional 'gui' dependency.
+    "qtpy",
 ]
 dynamic = ["version"]
 
@@ -59,6 +63,8 @@ content-type = "text/markdown"
 
 [project.optional-dependencies]
 full = ["ratarmountcore[full]", "rich-argparse", "rich"]
+# Not part of full because it is large and probably should be installed as a system package.
+gui = ["PySide6-Essentials", "markdown_it"]
 colors = ["rich-argparse", "rich"]
 bzip2 = ["ratarmountcore[bzip2]"]
 gzip = ["ratarmountcore[gzip]"]
@@ -79,12 +85,20 @@ git = ["ratarmountcore[git]"]
 ratarmount = "ratarmount.cli:cli"
 
 [tool.setuptools]
-packages = ["ratarmount"]
 license-files = ["LICENSE"]
+
+[tool.setuptools.package-data]
+ratarmount = [
+    "widgets/resources/*.svg",
+    "widgets/resources/icons/*.svg",
+]
+
+[tool.setuptools.packages.find]
+include = ["ratarmount", "ratarmount/.*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "ratarmount.version.__version__"}
 
 [tool.codespell]
 # fsspec uses cachable instead of cacheable ...
 ignore-words-list = "fo,Nd,unx,cachable"
-
-[tool.setuptools.dynamic]
-version = {attr = "ratarmount.version.__version__"}

@@ -13,6 +13,7 @@ ignore = [
     "E402",     # There are too many reasons for not putting imports strictly at the top!
     "E501",     # A linter should lint, not check for line lengths!
     "F401",     # Wants to from .version import __version__ as __version__ which clashes with pylint errors!
+    "N802",     # snake_case methods not enforcable because of PySide6 overrides.
     "N803",     # Argument names are camelCase instead of snake_case (400+ errors).
     "N806",     # Variable names are camelCase instead of snake_case (1100+ errors).
     "N815",     # Class-scope variable names are camelCase instead of snake_case (10 errors).

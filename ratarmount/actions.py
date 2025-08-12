@@ -175,12 +175,6 @@ def process_parsed_arguments(args) -> int:
         # args.mount_source suffices because it eats all arguments and args.mount_point is always empty by default.
         return unmount_list_checked([mountPoint for mountPoint in args.mount_source or [] if mountPoint])
 
-    # This is a hack but because we have two positional arguments (and want that reflected in the auto-generated help),
-    # all positional arguments, including the mountpath will be parsed into args.mount_source and we have to
-    # manually separate them depending on the type.
-    lastArgument = args.mount_source[-1]
-    if '://' not in lastArgument and (os.path.isdir(lastArgument) or not os.path.exists(lastArgument)):
-        args.mount_point = args.mount_source.pop()
     if not args.mount_source and not args.write_overlay and not args.control_interface:
         raise argparse.ArgumentTypeError("You must specify at least one path to a valid archive or folder!")
 

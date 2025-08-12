@@ -1,0 +1,467 @@
+/*
+https://doc.qt.io/qt-6/stylesheet-syntax.html
+https://doc.qt.io/qt-6/stylesheet-reference.html
+https://doc.qt.io/qt-6/widget-classes.html
+*/
+
+/* Global Styles */
+QWidget {
+    background-color: <<<WINDOW>>>;
+    color: <<<TEXT>>>;
+    selection-background-color: <<<BACKGROUND_SELECTED>>>;
+    selection-color: <<<TEXT_SELECTED>>>;
+    border-radius: <<<BORDER_RADIUS>>>;
+}
+
+QWidget:disabled {
+    color: <<<TEXT_DISABLED>>>;
+}
+
+QLabel {
+    background-color: transparent;
+}
+
+/* Background for input widgets.
+ * QAbstractItemView affects: QTreeView, QTreeWidget, QColumnView, QHeaderView, QListView, QListWidget, QTableView,
+ *                            QTableWidget */
+QLineEdit, QTextBrowser, QTextEdit, QSpinBox, QAbstractItemView {
+    background-color: <<<BASE>>>;
+}
+QTextBrowser QScrollBar, QTextEdit QScrollBar, QAbstractItemView QScrollBar {
+    background-color: <<<BASE>>>;
+}
+
+
+/* A bit of padding for input widgets. */
+QAbstractItemView,
+QComboBox,
+QLineEdit,
+QListView,
+QPlainTextEdit,
+QPushButton,
+QSpinBox,
+QTextEdit,
+QToolButton,
+QTreeView {
+    padding: 4px;
+}
+
+/* Large widgets are rarely inside a QGroupBox and therefore should have a border. */
+QAbstractScrollArea {
+    border: 1px solid <<<BORDER_NORMAL>>>;
+    padding: 0.5ex;
+}
+
+/* QLineEdit (very similar to QSpinBox) */
+QLineEdit {
+    border: 2px solid <<<BASE>>>;
+    background-color: <<<BASE>>>;
+    padding: 0.5ex;
+    color: <<<TEXT>>>;
+}
+
+QLineEdit:hover:!focus, QSpinBox:hover:!focus {
+    border: 2px solid <<<BORDER_NORMAL>>>
+}
+
+
+/** @todo Probably better to use QLabel for this? Else, it probably should be done for all inputs widgets! */
+QWidget[warning="true"] {
+    border: 2px solid <<<BORDER_WARNING>>>;
+    background-color: <<<BORDER_WARNING>>>;
+}
+QWidget[error="true"] {
+    border: 2px solid <<<BORDER_ERROR>>>;
+    background-color: <<<BORDER_ERROR>>>;
+}
+QLabel[error="true"] {
+	border: none;
+    background-color: <<<WINDOW>>>;
+    color: <<<BORDER_ERROR>>>;
+}
+QLabel[note="true"] {
+    color: <<<TEXT_DISABLED>>>;
+}
+
+/* Menu (TODO: QMenuBar the same?) */
+QMenu {
+    background-color: <<<WINDOW>>>;
+    color: <<<TEXT>>>;
+    border: 1px solid <<<BORDER_NORMAL>>>;
+    /* Rounded corners requires WA_TranslucentBackground, which we set for all QMenu via QProxyStyle.polish. */
+    border-radius: 0.5ex;
+    /* Visible distance of menu item icons from menu border.
+     * This padding is also visible as gaps for the QMenu::separator lines! */
+    padding: 0ex;
+}
+
+QMenu::icon {
+    /* Second argument to add padding to the left of icons! */
+    padding: 0ex 3ex 0ex 0ex;
+}
+
+/* For checkable items (untested). Should match QCheckBox */
+/*QMenu::indicator:checked {
+    background-color: <<<GREEN_PRIMARY>>>;
+    border-color: <<<GREEN_PRIMARY>>>;
+}*/
+
+QMenu::separator {
+    height: 1px;
+    background-color: <<<BORDER_NORMAL>>>;
+}
+
+QMenu::item {
+    /* First is top-padding of item text, third is bottom of text! Any inequal values for these two looks shit.
+     * In constrast to 'margin', padding also affects the selected rectangle background.
+     * Second is padding to the right. */
+    padding: 0.5ex 2ex 0.5ex 2ex;
+}
+
+QMenu::item:selected {
+    /* The border radius is not simply inherited from QMenu, it seems. */
+    border-radius: 0.5ex;
+    background-color: <<<BORDER_FOCUS>>>;
+}
+
+QMenu::item:disabled {
+    color: <<<TEXT_DISABLED>>>
+}
+
+
+/* Check boxes and radio buttons (todo) */
+QCheckBox {
+    padding: 1px;
+    background-color: transparent;
+    border-radius: <<<BORDER_RADIUS>>>;
+    color: <<<TEXT>>>;
+    spacing: 1ex;
+}
+
+QCheckBox::indicator {
+    width: 2.5ex;
+    height: 2.5ex;
+    border: 1px solid;
+    border-color: <<<BORDER_NORMAL>>>;
+    border-radius: 0.75ex;
+    background: <<<BASE>>>;
+}
+
+QCheckBox::indicator:hover {
+    border: 2px solid;
+    border-color: <<<BORDER_NORMAL>>>;
+}
+
+QCheckBox::indicator:checked {
+    background: <<<GREEN_DARK>>>;
+    border-color: <<<GREEN_DARK>>>;
+    image: url(:/icons/<<<MODE>>>-mode/cross.svg);
+}
+
+QCheckBox::indicator:checked:hover {
+    background: <<<GREEN_PRIMARY>>>;
+    border-color: <<<GREEN_PRIMARY>>>;
+}
+
+QCheckBox::indicator:focus {
+    border: 2px solid;
+    border-color: <<<BORDER_FOCUS>>>;
+}
+
+
+/* Group Boxes */
+
+QGroupBox, QGroupBox[flat="true"] {
+    /*border-left: 1px solid <<<TEXT_DISABLED>>>;*/
+    border-top: 1px solid <<<TEXT_DISABLED>>>;
+    border-radius: 0ex;
+    /*border-top-left-radius: 0.5ex;
+    border-bottom-left-radius: 0;*/
+    background-color: <<<WINDOW>>>;
+    margin-top: 4ex;  /* Leave space at the top for the title. Unfortunately this depends on the font! */
+}
+
+QGroupBox::title, QGroupBox::title[flat="true"] {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    margin-top: 0.75ex;
+    /*left: -3px;*/
+}
+
+QGroupBox::indicator:unchecked {
+    image: url(:/icons/<<<MODE>>>-mode/arrow-right.svg);
+}
+
+QGroupBox::indicator:checked {
+    image: url(:/icons/<<<MODE>>>-mode/arrow-down.svg);
+}
+
+/* Scroll Bars */
+
+QScrollBar {
+    border: none;
+    background: transparent;
+    width: 7px;
+    border-radius: 3px;
+}
+
+QScrollBar:hover {
+    background: <<<BACKGROUND_HOVER>>>;
+}
+
+QScrollBar::handle {
+    background: <<<BUTTON_NORMAL>>>;
+    min-height: 2ex;
+    border-radius: 3px;
+}
+
+QScrollBar::handle:hover {
+    background: <<<BUTTON_HOVER>>>;
+}
+
+QScrollBar::handle:pressed {
+    background: <<<BUTTON_PRESSED>>>;
+}
+
+QScrollBar::add-line, QScrollBar::sub-line {
+    height: 0px;
+    background: none;
+}
+
+/* Spin boxes */
+QSpinBox {
+    border-radius: <<<BORDER_RADIUS>>>;
+    padding-right: 4ex; /* leave space for the buttons */
+}
+
+/* Buttons */
+QSpinBox::up-button, QSpinBox::down-button {
+    background-color: <<<WINDOW>>>;
+    border-color: <<<WINDOW>>>;
+    padding-left: 0.25ex;
+    padding-right: 0.25ex;
+    margin-right: 0.75ex;
+    border-radius: 3px;
+    width: 1ex;
+}
+
+QSpinBox::up-button {
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+    margin-top: 3px;
+}
+
+QSpinBox::down-button {
+    subcontrol-origin: border;
+    subcontrol-position: bottom right;
+    margin-bottom: 3px;
+}
+
+/* Default arrow indicators */
+QSpinBox::up-arrow {
+    image: url(:/icons/<<<MODE>>>-mode/arrow-up.svg);
+    width: 1ex;
+}
+
+QSpinBox::down-arrow {
+    image: url(:/icons/<<<MODE>>>-mode/arrow-down.svg);
+    width: 1ex;
+}
+
+/* Splitter */
+QSplitter::handle {
+    background-color: transparent;
+    border-radius: 2px;
+    margin: 2px;
+}
+
+QSplitter::handle:hover {
+    background-color: <<<BORDER_NORMAL>>>;
+}
+
+QSplitter::handle:pressed {
+    background-color: <<<BORDER_FOCUS>>>;
+}
+
+/* Monospace font for command line text edits. TODO Solve with attribute? */
+QTextBrowser#terminal {
+    font-family: "monospace";
+    background-color: <<<BASE>>>;
+}
+
+/* Tabs TODO */
+/* TODO Clashes with purple focus border of contained widget! Either use purple instead of green, or add a hefty margin! */
+QTabWidget::pane {
+    border: none;
+    background-color: <<<WINDOW>>>;
+}
+
+QTabWidget::tab-bar {
+    left: 5px;
+}
+
+QTabBar::tab {
+    background-color: <<<WINDOW>>>;
+    border: 1px solid <<<BORDER_NORMAL>>>;
+    border-bottom: none;
+    border-top-left-radius: 1ex;
+    border-top-right-radius: 1ex;
+    padding: 6px 12px;
+    margin-right: 2px;
+}
+
+QTabBar::tab:selected {
+    background-color: <<<BASE>>>;
+    border-top: 2px solid <<<GREEN_PRIMARY>>>;
+    border-top-left-radius: 0.4ex;
+    border-top-right-radius: 0.4ex;
+}
+
+QTabBar::tab:hover {
+    background-color: <<<BACKGROUND_HOVER>>>;
+}
+
+
+/* Trees and Lists */
+QTreeView, QListView {
+    border: 1px solid <<<BORDER_NORMAL>>>;
+    border-radius: <<<BORDER_RADIUS>>>;
+    alternate-background-color: <<<BASE>>>;
+    show-decoration-selected: 1;
+    outline: none;
+}
+
+QTreeView::item, QListView::item {
+    padding: 2px;
+}
+
+QTreeView::item:hover, QListView::item:hover {
+    background-color: <<<BACKGROUND_HOVER>>>;
+}
+
+QTreeView::item:selected, QListView::item:selected {
+    background-color: <<<BACKGROUND_SELECTED>>>;
+}
+
+
+QToolTip {
+    background-color: <<<WINDOW>>>;
+    color: <<<TEXT>>>;
+    border: 1px solid <<<BORDER_NORMAL>>>;
+    /* Qt is too dumb to reliably remove the background outside of the rounded corners!
+     * So, do not set a border radius! Or one small enough where it is hard to notice */
+    border-radius: 2px;
+    padding: 0.5ex;
+}
+
+
+/* Tree view headers */
+QHeaderView {
+    border: none;
+    border-radius: 0;
+    padding-bottom: 0ex;
+    margin-bottom: 0ex;
+    padding-left: 0ex;
+    padding-right: 0ex;
+}
+
+QHeaderView::section {
+    border: 1px solid <<<BORDER_NORMAL>>>;
+    border-top-left-radius: 0.5ex;
+    border-top-right-radius: 0.5ex;
+    background-color: <<<WINDOW>>>;
+    padding: 0.5ex;
+}
+
+QHeaderView::section:hover {
+    background-color: <<<BACKGROUND_HOVER>>>;
+}
+
+QHeaderView::section:pressed {
+    background-color: <<<BORDER_FOCUS>>>;
+}
+
+
+/* QPushButton. Have this after QTreeView, so that QToolButton inside a QTreeView looks better! */
+QToolButton{
+    background-color: transparent;
+}
+QPushButton, QSpinBox::up-button, QSpinBox::down-button {
+    background-color: <<<BUTTON_NORMAL>>>;
+    border: 2px solid <<<BUTTON_NORMAL>>>;
+}
+/* > Pseudo-states can be chained, in which case a logical AND is implied. */
+QPushButton:focus:hover:!pressed, QToolButton:focus:hover:!pressed {
+    background-color: <<<BUTTON_HOVER>>>;
+    border-color: <<<BORDER_FOCUS>>>;
+}
+QPushButton:hover, QToolButton:hover, QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+    background-color: <<<BUTTON_HOVER>>>;
+    border-color: <<<BUTTON_HOVER>>>;
+}
+QPushButton:pressed, QToolButton:pressed, QSpinBox::up-button:pressed, QSpinBox::down-button:pressed {
+    background-color: <<<BUTTON_PRESSED>>>;
+    border-color: <<<BUTTON_PRESSED>>>;
+}
+/* This is an attempt to make QToolButton the same height as QPushButton, which it is not for some reason. */
+QToolButton {
+    padding: 3px;
+}
+
+/* Primary button styling (for main actions like Mount) */
+QPushButton#primary-button {
+    background-color: <<<GREEN_DARKER>>>;
+    border-color: <<<GREEN_DARKER>>>;
+    color: <<<TEXT>>>;
+}
+
+QPushButton#primary-button:disabled {
+    background-color: <<<BUTTON_NORMAL>>>;
+    border-color: <<<BUTTON_NORMAL>>>;
+	color: <<<TEXT_DISABLED>>>;
+}
+
+QPushButton#primary-button:focus {
+    border-color: <<<BORDER_FOCUS>>>;
+}
+
+QPushButton#primary-button:hover {
+    background-color: <<<GREEN_PRIMARY>>>;
+    border-color: <<<GREEN_PRIMARY>>>;
+    color: #000;
+}
+
+QPushButton#primary-button:focus:hover {
+    border-color: <<<BORDER_FOCUS>>>;
+}
+
+QSizeGrip {
+    width: 16px;
+    height: 16px;
+    image: url(:/icons/<<<MODE>>>-mode/size-grip.svg);
+}
+
+
+/* Important to get rid of the weird effect where the text inside QPushButton has a rectangle background when focused.
+ * I don't know how to specify it more concretely. */
+*:focus {
+    outline: none;
+}
+
+/* Make focused widgets with borders thicker.
+ * Simply using *:focus leads to some weird purple pixels when the QScrollBar::slider is at the top or bottom!
+ * Generic styles should be at the bottom so that it has precedence! */
+QAbstractItemView:focus,
+QAbstractScrollArea:focus,
+QComboBox:focus,
+QLineEdit:focus,
+QListView:focus,
+QPlainTextEdit:focus,
+QPushButton:focus,
+QSpinBox:focus,
+QTextEdit:focus,
+QToolButton:focus,
+QTreeView:focus {
+    border-style: solid;
+    border-color: <<<BORDER_FOCUS>>>;
+}

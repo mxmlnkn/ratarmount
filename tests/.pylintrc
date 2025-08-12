@@ -5,7 +5,7 @@ init-hook='import sys; sys.path.append("./core"); sys.path.append("./core/ratarm
 # run arbitrary code.
 extension-pkg-allow-list=indexed_gzip,indexed_bzip2,indexed_zstd,libarchive,libarchive.ffi,lzmaffi,rapidgzip,isal,
                          PySquashfsImage,PySquashfsImage.compressor,zstandard,lz4,deflate,pyminizip,fast_zip_decryption,
-                         asyncssh,sshfs,fsspec,pygit2
+                         asyncssh,sshfs,fsspec,pygit2,PySide6
 
 # Use multiple processes to speed up Pylint. Specifying 0 will auto-detect the
 # number of processors available to use.

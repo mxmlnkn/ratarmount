@@ -181,6 +181,10 @@ For further information, see the ReadMe on the project's homepage:
         '--oss-attributions', action=PrintOSSAttributionAction, nargs=0, default=argparse.SUPPRESS,
         help='Show licenses of used libraries.')
 
+    exclusiveCommandsGroup.add_argument(
+        '--gui', action='store_true', default=False,
+        help='Open graphical user interface.')
+
     # Common Options
 
     indexGroup.add_argument(
@@ -205,7 +209,7 @@ For further information, see the ReadMe on the project's homepage:
         help='Specify a single password which shall be used for RAR and ZIP files.')
 
     commonGroup.add_argument(
-        '-w', '--write-overlay',
+        '-w', '--write-overlay', type=str,
         help='Specify an existing folder to be used as a write overlay. The folder itself will be union-mounted '
              'on top such that files in this folder take precedence over all other existing ones. Furthermore, '
              'all file creations and modifications will be forwarded to files in this folder. '
@@ -443,6 +447,21 @@ For further information, see the ReadMe on the project's homepage:
 
     if 'argcomplete' in sys.modules:
         argcomplete.autocomplete(parser)
+
+    parse_args = parser.parse_args
+
+    def new_parse(self):
+        args = parse_args()
+        # This is a hack but because we have two positional arguments (and want that reflected in the auto-generated help),
+        # all positional arguments, including the mount path will be parsed into args.mount_source and we have to
+        # manually separate them depending on the type.
+        lastArgument = args.mount_source[-1]
+        if '://' not in lastArgument and (os.path.isdir(lastArgument) or not os.path.exists(lastArgument)):
+            args.mount_point = args.mount_source.pop()
+        return args
+
+    parser.parse_args = new_parse
+
     return parser
 
 
@@ -544,9 +563,36 @@ def cli(rawArgs: Optional[list[str]] = None) -> int:
     configure_logging(debug=debug, useColor=useColor)
 
     try:
+        if len(sys.argv) <= 1 or (rawArgs is not None and not rawArgs):
+            try:
+                from .gui import main as main_gui
+
+                return main_gui()
+            except Exception as exception:
+                logger.info("Will not show GUI because of: %s", exception, exc_info=logger.isEnabledFor(logging.DEBUG))
+
         args = create_parser(useColor=useColor).parse_args(rawArgs)
         if args.debug != debug or args.color != useColor:
             configure_logging(args.debug, args.color)
+
+        if args.gui:
+            try:
+                from .gui import main as main_gui
+            except ImportError as exception:
+                logger.error(
+                    "Unable to start GUI because of: %s. Try: pip install ratarmount[gui]",
+                    exception,
+                    exc_info=logger.isEnabledFor(logging.DEBUG),
+                )
+                return 1
+            except Exception as exception:
+                logger.error(
+                    "Unable to start GUI because of: %s.", exception, exc_info=logger.isEnabledFor(logging.DEBUG)
+                )
+                return 1
+
+            return main_gui(args)
+
         from .actions import process_parsed_arguments
 
         return process_parsed_arguments(args)
