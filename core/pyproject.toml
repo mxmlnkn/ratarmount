@@ -117,7 +117,7 @@ full = [
     "libarchive-c ~= 5.1, < 6.0",
     "python-xz ~= 0.4.0",
     # Require rapidgzip >= 0.14 for gztool index support.
-    "rapidgzip ~= 0.14.0",
+    "rapidgzip ~= 0.15.0",
     "rarfile ~= 4.1",
     "py7zr ~= 1.0",
     "PySquashfsImage == 0.9.0",
@@ -153,10 +153,10 @@ full = [
 # There are too many major versions and I don't wanna lock into one. I only need the most basic things anyway.
 # It should work with almost every version.
 colors = ["rich"]
-bzip2 = ["rapidgzip ~= 0.14.0"]
+bzip2 = ["rapidgzip ~= 0.15.0"]
 git = ["pygit2"]
 # Require rapidgzip >= 0.14 for gztool index support.
-gzip = ["rapidgzip ~= 0.14.0", "indexed_gzip ~= 1.7"]
+gzip = ["rapidgzip ~= 0.15.0", "indexed_gzip ~= 1.7"]
 fsspec = ["fsspec"]
 fsspec-backends = [
     # Copy-pasted from fsspec[full] list. Some were excluded because they are too unproportionally large.

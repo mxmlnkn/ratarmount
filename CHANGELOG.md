@@ -1,4 +1,32 @@
+# Version 1.2.0 built on 2025-08-16
+
+## Feature
+
+ - Add optional hidden folder control interface `<mount point>/.ratarmount-control/`.
+ - Add capability to mount into relative subpaths in existing FUSE mount using the control interface.
+ - Use `rich` for help formatting, logging, and the progress bar if installed.
+ - Enable `mfusepy` and other backend debug output for high `--debug` settings.
+ - `--recursive` will now also join split files and descend into the resulting file.
+ - Add `--no-file-versions` for disabling the file version layer.
+   One fewer layer may improve performance and reduce problems.
+ - Offer `--no-xxx` variants for all bool flags.
+ - Move all command line options that are actually subcommands into an exclusive group.
+
+## Performance
+
+ - Store gzip indexes as compressed gztool index. Gztool indexes are compressed.
+   A novel sparsing method is used to increase compressibility by doing a sparsity analysis
+   and setting all unneeded window bytes to 0. This reduces the index size for large gzips by 10-20x.
+   This also reduces memory consumption because the gzip index is fully held in memory.
+
+## API
+
+ - Drop support for EOL Python 3.7 and 3.8. Older ratarmount versions are still available on old Python versions.
+
+
 # Version 1.1.2 built on 2025-08-01
+
+## Fixes
 
  - Fix wrong `sys.executable` in AppImage and make AppRun POSIX-compliant to not require bash on the host.
  - Improve handling of non-existing input files in argument check.
