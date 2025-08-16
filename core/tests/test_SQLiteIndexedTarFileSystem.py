@@ -19,7 +19,7 @@ except ImportError:
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.SQLiteIndexedTarFsspec import SQLiteIndexedTarFileSystem as RatarFS  # noqa: E402
+from ratarmountcore.SQLiteIndexedTarFsspec import SQLiteIndexedTarFileSystem  # noqa: E402
 
 
 def find_test_file(relativePathOrName):
@@ -31,10 +31,10 @@ def find_test_file(relativePathOrName):
 
 
 def test_file_system():
-    fs = RatarFS(find_test_file('single-file.tar'))
+    fs = SQLiteIndexedTarFileSystem(find_test_file('single-file.tar'))
 
-    assert 'bar' in fs.ls("/", detail=False)
-    assert 'bar' in [info['name'] for info in fs.ls("/", detail=True)]
+    assert '/bar' in fs.ls("/", detail=False)
+    assert '/bar' in [info['name'] for info in fs.ls("/", detail=True)]
 
     assert not fs.isfile("/")
     assert fs.isdir("/")
@@ -49,6 +49,14 @@ def test_file_system():
 
     with fs.open("bar") as file:
         assert file.read() == b"foo\n"
+
+
+def test_listing():
+    fs = SQLiteIndexedTarFileSystem(find_test_file('nested-tar.tar'))
+
+    assert set(fs.find("/", maxdepth=9, withdirs=True)) == {'foo', 'foo/fighter', 'foo/fighter/ufo', 'foo/lighter.tar'}
+    # Should not raise exceptions.
+    print(fs.tree("/", recursion_limit=10))
 
 
 def test_url_context_manager():
