@@ -256,8 +256,11 @@ ratarmount --<tab><tab>
 
 # Benchmarks
 
-![Benchmark comparison between ratarmount, archivemount, and fuse-archive](benchmarks/plots/archivemount-comparison-2022-02-19.png)
+<div align="center">
 
+[![Benchmark comparison between ratarmount, archivemount, and fuse-archive](https://raw.githubusercontent.com/mxmlnkn/ratarmount/master/benchmarks/plots/archivemount-comparison-2022-02-19.png)](https://raw.githubusercontent.com/mxmlnkn/ratarmount/master/benchmarks/plots/archivemount-comparison-2022-02-19.png)
+
+</div>
 
  - Not shown in the benchmarks, but ratarmount can mount files with **preexisting index sidecar files** in under a second making it **vastly more efficient** compared to archivemount for every **subsequent mount**.
    Also, archivemount has no progress indicator making it very unlikely the user will wait hours for the mounting to finish.
@@ -279,8 +282,11 @@ ratarmount --<tab><tab>
  - For the other cases, mounting times become roughly the same compared to archivemount for archives with 2M files in an approximately 100GB archive.
  - **Getting a lot of metadata** for archive contents as demonstrated by calling `find` on the mount point is an order of magnitude **slower** compared to archivemount. Because the C-based fuse-archive is even slower than ratarmount, the difference is very likely that archivemount uses the low-level FUSE interface while ratarmount and fuse-archive use the high-level FUSE interface.
 
+<div align="center">
 
-![Reading bandwidth benchmark comparison between ratarmount, archivemount, and fuse-archive](benchmarks/plots/bandwidth-comparison.png)
+[![Reading bandwidth benchmark comparison between ratarmount, archivemount, and fuse-archive](https://raw.githubusercontent.com/mxmlnkn/ratarmount/master/benchmarks/plots/bandwidth-comparison.png)](https://raw.githubusercontent.com/mxmlnkn/ratarmount/master/benchmarks/plots/bandwidth-comparison.png)
+
+</div>
 
  - Reading files from the archive with archivemount are scaling quadratically instead of linearly.
    This is because archivemount starts reading from the beginning of the archive for each requested I/O block.
