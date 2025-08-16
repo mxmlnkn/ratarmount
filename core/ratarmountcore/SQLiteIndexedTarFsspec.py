@@ -33,19 +33,34 @@ class MountSourceFileSystem(fsspec.spec.AbstractFileSystem):
 
     @overrides(fsspec.spec.AbstractFileSystem)
     def ls(self, path, detail=True, **kwargs):
+        # https://filesystem-spec.readthedocs.io/en/latest/api.html#fsspec.spec.AbstractFileSystem.ls
+        # > The specific keys, or perhaps a FileInfo class, or similar, is TBD, but must be consistent across
+        # > implementations. Must include:
+        # > - full path to the entry (without protocol)
+        # > - size of the entry, in bytes. If the value cannot be determined, will be None.
+        # > - type of entry, “file”, “directory” or other
+        # How can something with "spec" in its name not be fully specified ... But the returned paths have to be
+        # a full path.
+        def prefix_path(name):
+            return f"{path.rstrip('/')}/{name}" if path else name
+
         strippedPath = self._stripProtocol(path)
         if detail:
             result = self.mountSource.list(strippedPath)
             if result is None:
                 raise FileNotFoundError(path)
             if not isinstance(result, dict):
-                result = {name: self.mountSource.lookup(name) for name in result}
-            return [self._file_info_to_dict(name, info) for name, info in result.items() if info is not None]
+                result = {prefix_path(name): self.mountSource.lookup(name) for name in result}
+            return [
+                self._file_info_to_dict(prefix_path(name), info) for name, info in result.items() if info is not None
+            ]
 
         result = self.mountSource.list_mode(strippedPath)
         if result is None:
             raise FileNotFoundError(path)
-        return list(result.keys()) if isinstance(result, dict) else result
+        if isinstance(result, dict):
+            return [prefix_path(name) for name in result]
+        return [prefix_path(name) for name in result]
 
     @overrides(fsspec.spec.AbstractFileSystem)
     def info(self, path, **kwargs):
