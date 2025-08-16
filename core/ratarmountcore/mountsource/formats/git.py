@@ -2,7 +2,7 @@ import io
 import os
 import stat
 from collections.abc import Iterable
-from typing import IO, Optional, Union
+from typing import IO, Any, Optional, Union
 
 try:
     import pygit2
@@ -49,8 +49,8 @@ class GitMountSource(MountSource):
 
         return 'master'
 
-    def _look_up_path(self, path: str):
-        tree = self.tree
+    def _look_up_path(self, path: str) -> Optional[Any]:
+        tree: Any = self.tree
         for name in self.prefix.split("/") + path.split("/"):
             if name and isinstance(tree, pygit2.Tree):
                 if name not in tree:
@@ -119,10 +119,14 @@ class GitMountSource(MountSource):
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
         path = fileInfo.userdata[-1]
-        assert isinstance(path, str)
+        if not isinstance(path, str):
+            raise TypeError("Expected str path in userdata!")
         # TODO Avoid high memory usage for very large files.
         #      Check whether pygit2 even has a kind of streaming API for file contents.
-        return io.BytesIO(self._look_up_path(path).data)
+        blob = self._look_up_path(path)
+        if blob:
+            return io.BytesIO(blob.data)
+        raise FileNotFoundError(path)
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
