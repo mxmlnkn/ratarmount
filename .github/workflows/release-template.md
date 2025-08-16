@@ -24,5 +24,6 @@ Supports:
  - libarchive backend: ar, CAB, cpio, grzip, ISO9660, lrzip, LZ4, lzip, LZMA, lzop, RPM, UU, WARC, XAR, Z
  - SquashFS
  - All remote protocols: ftp://, git://, http://, ssh://, ...
+ - Colored output
  - Ships with compiled Python bytecode to speed up startup latency by [2-3x](https://github.com/niess/python-appimage/issues/91#issuecomment-3136560614) at the cost of 20% larger AppImage size.
 
