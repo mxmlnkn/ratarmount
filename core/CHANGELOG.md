@@ -1,5 +1,31 @@
 
+# Version 0.10.0 built on 2025-08-16
+
+## Feature
+
+ - Add `RemovePrefixMountSource`.
+ - `AutoMountLayer` will now also join split files and recursively mount the result if necessary.
+ - Use `rich` for help formatting, logging, and the progress bar if installed.
+ - `SingleFileMountSource`: Initialize permission modes based on `fileobj.readable` and `.writable`.
+ - `SingleFileMountSource`: Accept open-file lambdas in addition to file objects.
+ - `SubvolumesMountSource`: Add capability to mount and unmount nested paths.
+
+## API
+
+ - Drop support for EOL Python 3.7 and 3.8. Older ratarmountcore versions are still available on old Python versions.
+ - Add default argument values for `compressions.open_compressed_file`.
+ - Use `Sequence` instead of `list` to annotate function arguments.
+ - `SingleFileMountSource`: Simplify code to only accept non-folder paths. Use `RemovePrefixMountSource` instead.
+ - Use the `logging` module instead of `debug: int` arguments to most functions.
+
+## Fixes
+
+ - Make fsspec `ratar://` protocol implementation return full paths on `ls` so that `AbstractFileSystem.find` works.
+
+
 # Version 0.9.2 built on 2025-08-01
+
+## Fixes
 
  - Querying compositing mount sources with empty string instead of `/` did not work correctly.
  - `SQLARMountSource`: Files with denormal paths did show empty mount points.
