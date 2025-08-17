@@ -1,4 +1,11 @@
 
+# Version 0.10.1 built on 2025-08-17
+
+## Fixes
+
+ - Avoid exception in split-file check when given only a name without slashes or a non-existing file.
+
+
 # Version 0.10.0 built on 2025-08-16
 
 ## Feature
