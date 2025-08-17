@@ -96,6 +96,8 @@ jobs:
           # Reset pkgrel to 1 https://wiki.archlinux.org/title/PKGBUILD#pkgrel
           sed -i "s|pkgrel=.*|pkgrel=1|" PKGBUILD
           sed -i "s|b2sums=.*|b2sums=('$b2sum512')|" PKGBUILD
+          sed -i '/pyfatfs/d' PKGBUILD
+          sed -Ei "s|(.*python-indexed-zstd.*)|\1\n    'python-rich'\n    'python-rich-argparse'|" PKGBUILD
           su user -c 'namcap PKGBUILD'
           su user -c 'makepkg --printsrcinfo > .SRCINFO'
           su user -c 'git add -f PKGBUILD .SRCINFO'
