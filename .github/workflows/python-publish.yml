@@ -90,7 +90,7 @@ jobs:
         shell: bash
         run: |
           pkgver=1.2.0
-          curl -L --output "$pkgver.tar.gz" "https://github.com/mxmlnkn/ratarmount/archive/refs/tags/v${pkgver}.tar.gz"
+          curl -L --output "$pkgver.tar.gz" "https://github.com/mxmlnkn/ratarmount/archive/refs/tags/core-v0.10.1.tar.gz"
           b2sum512=$( b2sum ${pkgver}.tar.gz | sed 's| .*||' )
           # Update PKGBUILD
           sed -i "s|pkgver=.*|pkgver=$pkgver|" PKGBUILD
