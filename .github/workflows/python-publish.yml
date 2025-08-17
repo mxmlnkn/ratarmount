@@ -2,6 +2,7 @@ name: Publish to PyPI
 
 on:
   push:
+    branches: '**'
     tags:
       - 'v*.*.*'
 
@@ -88,7 +89,7 @@ jobs:
           GITHUB_REF: ${{ github.ref }}
         shell: bash
         run: |
-          pkgver=${GITHUB_REF#refs/tags/v}
+          pkgver=1.2.0
           curl -L --output "$pkgver.tar.gz" "https://github.com/mxmlnkn/ratarmount/archive/refs/tags/v${pkgver}.tar.gz"
           b2sum512=$( b2sum ${pkgver}.tar.gz | sed 's| .*||' )
           # Update PKGBUILD
@@ -107,7 +108,6 @@ jobs:
           su user -c 'git show | cat'
 
       - name: Test PKGBUILD
-        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           # makepkgs does not work because the PKGBUILD depends on other AUR packages.
           #su user -c 'makepkg -s --noconfirm'
