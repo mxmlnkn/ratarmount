@@ -41,3 +41,13 @@ def copy_test_file(relativePathOrName):
                         break
 
         yield path
+
+
+@contextlib.contextmanager
+def change_working_directory(path):
+    old_path = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(old_path)

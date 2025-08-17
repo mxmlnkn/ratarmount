@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from helpers import change_working_directory, find_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -15,16 +16,18 @@ from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar  # noqa: E40
 from ratarmountcore.mountsource.formats.zip import ZipMountSource  # noqa: E402
 
 
-def find_test_file(relativePathOrName):
-    for i in range(3):
-        path = os.path.sep.join([".."] * i + ["tests", relativePathOrName])
-        if os.path.exists(path):
-            return path
-    return relativePathOrName
-
-
 @pytest.mark.parametrize("transform_path", [str, Path])
 class TestOpenMountSource:
+    @staticmethod
+    def test_open_with_name_only(transform_path):
+        # Specifying only a name, implying the current directory, triggered a bug because os.path.dirnmae("name")
+        # returns an empty string and os.listdir raises FileNotFoundError on an empty string.
+        # This should not be triggered via ratarmount because it uses os.realpath for all inputs,
+        # but funnily enough, this got triggered by the AUR test, which directly calls open_mount_source!
+        path, name = os.path.split(find_test_file("single-file.tar"))
+        with change_working_directory(path), open_mount_source(transform_path(name)) as mountSource:
+            assert mountSource.list("")
+
     @staticmethod
     def test_joining_archive(tmp_path, transform_path):
         compressed = bz2.compress(b"foobar")

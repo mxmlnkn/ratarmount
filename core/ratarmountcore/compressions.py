@@ -297,7 +297,11 @@ def check_for_split_file_in(path: str, candidateNames: Iterable[str]) -> Optiona
 
 
 def check_for_split_file_in_folder(path: str) -> Optional[tuple[list[str], str]]:
-    return check_for_split_file_in(path, os.listdir(os.path.dirname(path)))
+    try:
+        return check_for_split_file_in(path, os.listdir(os.path.dirname(path) or '.'))
+    except FileNotFoundError:
+        pass
+    return None
 
 
 def _compress_zstd(data):
