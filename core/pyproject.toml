@@ -125,10 +125,10 @@ full = [
     "python-lzo ~= 1.0",
     # Need at least 0.23.0 for Python 3.13 support.
     # https://github.com/indygreg/python-zstandard/issues/223
-    # With Python 3.14, I get ImportError: cannot import name 'ByteString' from 'typing' via
-    # zstandard/__init__.py:21.
+    # Need at least 0.24.0 for Python 3.14
     # https://github.com/indygreg/python-zstandard/issues/238
-    "zstandard ~= 0.23.0; python_version >= '3.8' and python_version < '3.14'",
+    "zstandard >= 0.23.0, <= 0.24.0; python_version < '3.14'",
+    "zstandard ~= 0.24.0; python_version >= '3.14'",
     # With Python 3.14, when building the wheel, I get:
     # /usr/bin/ld: cannot find /tmp/tmpcuw21d78/bin/isa-l.a: No such file or directory
     'isal ~= 1.0; python_version < "3.14.0"',
