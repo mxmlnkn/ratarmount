@@ -194,7 +194,7 @@ jobs:
       with:
         artifacts: "ratarmount*.AppImage/*.AppImage"
         tag: ${{ github.ref_name }}
-        name: "Ratarmount ${{ github.ref_name }}"
+        name: "ratarmount ${{ github.ref_name }}"
         bodyFile: release.md
         allowUpdates: true
         removeArtifacts: true
