@@ -312,8 +312,16 @@ def create_oss_markdown(version_info: VersionInformation) -> str:
     result = f"# {version_info.name}\n\n"
     if version_info.summary:
         result += version_info.summary + "\n\n"
+
     if version_info.urls:
-        result += "\n".join(version_info.urls) + "\n\n"
+        for url in version_info.urls:
+            split = url.split(', ', maxsplit=1)
+            name = 'Homepage'
+            if len(split) == 2:
+                name = split[0]
+            result += f"[{name}]({split[-1]})\n\n"
+        result += "\n"
+
     if version_info.authors:
         result += f"Authors: {', '.join(version_info.authors)}\n\n"
 

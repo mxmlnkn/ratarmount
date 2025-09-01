@@ -283,9 +283,10 @@ def plot_comparison(fileName):
     plot_benchmark(labels, data, ax, "find", "duration/s", tools)
 
     fig.tight_layout()
-    fileName = 'archivemount-comparison.png'
-    fig.savefig(fileName, dpi=150)
-    print("Written out:", fileName)
+    for extension in ['png', 'svg']:
+        fileName = f'archivemount-comparison.{extension}'
+        fig.savefig(fileName, dpi=150)
+        print("Written out:", fileName)
 
 
 def plot_ratarmount_parallel_comparison(fileName, compression):
