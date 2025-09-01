@@ -234,7 +234,7 @@ def parsed_args_to_options(args) -> dict[str, Any]:
         'lazyMounting'                 : bool(args.lazy),
         'passwords'                    : list(args.passwords),
         'parallelizations'             : args.parallelizations,
-        'isGnuIncremental'             : bool(args.gnu_incremental),
+        'isGnuIncremental'             : args.gnu_incremental,  # Optional[bool]
         'writeOverlay'                 : str(args.write_overlay) if args.write_overlay else '',
         'transformRecursiveMountPoint' : args.transform_recursive_mount_point,
         'transform'                    : args.transform,
