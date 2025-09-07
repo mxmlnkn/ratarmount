@@ -20,7 +20,7 @@ from helpers import copy_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.mountsource.formats.ext4 import EXT4MountSource  # noqa: E402
+from ratarmountcore.mountsource.formats.ext4 import EXT4MountSource
 
 
 class TestEXT4MountSource:

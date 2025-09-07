@@ -9,7 +9,7 @@ import tempfile
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.SQLiteBlobFile import SQLiteBlobFile, SQLiteBlobsFile  # noqa: E402
+from ratarmountcore.SQLiteBlobFile import SQLiteBlobFile, SQLiteBlobsFile
 
 testData = b"1234567890"
 tmpFile = tempfile.TemporaryFile()

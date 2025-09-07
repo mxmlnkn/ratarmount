@@ -10,6 +10,7 @@ ignore = [
     # Preview. Complaining about spaces (aligned arguments) should be a formatter option, not a linter one!
     # https://github.com/astral-sh/ruff/issues/2402
     "E201", "E202", "E203", "E211", "E221", "E226", "E251", "E265", "E266", "E271",
+    "E402",     # There are too many reasons for not putting imports strictly at the top!
     "E501",     # A linter should lint, not check for line lengths!
     "F401",     # Wants to from .version import __version__ as __version__ which clashes with pylint errors!
     "N803",     # Argument names are camelCase instead of snake_case (400+ errors).

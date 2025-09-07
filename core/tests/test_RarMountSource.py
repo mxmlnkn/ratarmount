@@ -8,7 +8,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.mountsource.formats.rar import RarMountSource  # noqa: E402
+from ratarmountcore.mountsource.formats.rar import RarMountSource
 
 
 def find_test_file(relativePathOrName):

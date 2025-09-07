@@ -16,11 +16,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../core')))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../core/tests')))
 
-from helpers import copy_test_file  # noqa: E402
-from ratarmountcore.compressions import libarchive  # noqa: E402
-from ratarmountcore.utils import ceil_div  # noqa: E402
+from helpers import copy_test_file
+from ratarmountcore.compressions import libarchive
+from ratarmountcore.utils import ceil_div
 
-from ratarmount.cli import cli as ratarmountcli  # noqa: E402
+from ratarmount.cli import cli as ratarmountcli
 
 try:
     import ext4

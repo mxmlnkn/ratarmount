@@ -10,8 +10,8 @@ import threading
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-import pytest  # noqa: E402
-from ratarmountcore.StenciledFile import (  # noqa: E402
+import pytest
+from ratarmountcore.StenciledFile import (
     JoinedFile,
     JoinedFileFromFactory,
     RawStenciledFile,

@@ -6,13 +6,13 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.compressions import (  # noqa: E402
+from ratarmountcore.compressions import (
     check_for_sequence,
     has_matching_alphabets,
     strip_suffix_from_archive,
     strip_suffix_from_compressed_file,
 )
-from ratarmountcore.utils import ALPHA, DIGITS, HEX, format_number  # noqa: E402
+from ratarmountcore.utils import ALPHA, DIGITS, HEX, format_number
 
 
 def test_strip_suffix_from_compressed_file():

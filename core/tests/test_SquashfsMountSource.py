@@ -14,8 +14,8 @@ from helpers import copy_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.formats import find_squashfs_offset  # noqa: E402
-from ratarmountcore.mountsource.formats.squashfs import SquashFSMountSource  # noqa: E402
+from ratarmountcore.formats import find_squashfs_offset
+from ratarmountcore.mountsource.formats.squashfs import SquashFSMountSource
 
 compressionsToTest = []
 if importlib.util.find_spec('PySquashfsImage'):
