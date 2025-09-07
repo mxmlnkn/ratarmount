@@ -16,16 +16,16 @@ from helpers import find_test_file
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Appends proper format checkers to 7Z, EXT4, FAT, RAR formats.
-import ratarmountcore.mountsource.archives  # noqa: E402, F401
-from ratarmountcore.formats import (  # noqa: E402
+import ratarmountcore.mountsource.archives  # noqa: F401
+from ratarmountcore.formats import (
     COMPRESSION_FORMATS,
     FILE_FORMATS,
     FileFormatID,
     detect_formats,
     might_be_format,
 )
-from ratarmountcore.mountsource.archives import ARCHIVE_BACKENDS  # noqa: E402
-from ratarmountcore.mountsource.factory import find_backends_by_extension  # noqa: E402
+from ratarmountcore.mountsource.archives import ARCHIVE_BACKENDS
+from ratarmountcore.mountsource.factory import find_backends_by_extension
 
 
 @pytest.mark.order(0)

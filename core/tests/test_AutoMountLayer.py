@@ -10,8 +10,8 @@ from helpers import copy_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.mountsource.compositing.automount import AutoMountLayer  # noqa: E402
-from ratarmountcore.mountsource.factory import open_mount_source  # noqa: E402
+from ratarmountcore.mountsource.compositing.automount import AutoMountLayer
+from ratarmountcore.mountsource.factory import open_mount_source
 
 
 @pytest.mark.order(-1)

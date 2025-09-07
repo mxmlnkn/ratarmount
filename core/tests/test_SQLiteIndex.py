@@ -9,7 +9,7 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.SQLiteIndex import SQLiteIndex  # noqa: E402
+from ratarmountcore.SQLiteIndex import SQLiteIndex
 
 
 @pytest.mark.order(0)

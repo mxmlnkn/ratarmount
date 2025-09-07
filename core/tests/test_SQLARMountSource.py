@@ -18,7 +18,7 @@ from helpers import copy_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.mountsource.formats.sqlar import SQLARMountSource  # noqa: E402
+from ratarmountcore.mountsource.formats.sqlar import SQLARMountSource
 
 
 class TestSQLARMountSource:

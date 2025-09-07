@@ -11,7 +11,7 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.mountsource.compositing.singlefile import SingleFileMountSource  # noqa: E402
+from ratarmountcore.mountsource.compositing.singlefile import SingleFileMountSource
 
 
 @pytest.mark.order(0)

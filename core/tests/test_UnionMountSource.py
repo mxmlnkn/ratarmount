@@ -10,10 +10,10 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-import pytest  # noqa: E402
-from ratarmountcore.mountsource.compositing.union import UnionMountSource  # noqa: E402
-from ratarmountcore.mountsource.formats.folder import FolderMountSource  # noqa: E402
-from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar  # noqa: E402
+import pytest
+from ratarmountcore.mountsource.compositing.union import UnionMountSource
+from ratarmountcore.mountsource.formats.folder import FolderMountSource
+from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar
 
 
 @dataclasses.dataclass

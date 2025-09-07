@@ -103,7 +103,7 @@ except ImportError:
     # The cryptography imports can fail pretty badly and it does not seem to be catchable :(
     #
     #    core/tests/test_formats.py:13: in <module>
-    #        import ratarmountcore.mountsource.archives  # noqa: E402, F401
+    #        import ratarmountcore.mountsource.archives  # noqa: F401
     #        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     #    core/ratarmountcore/mountsource/archives.py:14: in <module>
     #        from .formats.sqlar import SQLARMountSource

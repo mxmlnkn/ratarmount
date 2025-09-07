@@ -259,7 +259,7 @@ def find_module_version(moduleOrName: Union[str, types.ModuleType]) -> Optional[
 
     moduleFilePath = getattr(module, '__file__', None)
     if moduleFilePath:
-        import importlib.metadata as imeta  # noqa: E402  # Based on -X importtime seems to be pretty slow.
+        import importlib.metadata as imeta  # Based on -X importtime seems to be pretty slow.
 
         for distribution in imeta.distributions():
             try:

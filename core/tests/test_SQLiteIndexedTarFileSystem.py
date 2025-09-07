@@ -19,7 +19,7 @@ except ImportError:
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.SQLiteIndexedTarFsspec import SQLiteIndexedTarFileSystem  # noqa: E402
+from ratarmountcore.SQLiteIndexedTarFsspec import SQLiteIndexedTarFileSystem
 
 
 def find_test_file(relativePathOrName):

@@ -24,7 +24,7 @@ except ImportError:
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.BlockParallelReaders import ParallelXZReader, ParallelZstdReader  # noqa: E402
+from ratarmountcore.BlockParallelReaders import ParallelXZReader, ParallelZstdReader
 
 
 def test_find_block():
