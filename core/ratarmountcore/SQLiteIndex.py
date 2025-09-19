@@ -1391,8 +1391,12 @@ class SQLiteIndex:
         except MismatchingIndexError as e:
             raise e
         except Exception as exception:
-            logger.info("Exception: %s", exception, exc_info=logger.isEnabledFor(logging.DEBUG))
-            logger.warning("Could not load file: %s", indexFilePath)
+            logger.warning(
+                "Could not load file: %s because of: %s",
+                indexFilePath,
+                exception,
+                exc_info=logger.isEnabledFor(logging.DEBUG),
+            )
             logger.warning("Some likely reasons for not being able to load the index file:")
             logger.warning("  - The index file has incorrect read permissions")
             logger.warning("  - The index file is incomplete because ratarmount was killed during index creation")

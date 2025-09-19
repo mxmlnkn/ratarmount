@@ -145,7 +145,7 @@ class SubvolumesMountSource(MountSource):
         if result is None:
             return 0
 
-        subvolume, subpath, mounted = result
+        _subvolume, subpath, mounted = result
         if not isinstance(mounted, MountSource):
             return 1
 
@@ -156,7 +156,7 @@ class SubvolumesMountSource(MountSource):
         if result is None:
             return None
 
-        subvolume, subpath, mounted = result
+        _subvolume, subpath, mounted = result
         if not isinstance(mounted, MountSource):
             return {name: self.rootFileInfo.mode if onlyMode else self.rootFileInfo.clone() for name in mounted}
 

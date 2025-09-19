@@ -1332,7 +1332,8 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         but still fits.
         """
 
-        if 'tarstats' in metadata:
+        # TODO extract and store size even for opaque (e.g. remote) file objects by seeking to the end.
+        if 'tarstats' in metadata and os.path.exists(self.tarFileName):
             storedStats = json.loads(metadata['tarstats'])
             tarStats = os.stat(self.tarFileName)
 
