@@ -413,7 +413,10 @@ class WritableFolderMountSource(fuse.Operations):
     @check_ignored_prefixes('path')
     def create(self, path: str, mode: int, fi=None):
         self._open(path, mode)
-        return os.open(self._realpath(path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+        # TODO Use the correct flags according after fixing argument forwarding in mfusepy.
+        #      https://github.com/mxmlnkn/ratarmount/issues/172#issuecomment-3312526348
+        # I see no downside to always adding read-mode by default, until then.
+        return os.open(self._realpath(path), os.O_RDWR | os.O_CREAT | os.O_TRUNC, mode)
 
     @overrides(fuse.Operations)
     @check_ignored_prefixes('path')
