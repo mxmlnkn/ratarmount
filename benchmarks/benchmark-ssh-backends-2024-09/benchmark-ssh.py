@@ -5,6 +5,7 @@ import asyncio
 import getpass
 import io
 import os
+import string
 import subprocess
 import sys
 import time
@@ -60,7 +61,7 @@ def existing_digits(s):
 
     nDigits = 0
     for i in range(len(s)):
-        if s[i] in '0123456789':
+        if s[i] in string.digits:
             nDigits += 1
 
     return nDigits

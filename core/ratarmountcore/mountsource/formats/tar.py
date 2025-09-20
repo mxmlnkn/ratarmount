@@ -48,11 +48,11 @@ logger = logging.getLogger(__name__)
 
 # Patch https://github.com/python/cpython/issues/136602
 def patch_tarfile():
-    _proc_gnusparse_10 = getattr(tarfile.TarInfo, '_proc_gnusparse_10', None)
+    proc_gnusparse_10 = getattr(tarfile.TarInfo, '_proc_gnusparse_10', None)
     if (
-        not callable(_proc_gnusparse_10)
+        not callable(proc_gnusparse_10)
         or not hasattr(tarfile.TarInfo, '_link_target')
-        or inspect.getfullargspec(_proc_gnusparse_10).args != ['self', 'next', 'pax_headers', 'tarfile']
+        or inspect.getfullargspec(proc_gnusparse_10).args != ['self', 'next', 'pax_headers', 'tarfile']
     ):
         return
 
@@ -62,7 +62,7 @@ def patch_tarfile():
         # This member is only used for extracting anyway and we only use extract* methods for sparse files.
         # And it makes wrapping __init__ unnecessary.
         next._link_target = next.offset_data
-        return _proc_gnusparse_10(self, next, pax_headers, tarfile, *args, **kwargs)
+        return proc_gnusparse_10(self, next, pax_headers, tarfile, *args, **kwargs)
 
     tarfile.TarInfo._proc_gnusparse_10 = _wrapped_proc_gnusparse_10
 

@@ -2,6 +2,7 @@
 # pylint: disable=protected-access
 
 import os
+import string
 import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -126,7 +127,7 @@ def test_lru_cache():
 
 
 def test_is_latin_alpha():
-    assert ALPHA == 'abcdefghijklmnopqrstuvwxyz'
+    assert string.ascii_lowercase == ALPHA
     assert is_latin_alpha(ALPHA)
 
     assert is_latin_alpha("a")
@@ -147,7 +148,7 @@ def test_is_latin_alpha():
 
 
 def test_is_latin_digit():
-    assert DIGITS == '0123456789'
+    assert string.digits == DIGITS
     assert is_latin_digit(DIGITS)
 
     assert is_latin_digit("0")

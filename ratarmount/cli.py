@@ -503,7 +503,7 @@ def configure_logging(debug: int, useColor: bool) -> None:
     if rootLogger.hasHandlers():
         rootLogger.handlers.clear()
 
-    logging.basicConfig(level=level, format=logFormat, handlers=handlers if handlers else None)
+    logging.basicConfig(level=level, format=logFormat, handlers=handlers or None)
 
     # Suppress "warning" output by the asyncio module that seems to me more like debug / tracing output:
     # Warning: asyncio: Executing <Task pending name='Task-1' base_events.py:1994
