@@ -7,6 +7,7 @@ import concurrent.futures
 import io
 import os
 import stat
+import string
 import subprocess
 import sys
 import tarfile
@@ -379,7 +380,7 @@ class TestSQLiteIndexedTarParallelized:
 
         with tarfile.open(name=tar_path, mode="w:gz") as tarFile:
             create_file = TestSQLiteIndexedTarParallelized._create_file
-            create_file(tarFile, "increasing.dat", "".join(["0123456789"] * repeatCount))
+            create_file(tarFile, "increasing.dat", "".join([string.digits] * repeatCount))
             create_file(tarFile, "decreasing.dat", "".join(["9876543210"] * repeatCount))
 
         with SQLiteIndexedTar(tar_path, clearIndexCache=True, parallelization=parallelization) as indexedTar:
@@ -403,7 +404,7 @@ class TestSQLiteIndexedTarParallelized:
 
             with tarfile.open(name=tar_path, mode="w:gz") as tarFile:
                 create_file = TestSQLiteIndexedTarParallelized._create_file
-                create_file(tarFile, "increasing.dat", "".join(["0123456789"] * repeatCount))
+                create_file(tarFile, "increasing.dat", "".join([string.digits] * repeatCount))
                 create_file(tarFile, "decreasing.dat", "".join(["9876543210"] * repeatCount))
 
             with SQLiteIndexedTar(tar_path, clearIndexCache=True, parallelization=parallelization) as indexedTar:

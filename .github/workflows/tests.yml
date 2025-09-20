@@ -33,7 +33,8 @@ jobs:
 
     - name: Style Check With Ruff
       run: |
-        python3 -m pip install ruff
+        # I hate when the CI fails after not pushing for a while because ruff has new default rules.
+        python3 -m pip install ruff~=0.14
         ruff check --config tests/.ruff.toml -- $( git ls-tree -r --name-only HEAD | 'grep' -E '[.]py$' | 'grep' -v '/_external/' )
 
     - name: Style Check With Black

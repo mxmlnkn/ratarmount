@@ -7,6 +7,7 @@ import math
 import os
 import pathlib
 import platform
+import string
 import sys
 import types
 from collections.abc import Iterable
@@ -177,9 +178,7 @@ class Prefetcher:
         return range(self.lastFetched[-1] + 1, self.lastFetched[-1] + 1 + prefetchCount)
 
 
-ALPHA = ''.join(chr(ord('a') + i) for i in range(ord('z') - ord('a') + 1))
-DIGITS = ''.join(chr(ord('0') + i) for i in range(ord('9') - ord('0') + 1))
-HEX = DIGITS + ALPHA[:6]
+HEX = string.digits + string.ascii_lowercase[:6]
 
 
 def is_latin_alpha(text: str):

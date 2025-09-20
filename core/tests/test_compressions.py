@@ -2,6 +2,7 @@
 # pylint: disable=protected-access
 
 import os
+import string
 import sys
 
 import pytest
@@ -14,7 +15,7 @@ from ratarmountcore.compressions import (  # noqa: E402
     strip_suffix_from_archive,
     strip_suffix_from_compressed_file,
 )
-from ratarmountcore.utils import ALPHA, DIGITS, HEX, format_number  # noqa: E402
+from ratarmountcore.utils import HEX, format_number  # noqa: E402
 
 pytestmark = pytest.mark.order(0)
 
@@ -61,17 +62,17 @@ def test_has_matching_alphabets():
     assert matches('0', 'a')  # because both might be hexadecimal
     assert matches('1a', 'b0')
     assert matches(HEX, HEX)
-    assert matches(DIGITS, DIGITS)
-    assert matches(ALPHA, ALPHA)
-    assert matches(HEX, DIGITS)
-    assert not matches(ALPHA, HEX)
-    assert not matches(ALPHA, DIGITS)
+    assert matches(string.digits, string.digits)
+    assert matches(string.ascii_lowercase, string.ascii_lowercase)
+    assert matches(HEX, string.digits)
+    assert not matches(string.ascii_lowercase, HEX)
+    assert not matches(string.ascii_lowercase, string.digits)
     assert not matches('ag', 'b0')
 
 
 def test_check_for_sequence():
     def to_alpha1(i):
-        return format_number(i, ALPHA, 1)
+        return format_number(i, string.ascii_lowercase, 1)
 
     assert check_for_sequence(['a'], to_alpha1) == ['a']
     assert check_for_sequence(['a', 'b'], to_alpha1) == ['a', 'b']
@@ -83,7 +84,7 @@ def test_check_for_sequence():
     assert not check_for_sequence(['0'], to_alpha1)
 
     def to_alpha2(i):
-        return format_number(i, ALPHA, 2)
+        return format_number(i, string.ascii_lowercase, 2)
 
     assert check_for_sequence(['aa'], to_alpha2) == ['aa']
     assert check_for_sequence(['aa', 'ab'], to_alpha2) == ['aa', 'ab']
@@ -96,7 +97,7 @@ def test_check_for_sequence():
     assert not check_for_sequence(['00'], to_alpha2)
 
     def to_digit3(i):
-        return format_number(i, DIGITS, 3)
+        return format_number(i, string.digits, 3)
 
     assert check_for_sequence(['000'], to_digit3) == ['000']
     assert check_for_sequence(['000', '001'], to_digit3) == ['000', '001']
