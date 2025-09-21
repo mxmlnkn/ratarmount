@@ -200,6 +200,7 @@ class FuseMount(fuse.Operations):
             self._tmpLogFile = tempfile.NamedTemporaryFile('w+', encoding='utf-8', suffix='.ratarmount.log')
             logFilePath = self._tmpLogFile.name
         if logFilePath:
+            os.makedirs(Path(logFilePath).parent, exist_ok=True)
             self.logFile = open(logFilePath, "w+", buffering=1, encoding='utf-8')
 
             def _get_log(_buffering: int = 0) -> IO[bytes]:
