@@ -8,7 +8,7 @@ from typing import Any, Callable, Optional
 from qtpy import QtWidgets
 from qtpy.QtCore import Qt, Signal
 
-from ratarmount.actions import determine_mount_point
+from ratarmount.actions import determine_mount_point, process_parsed_arguments
 from ratarmount.widgets.PathsInputWidget import PathsInputWidget
 
 logger = logging.getLogger(__name__)
@@ -49,6 +49,14 @@ def check_output_file(path: str) -> Optional[str]:
     return None
 
 
+class NamespaceObject(dict):
+    def __getattr__(self, key, default=None):
+        return self[key] if key in self else default
+
+    def __setattr__(self, key, value):
+        self[key] = value
+
+
 class MountWidget(QtWidgets.QWidget):
     command_changed = Signal()
 
@@ -59,7 +67,7 @@ class MountWidget(QtWidgets.QWidget):
     def __init__(self, parser, parsed=None):
         super().__init__()
         self._parser = parser
-        self._parsed = parsed
+        self._parsed = parsed if parsed else NamespaceObject()
         # Stores getters, normally for each input widget, that return list of command line arguments, e.g.,
         # ["--index-folder", "~/.cache/ratarmount-indexes"].
         self._get_option_arguments: list[Callable[[], list[str]]] = []
@@ -239,7 +247,13 @@ class MountWidget(QtWidgets.QWidget):
                     self._get_option_arguments.append(
                         lambda w=input_widget, n=name: ([n, w.text()] if w.text() else [])
                     )
-                    self._get_option_values[action.dest] = input_widget.text
+
+                    def get_value(w=input_widget, default=action.default):
+                        try:
+                            return float(w.text())
+                        except ValueError:
+                            return default
+                    self._get_option_values[action.dest] = get_value
                 else:
                     logger.warning("Ignoring unknown argparse action '%s' with type: %s", name, action.type)
                     continue
@@ -296,5 +310,11 @@ class MountWidget(QtWidgets.QWidget):
         )
 
     def mount(self):
+        for name, getter in self._get_option_values.items():
+            setattr(self._parsed, name, getter())
+        process_parsed_arguments(self._parsed)
+        # TODO Disable mount button when there are errors
         # TODO Actually execute.
-        QtWidgets.QMessageBox.information(self, "Mount", "Would mount if it could.")
+        # TODO show error outputs, maybe in terminal output and/or a log tab
+        # TODO !!! Currently, this hangs the whole GUI here and closes the comamnd line but not the GUI!?
+        #QtWidgets.QMessageBox.information(self, "Mount", "Would mount if it could.")
