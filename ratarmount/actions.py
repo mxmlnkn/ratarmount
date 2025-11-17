@@ -228,7 +228,16 @@ def process_parsed_arguments(args) -> int:
         args.passwords.extend(Path(args.password_file).read_bytes().split(b'\n'))
     args.passwords = remove_duplicates_stable(args.passwords)
 
-    create_fuse_mount(args)  # Throws on errors.
+    if args.mount:
+        create_fuse_mount(args)  # Throws on errors.
+    else:
+        # Import late to avoid recursion and overhead during argcomplete!
+        from .FuseMount import FuseMount  # pylint: disable=import-outside-toplevel
+
+        # Simply calling the FuseMount constructor and destructor should create the indexes as a side effect.
+        with FuseMount(**CLIHelpers.parsed_args_to_options(args)):
+            pass
+
     return 0
 
 

@@ -248,5 +248,6 @@ def parsed_args_to_options(args) -> dict[str, Any]:
         'enableFileVersions'           : args.file_versions,
         'controlInterface'             : args.control_interface,
         'writeIndex'                   : True,
+        'mount'                        : args.mount,
     }
     # fmt: on

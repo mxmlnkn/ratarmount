@@ -1,7 +1,8 @@
 Usage: ratarmount
                   [-h | -u | --commit-overlay | -v | --oss-attributions-short | --oss-attributions]
-                  [-r | --recursive | --no-recursive] [-P PARALLELIZATION] [--password PASSWORD]
-                  [-w WRITE_OVERLAY] [-c | --recreate-index | --no-recreate-index]
+                  [--mount | --no-mount] [-r | --recursive | --no-recursive]
+                  [-P PARALLELIZATION] [--password PASSWORD] [-w WRITE_OVERLAY]
+                  [-c | --recreate-index | --no-recreate-index]
                   [--verify-mtime | --no-verify-mtime] [--index-file INDEX_FILE]
                   [--index-folders INDEX_FOLDERS] [--recursion-depth RECURSION_DEPTH]
                   [-l | --lazy | --no-lazy]
@@ -103,6 +104,8 @@ Index Options:
                         ~/.ratarmount as a storage location and nothing else. Instead, it will
                         first try ~/.ratarmount and the folder "foo,9000". (default:
                         ,~/.cache/ratarmount,~/.ratarmount)
+  --mount, --no-mount   When --no-mount is specified, exit after indexes for the specified files
+                        have been created. Do not create a mount point. (default: True)
   --verify-mtime, --no-verify-mtime
                         By default, only the TAR file size is checked to match the one in the
                         found existing ratarmount index. If this option is specified, then also

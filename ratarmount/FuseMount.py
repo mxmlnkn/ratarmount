@@ -276,6 +276,10 @@ class FuseMount(fuse.Operations):
 
             self.mknod = self.writeOverlay.mknod
 
+        self.mountPointInfo = {'st_mode': 0o40770}
+        if not options.get('mount', True):
+            return
+
         # Create mount point if it does not exist
         if mountPoint and not os.path.exists(mountPoint):
             os.mkdir(mountPoint)

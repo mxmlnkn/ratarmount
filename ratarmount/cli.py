@@ -183,6 +183,11 @@ For further information, see the ReadMe on the project's homepage:
 
     # Common Options
 
+    indexGroup.add_argument(
+        '--mount', action=argparse.BooleanOptionalAction, default=True,
+        help='When --no-mount is specified, exit after indexes for the specified files have been created. '
+             'Do not create a mount point.')
+
     commonGroup.add_argument(
         '-r', '--recursive', action=argparse.BooleanOptionalAction, default=False,
         help='Mount archives inside archives recursively. Same as --recursion-depth -1.')
