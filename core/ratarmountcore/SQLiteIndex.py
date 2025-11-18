@@ -653,7 +653,7 @@ class SQLiteIndex:
             return True
 
         except PermissionError:
-            logger.debug("Insufficient permissions to write to: %s", exc_info=logger.isEnabledFor(logging.DEBUG))
+            logger.debug("Insufficient permissions to write to: %s", path, exc_info=logger.isEnabledFor(logging.DEBUG))
 
         except OSError:
             logger.info("Could not create file: %s", path, exc_info=True)
@@ -1616,6 +1616,10 @@ class SQLiteIndex:
         except (indexed_gzip.ZranError, RuntimeError, ValueError) as exception:
             db.execute(f'DROP TABLE IF EXISTS "{table}"')
 
+            # Triggers false pylint positive as no escaping with %% is required when no substitutions are used:
+            # https://stackoverflow.com/questions/10678229/how-can-i-selectively-escape-percent-in-python-strings
+            #     #comment52793727_10678240
+            # pylint: disable-next=logging-too-few-args
             logger.warning(
                 "The gzip index required for seeking could not be written to the database!"
                 "This might happen when you are out of space in your temporary file and at the index file location. "

@@ -30,6 +30,7 @@ disable=invalid-name,
         broad-exception-raised,
         chained-comparison,  # Only available since Python 3.8
         too-many-arguments,
+        too-many-boolean-expressions,
         too-many-instance-attributes,
         too-many-locals,
         too-many-lines,
@@ -43,6 +44,7 @@ disable=invalid-name,
         similarities,
         consider-using-with,
         import-outside-toplevel,
+        unused-argument,  # Too many false positives for APIs / overrides
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
