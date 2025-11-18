@@ -2,7 +2,6 @@ import contextlib
 import datetime
 import json
 import logging
-import re
 import stat
 import sys
 import tarfile
@@ -32,13 +31,11 @@ class ZipMountSource(SQLiteIndexMountSource):
         self,
         fileOrPath             : Union[str, IO[bytes]],
         writeIndex             : bool                      = False,
-        clearIndexCache        : bool                      = False,
         indexFilePath          : Optional[str]             = None,
         indexFolders           : Optional[list[str]]       = None,
         encoding               : str                       = tarfile.ENCODING,
         verifyModificationTime : bool                      = False,
         indexMinimumFileCount  : int                       = 1000,
-        transform              : Optional[tuple[str, str]] = None,
         **options
     ) -> None:
         # fmt: on
@@ -49,14 +46,7 @@ class ZipMountSource(SQLiteIndexMountSource):
         self.fileObject             = zipfile.ZipFile(fileOrPath, 'r')
         self.verifyModificationTime = verifyModificationTime
         self.options                = options
-        self.transformPattern       = transform
         # fmt: on
-
-        self.transform = (
-            (lambda x: re.sub(self.transformPattern[0], self.transformPattern[1], x))
-            if isinstance(self.transformPattern, (tuple, list)) and len(self.transformPattern) == 2
-            else (lambda x: x)
-        )
 
         ZipMountSource._find_password(self.fileObject, options.get("passwords", []))
         self.files = {info.header_offset: info for info in self.fileObject.infolist()}
@@ -70,7 +60,6 @@ class ZipMountSource(SQLiteIndexMountSource):
                 indexMinimumFileCount=indexMinimumFileCount,
                 backendName='ZipMountSource',
             ),
-            clearIndexCache=clearIndexCache,
             checkMetadata=self._check_metadata,
             **options,
         )

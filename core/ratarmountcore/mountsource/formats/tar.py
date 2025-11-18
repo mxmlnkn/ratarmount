@@ -512,7 +512,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         fileObject                   : Optional[IO[bytes]]               = None,
         *,  # force all parameters after to be keyword-only
         writeIndex                   : bool                              = False,
-        clearIndexCache              : bool                              = False,
         indexFilePath                : Optional[str]                     = None,
         indexFolders                 : Optional[Sequence[str]]           = None,
         recursive                    : bool                              = False,
@@ -525,7 +524,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         parallelizations             : Optional[dict[str, int]]          = None,
         isGnuIncremental             : Optional[bool]                    = None,
         transformRecursiveMountPoint : Optional[tuple[str, str]]         = None,
-        transform                    : Optional[tuple[str, str]]         = None,
         prioritizedBackends          : Optional[list[str]]               = None,
         indexMinimumFileCount        : int                               = 0,
         recursionDepth               : Optional[int]                     = None,
@@ -544,9 +542,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             If true, then the sidecar index file will be written to a suitable location.
             Will be ignored if indexFilePath is ':memory:' or if only fileObject is specified
             but not tarFileName.
-        clearIndexCache
-            If true, then check all possible index file locations for the given tarFileName/fileObject
-            combination and delete them. This also implicitly forces a recreation of the index.
         indexFilePath
             Path to the index file for this TAR archive. This takes precedence over the automatically
             chosen locations. If it is ':memory:', then the SQLite database will be kept in memory
@@ -595,7 +590,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
         self.stripRecursiveTarExtension   = stripRecursiveTarExtension
         self.transformRecursiveMountPoint = transformRecursiveMountPoint
-        self.transformPattern             = transform
         self.ignoreZeros                  = ignoreZeros
         self.verifyModificationTime       = verifyModificationTime
         self.gzipSeekPointSpacing         = gzipSeekPointSpacing
@@ -609,12 +603,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         self.parallelizations = copy.deepcopy(parallelizations) if parallelizations else {}
         if '' not in self.parallelizations:
             self.parallelizations[''] = parallelization
-
-        self.transform = (
-            (lambda x: re.sub(self.transformPattern[0], self.transformPattern[1], x))
-            if isinstance(self.transformPattern, (tuple, list)) and len(self.transformPattern) == 2
-            else (lambda x: x)
-        )
 
         # Determine an archive file name to show for debug output and as file name inside the mount point for
         # simple non-TAR gzip/bzip2 stream-compressed files.
@@ -723,7 +711,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 backendName='SQLiteIndexedTar',
                 ignoreCurrentFolder=self.isFileObject and self._fileNameIsURL,
             ),
-            clearIndexCache=clearIndexCache,
             checkMetadata=self._check_metadata,
             **kwargs,
         )

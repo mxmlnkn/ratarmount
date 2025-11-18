@@ -5,7 +5,6 @@ import io
 import json
 import logging
 import os
-import re
 import stat
 import tarfile
 import zlib
@@ -396,13 +395,11 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         self,
         fileOrPath             : Union[str, IO[bytes]],
         writeIndex             : bool                      = False,
-        clearIndexCache        : bool                      = False,
         indexFilePath          : Optional[str]             = None,
         indexFolders           : Optional[list[str]]       = None,
         encoding               : str                       = tarfile.ENCODING,
         verifyModificationTime : bool                      = False,
         indexMinimumFileCount  : int                       = 1000,
-        transform              : Optional[tuple[str, str]] = None,
         **options
     ) -> None:
         # fmt: on
@@ -425,14 +422,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         self.image                  = SquashFSImage(self.rawFileObject, offset=offset)
         self.verifyModificationTime = verifyModificationTime
         self.options                = options
-        self.transformPattern       = transform
         # fmt: on
-
-        self.transform = (
-            (lambda x: re.sub(self.transformPattern[0], self.transformPattern[1], x))
-            if isinstance(self.transformPattern, (tuple, list)) and len(self.transformPattern) == 2
-            else (lambda x: x)
-        )
 
         super().__init__(
             SQLiteIndex(
@@ -443,7 +433,6 @@ class SquashFSMountSource(SQLiteIndexMountSource):
                 indexMinimumFileCount=indexMinimumFileCount,
                 backendName='SquashFSMountSource',
             ),
-            clearIndexCache=clearIndexCache,
             checkMetadata=self._check_metadata,
             **options,
         )

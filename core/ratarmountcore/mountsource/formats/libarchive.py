@@ -7,7 +7,6 @@ import io
 import json
 import logging
 import os
-import re
 import stat
 import sys
 import tarfile
@@ -502,12 +501,10 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
         self,
         fileOrPath             : Union[str, IO[bytes]],
         writeIndex             : bool                      = False,
-        clearIndexCache        : bool                      = False,
         indexFilePath          : Optional[str]             = None,
         indexFolders           : Optional[Sequence[str]]   = None,
         encoding               : str                       = tarfile.ENCODING,
         verifyModificationTime : bool                      = False,
-        transform              : Optional[tuple[str, str]] = None,
         indexMinimumFileCount  : int                       = 0,
         tarFileName            : Optional[str]             = None,
         **options
@@ -515,17 +512,10 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
         self.fileOrPath             = fileOrPath
         self.verifyModificationTime = verifyModificationTime
         self.options                = options
-        self.transformPattern       = transform
         self.passwords              = options.get("passwords", [])
         self.tarFileName            = tarFileName
         self._archiveCache          = IterableArchiveCache()
         # fmt: on
-
-        self.transform = (
-            (lambda x: re.sub(self.transformPattern[0], self.transformPattern[1], x))
-            if isinstance(self.transformPattern, (tuple, list)) and len(self.transformPattern) == 2
-            else (lambda x: x)
-        )
 
         # Determine an archive file name to show for debug output and as file name inside the mount point for
         # simple non-TAR gzip/bzip2 stream-compressed files.
@@ -539,7 +529,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
         # Force indexes in memory because:
         #  - They are incompatible with SQLiteIndexedTar and relevant consistency checks do not exist in older versions.
         #    Older versions would simply show the wrong folder hierarchy and return Input/Output error on file access.
-        #  - Seeking to a file takes on average half as time much as creating the index. I.e., the overhead for
+        #  - Seeking to a file takes on average half as much time as creating the index. I.e., the overhead for
         #    creating the index feels relatively insignificant assuming that more than 2 files are accessed.
         indexFilePath = ':memory:'
         super().__init__(
@@ -551,7 +541,6 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                 indexMinimumFileCount=indexMinimumFileCount,
                 backendName='LibarchiveMountSource',
             ),
-            clearIndexCache=clearIndexCache,
             checkMetadata=self._check_metadata,
             **options,
         )

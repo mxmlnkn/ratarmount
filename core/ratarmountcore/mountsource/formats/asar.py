@@ -2,7 +2,6 @@ import contextlib
 import json
 import logging
 import os
-import re
 import stat
 import tarfile
 import threading
@@ -72,27 +71,18 @@ class ASARMountSource(SQLiteIndexMountSource):
         self,
         fileOrPath             : Union[str, IO[bytes]],
         writeIndex             : bool                      = False,
-        clearIndexCache        : bool                      = False,
         indexFilePath          : Optional[str]             = None,
         indexFolders           : Optional[list[str]]       = None,
         encoding               : str                       = tarfile.ENCODING,
         verifyModificationTime : bool                      = False,
         indexMinimumFileCount  : int                       = 1000,
-        transform              : Optional[tuple[str, str]] = None,
         **options
     ) -> None:
         self.isFileObject           = not isinstance(fileOrPath, str)
         self.fileObject             = open(fileOrPath, 'rb') if isinstance(fileOrPath, str) else fileOrPath
         self.verifyModificationTime = verifyModificationTime
         self.options                = options
-        self.transformPattern       = transform
         # fmt: on
-
-        self.transform = (
-            (lambda x: re.sub(self.transformPattern[0], self.transformPattern[1], x))
-            if isinstance(self.transformPattern, (tuple, list)) and len(self.transformPattern) == 2
-            else (lambda x: x)
-        )
 
         # Try to open file
         self._headerOffset, self._headerSize, self._dataOffset = find_asar_header(self.fileObject)
@@ -111,7 +101,6 @@ class ASARMountSource(SQLiteIndexMountSource):
                 indexMinimumFileCount=indexMinimumFileCount,
                 backendName='ASARMountSource',
             ),
-            clearIndexCache=clearIndexCache,
             checkMetadata=self._check_metadata,
             **options,
         )

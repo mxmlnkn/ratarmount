@@ -1,6 +1,7 @@
 # pylint: disable=abstract-method
 
 import builtins
+import re
 import shutil
 import tempfile
 from collections.abc import Iterable
@@ -17,9 +18,21 @@ class SQLiteIndexMountSource(MountSource):
         index: Union[SQLiteIndex, str, IO[bytes]],
         clearIndexCache: bool = False,
         checkMetadata: Optional[Callable[[dict[str, Any]], None]] = None,
+        transform: Optional[tuple[str, str]] = None,
         **_,
     ) -> None:
+        """
+        clearIndexCache
+            If true, then check all possible index file locations for the given tarFileName/fileObject
+            combination and delete them. This also implicitly forces a recreation of the index.
+        """
         self.indexFilePath = ""
+        self.transformPattern = transform
+        self.transform = (
+            (lambda x: re.sub(self.transformPattern[0], self.transformPattern[1], x))
+            if isinstance(self.transformPattern, (tuple, list)) and len(self.transformPattern) == 2
+            else (lambda x: x)
+        )
 
         # Initialize index
         if isinstance(index, SQLiteIndex):

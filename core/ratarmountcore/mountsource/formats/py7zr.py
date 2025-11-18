@@ -90,7 +90,6 @@ class Py7zrMountSource(SQLiteIndexMountSource):
         self,
         fileOrPath             : Union[str, IO[bytes]],
         writeIndex             : bool                      = False,
-        clearIndexCache        : bool                      = False,
         indexFilePath          : Optional[str]             = None,
         indexFolders           : Optional[list[str]]       = None,
         encoding               : str                       = tarfile.ENCODING,
@@ -116,8 +115,8 @@ class Py7zrMountSource(SQLiteIndexMountSource):
         self.fileObject = Py7zrMountSource._find_password(open_file, options.get("passwords", []))
 
         # Force indexes in memory because:
-        #  - I have no idea what ID to write into offset or offsetheader. The "ID" for the py7zr interface
-        #    is the "filename" (path). Storing a string in the int 'offset' column is not a got idea.
+        #  - I have no idea what ID to write into 'offset' or 'offsetheader'. The "ID" for the py7zr interface
+        #    is the "filename" (path). Storing a string in the int 'offset' column is not a good idea.
         #  - The py7zr interface seems to lack a way to query information about symbolic links.
         indexFilePath = ':memory:'
         super().__init__(
@@ -129,7 +128,6 @@ class Py7zrMountSource(SQLiteIndexMountSource):
                 indexMinimumFileCount=indexMinimumFileCount,
                 backendName='Py7zrMountSource',
             ),
-            clearIndexCache=clearIndexCache,
             checkMetadata=self._check_metadata,
             **options,
         )
