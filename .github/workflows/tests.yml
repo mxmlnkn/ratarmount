@@ -129,16 +129,13 @@ jobs:
         # 3.11 was released 2022-10-24 and end-of-life will be 2027-10
         # 3.12 was released 2023-10-02 and end-of-life will be 2028-10
         # 3.13 was released 2024-10-07 and end-of-life will be 2029-10
-        # 3.14 is to be released 2025-10
+        # 3.14 was released 2025-10-07 and end-of-life will be 2030-10
         # Supported versions: https://github.com/actions/python-versions/blob/main/versions-manifest.json
-        python-version: ['3.9', '3.12', '3.13']
+        python-version: ['3.9', '3.12', '3.14']
         libfuse-version: ['system']
         include:
         - os: ubuntu-latest
-          python-version: '3.14.0-beta.4'
-          libfuse-version: 'system'
-        - os: ubuntu-latest
-          python-version: '3.13'
+          python-version: '3.12'
           libfuse-version: '3.17.2'
 
     defaults:
