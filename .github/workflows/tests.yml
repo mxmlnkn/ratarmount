@@ -113,7 +113,7 @@ jobs:
       # notice the error on the next CI run.
       fail-fast: false
       matrix:
-        os: ['macos-13', 'ubuntu-latest']
+        os: ['macos-15-intel', 'ubuntu-latest']
         # macos-13 / macos-latest does not work anymore because the dependencies don't have any wheels,
         # probably because it is M1 based.
         # ToDo: Add windows-latest but it requires a lot of setup of the dependencies!
