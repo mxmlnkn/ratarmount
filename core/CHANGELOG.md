@@ -1,3 +1,11 @@
+# Version 0.10.2 built on 2025-11-19
+
+## Fixes
+
+ - Add missing exception logging format string argument.
+ - Using a locally created index with a remote archive did fail.
+ - Add Zstandard support for Python 3.14+.
+
 
 # Version 0.10.1 built on 2025-08-17
 

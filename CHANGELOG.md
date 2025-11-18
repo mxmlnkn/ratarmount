@@ -1,3 +1,11 @@
+# Version 1.2.1 built on 2025-11-19
+
+## Fixes
+
+ - `WriteOverlay`: Reading from newly created overlay files did fail.
+ - Properly format multiple URLs per dependency in `--oss-attributions` output.
+
+
 # Version 1.2.0 built on 2025-08-16
 
 ## Feature
