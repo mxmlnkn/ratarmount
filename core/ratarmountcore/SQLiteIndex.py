@@ -14,6 +14,7 @@ import urllib.parse
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from timeit import default_timer as timer
 from typing import IO, Any, AnyStr, Callable, Optional, Union
 
 try:
@@ -300,6 +301,7 @@ class SQLiteIndex:
 
         self.sqlConnection: Optional[sqlite3.Connection] = None
         self.archiveFilePath = archiveFilePath
+        self._requestedIndexFilePath = indexFilePath
         # Will hold the actually opened valid path to an index file
         self.indexFilePath: Optional[str] = None
         # This is true if the index file found was compressed or an URL and had to be downloaded
@@ -820,6 +822,48 @@ class SQLiteIndex:
         logger.info("Resorting files by path ...")
 
         self.get_connection().executescript(cleanUpDatabase)
+
+    def create_index_timed(self, create_index: Callable[[], None]):
+        if logger.isEnabledFor(logging.WARNING):
+            print(f"Creating offset dictionary for {self.archiveFilePath} ...")
+        t0 = timer()
+
+        self.ensure_intermediary_tables()
+        create_index()
+        self.finalize()
+
+        if logger.isEnabledFor(logging.WARNING):
+            print(f"Creating offset dictionary for {self.archiveFilePath} took {timer() - t0:.2f}s")
+
+    def finalize_index(
+        self,
+        create_index: Callable[[], None],
+        store_metadata: Optional[Callable[[], None]] = None,
+        isFileObject: Optional[bool] = None,
+        writeIndex: bool = False,
+    ):
+        """If the index could not be loaded, creates it fully. The index is read-only after finalization."""
+        if self.index_is_loaded():
+            self.reload_index_read_only()
+            return
+
+        if isFileObject is None:
+            isFileObject = self.archiveFilePath is None
+
+        # Open new database when we didn't find an existing one.
+        # Simply open in memory without an error even if writeIndex is True but when no indication
+        # for an index file location has been given.
+        if writeIndex and (self._requestedIndexFilePath or not isFileObject):
+            self.open_writable()
+        else:
+            self.open_in_memory()
+
+        self.create_index_timed(create_index)
+
+        if self.index_is_loaded():
+            if callable(store_metadata):
+                store_metadata()
+            self.reload_index_read_only()
 
     def file_count(self) -> int:
         return self.get_connection().execute('SELECT COUNT(*) FROM "files";').fetchone()[0]

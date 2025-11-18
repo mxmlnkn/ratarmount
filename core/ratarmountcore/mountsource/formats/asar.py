@@ -5,7 +5,6 @@ import os
 import stat
 import tarfile
 import threading
-from timeit import default_timer as timer
 from typing import IO, Any, Optional, Union, cast
 
 from ratarmountcore.formats import find_asar_header
@@ -108,23 +107,8 @@ class ASARMountSource(SQLiteIndexMountSource):
 
         self.fileObjectLock = threading.Lock()
 
-        # Load or create index (copy-paste)
-
-        if self.index.index_is_loaded():
-            self.index.reload_index_read_only()
-        else:
-            # Open new database when we didn't find an existing one.
-            # Simply open in memory without an error even if writeIndex is True but when not indication
-            # for a index file location has been given.
-            if self.writeIndex and (indexFilePath or not self.isFileObject):
-                self.index.open_writable()
-            else:
-                self.index.open_in_memory()
-
-            self._create_index()
-            if self.index.index_is_loaded():
-                self._store_metadata()
-                self.index.reload_index_read_only()
+        self.index.finalize_index(
+            create_index=self._create_index, store_metadata=self._store_metadata, writeIndex=self.writeIndex)
 
     def _store_metadata(self) -> None:
         argumentsToSave = ['encoding', 'transformPattern']
@@ -165,12 +149,6 @@ class ASARMountSource(SQLiteIndexMountSource):
         return fileInfo
 
     def _create_index(self) -> None:
-        if logger.isEnabledFor(logging.WARNING):
-            print(f"Creating offset dictionary for {self.archiveFilePath} ...")
-        t0 = timer()
-
-        self.index.ensure_intermediary_tables()
-
         # Using StenciledFile instead of josn.loads(self.fileObject.read()) to avoid yet another copy in memory,
         # to roughly halve memory usage for very large JSONs. Note that the JSON size is limited to 4 GiB because
         # the size is 32-bit.
@@ -195,10 +173,6 @@ class ASARMountSource(SQLiteIndexMountSource):
 
         if fileInfos:
             self.index.set_file_infos(fileInfos)
-        self.index.finalize()
-
-        if logger.isEnabledFor(logging.WARNING):
-            print(f"Creating offset dictionary for {self.archiveFilePath} took {timer() - t0:.2f}s")
 
     @overrides(SQLiteIndexMountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):

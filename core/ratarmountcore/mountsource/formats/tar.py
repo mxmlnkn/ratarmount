@@ -15,7 +15,6 @@ import threading
 import time
 import urllib.parse
 from collections.abc import Generator, Iterable, Sequence
-from timeit import default_timer as timer
 from typing import IO, Any, Callable, Optional, Union, cast
 
 with contextlib.suppress(ImportError):
@@ -728,9 +727,9 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 appendedPartAsFile = StenciledFile(
                     fileStencils=[(self.tarFileObject, pastEndOffset, archiveSize - pastEndOffset)]
                 )
-                self._create_index(appendedPartAsFile, streamOffset=pastEndOffset)
-
-                self._load_or_store_compression_offsets()  # store
+                self.index.create_index_timed(
+                    create_index=lambda: self._create_index(appendedPartAsFile, streamOffset=pastEndOffset)
+                )
 
                 self.index.drop_metadata()
                 self._store_metadata()
@@ -740,6 +739,9 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             self.index.close()
             logger.warning("The loaded index does not match the archive. Will recreate it.")
 
+        # At this point, self.index.index_is_loaded() should return false because either it was false already
+        # or the preemptive return was triggered above or the index was closed at the end of the above branch!
+
         # TODO This does and did not work correctly for recursive TARs because the outermost layer will change
         #      None to a hard value and from then on it would have been fixed to that value even when called
         #      inside createIndex.
@@ -747,20 +749,12 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         if self._isGnuIncremental is None:
             self._isGnuIncremental = self._detect_gnu_incremental(self.tarFileObject)
 
-        # Open new database when we didn't find an existing one.
-        if not self.index.index_is_loaded():
-            # Simply open in memory without an error even if writeIndex is True but when no indication
-            # for an index file location has been given.
-            if self.writeIndex and (indexFilePath or self._get_archive_path() or not self.isFileObject):
-                self.index.open_writable()
-            else:
-                self.index.open_in_memory()
-
-        self._create_index(self.tarFileObject)
-        self._load_or_store_compression_offsets()  # store
-        if self.index.index_is_loaded():
-            self._store_metadata()
-            self.index.reload_index_read_only()
+        self.index.finalize_index(
+            create_index=lambda: self._create_index(self.tarFileObject),
+            store_metadata=self._store_metadata,
+            isFileObject=self.isFileObject and not self._get_archive_path(),
+            writeIndex=self.writeIndex,
+        )
 
         if logger.isEnabledFor(logging.WARNING) and self.index.indexFilePath and os.path.isfile(self.index.indexFilePath):
             # The 0-time is legacy for the automated tests
@@ -869,12 +863,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             logger.warning("An exception occurred when trying to update the progress bar: %s", exception, exc_info=logger.isEnabledFor(logging.DEBUG))
 
     def _create_index(self, fileObject: IO[bytes], streamOffset: int = 0) -> None:
-        if logger.isEnabledFor(logging.WARNING):
-            print(f"Creating offset dictionary for {self.tarFileName} ...")
-        t0 = timer()
-
-        self.index.ensure_intermediary_tables()
-
         with ProgressBar(self._archiveFileSize) as progressBar:
             self._create_index_recursively(
                 fileObject,
@@ -886,10 +874,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             # Call one last time to ensure that it is updated with the most recent value.
             self._update_progress_bar(progressBar, fileObject)
 
-        self.index.finalize()
-
-        if logger.isEnabledFor(logging.WARNING):
-            print(f"Creating offset dictionary for {self.tarFileName} took {timer() - t0:.2f}s")
+        self._load_or_store_compression_offsets()  # store
 
     def _create_index_recursively(
         self, fileObject: IO[bytes], progressBar: ProgressBar, pathPrefix: str, streamOffset: int, recursionDepth: int

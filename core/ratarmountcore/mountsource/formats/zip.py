@@ -6,7 +6,6 @@ import stat
 import sys
 import tarfile
 import zipfile
-from timeit import default_timer as timer
 from typing import IO, Any, Optional, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource
@@ -57,24 +56,8 @@ class ZipMountSource(SQLiteIndexMountSource):
             checkMetadata=self._check_metadata,
             **options,
         )
-
-        isFileObject = not isinstance(fileOrPath, str)
-
-        if self.index.index_is_loaded():
-            self.index.reload_index_read_only()
-        else:
-            # Open new database when we didn't find an existing one.
-            # Simply open in memory without an error even if writeIndex is True but when not indication
-            # for a index file location has been given.
-            if self.writeIndex and (indexFilePath or not isFileObject):
-                self.index.open_writable()
-            else:
-                self.index.open_in_memory()
-
-            self._create_index()
-            if self.index.index_is_loaded():
-                self._store_metadata()
-                self.index.reload_index_read_only()
+        self.index.finalize_index(
+            create_index=self._create_index, store_metadata=self._store_metadata, writeIndex=self.writeIndex)
 
     def _store_metadata(self) -> None:
         argumentsToSave = ['encoding', 'transformPattern']
@@ -137,16 +120,7 @@ class ZipMountSource(SQLiteIndexMountSource):
         return fileInfo
 
     def _create_index(self) -> None:
-        if logger.isEnabledFor(logging.WARNING):
-            print(f"Creating offset dictionary for {self.archiveFilePath} ...")
-        t0 = timer()
-
-        self.index.ensure_intermediary_tables()
         self.index.set_file_infos([self._convert_to_row(info) for info in self.fileObject.infolist()])
-        self.index.finalize()
-
-        if logger.isEnabledFor(logging.WARNING):
-            print(f"Creating offset dictionary for {self.archiveFilePath} took {timer() - t0:.2f}s")
 
     @staticmethod
     def _find_password(fileobj: "zipfile.ZipFile", passwords):
