@@ -601,7 +601,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
     def _store_metadata(self) -> None:
         argumentsToSave = ['encoding', 'transformPattern']
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
-        self.index.store_metadata(argumentsMetadata, self.archiveFilePath)
+        self.index.store_metadata(argumentsMetadata)
         self.index.store_metadata_key_value('backend', 'libarchive')
 
     def __del__(self):

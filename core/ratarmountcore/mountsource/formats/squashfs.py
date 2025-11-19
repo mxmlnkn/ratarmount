@@ -435,7 +435,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
     def _store_metadata(self) -> None:
         argumentsToSave = ['encoding', 'transformPattern']
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
-        self.index.store_metadata(argumentsMetadata, self.archiveFilePath)
+        self.index.store_metadata(argumentsMetadata)
 
     def _convert_to_row(self, inodeOffset: int, info: "PySquashfsImage.file.File") -> tuple:  # type: ignore
         mode = info.mode

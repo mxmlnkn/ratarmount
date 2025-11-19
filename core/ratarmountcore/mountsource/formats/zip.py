@@ -62,7 +62,7 @@ class ZipMountSource(SQLiteIndexMountSource):
     def _store_metadata(self) -> None:
         argumentsToSave = ['encoding', 'transformPattern']
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
-        self.index.store_metadata(argumentsMetadata, self.archiveFilePath)
+        self.index.store_metadata(argumentsMetadata)
 
     def _convert_to_row(self, info: "zipfile.ZipInfo") -> tuple:
         mtime = datetime.datetime(*info.date_time, tzinfo=datetime.timezone.utc).timestamp() if info.date_time else 0

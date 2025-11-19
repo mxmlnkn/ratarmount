@@ -827,7 +827,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
         # The second argument must be a path to a file to call os.stat with, not simply a file name.
-        self.index.store_metadata(argumentsMetadata, None if self.isFileObject else self.tarFileName)
+        self.index.store_metadata(argumentsMetadata, "" if self.isFileObject else self.tarFileName)
         self.index.store_metadata_key_value('isGnuIncremental', '1' if self._isGnuIncremental else '0')
 
     def _update_progress_bar(self, progressBar, fileobj: Any) -> None:

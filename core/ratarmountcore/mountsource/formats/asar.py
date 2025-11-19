@@ -113,7 +113,7 @@ class ASARMountSource(SQLiteIndexMountSource):
     def _store_metadata(self) -> None:
         argumentsToSave = ['encoding', 'transformPattern']
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
-        self.index.store_metadata(argumentsMetadata, self.archiveFilePath)
+        self.index.store_metadata(argumentsMetadata)
 
     def _convert_to_row(self, fullPath, entry: dict[str, Any], dataOffset: int) -> tuple:
         path, name = SQLiteIndex.normpath(self.transform(fullPath)).rsplit("/", 1)

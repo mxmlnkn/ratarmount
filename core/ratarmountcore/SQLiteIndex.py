@@ -501,6 +501,9 @@ class SQLiteIndex:
 
     def _store_file_metadata(self, filePath: AnyStr) -> None:
         """Adds some consistency meta information to recognize the need to update the cached TAR index"""
+        if not filePath:
+            return
+
         try:
             tarStats = os.stat(filePath)
             serializedTarStats = json.dumps(
@@ -528,8 +531,10 @@ class SQLiteIndex:
     def store_metadata(self, metadata: AnyStr, filePath: Optional[AnyStr] = None) -> None:
         self._store_versions_metadata()
         self.store_metadata_key_value('backendName', self.backendName)
-        if filePath:
+        if filePath is not None:
             self._store_file_metadata(filePath)
+        elif self.archiveFilePath:
+            self._store_file_metadata(self.archiveFilePath)
         self.store_metadata_key_value('arguments', metadata)
         self.store_metadata_key_value('backendName', self.backendName)
 

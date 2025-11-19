@@ -132,7 +132,7 @@ class Py7zrMountSource(SQLiteIndexMountSource):
     def _store_metadata(self) -> None:
         argumentsToSave = ['encoding']
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
-        self.index.store_metadata(argumentsMetadata, self.archiveFilePath)
+        self.index.store_metadata(argumentsMetadata)
 
     def _convert_to_row(self, info) -> tuple:
         mode = 0o777 | (stat.S_IFDIR if info.is_directory else stat.S_IFREG)
