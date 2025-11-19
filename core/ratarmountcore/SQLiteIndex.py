@@ -41,6 +41,7 @@ from .utils import (
     MismatchingIndexError,
     RatarmountError,
     find_module_version,
+    get_xdg_cache_home,
 )
 from .version import __version__
 
@@ -310,12 +311,6 @@ class SQLiteIndex:
         self.indexFilePathDeleteOnClose = False
         self.deleteInvalidIndexes = deleteInvalidIndexes
         self.encoding = encoding
-        self.possibleIndexFilePaths = SQLiteIndex.get_possible_index_file_paths(
-            indexFilePath,
-            indexFolders,
-            archiveFilePath,
-            ignoreCurrentFolder,
-        )
         # stores which parent folders were last tried to add to database and therefore do exist
         self.parentFolderCache: list[tuple[str, str]] = []
         self.preferMemory = preferMemory
@@ -323,6 +318,21 @@ class SQLiteIndex:
         self.backendName = backendName
         self._insertedRowCount = 0
         self._temporaryIndexFile: Optional[Any] = None
+
+        if indexFolders is None:
+            indexFolders = ['', os.path.join("~", ".ratarmount")]
+            xdgCacheHome = get_xdg_cache_home()
+            if xdgCacheHome and os.path.isdir(os.path.expanduser(xdgCacheHome)):
+                indexFolders.insert(1, os.path.join(xdgCacheHome, 'ratarmount'))
+        elif isinstance(indexFolders, str):
+            indexFolders = [indexFolders]
+
+        self.possibleIndexFilePaths = SQLiteIndex.get_possible_index_file_paths(
+            indexFilePath,
+            indexFolders,
+            archiveFilePath,
+            ignoreCurrentFolder,
+        )
 
         # Ignore minimum file count option if an index file path or index folder is configured.
         # For latter, ignore the special empty folder [''], which means that the indexes are stored

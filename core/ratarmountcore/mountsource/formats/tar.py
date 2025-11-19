@@ -35,7 +35,6 @@ from ratarmountcore.utils import (
     ceil_div,
     decode_unpadded_base64,
     determine_recursion_depth,
-    get_xdg_cache_home,
     overrides,
 )
 
@@ -510,7 +509,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         tarFileName                  : Optional[Union[str, os.PathLike]] = None,
         fileObject                   : Optional[IO[bytes]]               = None,
         *,  # force all parameters after to be keyword-only
-        indexFolders                 : Optional[Sequence[str]]           = None,
         recursive                    : bool                              = False,
         gzipSeekPointSpacing         : int                               = DEFAULT_GZIP_SEEK_POINT_SPACING,
         stripRecursiveTarExtension   : bool                              = False,
@@ -531,10 +529,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             A io.IOBase derived object. If not specified, tarFileName will be opened.
             If it is an instance of IndexedBzip2File, IndexedGzipFile, or IndexedZstdFile, then the offset
             loading and storing from and to the SQLite database is managed automatically by this class.
-        indexFolders
-            Specify one or multiple paths for storing .index.sqlite files. Paths will be tested for
-            suitability in the given order. An empty path will be interpreted as the location in which
-            the TAR resides.
         recursive
             If true, then TAR files inside this archive will be recursively analyzed and added to the SQLite
             index. Currently, this recursion can only break the outermost compression layer. I.e., a .tar.bz2
@@ -674,16 +668,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 self.tarFileName,
             )
 
-        if indexFolders is None:
-            indexFolders = ['', os.path.join("~", ".ratarmount")]
-            xdgCacheHome = get_xdg_cache_home()
-            if xdgCacheHome and os.path.isdir(os.path.expanduser(xdgCacheHome)):
-                indexFolders.insert(1, os.path.join(xdgCacheHome, 'ratarmount'))
-        elif isinstance(indexFolders, str):
-            indexFolders = [indexFolders]
-
         indexOptions = {
-            'indexFolders': indexFolders,
             'archiveFilePath': self.tarFileName if not self.isFileObject or self._fileNameIsURL else None,
             'backendName': 'SQLiteIndexedTar',
             'ignoreCurrentFolder': self.isFileObject and self._fileNameIsURL,
