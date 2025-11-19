@@ -6,7 +6,6 @@ import json
 import logging
 import os
 import stat
-import tarfile
 import zlib
 from typing import IO, Any, Optional, Union
 
@@ -389,17 +388,7 @@ class SquashFSImage(SquashFsImage):
 
 
 class SquashFSMountSource(SQLiteIndexMountSource):
-    # fmt: off
-    def __init__(
-        self,
-        fileOrPath             : Union[str, IO[bytes]],
-        indexFilePath          : Optional[str]             = None,
-        indexFolders           : Optional[list[str]]       = None,
-        encoding               : str                       = tarfile.ENCODING,
-        indexMinimumFileCount  : int                       = 1000,
-        **options
-    ) -> None:
-        # fmt: on
+    def __init__(self, fileOrPath: Union[str, IO[bytes]], **options) -> None:
         if isinstance(fileOrPath, str):
             openedFile = True
             file: IO[bytes] = open(fileOrPath, 'rb')
@@ -417,20 +406,14 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         self.rawFileObject = file
         self.image = SquashFSImage(self.rawFileObject, offset=offset)
 
-        super().__init__(
-            SQLiteIndex(
-                indexFilePath,
-                indexFolders=indexFolders,
-                archiveFilePath=fileOrPath if isinstance(fileOrPath, str) else None,
-                encoding=encoding,
-                indexMinimumFileCount=indexMinimumFileCount,
-                backendName='SquashFSMountSource',
-            ),
-            checkMetadata=self._check_metadata,
-            **options,
-        )
+        indexOptions = {
+            'archiveFilePath': fileOrPath if isinstance(fileOrPath, str) else None,
+            'backendName': 'SquashFSMountSource',
+        }
+        super().__init__(checkMetadata=self._check_metadata, **(options | indexOptions))
         self.index.finalize_index(
-            create_index=self._create_index, store_metadata=self._store_metadata, writeIndex=self.writeIndex)
+            create_index=self._create_index, store_metadata=self._store_metadata, writeIndex=self.writeIndex
+        )
 
     def _store_metadata(self) -> None:
         argumentsToSave = ['encoding', 'transformPattern']

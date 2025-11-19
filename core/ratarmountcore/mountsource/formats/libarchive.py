@@ -9,7 +9,6 @@ import logging
 import os
 import stat
 import sys
-import tarfile
 from collections.abc import Sequence
 from typing import IO, Any, Callable, Optional, Union, cast
 
@@ -495,18 +494,7 @@ class LibarchiveFile(io.RawIOBase):
 
 # The implementation is similar to ZipMountSource and SQLiteIndexedTarUserData.
 class LibarchiveMountSource(SQLiteIndexMountSource):
-    # fmt: off
-    def __init__(
-        self,
-        fileOrPath             : Union[str, IO[bytes]],
-        indexFilePath          : Optional[str]             = None,
-        indexFolders           : Optional[Sequence[str]]   = None,
-        encoding               : str                       = tarfile.ENCODING,
-        indexMinimumFileCount  : int                       = 0,
-        tarFileName            : Optional[str]             = None,
-        **options
-    ) -> None:
-        # fmt: on
+    def __init__(self, fileOrPath: Union[str, IO[bytes]], tarFileName: Optional[str] = None, **options) -> None:
         self.fileOrPath = fileOrPath
         self.passwords = options.get("passwords", [])
         self.tarFileName = tarFileName
@@ -526,19 +514,12 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
         #    Older versions would simply show the wrong folder hierarchy and return Input/Output error on file access.
         #  - Seeking to a file takes on average half as much time as creating the index. I.e., the overhead for
         #    creating the index feels relatively insignificant assuming that more than 2 files are accessed.
-        indexFilePath = ':memory:'
-        super().__init__(
-            SQLiteIndex(
-                indexFilePath,
-                indexFolders=indexFolders,
-                archiveFilePath=fileOrPath if isinstance(fileOrPath, str) else None,
-                encoding=encoding,
-                indexMinimumFileCount=indexMinimumFileCount,
-                backendName='LibarchiveMountSource',
-            ),
-            checkMetadata=self._check_metadata,
-            **options,
-        )
+        indexOptions = {
+            'indexFilePath': ':memory:',
+            'archiveFilePath': fileOrPath if isinstance(fileOrPath, str) else None,
+            'backendName': 'LibarchiveMountSource',
+        }
+        super().__init__(checkMetadata=self._check_metadata, **(options | indexOptions))
 
         if self.index.index_is_loaded():
             metadata = dict(self.index.get_connection().execute('SELECT * FROM metadata;'))
@@ -547,7 +528,8 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                 raise InvalidIndexError("The found index was not created by the libarchive backend.")
 
         self.index.finalize_index(
-            create_index=self._create_index, store_metadata=self._store_metadata, writeIndex=self.writeIndex)
+            create_index=self._create_index, store_metadata=self._store_metadata, writeIndex=self.writeIndex
+        )
 
     def _create_index(self) -> None:
         triedToOpen = False

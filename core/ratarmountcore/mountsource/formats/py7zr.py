@@ -3,7 +3,6 @@ import json
 import logging
 import stat
 import sys
-import tarfile
 from typing import IO, Any, Optional, Union
 
 from ratarmountcore.formats import FileFormatID, replace_format_check
@@ -84,18 +83,7 @@ logger = logging.getLogger(__name__)
 
 
 class Py7zrMountSource(SQLiteIndexMountSource):
-    # fmt: off
-    def __init__(
-        self,
-        fileOrPath             : Union[str, IO[bytes]],
-        indexFilePath          : Optional[str]             = None,
-        indexFolders           : Optional[list[str]]       = None,
-        encoding               : str                       = tarfile.ENCODING,
-        indexMinimumFileCount  : int                       = 1000,
-        **options
-    ) -> None:
-        # fmt: on
-
+    def __init__(self, fileOrPath: Union[str, IO[bytes]], **options) -> None:
         # TODO For now, 'transform' is not supported because we need the exact path to open the file and there
         #      currently is no SQLite table column to store this information in.
         # TODO I doubt that symbolic links work because py7zr.FileInfo does not have information regarding links.
@@ -113,21 +101,16 @@ class Py7zrMountSource(SQLiteIndexMountSource):
         #  - I have no idea what ID to write into 'offset' or 'offsetheader'. The "ID" for the py7zr interface
         #    is the "filename" (path). Storing a string in the int 'offset' column is not a good idea.
         #  - The py7zr interface seems to lack a way to query information about symbolic links.
-        indexFilePath = ':memory:'
-        super().__init__(
-            SQLiteIndex(
-                indexFilePath,
-                indexFolders=indexFolders,
-                archiveFilePath=fileOrPath if isinstance(fileOrPath, str) else None,
-                encoding=encoding,
-                indexMinimumFileCount=indexMinimumFileCount,
-                backendName='Py7zrMountSource',
-            ),
-            checkMetadata=self._check_metadata,
-            **options,
-        )
+
+        indexOptions = {
+            'indexFilePath': ':memory:',
+            'archiveFilePath': fileOrPath if isinstance(fileOrPath, str) else None,
+            'backendName': 'Py7zrMountSource',
+        }
+        super().__init__(checkMetadata=self._check_metadata, **(options | indexOptions))
         self.index.finalize_index(
-            create_index=self._create_index, store_metadata=self._store_metadata, writeIndex=self.writeIndex)
+            create_index=self._create_index, store_metadata=self._store_metadata, writeIndex=self.writeIndex
+        )
 
     def _store_metadata(self) -> None:
         argumentsToSave = ['encoding']

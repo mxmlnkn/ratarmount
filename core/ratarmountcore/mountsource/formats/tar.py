@@ -510,11 +510,9 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         tarFileName                  : Optional[Union[str, os.PathLike]] = None,
         fileObject                   : Optional[IO[bytes]]               = None,
         *,  # force all parameters after to be keyword-only
-        indexFilePath                : Optional[str]                     = None,
         indexFolders                 : Optional[Sequence[str]]           = None,
         recursive                    : bool                              = False,
         gzipSeekPointSpacing         : int                               = DEFAULT_GZIP_SEEK_POINT_SPACING,
-        encoding                     : str                               = tarfile.ENCODING,
         stripRecursiveTarExtension   : bool                              = False,
         ignoreZeros                  : bool                              = False,
         parallelization              : int                               = 1,
@@ -522,9 +520,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         isGnuIncremental             : Optional[bool]                    = None,
         transformRecursiveMountPoint : Optional[tuple[str, str]]         = None,
         prioritizedBackends          : Optional[list[str]]               = None,
-        indexMinimumFileCount        : int                               = 0,
         recursionDepth               : Optional[int]                     = None,
-        # pylint: disable=unused-argument
         **kwargs
     ) -> None:
         """
@@ -535,10 +531,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             A io.IOBase derived object. If not specified, tarFileName will be opened.
             If it is an instance of IndexedBzip2File, IndexedGzipFile, or IndexedZstdFile, then the offset
             loading and storing from and to the SQLite database is managed automatically by this class.
-        indexFilePath
-            Path to the index file for this TAR archive. This takes precedence over the automatically
-            chosen locations. If it is ':memory:', then the SQLite database will be kept in memory
-            and not stored to the file system at any point.
         indexFolders
             Specify one or multiple paths for storing .index.sqlite files. Paths will be tested for
             suitability in the given order. An empty path will be interpreted as the location in which
@@ -575,7 +567,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             it to a bool value. If true, then prefixes will be stripped from certain paths encountered
             with GNU incremental backups.
         kwargs
-            Unused. Only for compatibility with generic MountSource interface.
+            Will be forwarded to SQLiteIndex and SQLiteIndexMountSource.
         """
 
         self.stripRecursiveTarExtension   = stripRecursiveTarExtension
@@ -690,19 +682,13 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         elif isinstance(indexFolders, str):
             indexFolders = [indexFolders]
 
-        super().__init__(
-            SQLiteIndex(
-                indexFilePath,
-                indexFolders=indexFolders,
-                archiveFilePath=self.tarFileName if not self.isFileObject or self._fileNameIsURL else None,
-                encoding=encoding,
-                indexMinimumFileCount=indexMinimumFileCount,
-                backendName='SQLiteIndexedTar',
-                ignoreCurrentFolder=self.isFileObject and self._fileNameIsURL,
-            ),
-            checkMetadata=self._check_metadata,
-            **kwargs,
-        )
+        indexOptions = {
+            'indexFolders': indexFolders,
+            'archiveFilePath': self.tarFileName if not self.isFileObject or self._fileNameIsURL else None,
+            'backendName': 'SQLiteIndexedTar',
+            'ignoreCurrentFolder': self.isFileObject and self._fileNameIsURL,
+        }
+        super().__init__(checkMetadata=self._check_metadata, **(kwargs | indexOptions))
 
         if self.index.index_is_loaded():
             if not self.hasBeenAppendedTo:  # indirectly set by a successful call to _try_load_index

@@ -263,7 +263,7 @@ class SQLiteIndex:
 
     def __init__(
         self,
-        indexFilePath: Optional[str],
+        indexFilePath: Optional[str] = None,
         indexFolders: Optional[Sequence[str]] = None,
         archiveFilePath: Optional[str] = None,
         *,  # force all parameters after to be keyword-only
@@ -273,13 +273,14 @@ class SQLiteIndex:
         backendName: str = '',
         ignoreCurrentFolder: bool = False,
         deleteInvalidIndexes: bool = True,
+        **_,
     ):
         """
         archiveFilePath
             Path to the file to which this index belongs. This is used to derive a default index path.
         indexFilePath
-            Path to the index file. This takes precedence over defaultIndexFilePath.
-            If it is ':memory:', then the SQLite database will be kept in memory
+            Path to the index file for this TAR archive. This takes precedence over the automatically
+            chosen locations. If it is ':memory:', then the SQLite database will be kept in memory
             and not stored to the file system at any point.
         indexFolders
             Specify one or multiple paths for storing .index.sqlite files. Paths will be tested for
@@ -440,7 +441,7 @@ class SQLiteIndex:
         self.close()
 
     def close(self):
-        if self.sqlConnection:
+        if getattr(self, 'sqlConnection', None):
             try:
                 self.sqlConnection.commit()
                 self.sqlConnection.close()

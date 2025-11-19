@@ -15,13 +15,14 @@ from ratarmountcore.utils import RatarmountError, overrides
 class SQLiteIndexMountSource(MountSource):
     def __init__(
         self,
-        index: Union[SQLiteIndex, str, IO[bytes]],
+        index: Optional[Union[str, IO[bytes]]] = None,
         *,  # force all parameters after to be keyword-only
         clearIndexCache: bool = False,
         checkMetadata: Optional[Callable[[dict[str, Any]], None]] = None,
         transform: Optional[tuple[str, str]] = None,
         writeIndex: bool = False,
         verifyModificationTime: bool = False,
+        indexMinimumFileCount: int = 1000,
         **options,
     ) -> None:
         """
@@ -48,8 +49,8 @@ class SQLiteIndexMountSource(MountSource):
         self.options = options
 
         # Initialize index
-        if isinstance(index, SQLiteIndex):
-            self.index = index
+        if index is None:
+            self.index = SQLiteIndex(indexMinimumFileCount=indexMinimumFileCount, **options)
             if clearIndexCache:
                 self.index.clear_indexes()
         else:
@@ -77,7 +78,7 @@ class SQLiteIndexMountSource(MountSource):
         self.encoding = self.index.encoding
 
         # Try to load existing index.
-        if isinstance(index, SQLiteIndex):
+        if index is None:
             self.index.open_existing(checkMetadata=checkMetadata)
         else:
             self.index.open_existing(checkMetadata=checkMetadata, readOnly=True)

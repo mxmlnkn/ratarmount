@@ -3,9 +3,8 @@ import json
 import logging
 import os
 import stat
-import tarfile
 import threading
-from typing import IO, Any, Optional, Union, cast
+from typing import IO, Any, Union, cast
 
 from ratarmountcore.formats import find_asar_header
 from ratarmountcore.mountsource import FileInfo, MountSource
@@ -65,17 +64,7 @@ logger = logging.getLogger(__name__)
 #
 # There are no permissions, symbolic links (but hard links are possible), or file times.
 class ASARMountSource(SQLiteIndexMountSource):
-    # fmt: off
-    def __init__(
-        self,
-        fileOrPath             : Union[str, IO[bytes]],
-        indexFilePath          : Optional[str]             = None,
-        indexFolders           : Optional[list[str]]       = None,
-        encoding               : str                       = tarfile.ENCODING,
-        indexMinimumFileCount  : int                       = 1000,
-        **options
-    ) -> None:
-        # fmt: on
+    def __init__(self, fileOrPath: Union[str, IO[bytes]], **options) -> None:
         self.isFileObject = not isinstance(fileOrPath, str)
         self.fileObject = open(fileOrPath, 'rb') if isinstance(fileOrPath, str) else fileOrPath
 
@@ -87,18 +76,11 @@ class ASARMountSource(SQLiteIndexMountSource):
                 f"Failed to read the full ASAR header sized {self._headerSize} from offset {self._headerOffset}!"
             )
 
-        super().__init__(
-            SQLiteIndex(
-                indexFilePath,
-                indexFolders=indexFolders,
-                archiveFilePath=fileOrPath if isinstance(fileOrPath, str) else None,
-                encoding=encoding,
-                indexMinimumFileCount=indexMinimumFileCount,
-                backendName='ASARMountSource',
-            ),
-            checkMetadata=self._check_metadata,
-            **options,
-        )
+        indexOptions = {
+            'archiveFilePath': fileOrPath if isinstance(fileOrPath, str) else None,
+            'backendName': 'ASARMountSource',
+        }
+        super().__init__(checkMetadata=self._check_metadata, **(options | indexOptions))
 
         # Try to get block size from the real opened file.
         self.blockSize = 512
@@ -108,7 +90,8 @@ class ASARMountSource(SQLiteIndexMountSource):
         self.fileObjectLock = threading.Lock()
 
         self.index.finalize_index(
-            create_index=self._create_index, store_metadata=self._store_metadata, writeIndex=self.writeIndex)
+            create_index=self._create_index, store_metadata=self._store_metadata, writeIndex=self.writeIndex
+        )
 
     def _store_metadata(self) -> None:
         argumentsToSave = ['encoding', 'transformPattern']

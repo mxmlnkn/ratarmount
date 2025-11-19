@@ -4,9 +4,8 @@ import json
 import logging
 import stat
 import sys
-import tarfile
 import zipfile
-from typing import IO, Any, Optional, Union
+from typing import IO, Any, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
@@ -25,39 +24,23 @@ logger = logging.getLogger(__name__)
 
 
 class ZipMountSource(SQLiteIndexMountSource):
-    # fmt: off
-    def __init__(
-        self,
-        fileOrPath             : Union[str, IO[bytes]],
-        indexFilePath          : Optional[str]             = None,
-        indexFolders           : Optional[list[str]]       = None,
-        encoding               : str                       = tarfile.ENCODING,
-        indexMinimumFileCount  : int                       = 1000,
-        **options
-    ) -> None:
-        # fmt: on
+    def __init__(self, fileOrPath: Union[str, IO[bytes]], **options) -> None:
         if 'zipfile' not in sys.modules:
             raise RuntimeError("Did not find the zipfile module. Please use Python 3.7+.")
 
-        self.fileObject             = zipfile.ZipFile(fileOrPath, 'r')
+        self.fileObject = zipfile.ZipFile(fileOrPath, 'r')
 
         ZipMountSource._find_password(self.fileObject, options.get("passwords", []))
         self.files = {info.header_offset: info for info in self.fileObject.infolist()}
 
-        super().__init__(
-            SQLiteIndex(
-                indexFilePath,
-                indexFolders=indexFolders,
-                archiveFilePath=fileOrPath if isinstance(fileOrPath, str) else None,
-                encoding=encoding,
-                indexMinimumFileCount=indexMinimumFileCount,
-                backendName='ZipMountSource',
-            ),
-            checkMetadata=self._check_metadata,
-            **options,
-        )
+        indexOptions = {
+            'archiveFilePath': fileOrPath if isinstance(fileOrPath, str) else None,
+            'backendName': 'ZipMountSource',
+        }
+        super().__init__(checkMetadata=self._check_metadata, **(options | indexOptions))
         self.index.finalize_index(
-            create_index=self._create_index, store_metadata=self._store_metadata, writeIndex=self.writeIndex)
+            create_index=self._create_index, store_metadata=self._store_metadata, writeIndex=self.writeIndex
+        )
 
     def _store_metadata(self) -> None:
         argumentsToSave = ['encoding', 'transformPattern']
