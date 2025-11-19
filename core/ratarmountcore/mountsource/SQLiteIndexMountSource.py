@@ -16,15 +16,21 @@ class SQLiteIndexMountSource(MountSource):
     def __init__(
         self,
         index: Union[SQLiteIndex, str, IO[bytes]],
+        *,  # force all parameters after to be keyword-only
         clearIndexCache: bool = False,
         checkMetadata: Optional[Callable[[dict[str, Any]], None]] = None,
         transform: Optional[tuple[str, str]] = None,
+        writeIndex: bool = False,
         **_,
     ) -> None:
         """
         clearIndexCache
             If true, then check all possible index file locations for the given tarFileName/fileObject
             combination and delete them. This also implicitly forces a recreation of the index.
+        writeIndex
+            If true, then the sidecar index file will be written to a suitable location.
+            Will be ignored if indexFilePath is ':memory:' or if only fileObject is specified
+            but not tarFileName.
         """
         self.indexFilePath = ""
         self.transformPattern = transform
@@ -33,6 +39,7 @@ class SQLiteIndexMountSource(MountSource):
             if isinstance(self.transformPattern, (tuple, list)) and len(self.transformPattern) == 2
             else (lambda x: x)
         )
+        self.writeIndex = writeIndex
 
         # Initialize index
         if isinstance(index, SQLiteIndex):

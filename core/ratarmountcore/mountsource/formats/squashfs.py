@@ -394,7 +394,6 @@ class SquashFSMountSource(SQLiteIndexMountSource):
     def __init__(
         self,
         fileOrPath             : Union[str, IO[bytes]],
-        writeIndex             : bool                      = False,
         indexFilePath          : Optional[str]             = None,
         indexFolders           : Optional[list[str]]       = None,
         encoding               : str                       = tarfile.ENCODING,
@@ -446,7 +445,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
             # Open new database when we didn't find an existing one.
             # Simply open in memory without an error even if writeIndex is True but when not indication
             # for a index file location has been given.
-            if writeIndex and (indexFilePath or not isFileObject):
+            if self.writeIndex and (indexFilePath or not isFileObject):
                 self.index.open_writable()
             else:
                 self.index.open_in_memory()

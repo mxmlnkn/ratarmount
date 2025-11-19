@@ -511,7 +511,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         tarFileName                  : Optional[Union[str, os.PathLike]] = None,
         fileObject                   : Optional[IO[bytes]]               = None,
         *,  # force all parameters after to be keyword-only
-        writeIndex                   : bool                              = False,
         indexFilePath                : Optional[str]                     = None,
         indexFolders                 : Optional[Sequence[str]]           = None,
         recursive                    : bool                              = False,
@@ -538,10 +537,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             A io.IOBase derived object. If not specified, tarFileName will be opened.
             If it is an instance of IndexedBzip2File, IndexedGzipFile, or IndexedZstdFile, then the offset
             loading and storing from and to the SQLite database is managed automatically by this class.
-        writeIndex
-            If true, then the sidecar index file will be written to a suitable location.
-            Will be ignored if indexFilePath is ':memory:' or if only fileObject is specified
-            but not tarFileName.
         indexFilePath
             Path to the index file for this TAR archive. This takes precedence over the automatically
             chosen locations. If it is ':memory:', then the SQLite database will be kept in memory
@@ -761,7 +756,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         if not self.index.index_is_loaded():
             # Simply open in memory without an error even if writeIndex is True but when no indication
             # for an index file location has been given.
-            if writeIndex and (indexFilePath or self._get_archive_path() or not self.isFileObject):
+            if self.writeIndex and (indexFilePath or self._get_archive_path() or not self.isFileObject):
                 self.index.open_writable()
             else:
                 self.index.open_in_memory()
