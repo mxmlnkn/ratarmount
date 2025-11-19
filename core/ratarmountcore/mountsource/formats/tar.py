@@ -735,11 +735,10 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         if self._isGnuIncremental is None:
             self._isGnuIncremental = self._detect_gnu_incremental(self.tarFileObject)
 
-        self.index.finalize_index(
+        self._finalize_index(
             create_index=lambda: self._create_index(self.tarFileObject),
             store_metadata=self._store_metadata,
             isFileObject=self.isFileObject and not self._get_archive_path(),
-            writeIndex=self.writeIndex,
         )
 
         if logger.isEnabledFor(logging.WARNING) and self.index.indexFilePath and os.path.isfile(self.index.indexFilePath):

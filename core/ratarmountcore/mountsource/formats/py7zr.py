@@ -1,9 +1,8 @@
 import io
-import json
 import logging
 import stat
 import sys
-from typing import IO, Any, Optional, Union
+from typing import IO, Optional, Union
 
 from ratarmountcore.formats import FileFormatID, replace_format_check
 from ratarmountcore.mountsource import FileInfo, MountSource
@@ -101,21 +100,15 @@ class Py7zrMountSource(SQLiteIndexMountSource):
         #  - I have no idea what ID to write into 'offset' or 'offsetheader'. The "ID" for the py7zr interface
         #    is the "filename" (path). Storing a string in the int 'offset' column is not a good idea.
         #  - The py7zr interface seems to lack a way to query information about symbolic links.
-
         indexOptions = {
             'indexFilePath': ':memory:',
             'archiveFilePath': fileOrPath if isinstance(fileOrPath, str) else None,
             'backendName': 'Py7zrMountSource',
         }
-        super().__init__(checkMetadata=self._check_metadata, **(options | indexOptions))
-        self.index.finalize_index(
-            create_index=self._create_index, store_metadata=self._store_metadata, writeIndex=self.writeIndex
+        super().__init__(**(options | indexOptions))
+        self._finalize_index(
+            lambda: self.index.set_file_infos([self._convert_to_row(info) for info in self.fileObject.list()])
         )
-
-    def _store_metadata(self) -> None:
-        argumentsToSave = ['encoding']
-        argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
-        self.index.store_metadata(argumentsMetadata)
 
     def _convert_to_row(self, info) -> tuple:
         mode = 0o777 | (stat.S_IFDIR if info.is_directory else stat.S_IFREG)
@@ -144,9 +137,6 @@ class Py7zrMountSource(SQLiteIndexMountSource):
         # fmt: on
 
         return fileInfo
-
-    def _create_index(self) -> None:
-        self.index.set_file_infos([self._convert_to_row(info) for info in self.fileObject.list()])
 
     @staticmethod
     def _find_password(openFile, passwords):
@@ -184,10 +174,3 @@ class Py7zrMountSource(SQLiteIndexMountSource):
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
         return open_in_memory(self.fileObject, fileInfo.linkname)
-
-    def _check_metadata(self, metadata: dict[str, Any]) -> None:
-        """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
-        SQLiteIndex.check_archive_stats(self.archiveFilePath, metadata, self.verifyModificationTime)
-
-        if 'arguments' in metadata:
-            SQLiteIndex.check_metadata_arguments(json.loads(metadata['arguments']), self, argumentsToCheck=['encoding'])

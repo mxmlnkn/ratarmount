@@ -4,13 +4,12 @@
 import contextlib
 import ctypes
 import io
-import json
 import logging
 import os
 import stat
 import sys
 from collections.abc import Sequence
-from typing import IO, Any, Callable, Optional, Union, cast
+from typing import IO, Callable, Optional, Union, cast
 
 from ratarmountcore.compressions import COMPRESSION_BACKENDS
 from ratarmountcore.formats import FILE_FORMATS
@@ -519,7 +518,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
             'archiveFilePath': fileOrPath if isinstance(fileOrPath, str) else None,
             'backendName': 'LibarchiveMountSource',
         }
-        super().__init__(checkMetadata=self._check_metadata, **(options | indexOptions))
+        super().__init__(**(options | indexOptions))
 
         if self.index.index_is_loaded():
             metadata = dict(self.index.get_connection().execute('SELECT * FROM metadata;'))
@@ -527,9 +526,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                 self.__exit__(None, None, None)
                 raise InvalidIndexError("The found index was not created by the libarchive backend.")
 
-        self.index.finalize_index(
-            create_index=self._create_index, store_metadata=self._store_metadata, writeIndex=self.writeIndex
-        )
+        self._finalize_index(self._create_index)
 
     def _create_index(self) -> None:
         triedToOpen = False
@@ -580,12 +577,6 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
             elif not gotAnyEntry and archive.format_name() == b'tar':
                 raise ArchiveError("Supposedly detected a TAR with no entries in it. Rejecting it as unknown format!")
 
-    def _store_metadata(self) -> None:
-        argumentsToSave = ['encoding', 'transformPattern']
-        argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
-        self.index.store_metadata(argumentsMetadata)
-        self.index.store_metadata_key_value('backend', 'libarchive')
-
     def __del__(self):
         # TODO check that all objects are really closed to avoid memory leaks
         pass
@@ -605,12 +596,3 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
                 archiveCache=self._archiveCache,
             ),
         )
-
-    def _check_metadata(self, metadata: dict[str, Any]) -> None:
-        """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
-        SQLiteIndex.check_archive_stats(self.archiveFilePath, metadata, self.verifyModificationTime)
-
-        if 'arguments' in metadata:
-            SQLiteIndex.check_metadata_arguments(
-                json.loads(metadata['arguments']), self, argumentsToCheck=['encoding', 'transformPattern']
-            )

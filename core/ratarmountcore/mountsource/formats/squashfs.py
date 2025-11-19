@@ -2,7 +2,6 @@
 
 import contextlib
 import io
-import json
 import logging
 import os
 import stat
@@ -410,15 +409,8 @@ class SquashFSMountSource(SQLiteIndexMountSource):
             'archiveFilePath': fileOrPath if isinstance(fileOrPath, str) else None,
             'backendName': 'SquashFSMountSource',
         }
-        super().__init__(checkMetadata=self._check_metadata, **(options | indexOptions))
-        self.index.finalize_index(
-            create_index=self._create_index, store_metadata=self._store_metadata, writeIndex=self.writeIndex
-        )
-
-    def _store_metadata(self) -> None:
-        argumentsToSave = ['encoding', 'transformPattern']
-        argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
-        self.index.store_metadata(argumentsMetadata)
+        super().__init__(**(options | indexOptions))
+        self._finalize_index(self._create_index)
 
     def _convert_to_row(self, inodeOffset: int, info: "PySquashfsImage.file.File") -> tuple:  # type: ignore
         mode = info.mode
@@ -516,15 +508,3 @@ class SquashFSMountSource(SQLiteIndexMountSource):
             'f_favail': 0,
             'f_namemax': 256,
         }
-
-    def _check_metadata(self, metadata: dict[str, Any]) -> None:
-        """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
-        SQLiteIndex.check_archive_stats(self.archiveFilePath, metadata, self.verifyModificationTime)
-
-        if 'arguments' in metadata:
-            SQLiteIndex.check_metadata_arguments(
-                json.loads(metadata['arguments']), self, argumentsToCheck=['encoding', 'transformPattern']
-            )
-
-        if 'backendName' not in metadata:
-            self.index.try_to_open_first_file(lambda path: self.open(self.lookup(path)))

@@ -1,6 +1,7 @@
 # pylint: disable=abstract-method
 
 import builtins
+import json
 import re
 import shutil
 import tempfile
@@ -79,11 +80,53 @@ class SQLiteIndexMountSource(MountSource):
 
         # Try to load existing index.
         if index is None:
-            self.index.open_existing(checkMetadata=checkMetadata)
+            self.index.open_existing(checkMetadata=checkMetadata or self._check_metadata)
         else:
-            self.index.open_existing(checkMetadata=checkMetadata, readOnly=True)
+            self.index.open_existing(checkMetadata=checkMetadata or self._check_metadata_dummy, readOnly=True)
             if not self.index.index_is_loaded():
                 raise RatarmountError(f"Specified file {self.indexFilePath} is not a valid Ratarmount index.")
+
+    def _store_default_metadata(self) -> None:
+        argumentsToSave = ['encoding', 'transformPattern']
+        argumentsMetadata = json.dumps(
+            {argument: getattr(self, argument) for argument in argumentsToSave if hasattr(self, argument)}
+        )
+        self.index.store_metadata(argumentsMetadata)
+
+    def _check_metadata_dummy(self, metadata: dict[str, Any]) -> None:
+        pass
+
+    def _check_metadata(self, metadata: dict[str, Any]) -> None:
+        """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
+        SQLiteIndex.check_archive_stats(self.archiveFilePath, metadata, self.verifyModificationTime)
+
+        if 'arguments' in metadata:
+            SQLiteIndex.check_metadata_arguments(
+                json.loads(metadata['arguments']), self, argumentsToCheck=['encoding', 'transformPattern']
+            )
+
+        if 'backendName' not in metadata:
+            self.index.try_to_open_first_file(lambda path: self.open(self.lookup(path)))
+
+    def _finalize_index(
+        self,
+        create_index: Callable[[], None],
+        *,  # force all parameters after to be keyword-only
+        store_metadata: Optional[Callable[[], None]] = None,
+        isFileObject: Optional[bool] = None,
+    ):
+        """
+        metadata
+            Should either be a list of attributes on 'self' that should be stored or a callable that stores
+            metadata by calling self.index.store_metadata. If it is None a default selection of attributes
+            will be saved.
+        """
+        self.index.finalize_index(
+            create_index=create_index,
+            store_metadata=store_metadata if callable(store_metadata) else self._store_default_metadata,
+            isFileObject=isFileObject,
+            writeIndex=self.writeIndex,
+        )
 
     @staticmethod
     def _quick_check_file(fileObject: IO[bytes], name: str) -> None:

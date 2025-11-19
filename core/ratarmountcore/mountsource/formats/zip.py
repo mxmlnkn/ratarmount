@@ -1,11 +1,10 @@
 import contextlib
 import datetime
-import json
 import logging
 import stat
 import sys
 import zipfile
-from typing import IO, Any, Union
+from typing import IO, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
@@ -37,15 +36,10 @@ class ZipMountSource(SQLiteIndexMountSource):
             'archiveFilePath': fileOrPath if isinstance(fileOrPath, str) else None,
             'backendName': 'ZipMountSource',
         }
-        super().__init__(checkMetadata=self._check_metadata, **(options | indexOptions))
-        self.index.finalize_index(
-            create_index=self._create_index, store_metadata=self._store_metadata, writeIndex=self.writeIndex
+        super().__init__(**(options | indexOptions))
+        self._finalize_index(
+            lambda: self.index.set_file_infos([self._convert_to_row(info) for info in self.fileObject.infolist()])
         )
-
-    def _store_metadata(self) -> None:
-        argumentsToSave = ['encoding', 'transformPattern']
-        argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
-        self.index.store_metadata(argumentsMetadata)
 
     def _convert_to_row(self, info: "zipfile.ZipInfo") -> tuple:
         mtime = datetime.datetime(*info.date_time, tzinfo=datetime.timezone.utc).timestamp() if info.date_time else 0
@@ -102,9 +96,6 @@ class ZipMountSource(SQLiteIndexMountSource):
 
         return fileInfo
 
-    def _create_index(self) -> None:
-        self.index.set_file_infos([self._convert_to_row(info) for info in self.fileObject.infolist()])
-
     @staticmethod
     def _find_password(fileobj: "zipfile.ZipFile", passwords):
         # If headers are encrypted, then infolist will simply return an empty list!
@@ -150,15 +141,3 @@ class ZipMountSource(SQLiteIndexMountSource):
         # Very nice!
         # https://github.com/python/cpython/blob/a87c46eab3c306b1c5b8a072b7b30ac2c50651c0/Lib/zipfile/__init__.py#L1569
         return self.fileObject.open(info, 'r')  # https://github.com/pauldmccarthy/indexed_gzip/issues/85
-
-    def _check_metadata(self, metadata: dict[str, Any]) -> None:
-        """Raises an exception if the metadata mismatches so much that the index has to be treated as incompatible."""
-        SQLiteIndex.check_archive_stats(self.archiveFilePath, metadata, self.verifyModificationTime)
-
-        if 'arguments' in metadata:
-            SQLiteIndex.check_metadata_arguments(
-                json.loads(metadata['arguments']), self, argumentsToCheck=['encoding', 'transformPattern']
-            )
-
-        if 'backendName' not in metadata:
-            self.index.try_to_open_first_file(lambda path: self.open(self.lookup(path)))
