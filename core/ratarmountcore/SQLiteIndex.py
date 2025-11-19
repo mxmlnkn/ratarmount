@@ -274,6 +274,8 @@ class SQLiteIndex:
         deleteInvalidIndexes: bool = True,
     ):
         """
+        archiveFilePath
+            Path to the file to which this index belongs. This is used to derive a default index path.
         indexFilePath
             Path to the index file. This takes precedence over defaultIndexFilePath.
             If it is ':memory:', then the SQLite database will be kept in memory
@@ -297,6 +299,7 @@ class SQLiteIndex:
         """
 
         self.sqlConnection: Optional[sqlite3.Connection] = None
+        self.archiveFilePath = archiveFilePath
         # Will hold the actually opened valid path to an index file
         self.indexFilePath: Optional[str] = None
         # This is true if the index file found was compressed or an URL and had to be downloaded

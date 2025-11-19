@@ -98,8 +98,6 @@ class Py7zrMountSource(SQLiteIndexMountSource):
         indexMinimumFileCount  : int                       = 1000,
         **options
     ) -> None:
-        self.archiveFilePath        = fileOrPath if isinstance(fileOrPath, str) else None
-        self.encoding               = encoding
         self.verifyModificationTime = verifyModificationTime
         self.options                = options
         # fmt: on
@@ -126,13 +124,14 @@ class Py7zrMountSource(SQLiteIndexMountSource):
             SQLiteIndex(
                 indexFilePath,
                 indexFolders=indexFolders,
-                archiveFilePath=self.archiveFilePath,
-                encoding=self.encoding,
+                archiveFilePath=fileOrPath if isinstance(fileOrPath, str) else None,
+                encoding=encoding,
                 indexMinimumFileCount=indexMinimumFileCount,
                 backendName='Py7zrMountSource',
             ),
             clearIndexCache=clearIndexCache,
             checkMetadata=self._check_metadata,
+            **options,
         )
 
         isFileObject = not isinstance(fileOrPath, str)

@@ -512,9 +512,7 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
         tarFileName            : Optional[str]             = None,
         **options
     ) -> None:
-        self.archiveFilePath        = fileOrPath if isinstance(fileOrPath, str) else None
         self.fileOrPath             = fileOrPath
-        self.encoding               = encoding
         self.verifyModificationTime = verifyModificationTime
         self.options                = options
         self.transformPattern       = transform
@@ -548,13 +546,14 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
             SQLiteIndex(
                 indexFilePath,
                 indexFolders=indexFolders,
-                archiveFilePath=self.archiveFilePath,
-                encoding=self.encoding,
+                archiveFilePath=fileOrPath if isinstance(fileOrPath, str) else None,
+                encoding=encoding,
                 indexMinimumFileCount=indexMinimumFileCount,
                 backendName='LibarchiveMountSource',
             ),
             clearIndexCache=clearIndexCache,
             checkMetadata=self._check_metadata,
+            **options,
         )
 
         isFileObject = False  # Not supported yet

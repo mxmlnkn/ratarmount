@@ -83,8 +83,6 @@ class ASARMountSource(SQLiteIndexMountSource):
     ) -> None:
         self.isFileObject           = not isinstance(fileOrPath, str)
         self.fileObject             = open(fileOrPath, 'rb') if isinstance(fileOrPath, str) else fileOrPath
-        self.archiveFilePath        = fileOrPath if isinstance(fileOrPath, str) else None
-        self.encoding               = encoding
         self.verifyModificationTime = verifyModificationTime
         self.options                = options
         self.transformPattern       = transform
@@ -108,13 +106,14 @@ class ASARMountSource(SQLiteIndexMountSource):
             SQLiteIndex(
                 indexFilePath,
                 indexFolders=indexFolders,
-                archiveFilePath=self.archiveFilePath,
-                encoding=self.encoding,
+                archiveFilePath=fileOrPath if isinstance(fileOrPath, str) else None,
+                encoding=encoding,
                 indexMinimumFileCount=indexMinimumFileCount,
                 backendName='ASARMountSource',
             ),
             clearIndexCache=clearIndexCache,
             checkMetadata=self._check_metadata,
+            **options,
         )
 
         # Try to get block size from the real opened file.

@@ -423,8 +423,6 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         # fmt: off
         self.rawFileObject          = file
         self.image                  = SquashFSImage(self.rawFileObject, offset=offset)
-        self.archiveFilePath        = fileOrPath if isinstance(fileOrPath, str) else None
-        self.encoding               = encoding
         self.verifyModificationTime = verifyModificationTime
         self.options                = options
         self.transformPattern       = transform
@@ -440,13 +438,14 @@ class SquashFSMountSource(SQLiteIndexMountSource):
             SQLiteIndex(
                 indexFilePath,
                 indexFolders=indexFolders,
-                archiveFilePath=self.archiveFilePath,
-                encoding=self.encoding,
+                archiveFilePath=fileOrPath if isinstance(fileOrPath, str) else None,
+                encoding=encoding,
                 indexMinimumFileCount=indexMinimumFileCount,
                 backendName='SquashFSMountSource',
             ),
             clearIndexCache=clearIndexCache,
             checkMetadata=self._check_metadata,
+            **options,
         )
 
         isFileObject = not isinstance(fileOrPath, str)

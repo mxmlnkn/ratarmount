@@ -593,7 +593,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             Unused. Only for compatibility with generic MountSource interface.
         """
 
-        self.encoding                     = encoding
         self.stripRecursiveTarExtension   = stripRecursiveTarExtension
         self.transformRecursiveMountPoint = transformRecursiveMountPoint
         self.transformPattern             = transform
@@ -714,20 +713,19 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         elif isinstance(indexFolders, str):
             indexFolders = [indexFolders]
 
-        archiveFilePath = self.tarFileName if not self.isFileObject or self._fileNameIsURL else None
-
         super().__init__(
             SQLiteIndex(
                 indexFilePath,
                 indexFolders=indexFolders,
-                archiveFilePath=archiveFilePath,
-                encoding=self.encoding,
+                archiveFilePath=self.tarFileName if not self.isFileObject or self._fileNameIsURL else None,
+                encoding=encoding,
                 indexMinimumFileCount=indexMinimumFileCount,
                 backendName='SQLiteIndexedTar',
                 ignoreCurrentFolder=self.isFileObject and self._fileNameIsURL,
             ),
             clearIndexCache=clearIndexCache,
             checkMetadata=self._check_metadata,
+            **kwargs,
         )
 
         if self.index.index_is_loaded():
@@ -1119,7 +1117,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             tarFileSize = self.tarFileObject.tell()
         tarSubFile = self._open_stencil([(self.tarFileObject, tarFileInfo.offsetheader, tarFileSize)], buffering)
 
-        with tarfile.open(fileobj=cast(IO[bytes], tarSubFile), mode='r:', encoding=self.encoding) as tarFile:
+        with tarfile.open(fileobj=cast(IO[bytes], tarSubFile), mode='r:', encoding=self.index.encoding) as tarFile:
             tarInfo = next(iter(tarFile))
             if not tarInfo.sparse:
                 raise RatarmountError("Expected a sparse file but it does not seem to be one!")
@@ -1456,7 +1454,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                 headerBlockCount = max(1, math.ceil((offsetData - offsetHeader) / 512)) * 512
                 with StenciledFile(
                     fileStencils=[(self.tarFileObject, offsetHeader, headerBlockCount)]
-                ) as file, tarfile.open(fileobj=file, mode='r|', ignore_zeros=True, encoding=self.encoding) as archive:
+                ) as file, tarfile.open(fileobj=file, mode='r|', ignore_zeros=True, encoding=self.index.encoding) as archive:
                     tarInfo = next(iter(archive))
                     realFileInfos, _, _, _ = _TarFileMetadataReader._process_tar_info(
                         tarInfo,
