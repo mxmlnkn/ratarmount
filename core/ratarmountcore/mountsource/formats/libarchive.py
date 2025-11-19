@@ -503,18 +503,15 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
         indexFilePath          : Optional[str]             = None,
         indexFolders           : Optional[Sequence[str]]   = None,
         encoding               : str                       = tarfile.ENCODING,
-        verifyModificationTime : bool                      = False,
         indexMinimumFileCount  : int                       = 0,
         tarFileName            : Optional[str]             = None,
         **options
     ) -> None:
-        self.fileOrPath             = fileOrPath
-        self.verifyModificationTime = verifyModificationTime
-        self.options                = options
-        self.passwords              = options.get("passwords", [])
-        self.tarFileName            = tarFileName
-        self._archiveCache          = IterableArchiveCache()
         # fmt: on
+        self.fileOrPath = fileOrPath
+        self.passwords = options.get("passwords", [])
+        self.tarFileName = tarFileName
+        self._archiveCache = IterableArchiveCache()
 
         # Determine an archive file name to show for debug output and as file name inside the mount point for
         # simple non-TAR gzip/bzip2 stream-compressed files.

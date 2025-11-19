@@ -33,7 +33,6 @@ class ZipMountSource(SQLiteIndexMountSource):
         indexFilePath          : Optional[str]             = None,
         indexFolders           : Optional[list[str]]       = None,
         encoding               : str                       = tarfile.ENCODING,
-        verifyModificationTime : bool                      = False,
         indexMinimumFileCount  : int                       = 1000,
         **options
     ) -> None:
@@ -41,11 +40,7 @@ class ZipMountSource(SQLiteIndexMountSource):
         if 'zipfile' not in sys.modules:
             raise RuntimeError("Did not find the zipfile module. Please use Python 3.7+.")
 
-        # fmt: off
         self.fileObject             = zipfile.ZipFile(fileOrPath, 'r')
-        self.verifyModificationTime = verifyModificationTime
-        self.options                = options
-        # fmt: on
 
         ZipMountSource._find_password(self.fileObject, options.get("passwords", []))
         self.files = {info.header_offset: info for info in self.fileObject.infolist()}

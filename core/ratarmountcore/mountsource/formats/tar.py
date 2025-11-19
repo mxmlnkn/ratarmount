@@ -518,7 +518,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         encoding                     : str                               = tarfile.ENCODING,
         stripRecursiveTarExtension   : bool                              = False,
         ignoreZeros                  : bool                              = False,
-        verifyModificationTime       : bool                              = False,
         parallelization              : int                               = 1,
         parallelizations             : Optional[dict[str, int]]          = None,
         isGnuIncremental             : Optional[bool]                    = None,
@@ -565,9 +564,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             If specified, then a <path>.tar inside the current tar will be matched with the
             first argument of the tuple and replaced by the second argument. This new
             modified path is used as recursive mount point. See also Python's re.sub.
-        verifyModificationTime
-            If true, then the index will be recreated automatically if the TAR archive has a more
-            recent modification time than the index file.
         parallelization
             The amount of parallelization to be used for necessary compression backends if it offers
             parallelization at all and if it makes sense.
@@ -586,7 +582,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         self.stripRecursiveTarExtension   = stripRecursiveTarExtension
         self.transformRecursiveMountPoint = transformRecursiveMountPoint
         self.ignoreZeros                  = ignoreZeros
-        self.verifyModificationTime       = verifyModificationTime
         self.gzipSeekPointSpacing         = gzipSeekPointSpacing
         self.isFileObject                 = fileObject is not None
         self._isGnuIncremental            = isGnuIncremental

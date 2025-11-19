@@ -92,12 +92,9 @@ class Py7zrMountSource(SQLiteIndexMountSource):
         indexFilePath          : Optional[str]             = None,
         indexFolders           : Optional[list[str]]       = None,
         encoding               : str                       = tarfile.ENCODING,
-        verifyModificationTime : bool                      = False,
         indexMinimumFileCount  : int                       = 1000,
         **options
     ) -> None:
-        self.verifyModificationTime = verifyModificationTime
-        self.options                = options
         # fmt: on
 
         # TODO For now, 'transform' is not supported because we need the exact path to open the file and there

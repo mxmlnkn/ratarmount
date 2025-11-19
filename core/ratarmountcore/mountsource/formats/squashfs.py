@@ -397,7 +397,6 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         indexFilePath          : Optional[str]             = None,
         indexFolders           : Optional[list[str]]       = None,
         encoding               : str                       = tarfile.ENCODING,
-        verifyModificationTime : bool                      = False,
         indexMinimumFileCount  : int                       = 1000,
         **options
     ) -> None:
@@ -416,12 +415,8 @@ class SquashFSMountSource(SQLiteIndexMountSource):
                 file.close()
             raise ValueError("Not a valid SquashFS image!")
 
-        # fmt: off
-        self.rawFileObject          = file
-        self.image                  = SquashFSImage(self.rawFileObject, offset=offset)
-        self.verifyModificationTime = verifyModificationTime
-        self.options                = options
-        # fmt: on
+        self.rawFileObject = file
+        self.image = SquashFSImage(self.rawFileObject, offset=offset)
 
         super().__init__(
             SQLiteIndex(

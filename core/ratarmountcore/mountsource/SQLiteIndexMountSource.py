@@ -21,7 +21,8 @@ class SQLiteIndexMountSource(MountSource):
         checkMetadata: Optional[Callable[[dict[str, Any]], None]] = None,
         transform: Optional[tuple[str, str]] = None,
         writeIndex: bool = False,
-        **_,
+        verifyModificationTime: bool = False,
+        **options,
     ) -> None:
         """
         clearIndexCache
@@ -31,6 +32,9 @@ class SQLiteIndexMountSource(MountSource):
             If true, then the sidecar index file will be written to a suitable location.
             Will be ignored if indexFilePath is ':memory:' or if only fileObject is specified
             but not tarFileName.
+        verifyModificationTime
+            If true, then the index will be recreated automatically if the TAR archive has a more
+            recent modification time than the index file.
         """
         self.indexFilePath = ""
         self.transformPattern = transform
@@ -40,6 +44,8 @@ class SQLiteIndexMountSource(MountSource):
             else (lambda x: x)
         )
         self.writeIndex = writeIndex
+        self.verifyModificationTime = verifyModificationTime
+        self.options = options
 
         # Initialize index
         if isinstance(index, SQLiteIndex):

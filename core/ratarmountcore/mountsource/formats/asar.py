@@ -73,15 +73,12 @@ class ASARMountSource(SQLiteIndexMountSource):
         indexFilePath          : Optional[str]             = None,
         indexFolders           : Optional[list[str]]       = None,
         encoding               : str                       = tarfile.ENCODING,
-        verifyModificationTime : bool                      = False,
         indexMinimumFileCount  : int                       = 1000,
         **options
     ) -> None:
-        self.isFileObject           = not isinstance(fileOrPath, str)
-        self.fileObject             = open(fileOrPath, 'rb') if isinstance(fileOrPath, str) else fileOrPath
-        self.verifyModificationTime = verifyModificationTime
-        self.options                = options
         # fmt: on
+        self.isFileObject = not isinstance(fileOrPath, str)
+        self.fileObject = open(fileOrPath, 'rb') if isinstance(fileOrPath, str) else fileOrPath
 
         # Try to open file
         self._headerOffset, self._headerSize, self._dataOffset = find_asar_header(self.fileObject)
