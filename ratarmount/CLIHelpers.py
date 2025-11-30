@@ -78,20 +78,23 @@ def check_input_file_type(path: str) -> str:
             except Exception:
                 pass
 
-        # 1. Find any working backend for any of the possible formats.
+        # Try importing required modules in case something went wrong there.
+        # Normally this should be done in ratarmountcore.archives and ratarmountcore.compressions.
+        # Do not yet return errors because another backend could work.
         for backend in list(ARCHIVE_BACKENDS.values()) + list(COMPRESSION_BACKENDS.values()):
             if not formats.intersection(backend.formats):
                 continue
 
-            # Try importing required modules in case something went wrong there.
-            # Normally this should be done in ratarmountcore.archives and ratarmountcore.compressions.
-            # Do not yet return errors because another backend could work.
             for module, _ in backend.requiredModules:
                 if module not in sys.modules:
                     with contextlib.suppress(Exception):
                         importlib.import_module(module)
 
-            if all(module in sys.modules for module, _ in backend.requiredModules):
+        # 1. Find any working backend for any of the possible formats.
+        for backend in list(ARCHIVE_BACKENDS.values()) + list(COMPRESSION_BACKENDS.values()):
+            if formats.intersection(backend.formats) and all(
+                module in sys.modules for module, _ in backend.requiredModules
+            ):
                 return path
 
         # 2. Check for some obscure archive formats.

@@ -29,6 +29,11 @@ import tarfile
 import zipfile
 from typing import IO, Callable, Optional, Union
 
+try:
+    import sqlcipher3  # noqa: F401
+except ImportError:
+    sqlcipher3 = None  # type:ignore
+
 
 class FileFormatID(enum.Enum):
     # fmt: off
@@ -111,12 +116,12 @@ def find_asar_header(fileobj: IO[bytes]) -> tuple[int, int, int]:
         struct.unpack('<LLLL', fileobj.read(ASAR_MAGIC_SIZE))
     )
     if sizeOfPickledSize != 4:
-        raise ValueError("First magic bytes quadruplet does not match SQLAR!")
+        raise ValueError("First magic bytes quadruplet does not match ASAR!")
     if sizeOfPickledPickledPickledHeader != sizeOfPickledPickledHeader + 4:
-        raise ValueError("Second magic bytes quadruplet does not match SQLAR!")
+        raise ValueError("Second magic bytes quadruplet does not match ASAR!")
     padding = (4 - sizeOfPickledHeader % 4) % 4
     if sizeOfPickledPickledHeader != sizeOfPickledHeader + padding + 4:
-        raise ValueError("Third magic bytes quadruplet does not match SQLAR!")
+        raise ValueError("Third magic bytes quadruplet does not match ASAR!")
 
     dataOffset = ASAR_MAGIC_SIZE + sizeOfPickledHeader + padding
 
@@ -165,6 +170,9 @@ def is_squashfs(fileobj: IO[bytes]) -> bool:
         # Compressions: 0:None, 1:GZIP, 2:LZMA, 3:LZO, 4:XZ, 5:LZ4, 6:ZSTD
         if compressor > 6:
             return False
+
+    except struct.error:
+        return False
 
     finally:
         fileobj.seek(offset)
@@ -219,6 +227,8 @@ def _is_iso9660(fileobj: IO[bytes]) -> bool:
 
 def _check_zlib_header(fileobj: IO[bytes]) -> bool:
     header = fileobj.read(2)
+    if len(header) < 2:
+        return False
     cmf = header[0]
     if cmf & 0xF != 8:
         return False
@@ -237,29 +247,41 @@ def _is_bzip2(fileobj: IO[bytes]) -> bool:
 
 def _check_lz4_header(fileobj: IO[bytes]) -> bool:
     SKIPPABLE_FRAME_MAGIC = 0x184D2A50
-    (magic,) = struct.unpack('<L', fileobj.read(4))
-
-    # https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md#skippable-frames
-    while magic & 0xFFFF_FFF0 == SKIPPABLE_FRAME_MAGIC:
-        (frame_size,) = struct.unpack('<L', fileobj.read(4))
-        fileobj.seek(fileobj.tell() + frame_size)
+    try:
         (magic,) = struct.unpack('<L', fileobj.read(4))
 
-    # https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md#general-structure-of-lz4-frame-format
-    return magic == 0x184D2204
+        # https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md#skippable-frames
+        while magic & 0xFFFF_FFF0 == SKIPPABLE_FRAME_MAGIC:
+            (frame_size,) = struct.unpack('<L', fileobj.read(4))
+            fileobj.seek(fileobj.tell() + frame_size)
+            (magic,) = struct.unpack('<L', fileobj.read(4))
+
+        # https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md#general-structure-of-lz4-frame-format
+        return magic == 0x184D2204
+    except struct.error:
+        return False
 
 
 def _check_zstandard_header(fileobj: IO[bytes]) -> bool:
     SKIPPABLE_FRAME_MAGIC = 0x184D2A50
-    (magic,) = struct.unpack('<L', fileobj.read(4))
-
-    # https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md#skippable-frames
-    while magic & 0xFFFF_FFF0 == SKIPPABLE_FRAME_MAGIC:
-        (frame_size,) = struct.unpack('<L', fileobj.read(4))
-        fileobj.seek(fileobj.tell() + frame_size)
+    try:
         (magic,) = struct.unpack('<L', fileobj.read(4))
 
-    return magic == 0xFD2FB528
+        # https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md#skippable-frames
+        while magic & 0xFFFF_FFF0 == SKIPPABLE_FRAME_MAGIC:
+            (frame_size,) = struct.unpack('<L', fileobj.read(4))
+            fileobj.seek(fileobj.tell() + frame_size)
+            (magic,) = struct.unpack('<L', fileobj.read(4))
+
+        return magic == 0xFD2FB528
+    except struct.error:
+        return False
+
+
+def _check_encrypted_sqlar(fileobj: IO[bytes]) -> bool:
+    # File must at least contain the AES encryption salt, probably even many more bytes.
+    salt = fileobj.read(16)
+    return len(salt) >= 16
 
 
 @dataclasses.dataclass
@@ -287,9 +309,12 @@ ARCHIVE_FORMATS: dict[FileFormatID, FileFormatInfo] = {
     # is_zipfile might yields some false positives, we want it to err on the positive side.
     # See: https://bugs.python.org/issue42096
     FID.ZIP: FileFormatInfo(['zip'], None, zipfile.is_zipfile),
-    # SQLAR can be encrypted, for which it will not have any magic bytes! The first 16 B are the salt.
-    # lambda x: x.read(16) == b'SQLite format 3\x00'
-    FID.SQLAR: FileFormatInfo(['sqlar'], None, None),
+    # SQLAR can be encrypted, for which it will not have any magic bytes! Instead, the first 16 B are the salt.
+    FID.SQLAR: (
+        FileFormatInfo(['sqlar'], b'SQLite format 3\x00', None)
+        if sqlcipher3 is None
+        else FileFormatInfo(['sqlar'], None, _check_encrypted_sqlar)
+    ),
     # https://download.microsoft.com/download/4/d/a/4da14f27-b4ef-4170-a6e6-5b1ef85b1baa/[ms-cab].pdf
     FID.CAB: FileFormatInfo(['cab'], b'MSCF'),
     # https://www.ibm.com/docs/en/aix/7.2.0?topic=formats-ar-file-format-small
@@ -362,7 +387,7 @@ _FORMATS_WITHOUT_MAGIC_BYTES: list[FileFormatID] = []
 
 
 def recompute_cached_magic_bytes():
-    """Should be called when injecting new file formats from outsfide."""
+    """Should be called when injecting new file formats from outside."""
     for fid, info in FILE_FORMATS.items():
         if info.magicBytes is None or len(info.magicBytes) < 2:
             _FORMATS_WITHOUT_MAGIC_BYTES.append(fid)
@@ -388,8 +413,7 @@ def might_be_format(fileobj: IO[bytes], fid: Union[FileFormatID, FileFormatInfo]
     finally:
         fileobj.seek(oldOffset)
 
-    # No magic bytes and no header check, reject it because there seems to be the necessary module to read
-    # that format missing anyway.
+    # For no magic bytes and no header check, reject it because the necessary module to read it seems to be missing.
     return bool(formatInfo.magicBytes or formatInfo.checkHeader)
 
 

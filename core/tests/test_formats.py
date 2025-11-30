@@ -5,6 +5,11 @@
 import os
 import sys
 
+try:
+    import sqlcipher3  # noqa: F401
+except ImportError:
+    sqlcipher3 = None  # type:ignore
+
 from helpers import find_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -18,6 +23,8 @@ from ratarmountcore.formats import (  # noqa: E402
     detect_formats,
     might_be_format,
 )
+from ratarmountcore.mountsource.archives import ARCHIVE_BACKENDS  # noqa: E402
+from ratarmountcore.mountsource.factory import find_backends_by_extension  # noqa: E402
 
 
 def test_format_detection():
@@ -33,6 +40,21 @@ def test_format_detection():
             formats = detect_formats(file)
             assert formats == {fid for fid, info in FILE_FORMATS.items() if might_be_format(file, info)}, name
             assert formats == {fid for fid in FILE_FORMATS if might_be_format(file, fid)}, name
+
+            # Skip tests for which backends are not installed to test on some broken systems.
+            backends = find_backends_by_extension(name)
+            assert all(backend in ARCHIVE_BACKENDS for backend in backends)
+            hasBackend = True
+            for backend in backends:
+                modules = ARCHIVE_BACKENDS[backend].requiredModules
+                if modules and not all(module in sys.modules for module, _ in modules):
+                    hasBackend = False
+                    print(f"Ignoring test for: {backend} because required modules are missing: {modules}")
+                    break
+            if 'encrypted' in name and name.endswith('.sqlar') and sqlcipher3 is None:
+                hasBackend = False
+            if not hasBackend:
+                continue
 
             splitName = name.rsplit('.', 1)
             if len(splitName) > 1 and name and name[0] != '.':
@@ -59,11 +81,11 @@ def test_format_detection():
                     assert extension in ['001', '002', 'ini', 'sh', 'snar', 'txt', 'py'], message
                 elif len(formats) == 1:
                     formatID = next(iter(formats))
-                    extensions = FILE_FORMATS[formatID].extensions
+                    extensions = set(FILE_FORMATS[formatID].extensions)
                     if formatID in COMPRESSION_FORMATS:
-                        extensions += ['t' + e for e in extensions]
+                        extensions.update({'t' + e for e in extensions})
                     if formatID == FileFormatID.RATARMOUNT_INDEX:
-                        extensions.append('sqlite')
+                        extensions.add('sqlite')
                     assert extension in extensions, message
                 elif len(formats) > 1:
                     # SQLite files can be Ratarmount indexes or SQLAR

@@ -7,7 +7,6 @@ import urllib.parse
 from collections.abc import Iterable, Sequence
 from typing import IO, Any, Optional, Union
 
-from ratarmountcore.formats import FileFormatID, replace_format_check
 from ratarmountcore.mountsource import FileInfo, MountSource, create_root_file_info
 from ratarmountcore.SQLiteBlobFile import SQLiteBlobFile
 from ratarmountcore.StenciledFile import LambdaReaderFile
@@ -100,9 +99,6 @@ try:
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     from sqlcipher3 import dbapi2 as sqlcipher3  # type:ignore
-
-    # No way to detect encrypted SQLAR.
-    replace_format_check(FileFormatID.SQLAR, lambda x: True)
 except ImportError:
     # The cryptography imports can fail pretty badly and it does not seem to be catchable :(
     #
