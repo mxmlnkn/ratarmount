@@ -1,7 +1,7 @@
 import os
 import stat
 import time
-import urllib
+import urllib.parse
 from collections.abc import Iterable
 from typing import IO, Optional, Union
 
