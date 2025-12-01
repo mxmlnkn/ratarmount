@@ -127,7 +127,7 @@ jobs:
         bash tests/runtests.sh
 
   AppImage-Nightly-Release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     needs: [AppImage-Tests]
     if: github.ref_name == 'master'
     steps:
@@ -159,7 +159,7 @@ jobs:
 
   AppImage-Release:
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     needs: [AppImage-Tests]
     steps:
     - uses: actions/checkout@v4
