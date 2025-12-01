@@ -115,6 +115,8 @@ class ZipMountSource(SQLiteIndexMountSource):
         # file_redir is (type, flags, target) or None. Only tested for type == RAR5_XREDIR_UNIX_SYMLINK.
         linkname = ""
         mode = (info.external_attr >> 16) & 0o777
+        if mode == 0:
+            mode = 0o770 if info.is_dir() else 0o660
         if stat.S_ISLNK(info.external_attr >> 16):
             linkname = self.fileObject.read(info).decode()
             mode = mode | stat.S_IFLNK
