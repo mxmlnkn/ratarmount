@@ -26,7 +26,20 @@ try:
     # Use the FFI directly because the higher-level interface does not work sufficiently for our use case.
     import libarchive.ffi as laffi
     from libarchive.exception import ArchiveError
-except (ImportError, AttributeError):
+except Exception:
+    # I have encountered AttributeError, and on Windows also TypeError:
+    #   File "C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\site-packages\libarchive\ffi.py", line 26, in <module>
+    #     libarchive = ctypes.cdll.LoadLibrary(libarchive_path)
+    #                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    #   File "C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\ctypes\__init__.py", line 454, in LoadLibrary
+    #     return self._dlltype(name)
+    #            ^^^^^^^^^^^^^^^^^^^
+    #   File "C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\ctypes\__init__.py", line 366, in __init__
+    #     if '/' in name or '\\' in name:
+    #        ^^^^^^^^^^^
+    #   TypeError: argument of type 'NoneType' is not iterable
+    #
+    # OSError can happen when dependencies are missing, e.g., libicuuc.so.74.
     pass
 
 try:

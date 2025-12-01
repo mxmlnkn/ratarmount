@@ -19,7 +19,7 @@ from .SQLiteIndexMountSource import SQLiteIndexMountSource
 
 try:
     import libarchive
-except (ImportError, AttributeError):
+except Exception:
     libarchive = None  # type: ignore
 
 FID = FileFormatID

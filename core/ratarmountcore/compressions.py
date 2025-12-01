@@ -62,7 +62,6 @@ except ImportError:
 try:
     # Must be imported because find_available_backend checks for it to be in sys.modules!
     # Although, I'm unsure whether it gets implicitly added to sys.modules below when importing file_reader.
-    # OSError can happen when dependencies are missing, e.g., libicuuc.so.74.
     import libarchive  # pylint: disable=unused-import
 except Exception:
     libarchive = None  # type: ignore
