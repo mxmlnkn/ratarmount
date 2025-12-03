@@ -35,6 +35,7 @@ class UnionMountSource(MultiMountSourceMixin):
             and it shouldn't take minutes! Note that there always can be an edge case with hundred
             thousands of files in one folder, which can take an arbitrary amount of time to cache.
         """
+        super().__init__()
         self.mountSources: list[MountSource] = list(mountSources)
         self.folderCache: dict[str, list[MountSource]] = {"/": self.mountSources}
         self.folderCacheDepth = 0  # depth 1 means, we only cached top-level directories.

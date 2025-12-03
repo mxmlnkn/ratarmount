@@ -2,11 +2,11 @@
 
 import builtins
 from collections.abc import Sequence
+from contextlib import ExitStack
 from typing import IO, Any, Optional
 
 from ratarmountcore.mountsource import FileInfo, MountSource, merge_statfs
 from ratarmountcore.utils import overrides
-from typing_extensions import Self
 
 
 class MultiMountSourceMixin(MountSource):
@@ -22,6 +22,10 @@ class MultiMountSourceMixin(MountSource):
     """
 
     mountSources: Sequence[MountSource]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._exit_stack = ExitStack()
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering: int = -1) -> IO[bytes]:
@@ -48,7 +52,11 @@ class MultiMountSourceMixin(MountSource):
         """Lists extended attributes by delegating to the appropriate mount source."""
         mountSource = fileInfo.userdata.pop()
         try:
-            return mountSource.list_xattr(fileInfo) if isinstance(mountSource, MountSource) else []
+            return (
+                mountSource.list_xattr(fileInfo)
+                if isinstance(mountSource, MountSource)
+                else []
+            )
         finally:
             fileInfo.userdata.append(mountSource)
 
@@ -57,7 +65,11 @@ class MultiMountSourceMixin(MountSource):
         """Gets an extended attribute by delegating to the appropriate mount source."""
         mountSource = fileInfo.userdata.pop()
         try:
-            return mountSource.get_xattr(fileInfo, key) if isinstance(mountSource, MountSource) else None
+            return (
+                mountSource.get_xattr(fileInfo, key)
+                if isinstance(mountSource, MountSource)
+                else None
+            )
         finally:
             fileInfo.userdata.append(mountSource)
 
@@ -68,7 +80,7 @@ class MultiMountSourceMixin(MountSource):
         mountSource = sourceFileInfo.userdata.pop()
 
         if not isinstance(mountSource, MountSource):
-            return '/', self, fileInfo
+            return "/", self, fileInfo
 
         # Because all mount sources are mounted at '/', we do not have to append
         # the mount point path returned by get_mount_source to the mount point '/'.
@@ -87,14 +99,19 @@ class MultiMountSourceMixin(MountSource):
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
         """Cleanup method for all mount sources."""
-        result = super().__exit__(exception_type, exception_value, exception_traceback)
-        for mountSource in self.mountSources:
-            result = result or mountSource.__exit__(exception_type, exception_value, exception_traceback)
-        return result
+
+        # Use `ExitStack` because it is very verbose to properly aggregate multiple `__exit__` calls.
+        return self._exit_stack.__exit__(
+            exception_type, exception_value, exception_traceback
+        )
 
     @overrides(MountSource)
-    def __enter__(self) -> Self:
+    def __enter__(self):
         """Context manager entry point for all mount sources."""
         for mountSource in self.mountSources:
-            mountSource.__enter__()
-        return super().__enter__()
+            self._exit_stack.enter_context(mountSource)
+
+        # Use `push` instead of `enter_context`, because `enter_context` does not support `super()` as an argument.
+        super().__enter__()
+        self._exit_stack.push(super().__exit__)
+        return self
