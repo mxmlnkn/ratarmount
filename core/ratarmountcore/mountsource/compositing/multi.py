@@ -105,3 +105,9 @@ class MultiMountSourceMixin(MountSource):
         super().__enter__()
         self._exit_stack.push(super().__exit__)
         return self
+
+    def join_threads(self):
+        """Joins threads from all underlying mount sources that support it."""
+        for mountSource in self.mountSources:
+            if hasattr(mountSource, 'join_threads'):
+                mountSource.join_threads()

@@ -186,8 +186,3 @@ class UnionMountSource(MultiMountSourceMixin):
         Returns the set of all folder contents over all mount sources or None if the path was found in none of them.
         """
         return self._list(path, onlyMode=True)
-
-    def join_threads(self):
-        for mountSource in self.mountSources:
-            if hasattr(mountSource, 'join_threads'):
-                mountSource.join_threads()
