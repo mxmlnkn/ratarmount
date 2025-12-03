@@ -4,7 +4,7 @@ import unittest
 from typing import IO, Dict, Iterable, List, Optional, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource
-from ratarmountcore.mountsource.compositing.link import LinkResolutionLayer
+from ratarmountcore.mountsource.compositing.link import LinkResolutionUnionMountSource
 
 
 class MockFile(io.BytesIO):
@@ -21,7 +21,7 @@ class MockFile(io.BytesIO):
 
 
 class MockMountSource(MountSource):
-    """Mock mount source for testing LinkResolutionLayer."""
+    """Mock mount source for testing LinkResolutionUnionMountSource."""
 
     def __init__(self, files: Dict[str, FileInfo]):
         self.files = files
@@ -76,8 +76,8 @@ class MockMountSource(MountSource):
         pass
 
 
-class TestLinkResolutionLayer(unittest.TestCase):
-    """Test cases for LinkResolutionLayer."""
+class TestLinkResolutionUnionMountSource(unittest.TestCase):
+    """Test cases for LinkResolutionUnionMountSource."""
 
     def setUp(self):
         """Set up test fixtures."""
@@ -184,13 +184,13 @@ class TestLinkResolutionLayer(unittest.TestCase):
         }
 
     def test_no_link_resolution(self):
-        """Test LinkResolutionLayer with no link resolution."""
+        """Test LinkResolutionUnionMountSource with no link resolution."""
         mock_source = MockMountSource(self.test_files)
 
         def should_not_resolve_link(linkname: str, file_type: int) -> bool:
             return False
 
-        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_not_resolve_link)
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=should_not_resolve_link)
 
         # Regular file should work normally
         file_info = layer.lookup("/file1.txt")
@@ -218,7 +218,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         # Absolute symlink should be resolved
         symlink_info = layer.lookup("/symlink1")
@@ -236,7 +236,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         # Relative symlink should be resolved
         symlink_info = layer.lookup("/symlink2")
@@ -260,7 +260,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_hardlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFREG and linkname != ""
 
-        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_hardlinks)
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=should_resolve_hardlinks)
 
         # Hardlink should be resolved
         hardlink_info = layer.lookup("/hardlink1")
@@ -274,7 +274,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_all_links(linkname: str, file_type: int) -> bool:
             return linkname != ""
 
-        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_all_links)
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=should_resolve_all_links)
 
         # Both symlinks and hardlinks should be resolved
         symlink_info = layer.lookup("/symlink1")
@@ -292,7 +292,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         # Root directory listing
         listing = layer.list("/")
@@ -311,7 +311,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         # Root directory listing with modes
         listing = layer.list_mode("/")
@@ -327,7 +327,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         # Get file info for a resolved symlink
         symlink_info = layer.lookup("/symlink1")
@@ -348,7 +348,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         # Test exists
         assert layer.exists("/file1.txt")
@@ -367,7 +367,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         # Get file info for a resolved symlink
         symlink_info = layer.lookup("/symlink1")
@@ -391,7 +391,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         # Test immutability delegation
         assert layer.is_immutable() == mock_source.is_immutable()
@@ -415,7 +415,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        with LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks) as layer:
+        with LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks) as layer:
             # Should work normally within context
             file_info = layer.lookup("/file1.txt")
             assert file_info is not None
@@ -427,7 +427,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         # This should not crash due to infinite recursion
         # The implementation should handle circular references gracefully
@@ -439,8 +439,8 @@ class TestLinkResolutionLayer(unittest.TestCase):
             self.fail("Should not get RecursionError for circular symlinks")
 
 
-class TestLinkResolutionLayerMultiMount(unittest.TestCase):
-    """Test cases for LinkResolutionLayer with multiple mount sources."""
+class TestLinkResolutionUnionMountSourceMultiMount(unittest.TestCase):
+    """Test cases for LinkResolutionUnionMountSource with multiple mount sources."""
 
     def test_union_with_two_mount_sources_basic(self):
         """Test basic union functionality with two mount sources."""
@@ -508,7 +508,7 @@ class TestLinkResolutionLayerMultiMount(unittest.TestCase):
         def should_not_resolve(linkname: str, file_type: int) -> bool:
             return False
 
-        layer = LinkResolutionLayer(
+        layer = LinkResolutionUnionMountSource(
             mountSources=[mount_source_a, mount_source_b],
             shouldResolveLink=should_not_resolve
         )
@@ -587,7 +587,7 @@ class TestLinkResolutionLayerMultiMount(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionLayer(
+        layer = LinkResolutionUnionMountSource(
             mountSources=[mount_source_a, mount_source_b],
             shouldResolveLink=should_resolve_symlinks
         )
@@ -658,7 +658,7 @@ class TestLinkResolutionLayerMultiMount(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionLayer(
+        layer = LinkResolutionUnionMountSource(
             mountSources=[mount_source_a, mount_source_b],
             shouldResolveLink=should_resolve_symlinks
         )
@@ -740,7 +740,7 @@ class TestLinkResolutionLayerMultiMount(unittest.TestCase):
         def should_not_resolve(linkname: str, file_type: int) -> bool:
             return False
 
-        layer = LinkResolutionLayer(
+        layer = LinkResolutionUnionMountSource(
             mountSources=[mount_source_a, mount_source_b],
             shouldResolveLink=should_not_resolve
         )
@@ -749,7 +749,7 @@ class TestLinkResolutionLayerMultiMount(unittest.TestCase):
         versions = layer.versions("/file.txt")
         assert versions == 2
 
-        # LinkResolutionLayer iterates mount sources in reverse order (right to left),
+        # LinkResolutionUnionMountSource iterates mount sources in reverse order (right to left),
         # so version 0 is from the rightmost mount (B) and version 1 is from mount A.
         # This is consistent with UnionMountSource which gives rightmost precedence.
 

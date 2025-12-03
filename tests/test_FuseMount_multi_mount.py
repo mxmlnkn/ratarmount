@@ -5,7 +5,7 @@ import unittest
 from typing import IO, Dict, Iterable, List, Optional, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource
-from ratarmountcore.mountsource.compositing.link import LinkResolutionLayer
+from ratarmountcore.mountsource.compositing.link import LinkResolutionUnionMountSource
 from ratarmountcore.mountsource.compositing.union import UnionMountSource
 from ratarmountcore.mountsource.compositing.subvolumes import SubvolumesMountSource
 
@@ -20,7 +20,7 @@ def _create_multi_mount(mountSources: list[tuple[str, MountSource]], options: di
     # Extract mount sources from tuples
     sources = [x[1] for x in mountSources]
 
-    # Check if we should use LinkResolutionLayer
+    # Check if we should use LinkResolutionUnionMountSource
     resolveSymbolicLinks = bool(options.get('resolveSymbolicLinks', False))
 
     # Define the link resolution function once, used for both single and multiple sources
@@ -30,7 +30,7 @@ def _create_multi_mount(mountSources: list[tuple[str, MountSource]], options: di
         For now, only resolve symbolic links if the option is enabled.
         Hard links are not resolved for now, as it will be resolved by FileVersionLayer.
         """
-        # TODO Resolve hard links in LinkResolutionLayer and remove hard link handling from FileVersionLayer.
+        # TODO Resolve hard links in LinkResolutionUnionMountSource and remove hard link handling from FileVersionLayer.
         return bool(fileType == stat.S_IFLNK)
 
     # Handle single mount source case
@@ -38,7 +38,7 @@ def _create_multi_mount(mountSources: list[tuple[str, MountSource]], options: di
         singleSource = sources[0]
         if resolveSymbolicLinks:
             # Apply link resolution for single source
-            return LinkResolutionLayer([singleSource], shouldResolveLink=should_resolve_link)
+            return LinkResolutionUnionMountSource([singleSource], shouldResolveLink=should_resolve_link)
         else:
             return singleSource
 
@@ -46,7 +46,7 @@ def _create_multi_mount(mountSources: list[tuple[str, MountSource]], options: di
     disableUnionMount = options.get('disableUnionMount', False)
 
     if resolveSymbolicLinks:
-        # LinkResolutionLayer is a type of union mount
+        # LinkResolutionUnionMountSource is a type of union mount
         # so it conflicts with disableUnionMount
         if disableUnionMount:
             raise ValueError(
@@ -55,8 +55,8 @@ def _create_multi_mount(mountSources: list[tuple[str, MountSource]], options: di
                 "requires union mount functionality."
             )
 
-        # Use LinkResolutionLayer which combines union and link resolution functionality
-        return LinkResolutionLayer(sources, shouldResolveLink=should_resolve_link)
+        # Use LinkResolutionUnionMountSource which combines union and link resolution functionality
+        return LinkResolutionUnionMountSource(sources, shouldResolveLink=should_resolve_link)
 
     if not disableUnionMount:
         return UnionMountSource(sources, **options)
@@ -150,7 +150,7 @@ class TestFuseMountCreateMultiMount(unittest.TestCase):
 
         # Should return unwrapped mount source
         assert result is mock_source
-        assert not isinstance(result, LinkResolutionLayer)
+        assert not isinstance(result, LinkResolutionUnionMountSource)
 
     def test_single_source_with_resolve(self):
         """Test single mount source with link resolution."""
@@ -160,8 +160,8 @@ class TestFuseMountCreateMultiMount(unittest.TestCase):
 
         result = _create_multi_mount(sources, options)
 
-        # Should wrap in LinkResolutionLayer
-        assert isinstance(result, LinkResolutionLayer)
+        # Should wrap in LinkResolutionUnionMountSource
+        assert isinstance(result, LinkResolutionUnionMountSource)
         assert len(result.mountSources) == 1
         assert result.mountSources[0] is mock_source
 
@@ -193,8 +193,8 @@ class TestFuseMountCreateMultiMount(unittest.TestCase):
 
         result = _create_multi_mount(sources, options)
 
-        # Should return LinkResolutionLayer
-        assert isinstance(result, LinkResolutionLayer)
+        # Should return LinkResolutionUnionMountSource
+        assert isinstance(result, LinkResolutionUnionMountSource)
         assert len(result.mountSources) == 2
         assert result.mountSources[0] is mock_source_a
         assert result.mountSources[1] is mock_source_b

@@ -17,7 +17,7 @@ from ratarmountcore.mountsource import FileInfo, MountSource
 
 # These imports can be particularly expensive when all fsspec backends are installed.
 from ratarmountcore.mountsource.compositing.automount import AutoMountLayer
-from ratarmountcore.mountsource.compositing.link import LinkResolutionLayer
+from ratarmountcore.mountsource.compositing.link import LinkResolutionUnionMountSource
 from ratarmountcore.mountsource.compositing.removeprefix import RemovePrefixMountSource
 from ratarmountcore.mountsource.compositing.singlefile import SingleFileMountSource
 from ratarmountcore.mountsource.compositing.subvolumes import SubvolumesMountSource
@@ -450,7 +450,7 @@ class FuseMount(fuse.Operations):
         # Extract mount sources from tuples
         sources = [x[1] for x in mountSources]
 
-        # Check if we should use LinkResolutionLayer
+        # Check if we should use LinkResolutionUnionMountSource
         resolveSymbolicLinks = bool(options.get('resolveSymbolicLinks', False))
 
         # Define the link resolution function once, used for both single and multiple sources
@@ -460,7 +460,7 @@ class FuseMount(fuse.Operations):
             For now, only resolve symbolic links if the option is enabled.
             Hard links are not resolved for now, as it will be resolved by FileVersionLayer.
             """
-            # TODO Resolve hard links in LinkResolutionLayer and remove hard link handling from FileVersionLayer.
+            # TODO Resolve hard links in LinkResolutionUnionMountSource and remove hard link handling from FileVersionLayer.
             return bool(fileType == stat.S_IFLNK)
 
         # Handle single mount source case
@@ -468,7 +468,7 @@ class FuseMount(fuse.Operations):
             singleSource = sources[0]
             if resolveSymbolicLinks:
                 # Apply link resolution for single source
-                return LinkResolutionLayer([singleSource], shouldResolveLink=should_resolve_link)
+                return LinkResolutionUnionMountSource([singleSource], shouldResolveLink=should_resolve_link)
             else:
                 return singleSource
 
@@ -476,7 +476,7 @@ class FuseMount(fuse.Operations):
         disableUnionMount = options.get('disableUnionMount', False)
 
         if resolveSymbolicLinks:
-            # LinkResolutionLayer is a type of union mount
+            # LinkResolutionUnionMountSource is a type of union mount
             # so it conflicts with disableUnionMount
             if disableUnionMount:
                 raise ValueError(
@@ -485,8 +485,8 @@ class FuseMount(fuse.Operations):
                     "requires union mount functionality."
                 )
 
-            # Use LinkResolutionLayer which combines union and link resolution functionality
-            return LinkResolutionLayer(sources, shouldResolveLink=should_resolve_link)
+            # Use LinkResolutionUnionMountSource which combines union and link resolution functionality
+            return LinkResolutionUnionMountSource(sources, shouldResolveLink=should_resolve_link)
 
         if not disableUnionMount:
             return UnionMountSource(sources, **options)

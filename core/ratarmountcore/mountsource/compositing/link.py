@@ -123,8 +123,8 @@ class _UnionPath:
     underlying file versions.
     """
 
-    layer: Final["LinkResolutionLayer"]
-    """The LinkResolutionLayer this path belongs to."""
+    layer: Final["LinkResolutionUnionMountSource"]
+    """The LinkResolutionUnionMountSource this path belongs to."""
 
     @cached_property
     @abstractmethod
@@ -299,7 +299,7 @@ class _RootUnionPath(_UnionPath):
 
 
 @dataclass
-class LinkResolutionLayer(MountSource):
+class LinkResolutionUnionMountSource(MountSource):
     """
     A MountSource layer that resolves symbolic links in an underlying MountSource.
 
