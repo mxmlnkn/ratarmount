@@ -23,10 +23,6 @@ class MultiMountSourceMixin(MountSource):
 
     mountSources: Sequence[MountSource]
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._exit_stack = ExitStack()
-
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering: int = -1) -> IO[bytes]:
         """Opens a file for reading by delegating to the appropriate mount source."""
@@ -98,6 +94,7 @@ class MultiMountSourceMixin(MountSource):
     @overrides(MountSource)
     def __enter__(self):
         """Context manager entry point for all mount sources."""
+        self._exit_stack = ExitStack()
         for mountSource in self.mountSources:
             self._exit_stack.enter_context(mountSource)
 

@@ -346,9 +346,6 @@ class LinkResolutionUnionMountSource(MultiMountSourceMixin):
         file_type (int): The file type of the link, as returned by `stat.S_IFMT(mode)`.
     """
 
-    def __post_init__(self):
-        super().__init__()
-
     @cached_property
     def _root_union_path(self) -> _RootUnionPath:
         return _RootUnionPath(layer=self)
