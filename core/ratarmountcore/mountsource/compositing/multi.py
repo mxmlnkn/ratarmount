@@ -52,11 +52,7 @@ class MultiMountSourceMixin(MountSource):
         """Lists extended attributes by delegating to the appropriate mount source."""
         mountSource = fileInfo.userdata.pop()
         try:
-            return (
-                mountSource.list_xattr(fileInfo)
-                if isinstance(mountSource, MountSource)
-                else []
-            )
+            return mountSource.list_xattr(fileInfo) if isinstance(mountSource, MountSource) else []
         finally:
             fileInfo.userdata.append(mountSource)
 
@@ -65,11 +61,7 @@ class MultiMountSourceMixin(MountSource):
         """Gets an extended attribute by delegating to the appropriate mount source."""
         mountSource = fileInfo.userdata.pop()
         try:
-            return (
-                mountSource.get_xattr(fileInfo, key)
-                if isinstance(mountSource, MountSource)
-                else None
-            )
+            return mountSource.get_xattr(fileInfo, key) if isinstance(mountSource, MountSource) else None
         finally:
             fileInfo.userdata.append(mountSource)
 
@@ -101,9 +93,7 @@ class MultiMountSourceMixin(MountSource):
         """Cleanup method for all mount sources."""
 
         # Use `ExitStack` because it is very verbose to properly aggregate multiple `__exit__` calls.
-        return self._exit_stack.__exit__(
-            exception_type, exception_value, exception_traceback
-        )
+        return self._exit_stack.__exit__(exception_type, exception_value, exception_traceback)
 
     @overrides(MountSource)
     def __enter__(self):

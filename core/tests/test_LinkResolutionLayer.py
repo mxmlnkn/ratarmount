@@ -1,7 +1,9 @@
+import builtins
 import io
 import stat
 import unittest
-from typing import IO, Dict, Iterable, List, Optional, Union
+from collections.abc import Iterable
+from typing import IO, Optional, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.compositing.link import LinkResolutionUnionMountSource
@@ -23,14 +25,14 @@ class MockFile(io.BytesIO):
 class MockMountSource(MountSource):
     """Mock mount source for testing LinkResolutionUnionMountSource."""
 
-    def __init__(self, files: Dict[str, FileInfo]):
+    def __init__(self, files: dict[str, FileInfo]):
         self.files = files
         self._immutable = True
 
     def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         return self.files.get(path)
 
-    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], dict[str, FileInfo]]]:
         # Return children of the given path
         children = {}
         if path == "/":
@@ -61,7 +63,7 @@ class MockMountSource(MountSource):
         mock_data = b"mock data" * (size // 9 + 1)
         return mock_data[:size]
 
-    def list_xattr(self, fileInfo: FileInfo) -> List[str]:
+    def list_xattr(self, fileInfo: FileInfo) -> builtins.list[str]:
         return ["user.test"]
 
     def get_xattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
@@ -415,7 +417,9 @@ class TestLinkResolutionUnionMountSource(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        with LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks) as layer:
+        with LinkResolutionUnionMountSource(
+            mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks
+        ) as layer:
             # Should work normally within context
             file_info = layer.lookup("/file1.txt")
             assert file_info is not None
@@ -445,72 +449,75 @@ class TestLinkResolutionUnionMountSourceMultiMount(unittest.TestCase):
     def test_union_with_two_mount_sources_basic(self):
         """Test basic union functionality with two mount sources."""
         # Create two mock mount sources with different files
-        mount_source_a = MockMountSource({
-            "/": FileInfo(
-                size=0,
-                mtime=0,
-                mode=0o755 | stat.S_IFDIR,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/"],
-            ),
-            "/file_a.txt": FileInfo(
-                size=100,
-                mtime=1234567890,
-                mode=0o644 | stat.S_IFREG,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/file_a.txt"],
-            ),
-            "/dir_a": FileInfo(
-                size=0,
-                mtime=1234567890,
-                mode=0o755 | stat.S_IFDIR,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/dir_a"],
-            ),
-        })
+        mount_source_a = MockMountSource(
+            {
+                "/": FileInfo(
+                    size=0,
+                    mtime=0,
+                    mode=0o755 | stat.S_IFDIR,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/"],
+                ),
+                "/file_a.txt": FileInfo(
+                    size=100,
+                    mtime=1234567890,
+                    mode=0o644 | stat.S_IFREG,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/file_a.txt"],
+                ),
+                "/dir_a": FileInfo(
+                    size=0,
+                    mtime=1234567890,
+                    mode=0o755 | stat.S_IFDIR,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/dir_a"],
+                ),
+            }
+        )
 
-        mount_source_b = MockMountSource({
-            "/": FileInfo(
-                size=0,
-                mtime=0,
-                mode=0o755 | stat.S_IFDIR,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/"],
-            ),
-            "/file_b.txt": FileInfo(
-                size=200,
-                mtime=1234567890,
-                mode=0o644 | stat.S_IFREG,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/file_b.txt"],
-            ),
-            "/dir_b": FileInfo(
-                size=0,
-                mtime=1234567890,
-                mode=0o755 | stat.S_IFDIR,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/dir_b"],
-            ),
-        })
+        mount_source_b = MockMountSource(
+            {
+                "/": FileInfo(
+                    size=0,
+                    mtime=0,
+                    mode=0o755 | stat.S_IFDIR,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/"],
+                ),
+                "/file_b.txt": FileInfo(
+                    size=200,
+                    mtime=1234567890,
+                    mode=0o644 | stat.S_IFREG,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/file_b.txt"],
+                ),
+                "/dir_b": FileInfo(
+                    size=0,
+                    mtime=1234567890,
+                    mode=0o755 | stat.S_IFDIR,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/dir_b"],
+                ),
+            }
+        )
 
         def should_not_resolve(linkname: str, file_type: int) -> bool:
             return False
 
         layer = LinkResolutionUnionMountSource(
-            mountSources=[mount_source_a, mount_source_b],
-            shouldResolveLink=should_not_resolve
+            mountSources=[mount_source_a, mount_source_b], shouldResolveLink=should_not_resolve
         )
 
         # Files from both sources should be accessible
@@ -528,10 +535,7 @@ class TestLinkResolutionUnionMountSourceMultiMount(unittest.TestCase):
         # Directory listing should merge files from both sources
         listing = layer.list("/")
         assert listing is not None
-        if isinstance(listing, dict):
-            names = set(listing.keys())
-        else:
-            names = set(listing)
+        names = set(listing.keys()) if isinstance(listing, dict) else set(listing)
 
         assert "file_a.txt" in names
         assert "file_b.txt" in names
@@ -541,55 +545,58 @@ class TestLinkResolutionUnionMountSourceMultiMount(unittest.TestCase):
     def test_cross_mount_absolute_symlink_resolution(self):
         """Test resolving absolute symlink across mount sources (CRITICAL)."""
         # Mount A has the target file
-        mount_source_a = MockMountSource({
-            "/": FileInfo(
-                size=0,
-                mtime=0,
-                mode=0o755 | stat.S_IFDIR,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/"],
-            ),
-            "/target.txt": FileInfo(
-                size=100,
-                mtime=1234567890,
-                mode=0o644 | stat.S_IFREG,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/target.txt"],
-            ),
-        })
+        mount_source_a = MockMountSource(
+            {
+                "/": FileInfo(
+                    size=0,
+                    mtime=0,
+                    mode=0o755 | stat.S_IFDIR,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/"],
+                ),
+                "/target.txt": FileInfo(
+                    size=100,
+                    mtime=1234567890,
+                    mode=0o644 | stat.S_IFREG,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/target.txt"],
+                ),
+            }
+        )
 
         # Mount B has a symlink pointing to the target in mount A
-        mount_source_b = MockMountSource({
-            "/": FileInfo(
-                size=0,
-                mtime=0,
-                mode=0o755 | stat.S_IFDIR,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/"],
-            ),
-            "/link": FileInfo(
-                size=0,
-                mtime=1234567890,
-                mode=0o777 | stat.S_IFLNK,
-                linkname="/target.txt",
-                uid=0,
-                gid=0,
-                userdata=["/link"],
-            ),
-        })
+        mount_source_b = MockMountSource(
+            {
+                "/": FileInfo(
+                    size=0,
+                    mtime=0,
+                    mode=0o755 | stat.S_IFDIR,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/"],
+                ),
+                "/link": FileInfo(
+                    size=0,
+                    mtime=1234567890,
+                    mode=0o777 | stat.S_IFLNK,
+                    linkname="/target.txt",
+                    uid=0,
+                    gid=0,
+                    userdata=["/link"],
+                ),
+            }
+        )
 
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
         layer = LinkResolutionUnionMountSource(
-            mountSources=[mount_source_a, mount_source_b],
-            shouldResolveLink=should_resolve_symlinks
+            mountSources=[mount_source_a, mount_source_b], shouldResolveLink=should_resolve_symlinks
         )
 
         # Symlink should resolve to target file from different mount source
@@ -612,55 +619,58 @@ class TestLinkResolutionUnionMountSourceMultiMount(unittest.TestCase):
     def test_file_operations_preserve_mount_source(self):
         """Test that file operations preserve mount source userdata (CRITICAL)."""
         # Mount A has a file with xattrs
-        mount_source_a = MockMountSource({
-            "/": FileInfo(
-                size=0,
-                mtime=0,
-                mode=0o755 | stat.S_IFDIR,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/"],
-            ),
-            "/file_a.txt": FileInfo(
-                size=100,
-                mtime=1234567890,
-                mode=0o644 | stat.S_IFREG,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/file_a.txt"],
-            ),
-        })
+        mount_source_a = MockMountSource(
+            {
+                "/": FileInfo(
+                    size=0,
+                    mtime=0,
+                    mode=0o755 | stat.S_IFDIR,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/"],
+                ),
+                "/file_a.txt": FileInfo(
+                    size=100,
+                    mtime=1234567890,
+                    mode=0o644 | stat.S_IFREG,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/file_a.txt"],
+                ),
+            }
+        )
 
         # Mount B has a symlink to the file in mount A
-        mount_source_b = MockMountSource({
-            "/": FileInfo(
-                size=0,
-                mtime=0,
-                mode=0o755 | stat.S_IFDIR,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/"],
-            ),
-            "/link": FileInfo(
-                size=0,
-                mtime=1234567890,
-                mode=0o777 | stat.S_IFLNK,
-                linkname="/file_a.txt",
-                uid=0,
-                gid=0,
-                userdata=["/link"],
-            ),
-        })
+        mount_source_b = MockMountSource(
+            {
+                "/": FileInfo(
+                    size=0,
+                    mtime=0,
+                    mode=0o755 | stat.S_IFDIR,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/"],
+                ),
+                "/link": FileInfo(
+                    size=0,
+                    mtime=1234567890,
+                    mode=0o777 | stat.S_IFLNK,
+                    linkname="/file_a.txt",
+                    uid=0,
+                    gid=0,
+                    userdata=["/link"],
+                ),
+            }
+        )
 
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
         layer = LinkResolutionUnionMountSource(
-            mountSources=[mount_source_a, mount_source_b],
-            shouldResolveLink=should_resolve_symlinks
+            mountSources=[mount_source_a, mount_source_b], shouldResolveLink=should_resolve_symlinks
         )
 
         # Get file info through symlink
@@ -694,55 +704,58 @@ class TestLinkResolutionUnionMountSourceMultiMount(unittest.TestCase):
     def test_overlapping_files_precedence(self):
         """Test file versioning with overlapping files from multiple mount sources."""
         # Mount A has file.txt with content "from A"
-        mount_source_a = MockMountSource({
-            "/": FileInfo(
-                size=0,
-                mtime=0,
-                mode=0o755 | stat.S_IFDIR,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/"],
-            ),
-            "/file.txt": FileInfo(
-                size=100,
-                mtime=1234567890,
-                mode=0o644 | stat.S_IFREG,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/file.txt", "from A"],
-            ),
-        })
+        mount_source_a = MockMountSource(
+            {
+                "/": FileInfo(
+                    size=0,
+                    mtime=0,
+                    mode=0o755 | stat.S_IFDIR,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/"],
+                ),
+                "/file.txt": FileInfo(
+                    size=100,
+                    mtime=1234567890,
+                    mode=0o644 | stat.S_IFREG,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/file.txt", "from A"],
+                ),
+            }
+        )
 
         # Mount B has file.txt with content "from B"
-        mount_source_b = MockMountSource({
-            "/": FileInfo(
-                size=0,
-                mtime=0,
-                mode=0o755 | stat.S_IFDIR,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/"],
-            ),
-            "/file.txt": FileInfo(
-                size=200,
-                mtime=1234567890,
-                mode=0o644 | stat.S_IFREG,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/file.txt", "from B"],
-            ),
-        })
+        mount_source_b = MockMountSource(
+            {
+                "/": FileInfo(
+                    size=0,
+                    mtime=0,
+                    mode=0o755 | stat.S_IFDIR,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/"],
+                ),
+                "/file.txt": FileInfo(
+                    size=200,
+                    mtime=1234567890,
+                    mode=0o644 | stat.S_IFREG,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/file.txt", "from B"],
+                ),
+            }
+        )
 
         def should_not_resolve(linkname: str, file_type: int) -> bool:
             return False
 
         layer = LinkResolutionUnionMountSource(
-            mountSources=[mount_source_a, mount_source_b],
-            shouldResolveLink=should_not_resolve
+            mountSources=[mount_source_a, mount_source_b], shouldResolveLink=should_not_resolve
         )
 
         # Check file versions - should have 2 versions
@@ -777,51 +790,51 @@ class TestInfiniteDepthSymlinks(unittest.TestCase):
 
         This should allow traversing /dir/subdir/subdir/subdir/... infinitely.
         """
-        mock_source = MockMountSource({
-            "/": FileInfo(
-                size=0,
-                mtime=0,
-                mode=0o755 | stat.S_IFDIR,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/"],
-            ),
-            "/dir": FileInfo(
-                size=0,
-                mtime=0,
-                mode=0o755 | stat.S_IFDIR,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/dir"],
-            ),
-            "/dir/file.txt": FileInfo(
-                size=100,
-                mtime=1234567890,
-                mode=0o644 | stat.S_IFREG,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/dir/file.txt"],
-            ),
-            "/dir/subdir": FileInfo(
-                size=0,
-                mtime=0,
-                mode=0o777 | stat.S_IFLNK,
-                linkname="/dir",
-                uid=0,
-                gid=0,
-                userdata=["/dir/subdir"],
-            ),
-        })
+        mock_source = MockMountSource(
+            {
+                "/": FileInfo(
+                    size=0,
+                    mtime=0,
+                    mode=0o755 | stat.S_IFDIR,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/"],
+                ),
+                "/dir": FileInfo(
+                    size=0,
+                    mtime=0,
+                    mode=0o755 | stat.S_IFDIR,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/dir"],
+                ),
+                "/dir/file.txt": FileInfo(
+                    size=100,
+                    mtime=1234567890,
+                    mode=0o644 | stat.S_IFREG,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/dir/file.txt"],
+                ),
+                "/dir/subdir": FileInfo(
+                    size=0,
+                    mtime=0,
+                    mode=0o777 | stat.S_IFLNK,
+                    linkname="/dir",
+                    uid=0,
+                    gid=0,
+                    userdata=["/dir/subdir"],
+                ),
+            }
+        )
 
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionUnionMountSource(
-            mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks
-        )
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         # Basic lookup should work
         dir_info = layer.lookup("/dir")
@@ -872,78 +885,78 @@ class TestInfiniteDepthSymlinks(unittest.TestCase):
 
         This creates a cycle: /a/to_b/to_a/to_b/...
         """
-        mock_source = MockMountSource({
-            "/": FileInfo(
-                size=0,
-                mtime=0,
-                mode=0o755 | stat.S_IFDIR,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/"],
-            ),
-            "/a": FileInfo(
-                size=0,
-                mtime=0,
-                mode=0o755 | stat.S_IFDIR,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/a"],
-            ),
-            "/a/file.txt": FileInfo(
-                size=100,
-                mtime=1234567890,
-                mode=0o644 | stat.S_IFREG,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/a/file.txt"],
-            ),
-            "/a/to_b": FileInfo(
-                size=0,
-                mtime=0,
-                mode=0o777 | stat.S_IFLNK,
-                linkname="/b",
-                uid=0,
-                gid=0,
-                userdata=["/a/to_b"],
-            ),
-            "/b": FileInfo(
-                size=0,
-                mtime=0,
-                mode=0o755 | stat.S_IFDIR,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/b"],
-            ),
-            "/b/file.txt": FileInfo(
-                size=200,
-                mtime=1234567890,
-                mode=0o644 | stat.S_IFREG,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/b/file.txt"],
-            ),
-            "/b/to_a": FileInfo(
-                size=0,
-                mtime=0,
-                mode=0o777 | stat.S_IFLNK,
-                linkname="/a",
-                uid=0,
-                gid=0,
-                userdata=["/b/to_a"],
-            ),
-        })
+        mock_source = MockMountSource(
+            {
+                "/": FileInfo(
+                    size=0,
+                    mtime=0,
+                    mode=0o755 | stat.S_IFDIR,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/"],
+                ),
+                "/a": FileInfo(
+                    size=0,
+                    mtime=0,
+                    mode=0o755 | stat.S_IFDIR,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/a"],
+                ),
+                "/a/file.txt": FileInfo(
+                    size=100,
+                    mtime=1234567890,
+                    mode=0o644 | stat.S_IFREG,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/a/file.txt"],
+                ),
+                "/a/to_b": FileInfo(
+                    size=0,
+                    mtime=0,
+                    mode=0o777 | stat.S_IFLNK,
+                    linkname="/b",
+                    uid=0,
+                    gid=0,
+                    userdata=["/a/to_b"],
+                ),
+                "/b": FileInfo(
+                    size=0,
+                    mtime=0,
+                    mode=0o755 | stat.S_IFDIR,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/b"],
+                ),
+                "/b/file.txt": FileInfo(
+                    size=200,
+                    mtime=1234567890,
+                    mode=0o644 | stat.S_IFREG,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/b/file.txt"],
+                ),
+                "/b/to_a": FileInfo(
+                    size=0,
+                    mtime=0,
+                    mode=0o777 | stat.S_IFLNK,
+                    linkname="/a",
+                    uid=0,
+                    gid=0,
+                    userdata=["/b/to_a"],
+                ),
+            }
+        )
 
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionUnionMountSource(
-            mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks
-        )
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         # Basic lookups
         a_info = layer.lookup("/a")
@@ -993,51 +1006,51 @@ class TestInfiniteDepthSymlinks(unittest.TestCase):
 
     def test_directory_listing_with_infinite_depth_symlink(self):
         """Test listing a directory accessed through infinite depth symlinks."""
-        mock_source = MockMountSource({
-            "/": FileInfo(
-                size=0,
-                mtime=0,
-                mode=0o755 | stat.S_IFDIR,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/"],
-            ),
-            "/dir": FileInfo(
-                size=0,
-                mtime=0,
-                mode=0o755 | stat.S_IFDIR,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/dir"],
-            ),
-            "/dir/file.txt": FileInfo(
-                size=100,
-                mtime=1234567890,
-                mode=0o644 | stat.S_IFREG,
-                linkname="",
-                uid=0,
-                gid=0,
-                userdata=["/dir/file.txt"],
-            ),
-            "/dir/subdir": FileInfo(
-                size=0,
-                mtime=0,
-                mode=0o777 | stat.S_IFLNK,
-                linkname="/dir",
-                uid=0,
-                gid=0,
-                userdata=["/dir/subdir"],
-            ),
-        })
+        mock_source = MockMountSource(
+            {
+                "/": FileInfo(
+                    size=0,
+                    mtime=0,
+                    mode=0o755 | stat.S_IFDIR,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/"],
+                ),
+                "/dir": FileInfo(
+                    size=0,
+                    mtime=0,
+                    mode=0o755 | stat.S_IFDIR,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/dir"],
+                ),
+                "/dir/file.txt": FileInfo(
+                    size=100,
+                    mtime=1234567890,
+                    mode=0o644 | stat.S_IFREG,
+                    linkname="",
+                    uid=0,
+                    gid=0,
+                    userdata=["/dir/file.txt"],
+                ),
+                "/dir/subdir": FileInfo(
+                    size=0,
+                    mtime=0,
+                    mode=0o777 | stat.S_IFLNK,
+                    linkname="/dir",
+                    uid=0,
+                    gid=0,
+                    userdata=["/dir/subdir"],
+                ),
+            }
+        )
 
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionUnionMountSource(
-            mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks
-        )
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         try:
             # List root directory

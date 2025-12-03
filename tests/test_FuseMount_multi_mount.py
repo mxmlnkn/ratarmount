@@ -1,13 +1,15 @@
+import builtins
 import io
-import pytest
 import stat
 import unittest
-from typing import IO, Dict, Iterable, List, Optional, Union
+from collections.abc import Iterable
+from typing import IO, Optional, Union
 
+import pytest
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.compositing.link import LinkResolutionUnionMountSource
-from ratarmountcore.mountsource.compositing.union import UnionMountSource
 from ratarmountcore.mountsource.compositing.subvolumes import SubvolumesMountSource
+from ratarmountcore.mountsource.compositing.union import UnionMountSource
 
 
 # Import the _create_multi_mount method by executing just that part of FuseMount
@@ -39,8 +41,7 @@ def _create_multi_mount(mountSources: list[tuple[str, MountSource]], options: di
         if resolveSymbolicLinks:
             # Apply link resolution for single source
             return LinkResolutionUnionMountSource([singleSource], shouldResolveLink=should_resolve_link)
-        else:
-            return singleSource
+        return singleSource
 
     # Handle multiple mount sources
     disableUnionMount = options.get('disableUnionMount', False)
@@ -108,7 +109,7 @@ class MockMountSource(MountSource):
     def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
         return self.files.get(path)
 
-    def list(self, path: str) -> Optional[Union[Iterable[str], Dict[str, FileInfo]]]:
+    def list(self, path: str) -> Optional[Union[Iterable[str], dict[str, FileInfo]]]:
         return {}
 
     def versions(self, path: str) -> int:
@@ -121,7 +122,7 @@ class MockMountSource(MountSource):
         mock_data = b"mock data" * (size // 9 + 1)
         return mock_data[:size]
 
-    def list_xattr(self, fileInfo: FileInfo) -> List[str]:
+    def list_xattr(self, fileInfo: FileInfo) -> builtins.list[str]:
         return []
 
     def get_xattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
@@ -169,10 +170,7 @@ class TestFuseMountCreateMultiMount(unittest.TestCase):
         """Test multiple mount sources with default union mount."""
         mock_source_a = MockMountSource("a")
         mock_source_b = MockMountSource("b")
-        sources = [
-            ("archive1.tar", mock_source_a),
-            ("archive2.tar", mock_source_b)
-        ]
+        sources = [("archive1.tar", mock_source_a), ("archive2.tar", mock_source_b)]
         options = {'resolveSymbolicLinks': False, 'disableUnionMount': False}
 
         result = _create_multi_mount(sources, options)
@@ -185,10 +183,7 @@ class TestFuseMountCreateMultiMount(unittest.TestCase):
         """Test multiple mount sources with link resolution (CRITICAL)."""
         mock_source_a = MockMountSource("a")
         mock_source_b = MockMountSource("b")
-        sources = [
-            ("archive1.tar", mock_source_a),
-            ("archive2.tar", mock_source_b)
-        ]
+        sources = [("archive1.tar", mock_source_a), ("archive2.tar", mock_source_b)]
         options = {'resolveSymbolicLinks': True}
 
         result = _create_multi_mount(sources, options)
@@ -203,14 +198,8 @@ class TestFuseMountCreateMultiMount(unittest.TestCase):
         """Test error when resolveSymbolicLinks=True with disableUnionMount=True (CRITICAL)."""
         mock_source_a = MockMountSource("a")
         mock_source_b = MockMountSource("b")
-        sources = [
-            ("archive1.tar", mock_source_a),
-            ("archive2.tar", mock_source_b)
-        ]
-        options = {
-            'resolveSymbolicLinks': True,
-            'disableUnionMount': True
-        }
+        sources = [("archive1.tar", mock_source_a), ("archive2.tar", mock_source_b)]
+        options = {'resolveSymbolicLinks': True, 'disableUnionMount': True}
 
         # Should raise ValueError
         with pytest.raises(ValueError, match="Cannot use 'resolveSymbolicLinks'"):
@@ -220,10 +209,7 @@ class TestFuseMountCreateMultiMount(unittest.TestCase):
         """Test multiple mount sources with disableUnionMount (subvolumes mode)."""
         mock_source_a = MockMountSource("a")
         mock_source_b = MockMountSource("b")
-        sources = [
-            ("archive1.tar", mock_source_a),
-            ("archive2.tar", mock_source_b)
-        ]
+        sources = [("archive1.tar", mock_source_a), ("archive2.tar", mock_source_b)]
         options = {'disableUnionMount': True, 'resolveSymbolicLinks': False}
 
         result = _create_multi_mount(sources, options)

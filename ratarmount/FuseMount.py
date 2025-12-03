@@ -460,7 +460,8 @@ class FuseMount(fuse.Operations):
             For now, only resolve symbolic links if the option is enabled.
             Hard links are not resolved for now, as it will be resolved by FileVersionLayer.
             """
-            # TODO Resolve hard links in LinkResolutionUnionMountSource and remove hard link handling from FileVersionLayer.
+            # TODO Resolve hard links in LinkResolutionUnionMountSource
+            # and remove hard link handling from FileVersionLayer.
             return bool(fileType == stat.S_IFLNK)
 
         # Handle single mount source case
@@ -469,8 +470,7 @@ class FuseMount(fuse.Operations):
             if resolveSymbolicLinks:
                 # Apply link resolution for single source
                 return LinkResolutionUnionMountSource([singleSource], shouldResolveLink=should_resolve_link)
-            else:
-                return singleSource
+            return singleSource
 
         # Handle multiple mount sources
         disableUnionMount = options.get('disableUnionMount', False)

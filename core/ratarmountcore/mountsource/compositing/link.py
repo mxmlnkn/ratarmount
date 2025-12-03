@@ -4,21 +4,20 @@ import os.path
 import stat
 import sys
 from abc import abstractmethod
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from functools import reduce
-from collections.abc import Iterable, Iterator, Mapping, Sequence
 from typing import (
     IO,
     Callable,
     Optional,
-    Tuple,
     Union,
 )
 
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.compositing.multi import MultiMountSourceMixin
 from ratarmountcore.utils import cached_property, overrides
-from typing_extensions import Final, final
+from typing_extensions import final
 
 
 @final
@@ -28,20 +27,20 @@ class _FileVersion:
     An underlying file version bound to a union path.
     """
 
-    path: Final[str]
+    path: str
     """
     The absolute path in the underlying mount source.
     """
-    version: Final[int]
+    version: int
     """
     The version number of the file in the underlying mount source.
     """
-    mountSourceIndex: Final[int]
+    mountSourceIndex: int
     """
     The index of the mount source in the layer's mountSources list.
     """
 
-    parent: Final[Optional["_FileVersion"]]
+    parent: Optional["_FileVersion"]
     """
     The parent folder version, or None if the current path is '/'.
 
@@ -49,7 +48,7 @@ class _FileVersion:
     it is accessed.
     """
 
-    unionPath: Final["_UnionPath"]
+    unionPath: "_UnionPath"
     """
     The union path to which this file version belongs.
     """
@@ -71,7 +70,9 @@ class _FileVersion:
     @cached_property
     def file_info(self) -> FileInfo:
         """The FileInfo for this file version."""
-        return self.mountSource.lookup(self.path, fileVersion=self.version)
+        result = self.mountSource.lookup(self.path, fileVersion=self.version)
+        assert result is not None, f"File version {self.version} not found at {self.path}"
+        return result
 
     @cached_property
     def link_target(self) -> Optional["_UnionPath"]:
@@ -96,7 +97,7 @@ class _FileVersion:
                         assert part == os.path.pardir
                         return parent.parent
 
-                    resolvedParent = reduce(resolve_parent, partGroup0, self.parent)
+                    resolvedParent = reduce(resolve_parent, partGroup0, self.parent)  # type: ignore[arg-type]
                     if resolvedParent is None:
                         raise FileNotFoundError(
                             f"Cannot resolve outer parent when resolving {normalizedLinkname} from {self.path}"
@@ -127,7 +128,7 @@ class _UnionPath:
     underlying file versions.
     """
 
-    layer: Final["LinkResolutionUnionMountSource"]
+    layer: "LinkResolutionUnionMountSource"
     """The LinkResolutionUnionMountSource this path belongs to."""
 
     @cached_property
@@ -205,7 +206,7 @@ class _UnionPath:
             name=name,
         )
 
-    def lookup_version(self, fileVersion: int) -> Optional[Tuple[FileInfo, Optional[MountSource]]]:
+    def lookup_version(self, fileVersion: int) -> Optional[tuple[FileInfo, Optional[MountSource]]]:
         """Looks up a specific version of this path.
 
         Returns:
@@ -245,9 +246,9 @@ class _UnionPath:
 class _ChildUnionPath(_UnionPath):
     """Represents a non-root path in the union filesystem."""
 
-    name: Final[str]
+    name: str
     """The name of this path segment."""
-    parent: Final[_UnionPath]
+    parent: _UnionPath
     """The parent union path."""
 
     @cached_property
@@ -312,11 +313,12 @@ class _RootUnionPath(_UnionPath):
         Supports both absolute and relative paths. Relative paths are treated as absolute paths by prepending a "/" if needed.
         """
         parts = os.path.normpath(path).split(os.path.sep)
-        return reduce(
-            lambda parent, part: parent.lookup_child(part),
+        result: _UnionPath = reduce(
+            lambda parent, part: parent.lookup_child(part),  # type: ignore[arg-type, return-value]
             itertools.dropwhile(lambda part: part == "", parts),
             self,
         )
+        return result
 
 
 @dataclass
@@ -336,7 +338,7 @@ class LinkResolutionUnionMountSource(MultiMountSourceMixin):
 
     mountSources: Sequence[MountSource]
     """The underlying MountSources to resolve links in."""
-    shouldResolveLink: Final[Callable[[str, int], bool]]
+    shouldResolveLink: Callable[[str, int], bool]
     """A function that determines whether a given link should be resolved.
 
     Args:
@@ -380,7 +382,7 @@ class LinkResolutionUnionMountSource(MultiMountSourceMixin):
             return {
                 childName
                 for versionedPath in unionPath.resolved_folder_versions
-                for childName in versionedPath.list_child_names()
+                for childName in (versionedPath.list_child_names() or ())
             }
         return None
 
@@ -426,7 +428,6 @@ class LinkResolutionUnionMountSource(MultiMountSourceMixin):
         finally:
             fileInfo.userdata.append(mountSource)
 
-
     @overrides(MountSource)
     def exists(self, path: str) -> bool:
         """
@@ -455,4 +456,3 @@ class LinkResolutionUnionMountSource(MultiMountSourceMixin):
         if sourceFileInfo.userdata:
             return mountSource.get_mount_source(sourceFileInfo)
         return "/", self, fileInfo
-
