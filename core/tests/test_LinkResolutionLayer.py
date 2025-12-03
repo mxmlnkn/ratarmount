@@ -764,5 +764,312 @@ class TestLinkResolutionUnionMountSourceMultiMount(unittest.TestCase):
         assert file_v1.size == 100  # From mount A
 
 
+class TestInfiniteDepthSymlinks(unittest.TestCase):
+    """Test cases for infinite depth recursive symbolic link directories."""
+
+    def test_symlink_to_parent_creates_infinite_depth(self):
+        """Test directory symlink pointing to parent directory creates infinite depth.
+
+        Structure:
+            /dir/           - real directory
+            /dir/file.txt   - real file
+            /dir/subdir     - symlink to /dir
+
+        This should allow traversing /dir/subdir/subdir/subdir/... infinitely.
+        """
+        mock_source = MockMountSource({
+            "/": FileInfo(
+                size=0,
+                mtime=0,
+                mode=0o755 | stat.S_IFDIR,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/"],
+            ),
+            "/dir": FileInfo(
+                size=0,
+                mtime=0,
+                mode=0o755 | stat.S_IFDIR,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/dir"],
+            ),
+            "/dir/file.txt": FileInfo(
+                size=100,
+                mtime=1234567890,
+                mode=0o644 | stat.S_IFREG,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/dir/file.txt"],
+            ),
+            "/dir/subdir": FileInfo(
+                size=0,
+                mtime=0,
+                mode=0o777 | stat.S_IFLNK,
+                linkname="/dir",
+                uid=0,
+                gid=0,
+                userdata=["/dir/subdir"],
+            ),
+        })
+
+        def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
+            return file_type == stat.S_IFLNK
+
+        layer = LinkResolutionUnionMountSource(
+            mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks
+        )
+
+        # Basic lookup should work
+        dir_info = layer.lookup("/dir")
+        assert dir_info is not None
+        assert stat.S_ISDIR(dir_info.mode)
+
+        file_info = layer.lookup("/dir/file.txt")
+        assert file_info is not None
+        assert file_info.size == 100
+
+        # Symlink should resolve to directory
+        subdir_info = layer.lookup("/dir/subdir")
+        assert subdir_info is not None
+        assert stat.S_ISDIR(subdir_info.mode)
+
+        # Should be able to traverse through the symlink (infinite depth)
+        # These should all work without RecursionError
+        try:
+            # Access file through one level of symlink
+            file_via_subdir = layer.lookup("/dir/subdir/file.txt")
+            assert file_via_subdir is not None
+            assert file_via_subdir.size == 100
+
+            # Access file through two levels of symlink
+            file_via_subdir2 = layer.lookup("/dir/subdir/subdir/file.txt")
+            assert file_via_subdir2 is not None
+            assert file_via_subdir2.size == 100
+
+            # Access file through many levels of symlink (stress test)
+            deep_path = "/dir" + "/subdir" * 10 + "/file.txt"
+            file_deep = layer.lookup(deep_path)
+            assert file_deep is not None
+            assert file_deep.size == 100
+
+        except RecursionError:
+            self.fail("Should not get RecursionError for infinite depth symlinks")
+
+    def test_mutual_directory_symlinks(self):
+        """Test mutual directory symlinks that create cycles.
+
+        Structure:
+            /a/         - real directory
+            /a/file.txt - real file
+            /a/to_b     - symlink to /b
+            /b/         - real directory
+            /b/file.txt - real file
+            /b/to_a     - symlink to /a
+
+        This creates a cycle: /a/to_b/to_a/to_b/...
+        """
+        mock_source = MockMountSource({
+            "/": FileInfo(
+                size=0,
+                mtime=0,
+                mode=0o755 | stat.S_IFDIR,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/"],
+            ),
+            "/a": FileInfo(
+                size=0,
+                mtime=0,
+                mode=0o755 | stat.S_IFDIR,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/a"],
+            ),
+            "/a/file.txt": FileInfo(
+                size=100,
+                mtime=1234567890,
+                mode=0o644 | stat.S_IFREG,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/a/file.txt"],
+            ),
+            "/a/to_b": FileInfo(
+                size=0,
+                mtime=0,
+                mode=0o777 | stat.S_IFLNK,
+                linkname="/b",
+                uid=0,
+                gid=0,
+                userdata=["/a/to_b"],
+            ),
+            "/b": FileInfo(
+                size=0,
+                mtime=0,
+                mode=0o755 | stat.S_IFDIR,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/b"],
+            ),
+            "/b/file.txt": FileInfo(
+                size=200,
+                mtime=1234567890,
+                mode=0o644 | stat.S_IFREG,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/b/file.txt"],
+            ),
+            "/b/to_a": FileInfo(
+                size=0,
+                mtime=0,
+                mode=0o777 | stat.S_IFLNK,
+                linkname="/a",
+                uid=0,
+                gid=0,
+                userdata=["/b/to_a"],
+            ),
+        })
+
+        def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
+            return file_type == stat.S_IFLNK
+
+        layer = LinkResolutionUnionMountSource(
+            mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks
+        )
+
+        # Basic lookups
+        a_info = layer.lookup("/a")
+        assert a_info is not None
+        assert stat.S_ISDIR(a_info.mode)
+
+        b_info = layer.lookup("/b")
+        assert b_info is not None
+        assert stat.S_ISDIR(b_info.mode)
+
+        try:
+            # Access /b through symlink in /a
+            b_via_a = layer.lookup("/a/to_b")
+            assert b_via_a is not None
+            assert stat.S_ISDIR(b_via_a.mode)
+
+            b_file_via_a = layer.lookup("/a/to_b/file.txt")
+            assert b_file_via_a is not None
+            assert b_file_via_a.size == 200
+
+            # Access /a through symlink in /b
+            a_via_b = layer.lookup("/b/to_a")
+            assert a_via_b is not None
+            assert stat.S_ISDIR(a_via_b.mode)
+
+            a_file_via_b = layer.lookup("/b/to_a/file.txt")
+            assert a_file_via_b is not None
+            assert a_file_via_b.size == 100
+
+            # Cycle: /a/to_b/to_a should resolve to /a
+            cycle_path = layer.lookup("/a/to_b/to_a")
+            assert cycle_path is not None
+            assert stat.S_ISDIR(cycle_path.mode)
+
+            # Access file through cycle
+            file_through_cycle = layer.lookup("/a/to_b/to_a/file.txt")
+            assert file_through_cycle is not None
+            assert file_through_cycle.size == 100
+
+            # Deep cycle traversal
+            deep_cycle = layer.lookup("/a/to_b/to_a/to_b/to_a/to_b/file.txt")
+            assert deep_cycle is not None
+            assert deep_cycle.size == 200
+
+        except RecursionError:
+            self.fail("Should not get RecursionError for mutual symlinks")
+
+    def test_directory_listing_with_infinite_depth_symlink(self):
+        """Test listing a directory accessed through infinite depth symlinks."""
+        mock_source = MockMountSource({
+            "/": FileInfo(
+                size=0,
+                mtime=0,
+                mode=0o755 | stat.S_IFDIR,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/"],
+            ),
+            "/dir": FileInfo(
+                size=0,
+                mtime=0,
+                mode=0o755 | stat.S_IFDIR,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/dir"],
+            ),
+            "/dir/file.txt": FileInfo(
+                size=100,
+                mtime=1234567890,
+                mode=0o644 | stat.S_IFREG,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/dir/file.txt"],
+            ),
+            "/dir/subdir": FileInfo(
+                size=0,
+                mtime=0,
+                mode=0o777 | stat.S_IFLNK,
+                linkname="/dir",
+                uid=0,
+                gid=0,
+                userdata=["/dir/subdir"],
+            ),
+        })
+
+        def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
+            return file_type == stat.S_IFLNK
+
+        layer = LinkResolutionUnionMountSource(
+            mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks
+        )
+
+        try:
+            # List root directory
+            root_listing = layer.list("/")
+            assert root_listing is not None
+            root_names = set(root_listing.keys()) if isinstance(root_listing, dict) else set(root_listing)
+            assert "dir" in root_names
+
+            # List /dir
+            dir_listing = layer.list("/dir")
+            assert dir_listing is not None
+            dir_names = set(dir_listing.keys()) if isinstance(dir_listing, dict) else set(dir_listing)
+            assert "file.txt" in dir_names
+            assert "subdir" in dir_names
+
+            # List /dir/subdir (which resolves to /dir)
+            subdir_listing = layer.list("/dir/subdir")
+            assert subdir_listing is not None
+            subdir_names = set(subdir_listing.keys()) if isinstance(subdir_listing, dict) else set(subdir_listing)
+            assert "file.txt" in subdir_names
+            assert "subdir" in subdir_names
+
+            # List through deep symlink chain
+            deep_listing = layer.list("/dir/subdir/subdir/subdir")
+            assert deep_listing is not None
+            deep_names = set(deep_listing.keys()) if isinstance(deep_listing, dict) else set(deep_listing)
+            assert "file.txt" in deep_names
+            assert "subdir" in deep_names
+
+        except RecursionError:
+            self.fail("Should not get RecursionError when listing infinite depth directories")
+
+
 if __name__ == "__main__":
     unittest.main()
