@@ -6,7 +6,7 @@ import sys
 from abc import abstractmethod
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
-from functools import reduce
+from functools import cached_property, reduce
 from typing import (
     IO,
     Callable,
@@ -16,7 +16,7 @@ from typing import (
 
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.compositing.multi import MultiMountSourceMixin
-from ratarmountcore.utils import cached_property, overrides
+from ratarmountcore.utils import overrides
 from typing_extensions import final
 
 
