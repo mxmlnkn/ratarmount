@@ -206,12 +206,12 @@ class _UnionPath:
             name=name,
         )
 
-    def lookup_version(self, fileVersion: int) -> Optional[Tuple[FileInfo, Optional[int]]]:
+    def lookup_version(self, fileVersion: int) -> Optional[Tuple[FileInfo, Optional[MountSource]]]:
         """Looks up a specific version of this path.
 
         Returns:
-            A tuple of (FileInfo, mountSourceIndex) where mountSourceIndex is None for
-            synthetic folder entries, or the index of the mount source for files.
+            A tuple of (FileInfo, mountSource) where mountSource is None for
+            synthetic folder entries, or the mount source for files.
         """
         if fileVersion < 0:
             return None
@@ -232,12 +232,12 @@ class _UnionPath:
             if fileVersion - 1 >= len(self.resolved_nonfolder_versions):
                 return None
             nfVersion = self.resolved_nonfolder_versions[fileVersion - 1]
-            return (nfVersion.file_info, nfVersion.mountSourceIndex)
+            return (nfVersion.file_info, nfVersion.mountSource)
         if self.resolved_nonfolder_versions:
             if fileVersion >= len(self.resolved_nonfolder_versions):
                 return None
             nfVersion = self.resolved_nonfolder_versions[fileVersion]
-            return (nfVersion.file_info, nfVersion.mountSourceIndex)
+            return (nfVersion.file_info, nfVersion.mountSource)
         return None
 
 
@@ -368,8 +368,8 @@ class LinkResolutionUnionMountSource(MountSource):
         result = unionPath.lookup_version(fileVersion)
         if result is None:
             return None
-        fileInfo, mountSourceIndex = result
-        fileInfo.userdata.append(mountSourceIndex)
+        fileInfo, mountSource = result
+        fileInfo.userdata.append(mountSource)
         return fileInfo
 
     def _list(self, path: str) -> Optional[Iterable[str]]:
@@ -401,52 +401,50 @@ class LinkResolutionUnionMountSource(MountSource):
         """
         Opens a file for reading, after link resolution.
         """
-        mountSourceIndex = fileInfo.userdata.pop()
-        if mountSourceIndex is None:
+        mountSource = fileInfo.userdata.pop()
+        if mountSource is None:
             raise IsADirectoryError("Cannot open a directory")
         try:
-            return self.mountSources[mountSourceIndex].open(fileInfo, buffering)
+            assert isinstance(mountSource, MountSource)
+            return mountSource.open(fileInfo, buffering)
         finally:
-            fileInfo.userdata.append(mountSourceIndex)
+            fileInfo.userdata.append(mountSource)
 
     @overrides(MountSource)
     def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
         """
         Reads data from a file, after link resolution.
         """
-        mountSourceIndex = fileInfo.userdata.pop()
-        if mountSourceIndex is None:
+        mountSource = fileInfo.userdata.pop()
+        if mountSource is None:
             raise IsADirectoryError("Cannot read a directory")
         try:
-            return self.mountSources[mountSourceIndex].read(fileInfo, size, offset)
+            assert isinstance(mountSource, MountSource)
+            return mountSource.read(fileInfo, size, offset)
         finally:
-            fileInfo.userdata.append(mountSourceIndex)
+            fileInfo.userdata.append(mountSource)
 
     @overrides(MountSource)
     def list_xattr(self, fileInfo: FileInfo) -> builtins.list[str]:
         """
         Lists extended attributes of a file, after link resolution.
         """
-        mountSourceIndex = fileInfo.userdata.pop()
+        mountSource = fileInfo.userdata.pop()
         try:
-            if mountSourceIndex is None:
-                return []
-            return self.mountSources[mountSourceIndex].list_xattr(fileInfo)
+            return mountSource.list_xattr(fileInfo) if isinstance(mountSource, MountSource) else []
         finally:
-            fileInfo.userdata.append(mountSourceIndex)
+            fileInfo.userdata.append(mountSource)
 
     @overrides(MountSource)
     def get_xattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
         """
         Gets an extended attribute of a file, after link resolution.
         """
-        mountSourceIndex = fileInfo.userdata.pop()
+        mountSource = fileInfo.userdata.pop()
         try:
-            if mountSourceIndex is None:
-                return None
-            return self.mountSources[mountSourceIndex].get_xattr(fileInfo, key)
+            return mountSource.get_xattr(fileInfo, key) if isinstance(mountSource, MountSource) else None
         finally:
-            fileInfo.userdata.append(mountSourceIndex)
+            fileInfo.userdata.append(mountSource)
 
     @overrides(MountSource)
     def is_immutable(self) -> bool:
@@ -477,9 +475,11 @@ class LinkResolutionUnionMountSource(MountSource):
         Gets the mount source for a file, after link resolution.
         """
         sourceFileInfo = fileInfo.clone()
-        mountSourceIndex = sourceFileInfo.userdata.pop()
-        if sourceFileInfo.userdata and mountSourceIndex is not None:
-            return self.mountSources[mountSourceIndex].get_mount_source(sourceFileInfo)
+        mountSource = sourceFileInfo.userdata.pop()
+        if not isinstance(mountSource, MountSource):
+            return "/", self, fileInfo
+        if sourceFileInfo.userdata:
+            return mountSource.get_mount_source(sourceFileInfo)
         return "/", self, fileInfo
 
     @overrides(MountSource)
