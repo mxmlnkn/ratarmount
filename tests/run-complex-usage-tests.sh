@@ -1244,6 +1244,132 @@ EOF
     return 0
 }
 
+checkResolveSymlinksMultipleTars()
+{
+    local tmpFolder
+    tmpFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
+
+    local mountFolder
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+
+    TMP_FILES_TO_CLEANUP+=( "$tmpFolder" )
+
+    # Create archive_a.tar with target file
+    mkdir -p "$tmpFolder/archive_a"
+    echo "target content from archive A" > "$tmpFolder/archive_a/target.txt"
+    tar -cf "$tmpFolder/archive_a.tar" -C "$tmpFolder/archive_a" target.txt
+
+    # Create archive_b.tar with symlink pointing to target
+    mkdir -p "$tmpFolder/archive_b"
+    (cd "$tmpFolder/archive_b" && ln -s /target.txt link.txt)
+    tar -cf "$tmpFolder/archive_b.tar" -C "$tmpFolder/archive_b" link.txt
+
+    # Test with --resolve-symbolic-links on multiple archives
+    local args=( -P "$parallelization" -c --resolve-symbolic-links "$tmpFolder/archive_a.tar" "$tmpFolder/archive_b.tar" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}"
+
+        # Check that target exists
+        if [[ ! -f "$mountFolder/target.txt" ]]; then
+            returnError "$LINENO" 'Target file from archive_a not found'
+        fi
+
+        # Check that symlink is resolved to a regular file (not a symlink)
+        if [[ -L "$mountFolder/link.txt" ]]; then
+            returnError "$LINENO" 'Symbolic link should be resolved with --resolve-symbolic-links across multiple archives'
+        fi
+
+        if [[ ! -f "$mountFolder/link.txt" ]]; then
+            returnError "$LINENO" 'Expected regular file after resolving cross-archive symbolic link'
+        fi
+
+        # Check that the resolved link has the correct content
+        local content
+        content=$( cat "$mountFolder/link.txt" )
+        if [[ "$content" != "target content from archive A" ]]; then
+            returnError "$LINENO" "Cross-archive symlink content mismatch. Expected 'target content from archive A', got '$content'"
+        fi
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+
+    funmount "$mountFolder"
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully cross-archive symbolic link resolution."
+
+    cleanup
+
+    return 0
+}
+
+checkMultipleSourcesPrecedence()
+{
+    local tmpFolder
+    tmpFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
+
+    local mountFolder
+    mountFolder="$( mktemp -d --suffix .test.ratarmount )" || returnError "$LINENO" 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+
+    TMP_FILES_TO_CLEANUP+=( "$tmpFolder" )
+
+    # Create archive_a.tar with file.txt content "from A"
+    mkdir -p "$tmpFolder/archive_a"
+    echo "from A" > "$tmpFolder/archive_a/file.txt"
+    tar -cf "$tmpFolder/archive_a.tar" -C "$tmpFolder/archive_a" file.txt
+
+    # Create archive_b.tar with file.txt content "from B"
+    mkdir -p "$tmpFolder/archive_b"
+    echo "from B" > "$tmpFolder/archive_b/file.txt"
+    tar -cf "$tmpFolder/archive_b.tar" -C "$tmpFolder/archive_b" file.txt
+
+    # Test that rightmost archive has precedence (archive_b should take priority)
+    local args=( -P "$parallelization" -c "$tmpFolder/archive_a.tar" "$tmpFolder/archive_b.tar" "$mountFolder" )
+    {
+        runAndCheckRatarmount "${args[@]}"
+
+        # Check that file.txt exists
+        if [[ ! -f "$mountFolder/file.txt" ]]; then
+            returnError "$LINENO" 'file.txt not found in union mount'
+        fi
+
+        # Check that the file content is from archive_b (rightmost has precedence)
+        local content
+        content=$( cat "$mountFolder/file.txt" )
+        if [[ "$content" != "from B" ]]; then
+            returnError "$LINENO" "File precedence test failed. Expected 'from B' (rightmost), got '$content'"
+        fi
+
+        # Check file versions - should have 2 versions accessible via .versions directory
+        if [[ ! -f "$mountFolder/file.txt.versions/0" ]]; then
+            returnError "$LINENO" 'Version 0 of file.txt not found'
+        fi
+
+        if [[ ! -f "$mountFolder/file.txt.versions/1" ]]; then
+            returnError "$LINENO" 'Version 1 of file.txt not found'
+        fi
+
+        # Version 0 should be from rightmost (archive_b)
+        content=$( cat "$mountFolder/file.txt.versions/0" )
+        if [[ "$content" != "from B" ]]; then
+            returnError "$LINENO" "Version 0 precedence test failed. Expected 'from B', got '$content'"
+        fi
+
+        # Version 1 should be from archive_a
+        content=$( cat "$mountFolder/file.txt.versions/1" )
+        if [[ "$content" != "from A" ]]; then
+            returnError "$LINENO" "Version 1 test failed. Expected 'from A', got '$content'"
+        fi
+    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+
+    funmount "$mountFolder"
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully multiple sources precedence."
+
+    cleanup
+
+    return 0
+}
+
 checkSymbolicLinkResolution()
 {
     local tmpFolder
@@ -1358,6 +1484,8 @@ checkLinkInTAR tests/symlinks.tar foo ../foo
 checkLinkInTAR tests/symlinks.tar python /usr/bin/python
 
 checkSymbolicLinkResolution || returnError "$LINENO" 'Symbolic link resolution test failed!'
+checkResolveSymlinksMultipleTars || returnError "$LINENO" 'Cross-archive symbolic link resolution test failed!'
+checkMultipleSourcesPrecedence || returnError "$LINENO" 'Multiple sources precedence test failed!'
 
 checkFileInTARPrefix '' tests/single-nested-file.tar foo/fighter/ufo 2709a3348eb2c52302a7606ecf5860bc
 checkFileInTARPrefix foo tests/single-nested-file.tar fighter/ufo 2709a3348eb2c52302a7606ecf5860bc

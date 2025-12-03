@@ -190,7 +190,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_not_resolve_link(linkname: str, file_type: int) -> bool:
             return False
 
-        layer = LinkResolutionLayer(mountSource=mock_source, shouldResolveLink=should_not_resolve_link)
+        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_not_resolve_link)
 
         # Regular file should work normally
         file_info = layer.lookup("/file1.txt")
@@ -218,7 +218,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionLayer(mountSource=mock_source, shouldResolveLink=should_resolve_symlinks)
+        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         # Absolute symlink should be resolved
         symlink_info = layer.lookup("/symlink1")
@@ -236,7 +236,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionLayer(mountSource=mock_source, shouldResolveLink=should_resolve_symlinks)
+        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         # Relative symlink should be resolved
         symlink_info = layer.lookup("/symlink2")
@@ -260,7 +260,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_hardlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFREG and linkname != ""
 
-        layer = LinkResolutionLayer(mountSource=mock_source, shouldResolveLink=should_resolve_hardlinks)
+        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_hardlinks)
 
         # Hardlink should be resolved
         hardlink_info = layer.lookup("/hardlink1")
@@ -274,7 +274,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_all_links(linkname: str, file_type: int) -> bool:
             return linkname != ""
 
-        layer = LinkResolutionLayer(mountSource=mock_source, shouldResolveLink=should_resolve_all_links)
+        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_all_links)
 
         # Both symlinks and hardlinks should be resolved
         symlink_info = layer.lookup("/symlink1")
@@ -292,14 +292,11 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionLayer(mountSource=mock_source, shouldResolveLink=should_resolve_symlinks)
+        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         # Root directory listing
         listing = layer.list("/")
         print(f"DEBUG: listing = {listing}")
-        print(f"DEBUG: root unionPath resolved_folder_versions = {layer._root_union_path.resolved_folder_versions}")
-        for i, fv in enumerate(layer._root_union_path.resolved_folder_versions):
-            print(f"DEBUG: folder version {i}: path={fv.path}, list_child_names={fv.list_child_names()}")
         print(f"DEBUG: mock source list for '/': {mock_source.list('/')}")
         assert listing is not None
 
@@ -314,7 +311,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionLayer(mountSource=mock_source, shouldResolveLink=should_resolve_symlinks)
+        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         # Root directory listing with modes
         listing = layer.list_mode("/")
@@ -330,7 +327,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionLayer(mountSource=mock_source, shouldResolveLink=should_resolve_symlinks)
+        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         # Get file info for a resolved symlink
         symlink_info = layer.lookup("/symlink1")
@@ -351,7 +348,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionLayer(mountSource=mock_source, shouldResolveLink=should_resolve_symlinks)
+        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         # Test exists
         assert layer.exists("/file1.txt")
@@ -370,7 +367,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionLayer(mountSource=mock_source, shouldResolveLink=should_resolve_symlinks)
+        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         # Get file info for a resolved symlink
         symlink_info = layer.lookup("/symlink1")
@@ -394,7 +391,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionLayer(mountSource=mock_source, shouldResolveLink=should_resolve_symlinks)
+        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         # Test immutability delegation
         assert layer.is_immutable() == mock_source.is_immutable()
@@ -418,7 +415,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        with LinkResolutionLayer(mountSource=mock_source, shouldResolveLink=should_resolve_symlinks) as layer:
+        with LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks) as layer:
             # Should work normally within context
             file_info = layer.lookup("/file1.txt")
             assert file_info is not None
@@ -430,7 +427,7 @@ class TestLinkResolutionLayer(unittest.TestCase):
         def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFLNK
 
-        layer = LinkResolutionLayer(mountSource=mock_source, shouldResolveLink=should_resolve_symlinks)
+        layer = LinkResolutionLayer(mountSources=[mock_source], shouldResolveLink=should_resolve_symlinks)
 
         # This should not crash due to infinite recursion
         # The implementation should handle circular references gracefully
@@ -440,6 +437,331 @@ class TestLinkResolutionLayer(unittest.TestCase):
             # The important thing is that it doesn't crash
         except RecursionError:
             self.fail("Should not get RecursionError for circular symlinks")
+
+
+class TestLinkResolutionLayerMultiMount(unittest.TestCase):
+    """Test cases for LinkResolutionLayer with multiple mount sources."""
+
+    def test_union_with_two_mount_sources_basic(self):
+        """Test basic union functionality with two mount sources."""
+        # Create two mock mount sources with different files
+        mount_source_a = MockMountSource({
+            "/": FileInfo(
+                size=0,
+                mtime=0,
+                mode=0o755 | stat.S_IFDIR,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/"],
+            ),
+            "/file_a.txt": FileInfo(
+                size=100,
+                mtime=1234567890,
+                mode=0o644 | stat.S_IFREG,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/file_a.txt"],
+            ),
+            "/dir_a": FileInfo(
+                size=0,
+                mtime=1234567890,
+                mode=0o755 | stat.S_IFDIR,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/dir_a"],
+            ),
+        })
+
+        mount_source_b = MockMountSource({
+            "/": FileInfo(
+                size=0,
+                mtime=0,
+                mode=0o755 | stat.S_IFDIR,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/"],
+            ),
+            "/file_b.txt": FileInfo(
+                size=200,
+                mtime=1234567890,
+                mode=0o644 | stat.S_IFREG,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/file_b.txt"],
+            ),
+            "/dir_b": FileInfo(
+                size=0,
+                mtime=1234567890,
+                mode=0o755 | stat.S_IFDIR,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/dir_b"],
+            ),
+        })
+
+        def should_not_resolve(linkname: str, file_type: int) -> bool:
+            return False
+
+        layer = LinkResolutionLayer(
+            mountSources=[mount_source_a, mount_source_b],
+            shouldResolveLink=should_not_resolve
+        )
+
+        # Files from both sources should be accessible
+        assert layer.exists("/file_a.txt")
+        assert layer.exists("/file_b.txt")
+
+        file_a = layer.lookup("/file_a.txt")
+        assert file_a is not None
+        assert file_a.size == 100
+
+        file_b = layer.lookup("/file_b.txt")
+        assert file_b is not None
+        assert file_b.size == 200
+
+        # Directory listing should merge files from both sources
+        listing = layer.list("/")
+        assert listing is not None
+        if isinstance(listing, dict):
+            names = set(listing.keys())
+        else:
+            names = set(listing)
+
+        assert "file_a.txt" in names
+        assert "file_b.txt" in names
+        assert "dir_a" in names
+        assert "dir_b" in names
+
+    def test_cross_mount_absolute_symlink_resolution(self):
+        """Test resolving absolute symlink across mount sources (CRITICAL)."""
+        # Mount A has the target file
+        mount_source_a = MockMountSource({
+            "/": FileInfo(
+                size=0,
+                mtime=0,
+                mode=0o755 | stat.S_IFDIR,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/"],
+            ),
+            "/target.txt": FileInfo(
+                size=100,
+                mtime=1234567890,
+                mode=0o644 | stat.S_IFREG,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/target.txt"],
+            ),
+        })
+
+        # Mount B has a symlink pointing to the target in mount A
+        mount_source_b = MockMountSource({
+            "/": FileInfo(
+                size=0,
+                mtime=0,
+                mode=0o755 | stat.S_IFDIR,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/"],
+            ),
+            "/link": FileInfo(
+                size=0,
+                mtime=1234567890,
+                mode=0o777 | stat.S_IFLNK,
+                linkname="/target.txt",
+                uid=0,
+                gid=0,
+                userdata=["/link"],
+            ),
+        })
+
+        def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
+            return file_type == stat.S_IFLNK
+
+        layer = LinkResolutionLayer(
+            mountSources=[mount_source_a, mount_source_b],
+            shouldResolveLink=should_resolve_symlinks
+        )
+
+        # Symlink should resolve to target file from different mount source
+        link_info = layer.lookup("/link")
+        assert link_info is not None
+        assert link_info.size == 100  # Resolved to target
+
+        # File operations should work through resolved symlink
+        file_handle = layer.open(link_info)
+        assert file_handle is not None
+
+        data = layer.read(link_info, 100, 0)
+        assert data is not None
+        assert len(data) == 100
+
+        # Verify userdata tracking - should have mount source info
+        assert link_info.userdata is not None
+        assert len(link_info.userdata) > 0
+
+    def test_file_operations_preserve_mount_source(self):
+        """Test that file operations preserve mount source userdata (CRITICAL)."""
+        # Mount A has a file with xattrs
+        mount_source_a = MockMountSource({
+            "/": FileInfo(
+                size=0,
+                mtime=0,
+                mode=0o755 | stat.S_IFDIR,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/"],
+            ),
+            "/file_a.txt": FileInfo(
+                size=100,
+                mtime=1234567890,
+                mode=0o644 | stat.S_IFREG,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/file_a.txt"],
+            ),
+        })
+
+        # Mount B has a symlink to the file in mount A
+        mount_source_b = MockMountSource({
+            "/": FileInfo(
+                size=0,
+                mtime=0,
+                mode=0o755 | stat.S_IFDIR,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/"],
+            ),
+            "/link": FileInfo(
+                size=0,
+                mtime=1234567890,
+                mode=0o777 | stat.S_IFLNK,
+                linkname="/file_a.txt",
+                uid=0,
+                gid=0,
+                userdata=["/link"],
+            ),
+        })
+
+        def should_resolve_symlinks(linkname: str, file_type: int) -> bool:
+            return file_type == stat.S_IFLNK
+
+        layer = LinkResolutionLayer(
+            mountSources=[mount_source_a, mount_source_b],
+            shouldResolveLink=should_resolve_symlinks
+        )
+
+        # Get file info through symlink
+        link_info = layer.lookup("/link")
+        assert link_info is not None
+
+        # Test open() operation
+        file_handle = layer.open(link_info)
+        assert file_handle is not None
+        # Userdata should still be present after open
+        assert link_info.userdata is not None
+
+        # Test read() operation
+        data = layer.read(link_info, 100, 0)
+        assert data is not None
+        # Userdata should still be present after read
+        assert link_info.userdata is not None
+
+        # Test get_xattr() operation
+        xattr_value = layer.get_xattr(link_info, "user.test")
+        assert xattr_value == b"test_value"
+        # Userdata should still be present after get_xattr
+        assert link_info.userdata is not None
+
+        # Test list_xattr() operation
+        xattr_list = layer.list_xattr(link_info)
+        assert xattr_list == ["user.test"]
+        # Userdata should still be present after list_xattr
+        assert link_info.userdata is not None
+
+    def test_overlapping_files_precedence(self):
+        """Test file versioning with overlapping files from multiple mount sources."""
+        # Mount A has file.txt with content "from A"
+        mount_source_a = MockMountSource({
+            "/": FileInfo(
+                size=0,
+                mtime=0,
+                mode=0o755 | stat.S_IFDIR,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/"],
+            ),
+            "/file.txt": FileInfo(
+                size=100,
+                mtime=1234567890,
+                mode=0o644 | stat.S_IFREG,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/file.txt", "from A"],
+            ),
+        })
+
+        # Mount B has file.txt with content "from B"
+        mount_source_b = MockMountSource({
+            "/": FileInfo(
+                size=0,
+                mtime=0,
+                mode=0o755 | stat.S_IFDIR,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/"],
+            ),
+            "/file.txt": FileInfo(
+                size=200,
+                mtime=1234567890,
+                mode=0o644 | stat.S_IFREG,
+                linkname="",
+                uid=0,
+                gid=0,
+                userdata=["/file.txt", "from B"],
+            ),
+        })
+
+        def should_not_resolve(linkname: str, file_type: int) -> bool:
+            return False
+
+        layer = LinkResolutionLayer(
+            mountSources=[mount_source_a, mount_source_b],
+            shouldResolveLink=should_not_resolve
+        )
+
+        # Check file versions - should have 2 versions
+        versions = layer.versions("/file.txt")
+        assert versions == 2
+
+        # LinkResolutionLayer iterates mount sources in reverse order (right to left),
+        # so version 0 is from the rightmost mount (B) and version 1 is from mount A.
+        # This is consistent with UnionMountSource which gives rightmost precedence.
+
+        # Version 0 should be from rightmost mount (B)
+        file_v0 = layer.lookup("/file.txt", fileVersion=0)
+        assert file_v0 is not None
+        assert file_v0.size == 200  # From mount B
+
+        # Version 1 should be from mount A
+        file_v1 = layer.lookup("/file.txt", fileVersion=1)
+        assert file_v1 is not None
+        assert file_v1.size == 100  # From mount A
 
 
 if __name__ == "__main__":
