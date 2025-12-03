@@ -3,7 +3,7 @@ import os
 import os.path
 import stat
 import sys
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
@@ -122,7 +122,7 @@ class _FileVersion:
 
 
 @dataclass
-class _UnionPath:
+class _UnionPath(ABC):
     """
     Represents a path in the union filesystem, which may correspond to multiple
     underlying file versions.
