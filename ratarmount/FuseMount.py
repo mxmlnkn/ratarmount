@@ -4,6 +4,7 @@ import errno
 import io
 import logging
 import os
+import stat
 import subprocess
 import sys
 import tempfile
@@ -16,6 +17,7 @@ from ratarmountcore.mountsource import FileInfo, MountSource
 
 # These imports can be particularly expensive when all fsspec backends are installed.
 from ratarmountcore.mountsource.compositing.automount import AutoMountLayer
+from ratarmountcore.mountsource.compositing.link import LinkResolutionLayer
 from ratarmountcore.mountsource.compositing.removeprefix import RemovePrefixMountSource
 from ratarmountcore.mountsource.compositing.singlefile import SingleFileMountSource
 from ratarmountcore.mountsource.compositing.subvolumes import SubvolumesMountSource
@@ -253,6 +255,20 @@ class FuseMount(fuse.Operations):
         join_threads = getattr(self.mountSource, 'join_threads', None)
         if join_threads is not None:
             join_threads()
+
+        # Create a function to determine whether to resolve links
+        resolveSymbolicLinks = bool(options.get('resolveSymbolicLinks', False))
+
+        def should_resolve_link(linkname: str, fileType: int) -> bool:
+            """
+            Determine whether to resolve a link based on user configuration.
+            For now, only resolve symbolic links if the option is enabled.
+            Hard links are not resolved for now, as it will be resolved by FileVersionLayer.
+            """
+            # TODO Resolve hard links in LinkResolutionLayer and remove hard link handling from FileVersionLayer.
+            return bool(resolveSymbolicLinks and fileType == stat.S_IFLNK)
+
+        self.mountSource = LinkResolutionLayer(self.mountSource, shouldResolveLink=should_resolve_link)
 
         if self.overlayPath:
             ignoredPrefixes: list[str] = []

@@ -247,6 +247,7 @@ def parsed_args_to_options(args) -> dict[str, Any]:
         'logFile'                      : args.log_file,
         'enableFileVersions'           : args.file_versions,
         'controlInterface'             : args.control_interface,
+        'resolveSymbolicLinks'         : args.resolve_symbolic_links,
         'writeIndex'                   : True,
         'mount'                        : args.mount,
     }
