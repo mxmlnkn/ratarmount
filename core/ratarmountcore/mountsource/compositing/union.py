@@ -1,18 +1,18 @@
-import builtins
 import logging
 import os
 import stat
 import time
 from collections.abc import Iterable, Sequence
-from typing import IO, Any, Optional, Union
+from typing import Optional, Union
 
-from ratarmountcore.mountsource import FileInfo, MountSource, create_root_file_info, merge_statfs
+from ratarmountcore.mountsource import FileInfo, MountSource, create_root_file_info
+from ratarmountcore.mountsource.compositing.multi import MultiMountSourceMixin
 from ratarmountcore.utils import overrides
 
 logger = logging.getLogger(__name__)
 
 
-class UnionMountSource(MountSource):
+class UnionMountSource(MultiMountSourceMixin):
     def __init__(
         self,
         mountSources: Sequence[MountSource],
@@ -96,10 +96,6 @@ class UnionMountSource(MountSource):
                 f"Cached mount sources for {len(self.folderCache)} folders up to a depth of "
                 f"{self.folderCacheDepth} in {t1 - t0:.3}s for faster union mount."
             )
-
-    @overrides(MountSource)
-    def is_immutable(self) -> bool:
-        return all(m.is_immutable() for m in self.mountSources)
 
     @overrides(MountSource)
     def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
@@ -189,61 +185,6 @@ class UnionMountSource(MountSource):
         Returns the set of all folder contents over all mount sources or None if the path was found in none of them.
         """
         return self._list(path, onlyMode=True)
-
-    @overrides(MountSource)
-    def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
-        mountSource = fileInfo.userdata.pop()
-        try:
-            assert isinstance(mountSource, MountSource)
-            return mountSource.open(fileInfo, buffering=buffering)
-        finally:
-            fileInfo.userdata.append(mountSource)
-
-    @overrides(MountSource)
-    def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
-        mountSource = fileInfo.userdata.pop()
-        try:
-            assert isinstance(mountSource, MountSource)
-            return mountSource.read(fileInfo, size, offset)
-        finally:
-            fileInfo.userdata.append(mountSource)
-
-    @overrides(MountSource)
-    def list_xattr(self, fileInfo: FileInfo) -> builtins.list[str]:
-        mountSource = fileInfo.userdata.pop()
-        try:
-            return mountSource.list_xattr(fileInfo) if isinstance(mountSource, MountSource) else []
-        finally:
-            fileInfo.userdata.append(mountSource)
-
-    @overrides(MountSource)
-    def get_xattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
-        mountSource = fileInfo.userdata.pop()
-        try:
-            return mountSource.get_xattr(fileInfo, key) if isinstance(mountSource, MountSource) else None
-        finally:
-            fileInfo.userdata.append(mountSource)
-
-    @overrides(MountSource)
-    def get_mount_source(self, fileInfo: FileInfo) -> tuple[str, MountSource, FileInfo]:
-        sourceFileInfo = fileInfo.clone()
-        mountSource = sourceFileInfo.userdata.pop()
-
-        if not isinstance(mountSource, MountSource):
-            return '/', self, fileInfo
-
-        # Because all mount sources are mounted at '/', we do not have to append
-        # the mount point path returned by get_mount_source to the mount point '/'.
-        return mountSource.get_mount_source(sourceFileInfo)
-
-    @overrides(MountSource)
-    def statfs(self) -> dict[str, Any]:
-        return merge_statfs([mountSource.statfs() for mountSource in self.mountSources])
-
-    @overrides(MountSource)
-    def __exit__(self, exception_type, exception_value, exception_traceback):
-        for mountSource in self.mountSources:
-            mountSource.__exit__(exception_type, exception_value, exception_traceback)
 
     def join_threads(self):
         for mountSource in self.mountSources:

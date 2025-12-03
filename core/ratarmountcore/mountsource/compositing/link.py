@@ -1,4 +1,3 @@
-import builtins
 import itertools
 import os
 import os.path
@@ -10,16 +9,16 @@ from functools import reduce
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from typing import (
     IO,
-    Any,
     Callable,
     Optional,
     Tuple,
     Union,
 )
 
-from ratarmountcore.mountsource import FileInfo, MountSource, merge_statfs
+from ratarmountcore.mountsource import FileInfo, MountSource
+from ratarmountcore.mountsource.compositing.multi import MultiMountSourceMixin
 from ratarmountcore.utils import cached_property, overrides
-from typing_extensions import Final, Self, final
+from typing_extensions import Final, final
 
 
 @final
@@ -321,7 +320,7 @@ class _RootUnionPath(_UnionPath):
 
 
 @dataclass
-class LinkResolutionUnionMountSource(MountSource):
+class LinkResolutionUnionMountSource(MultiMountSourceMixin):
     """
     A MountSource layer that resolves symbolic links in underlying MountSources.
 
@@ -335,7 +334,7 @@ class LinkResolutionUnionMountSource(MountSource):
     resolve within the merged view rather than their original source.
     """
 
-    mountSources: Final[Sequence[MountSource]]
+    mountSources: Sequence[MountSource]
     """The underlying MountSources to resolve links in."""
     shouldResolveLink: Final[Callable[[str, int], bool]]
     """A function that determines whether a given link should be resolved.
@@ -424,34 +423,6 @@ class LinkResolutionUnionMountSource(MountSource):
         finally:
             fileInfo.userdata.append(mountSource)
 
-    @overrides(MountSource)
-    def list_xattr(self, fileInfo: FileInfo) -> builtins.list[str]:
-        """
-        Lists extended attributes of a file, after link resolution.
-        """
-        mountSource = fileInfo.userdata.pop()
-        try:
-            return mountSource.list_xattr(fileInfo) if isinstance(mountSource, MountSource) else []
-        finally:
-            fileInfo.userdata.append(mountSource)
-
-    @overrides(MountSource)
-    def get_xattr(self, fileInfo: FileInfo, key: str) -> Optional[bytes]:
-        """
-        Gets an extended attribute of a file, after link resolution.
-        """
-        mountSource = fileInfo.userdata.pop()
-        try:
-            return mountSource.get_xattr(fileInfo, key) if isinstance(mountSource, MountSource) else None
-        finally:
-            fileInfo.userdata.append(mountSource)
-
-    @overrides(MountSource)
-    def is_immutable(self) -> bool:
-        """
-        Returns whether all underlying mount sources are immutable.
-        """
-        return all(ms.is_immutable() for ms in self.mountSources)
 
     @overrides(MountSource)
     def exists(self, path: str) -> bool:
@@ -482,28 +453,3 @@ class LinkResolutionUnionMountSource(MountSource):
             return mountSource.get_mount_source(sourceFileInfo)
         return "/", self, fileInfo
 
-    @overrides(MountSource)
-    def statfs(self) -> dict[str, Any]:
-        """
-        Returns merged filesystem statistics from all mount sources.
-        """
-        return merge_statfs([mountSource.statfs() for mountSource in self.mountSources])
-
-    @overrides(MountSource)
-    def __exit__(self, exception_type, exception_value, exception_traceback):
-        """
-        Cleanup method for the mount sources.
-        """
-        result = super().__exit__(exception_type, exception_value, exception_traceback)
-        for mountSource in self.mountSources:
-            result = result or mountSource.__exit__(exception_type, exception_value, exception_traceback)
-        return result
-
-    @overrides(MountSource)
-    def __enter__(self) -> Self:
-        """
-        Context manager entry point for the mount sources.
-        """
-        for mountSource in self.mountSources:
-            mountSource.__enter__()
-        return super().__enter__()
