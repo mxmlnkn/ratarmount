@@ -15,7 +15,6 @@ from ratarmountcore.mountsource import FileInfo, MountSource  # noqa: E402
 from ratarmountcore.mountsource.compositing.link import LinkResolutionUnionMountSource  # noqa: E402
 from ratarmountcore.mountsource.formats.folder import FolderMountSource  # noqa: E402
 
-
 # =============================================================================
 # Dataclasses for Test Data Organization
 # =============================================================================
@@ -269,26 +268,30 @@ def fixture_branch2_folder(tmp_path):
 @pytest.fixture(name="infinite_depth_mock")
 def fixture_infinite_depth_mock():
     """Mock source with symlink creating infinite depth."""
-    return _create_mock_source({
-        "/": ('dir',),
-        "/dir": ('dir',),
-        "/dir/file.txt": ('file', 100),
-        "/dir/subdir": ('symlink', "/dir"),
-    })
+    return _create_mock_source(
+        {
+            "/": ('dir',),
+            "/dir": ('dir',),
+            "/dir/file.txt": ('file', 100),
+            "/dir/subdir": ('symlink', "/dir"),
+        }
+    )
 
 
 @pytest.fixture(name="mutual_symlinks_mock")
 def fixture_mutual_symlinks_mock():
     """Mock source with mutual symlinks creating cycles."""
-    return _create_mock_source({
-        "/": ('dir',),
-        "/a": ('dir',),
-        "/a/file.txt": ('file', 100),
-        "/a/to_b": ('symlink', "/b"),
-        "/b": ('dir',),
-        "/b/file.txt": ('file', 200),
-        "/b/to_a": ('symlink', "/a"),
-    })
+    return _create_mock_source(
+        {
+            "/": ('dir',),
+            "/a": ('dir',),
+            "/a/file.txt": ('file', 100),
+            "/a/to_b": ('symlink', "/b"),
+            "/b": ('dir',),
+            "/b/file.txt": ('file', 200),
+            "/b/to_a": ('symlink', "/a"),
+        }
+    )
 
 
 # =============================================================================
@@ -303,9 +306,7 @@ class TestLinkResolutionBasic:
     def test_no_link_resolution(basic_mock_files):
         """Test LinkResolutionUnionMountSource with no link resolution."""
         mock_source = MockMountSource(basic_mock_files)
-        layer = LinkResolutionUnionMountSource(
-            mountSources=[mock_source], shouldResolveLink=_should_not_resolve
-        )
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=_should_not_resolve)
 
         file_info = layer.lookup("/file1.txt")
         assert file_info is not None
@@ -323,9 +324,7 @@ class TestLinkResolutionBasic:
     def test_absolute_symlink_resolution(basic_mock_files):
         """Test resolving absolute symbolic links."""
         mock_source = MockMountSource(basic_mock_files)
-        layer = LinkResolutionUnionMountSource(
-            mountSources=[mock_source], shouldResolveLink=_should_resolve_symlinks
-        )
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=_should_resolve_symlinks)
 
         symlink_info = layer.lookup("/symlink1")
         assert symlink_info is not None
@@ -337,9 +336,7 @@ class TestLinkResolutionBasic:
     def test_relative_symlink_resolution(basic_mock_files):
         """Test resolving relative symbolic links."""
         mock_source = MockMountSource(basic_mock_files)
-        layer = LinkResolutionUnionMountSource(
-            mountSources=[mock_source], shouldResolveLink=_should_resolve_symlinks
-        )
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=_should_resolve_symlinks)
 
         # Relative symlink in root
         symlink_info = layer.lookup("/symlink2")
@@ -364,9 +361,7 @@ class TestLinkResolutionBasic:
         def should_resolve_hardlinks(linkname: str, file_type: int) -> bool:
             return file_type == stat.S_IFREG and linkname != ""
 
-        layer = LinkResolutionUnionMountSource(
-            mountSources=[mock_source], shouldResolveLink=should_resolve_hardlinks
-        )
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=should_resolve_hardlinks)
 
         hardlink_info = layer.lookup("/hardlink1")
         assert hardlink_info is not None
@@ -376,9 +371,7 @@ class TestLinkResolutionBasic:
     def test_mixed_link_resolution(basic_mock_files):
         """Test resolving both symlinks and hardlinks."""
         mock_source = MockMountSource(basic_mock_files)
-        layer = LinkResolutionUnionMountSource(
-            mountSources=[mock_source], shouldResolveLink=_should_resolve_all_links
-        )
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=_should_resolve_all_links)
 
         symlink_info = layer.lookup("/symlink1")
         assert symlink_info is not None
@@ -392,9 +385,7 @@ class TestLinkResolutionBasic:
     def test_directory_listing(basic_mock_files):
         """Test directory listing with link resolution."""
         mock_source = MockMountSource(basic_mock_files)
-        layer = LinkResolutionUnionMountSource(
-            mountSources=[mock_source], shouldResolveLink=_should_resolve_symlinks
-        )
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=_should_resolve_symlinks)
 
         listing = layer.list("/")
         assert listing is not None
@@ -406,9 +397,7 @@ class TestLinkResolutionBasic:
     def test_directory_listing_with_modes(basic_mock_files):
         """Test directory listing with file modes."""
         mock_source = MockMountSource(basic_mock_files)
-        layer = LinkResolutionUnionMountSource(
-            mountSources=[mock_source], shouldResolveLink=_should_resolve_symlinks
-        )
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=_should_resolve_symlinks)
 
         listing = layer.list_mode("/")
         assert listing is not None
@@ -420,9 +409,7 @@ class TestLinkResolutionBasic:
     def test_file_operations(basic_mock_files):
         """Test file operations on resolved links."""
         mock_source = MockMountSource(basic_mock_files)
-        layer = LinkResolutionUnionMountSource(
-            mountSources=[mock_source], shouldResolveLink=_should_resolve_symlinks
-        )
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=_should_resolve_symlinks)
 
         symlink_info = layer.lookup("/symlink1")
         assert symlink_info is not None
@@ -437,9 +424,7 @@ class TestLinkResolutionBasic:
     def test_exists_and_is_dir(basic_mock_files):
         """Test exists() and is_dir() methods."""
         mock_source = MockMountSource(basic_mock_files)
-        layer = LinkResolutionUnionMountSource(
-            mountSources=[mock_source], shouldResolveLink=_should_resolve_symlinks
-        )
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=_should_resolve_symlinks)
 
         assert layer.exists("/file1.txt")
         assert layer.exists("/symlink1")
@@ -453,9 +438,7 @@ class TestLinkResolutionBasic:
     def test_extended_attributes(basic_mock_files):
         """Test extended attribute operations."""
         mock_source = MockMountSource(basic_mock_files)
-        layer = LinkResolutionUnionMountSource(
-            mountSources=[mock_source], shouldResolveLink=_should_resolve_symlinks
-        )
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=_should_resolve_symlinks)
 
         symlink_info = layer.lookup("/symlink1")
         assert symlink_info is not None
@@ -472,9 +455,7 @@ class TestLinkResolutionBasic:
     def test_mount_source_delegation(basic_mock_files):
         """Test delegation to underlying mount source."""
         mock_source = MockMountSource(basic_mock_files)
-        layer = LinkResolutionUnionMountSource(
-            mountSources=[mock_source], shouldResolveLink=_should_resolve_symlinks
-        )
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=_should_resolve_symlinks)
 
         assert layer.is_immutable() == mock_source.is_immutable()
 
@@ -503,9 +484,7 @@ class TestLinkResolutionBasic:
     def test_circular_symlink_handling(basic_mock_files):
         """Test handling of circular symbolic links."""
         mock_source = MockMountSource(basic_mock_files)
-        layer = LinkResolutionUnionMountSource(
-            mountSources=[mock_source], shouldResolveLink=_should_resolve_symlinks
-        )
+        layer = LinkResolutionUnionMountSource(mountSources=[mock_source], shouldResolveLink=_should_resolve_symlinks)
 
         # Should not crash due to infinite recursion
         try:
@@ -520,16 +499,20 @@ class TestLinkResolutionMultiMount:
     @staticmethod
     def test_union_with_two_mount_sources_basic():
         """Test basic union functionality with two mount sources."""
-        mount_source_a = _create_mock_source({
-            "/": ('dir',),
-            "/file_a.txt": ('file', 100),
-            "/dir_a": ('dir',),
-        })
-        mount_source_b = _create_mock_source({
-            "/": ('dir',),
-            "/file_b.txt": ('file', 200),
-            "/dir_b": ('dir',),
-        })
+        mount_source_a = _create_mock_source(
+            {
+                "/": ('dir',),
+                "/file_a.txt": ('file', 100),
+                "/dir_a": ('dir',),
+            }
+        )
+        mount_source_b = _create_mock_source(
+            {
+                "/": ('dir',),
+                "/file_b.txt": ('file', 200),
+                "/dir_b": ('dir',),
+            }
+        )
 
         layer = LinkResolutionUnionMountSource(
             mountSources=[mount_source_a, mount_source_b], shouldResolveLink=_should_not_resolve
@@ -552,14 +535,18 @@ class TestLinkResolutionMultiMount:
     @staticmethod
     def test_cross_mount_absolute_symlink_resolution():
         """Test resolving absolute symlink across mount sources."""
-        mount_source_a = _create_mock_source({
-            "/": ('dir',),
-            "/target.txt": ('file', 100),
-        })
-        mount_source_b = _create_mock_source({
-            "/": ('dir',),
-            "/link": ('symlink', "/target.txt"),
-        })
+        mount_source_a = _create_mock_source(
+            {
+                "/": ('dir',),
+                "/target.txt": ('file', 100),
+            }
+        )
+        mount_source_b = _create_mock_source(
+            {
+                "/": ('dir',),
+                "/link": ('symlink', "/target.txt"),
+            }
+        )
 
         layer = LinkResolutionUnionMountSource(
             mountSources=[mount_source_a, mount_source_b], shouldResolveLink=_should_resolve_symlinks
@@ -579,14 +566,18 @@ class TestLinkResolutionMultiMount:
     @staticmethod
     def test_file_operations_preserve_mount_source():
         """Test that file operations preserve mount source userdata."""
-        mount_source_a = _create_mock_source({
-            "/": ('dir',),
-            "/file_a.txt": ('file', 100),
-        })
-        mount_source_b = _create_mock_source({
-            "/": ('dir',),
-            "/link": ('symlink', "/file_a.txt"),
-        })
+        mount_source_a = _create_mock_source(
+            {
+                "/": ('dir',),
+                "/file_a.txt": ('file', 100),
+            }
+        )
+        mount_source_b = _create_mock_source(
+            {
+                "/": ('dir',),
+                "/link": ('symlink', "/file_a.txt"),
+            }
+        )
 
         layer = LinkResolutionUnionMountSource(
             mountSources=[mount_source_a, mount_source_b], shouldResolveLink=_should_resolve_symlinks
@@ -610,14 +601,18 @@ class TestLinkResolutionMultiMount:
     @staticmethod
     def test_overlapping_files_precedence():
         """Test file versioning with overlapping files from multiple mount sources."""
-        mount_source_a = _create_mock_source({
-            "/": ('dir',),
-            "/file.txt": ('file', 100),
-        })
-        mount_source_b = _create_mock_source({
-            "/": ('dir',),
-            "/file.txt": ('file', 200),
-        })
+        mount_source_a = _create_mock_source(
+            {
+                "/": ('dir',),
+                "/file.txt": ('file', 100),
+            }
+        )
+        mount_source_b = _create_mock_source(
+            {
+                "/": ('dir',),
+                "/file.txt": ('file', 200),
+            }
+        )
 
         layer = LinkResolutionUnionMountSource(
             mountSources=[mount_source_a, mount_source_b], shouldResolveLink=_should_not_resolve
