@@ -8,6 +8,7 @@ pylint
 pytest>=8; python_version >= '3.8'
 pytest
 pytest-xdist
+pytest-order
 # Depends on msgspec, which has no wheels for Python 3.13 and results in build errors.
 # msgspec/_core.c:11254:15: error: too few arguments to function ‘_PyLong_AsByteArray’
 pytype; python_version >= '3.8' and python_version < '3.13'

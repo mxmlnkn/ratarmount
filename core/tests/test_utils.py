@@ -4,6 +4,8 @@
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from ratarmountcore.utils import (  # noqa: E402
@@ -19,6 +21,8 @@ from ratarmountcore.utils import (  # noqa: E402
     is_latin_hex_alpha,
     is_random,
 )
+
+pytestmark = pytest.mark.order(0)
 
 
 def test_ceil_div():

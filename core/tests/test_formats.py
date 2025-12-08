@@ -10,6 +10,7 @@ try:
 except ImportError:
     sqlcipher3 = None  # type:ignore
 
+import pytest
 from helpers import find_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -27,6 +28,7 @@ from ratarmountcore.mountsource.archives import ARCHIVE_BACKENDS  # noqa: E402
 from ratarmountcore.mountsource.factory import find_backends_by_extension  # noqa: E402
 
 
+@pytest.mark.order(0)
 def test_format_detection():
     # This test assumes that we use correct extensions for all files in the tests folder.
     folder = os.path.dirname(find_test_file("tests/single-file.tar"))

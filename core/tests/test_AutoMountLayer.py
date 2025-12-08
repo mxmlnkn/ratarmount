@@ -5,16 +5,17 @@ import os
 import stat
 import sys
 
+import pytest
 from helpers import copy_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-import pytest  # noqa: E402
 from ratarmountcore.mountsource.compositing.automount import AutoMountLayer  # noqa: E402
 from ratarmountcore.mountsource.factory import open_mount_source  # noqa: E402
 
 
-# @pytest.mark.parametrize("parallelization", [1, 2, 4])
+@pytest.mark.order(-1)
+@pytest.mark.parallel
 @pytest.mark.parametrize("parallelization", [1])
 class TestAutoMountLayer:
     @staticmethod

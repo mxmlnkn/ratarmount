@@ -4,6 +4,8 @@
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from ratarmountcore.compressions import (  # noqa: E402
@@ -13,6 +15,8 @@ from ratarmountcore.compressions import (  # noqa: E402
     strip_suffix_from_compressed_file,
 )
 from ratarmountcore.utils import ALPHA, DIGITS, HEX, format_number  # noqa: E402
+
+pytestmark = pytest.mark.order(0)
 
 
 def test_strip_suffix_from_compressed_file():

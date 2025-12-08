@@ -5,11 +5,14 @@
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from ratarmountcore.SQLiteIndex import SQLiteIndex  # noqa: E402
 
 
+@pytest.mark.order(0)
 class TestSQLiteIndexedTarParallelized:
     @staticmethod
     def test_normpath():

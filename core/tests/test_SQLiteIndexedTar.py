@@ -21,6 +21,7 @@ from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar, SQLiteIndex
 from ratarmountcore.utils import RatarmountError  # noqa: E402
 
 
+@pytest.mark.parallel
 @pytest.mark.parametrize("parallelization", [1, 2, 4])
 class TestSQLiteIndexedTarParallelized:
     @staticmethod

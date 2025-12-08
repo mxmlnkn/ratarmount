@@ -70,6 +70,7 @@ def test_block_size():
     assert blockSize([0, 2, 4], 2) == 0
 
 
+@pytest.mark.parallel
 @pytest.mark.parametrize("parallelization", [1, 2, 3, os.cpu_count()])
 class TestParallelXZReader:
     @staticmethod
@@ -196,6 +197,7 @@ class SeekableZstd:
             self.fileobj.close()
 
 
+@pytest.mark.parallel
 @pytest.mark.parametrize("parallelization", [1, 2, 3, os.cpu_count()])
 class TestParallelZstdReader:
     @staticmethod

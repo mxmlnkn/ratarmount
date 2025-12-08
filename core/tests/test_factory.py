@@ -16,6 +16,7 @@ from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar  # noqa: E40
 from ratarmountcore.mountsource.formats.zip import ZipMountSource  # noqa: E402
 
 
+@pytest.mark.order(-1)
 @pytest.mark.parametrize("transform_path", [str, Path])
 class TestOpenMountSource:
     @staticmethod

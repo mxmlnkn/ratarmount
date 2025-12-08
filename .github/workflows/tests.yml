@@ -27,7 +27,7 @@ jobs:
         sudo apt-get -y update
         sudo apt-get -y install liblzo2-dev
         python3 -m pip install --upgrade pip
-        python3 -m pip install --user pytest lz4 PySquashfsImage asyncssh fsspec pygit2 sqlcipher3-wheels
+        python3 -m pip install --user pytest fsspec
         ( cd core && python3 -m pip install --user .[full,ext4,fsspec,sqlar] )
         python3 -m pip install --user .
 
@@ -93,7 +93,7 @@ jobs:
         sudo apt-get -y update
         sudo apt-get -y install liblzo2-dev
         python3 -m pip install --upgrade pip
-        python3 -m pip install --user pytest lz4 PySquashfsImage asyncssh fsspec pygit2 sqlcipher3-wheels
+        python3 -m pip install --user pytest asyncssh
         ( cd core && python3 -m pip install --user .[full,ext4,fsspec,sqlar] )
         python3 -m pip install --user .
 
@@ -336,22 +336,9 @@ jobs:
 
     - name: Unit Tests
       run: |
-        python3 -m pip install pytest pytest-xdist pandas
-        for file in core/tests/test_*.py; do
-            case "$file" in
-                "core/tests/test_AutoMountLayer.py"\
-                |"core/tests/test_BlockParallelReaders.py"\
-                |"core/tests/test_LibarchiveMountSource.py"\
-                |"core/tests/test_SQLiteIndexedTar.py")
-                    echo "$file"  # pytest-xdist seems to omit the test file name
-                    pytest -n auto --disable-warnings "$file"
-                    ;;
-                *)
-                  # Fusepy warns about usage of use_ns because the implicit behavior is deprecated.
-                  # But there has been no development to fusepy for 4 years, so I think it should be fine to ignore.
-                  pytest --disable-warnings "$file"
-            esac
-        done
+        python3 -m pip install pytest pytest-xdist pytest-order pandas
+        pytest -rs -v -m 'not parallel' core/tests/test_*.py
+        pytest -rs -v -n auto -m parallel core/tests/test_*.py
         python3 tests/tests.py
 
     - name: Install pip Test Dependencies

@@ -10,3 +10,8 @@ def pytest_assertion_pass(item, lineno, orig, expl):
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
     print(f'{assertion_count} assertions tested.')
+
+
+def pytest_configure(config):
+    # register an additional marker
+    config.addinivalue_line("markers", "parallel: mark test to run parallelized with xdist")

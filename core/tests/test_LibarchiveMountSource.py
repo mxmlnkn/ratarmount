@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from ratarmountcore.mountsource.formats.libarchive import IterableArchive, LibarchiveMountSource  # noqa: E402
 
 
+@pytest.mark.parallel
 class TestLibarchiveMountSource:
     @staticmethod
     @pytest.mark.parametrize('compression', ['7z', 'rar', 'zip'])
