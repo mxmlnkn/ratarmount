@@ -11,7 +11,7 @@ from typing import IO, Optional, Union
 
 from ratarmountcore.formats import FileFormatID, replace_format_check
 from ratarmountcore.mountsource import FileInfo, MountSource, create_root_file_info
-from ratarmountcore.utils import overrides
+from ratarmountcore.utils import get_groupid, get_userid, overrides
 
 with contextlib.suppress(ImportError):
     import rarfile
@@ -108,8 +108,8 @@ class RarMountSource(MountSource):
             mode     = RarMountSource._get_mode(info),
             # file_redir is (type, flags, target) or None. Only tested for type == RAR5_XREDIR_UNIX_SYMLINK.
             linkname = info.file_redir[2] if info.file_redir else "",
-            uid      = os.getuid(),
-            gid      = os.getgid(),
+            uid      = get_userid(),
+            gid      = get_groupid(),
             userdata = [(normalizedPath, info)],
         )
         # fmt: on
@@ -185,7 +185,7 @@ class RarMountSource(MountSource):
                     mtime    = time.time(),
                     mode     = 0o777 | stat.S_IFDIR,
                     linkname = "",
-                    uid      = os.getuid(),
+                    uid      = get_userid(),
                     gid      = os.getgid(),
                     userdata = [None],
                 )

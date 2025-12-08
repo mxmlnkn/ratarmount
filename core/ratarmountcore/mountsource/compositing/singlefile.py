@@ -10,7 +10,7 @@ from typing import IO, Any, Callable, Optional, Union, cast, final
 
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.StenciledFile import RawStenciledFile, StenciledFile
-from ratarmountcore.utils import overrides
+from ratarmountcore.utils import get_groupid, get_userid, overrides
 
 
 def _get_mode(fileobj: IO[bytes]) -> int:
@@ -126,8 +126,8 @@ class SingleFileMountSource(MountSource):
             mtime    = self.mtime,
             mode     = mode | (stat.S_IFDIR if isdir else stat.S_IFREG),
             linkname = '',
-            uid      = self._file_info.uid if self._file_info else os.getuid(),
-            gid      = self._file_info.gid if self._file_info else os.getgid(),
+            uid      = self._file_info.uid if self._file_info else get_userid(),
+            gid      = self._file_info.gid if self._file_info else get_groupid(),
             userdata = [],
         )
         # fmt: on

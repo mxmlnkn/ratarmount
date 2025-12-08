@@ -1,4 +1,3 @@
-import os
 import posixpath
 import shutil
 import sqlite3
@@ -11,7 +10,7 @@ from typing import IO, Any, Optional, Union
 from ratarmountcore.mountsource import FileInfo, MountSource, create_root_file_info
 from ratarmountcore.SQLiteBlobFile import SQLiteBlobFile
 from ratarmountcore.StenciledFile import LambdaReaderFile
-from ratarmountcore.utils import overrides
+from ratarmountcore.utils import get_groupid, get_userid, overrides
 
 try:
     import rapidgzip
@@ -264,8 +263,8 @@ class SQLARMountSource(MountSource):
             mtime    = int(mtime),
             mode     = mode,
             linkname = linkname,
-            uid      = os.getuid(),
-            gid      = os.getgid(),
+            uid      = get_userid(),
+            gid      = get_groupid(),
             userdata = [rowid],
         )
         # fmt: on

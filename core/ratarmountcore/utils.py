@@ -396,3 +396,11 @@ def is_random(data: bytes) -> bool:
 
     diffData = bytes((data[i + 1] - data[i] + 256) % 256 for i in range(len(data) - 1))
     return is_in_threshold(data) and is_in_threshold(diffData)
+
+
+def get_userid():
+    return os.getuid() if hasattr(os, 'getuid') else 0
+
+
+def get_groupid():
+    return os.getgid() if hasattr(os, 'getgid') else 0

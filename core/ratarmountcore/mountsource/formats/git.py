@@ -10,7 +10,7 @@ except ImportError:
     pygit2 = None  # type: ignore
 
 from ratarmountcore.mountsource import FileInfo, MountSource
-from ratarmountcore.utils import overrides
+from ratarmountcore.utils import get_groupid, get_userid, overrides
 
 
 class GitMountSource(MountSource):
@@ -71,8 +71,8 @@ class GitMountSource(MountSource):
             mtime    = self.commitTime,
             mode     = GitMountSource._convert_to_file_mode(obj),
             linkname = obj.data.decode() if obj.filemode == pygit2.enums.FileMode.LINK else "",
-            uid      = os.getuid(),
-            gid      = os.getgid(),
+            uid      = get_userid(),
+            gid      = get_groupid(),
             userdata = [path],
         )
         # fmt: on

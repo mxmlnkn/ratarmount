@@ -1,4 +1,3 @@
-import os
 import stat
 import time
 import urllib.parse
@@ -6,7 +5,7 @@ from collections.abc import Iterable
 from typing import IO, Optional, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource, create_root_file_info
-from ratarmountcore.utils import overrides
+from ratarmountcore.utils import get_groupid, get_userid, overrides
 
 try:
     import fsspec
@@ -150,8 +149,8 @@ class FSSpecMountSource(MountSource):
             mtime    = FSSpecMountSource._get_modification_time(entry),
             mode     = FSSpecMountSource._get_mode(entry),
             linkname = "",
-            uid      = os.getuid(),
-            gid      = os.getgid(),
+            uid      = get_userid(),
+            gid      = get_groupid(),
             userdata = [path],
         )
         # fmt: on

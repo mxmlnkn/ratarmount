@@ -146,8 +146,8 @@ def create_root_file_info(userdata: list[Any]):
         mtime    = time.time(),
         mode     = 0o777 | stat.S_IFDIR,
         linkname = "",
-        uid      = os.getuid(),
-        gid      = os.getgid(),
+        uid      = os.getuid() if hasattr(os, 'getuid') else 0,
+        gid      = os.getgid() if hasattr(os, 'getgid') else 0,
         userdata = userdata,
     )
     # fmt: on
