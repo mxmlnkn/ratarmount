@@ -7,6 +7,7 @@ import stat
 import sys
 import tarfile
 import zipfile
+from pathlib import Path
 from timeit import default_timer as timer
 from typing import IO, Any, Optional, Union
 
@@ -30,7 +31,7 @@ class ZipMountSource(SQLiteIndexMountSource):
     # fmt: off
     def __init__(
         self,
-        fileOrPath             : Union[str, IO[bytes]],
+        fileOrPath             : Union[str, IO[bytes], Path],
         writeIndex             : bool                      = False,
         clearIndexCache        : bool                      = False,
         indexFilePath          : Optional[str]             = None,
@@ -44,6 +45,9 @@ class ZipMountSource(SQLiteIndexMountSource):
         # fmt: on
         if 'zipfile' not in sys.modules:
             raise RuntimeError("Did not find the zipfile module. Please use Python 3.7+.")
+
+        if isinstance(fileOrPath, Path):
+            fileOrPath = str(fileOrPath)
 
         # fmt: off
         self.fileObject             = zipfile.ZipFile(fileOrPath, 'r')

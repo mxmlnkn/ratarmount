@@ -12,6 +12,7 @@ import stat
 import sys
 import tarfile
 from collections.abc import Sequence
+from pathlib import Path
 from timeit import default_timer as timer
 from typing import IO, Any, Callable, Optional, Union, cast
 
@@ -245,6 +246,8 @@ class IterableArchive:
 
         if isinstance(self._file, str):
             laffi.read_open_filename_w(self._archive, self._file, os.stat(self._file).st_blksize)
+        elif isinstance(self._file, Path):
+            laffi.read_open_filename_w(self._archive, str(self._file), self._file.stat().st_blksize)
         elif isinstance(self._file, int):
             laffi.read_open_fd(self._archive, self._file, os.fstat(self._file).st_blksize)
         elif hasattr(self._file, 'readinto'):
