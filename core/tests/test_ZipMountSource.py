@@ -130,9 +130,10 @@ class TestZipMountSource:
 
 
 def benchmark_fast_zipfile_decryption():
-    with tempfile.NamedTemporaryFile(suffix=".zip") as archive_path:
-        files = create_encrypted_test_file(archive_path.name)
-        with zipfile.ZipFile(archive_path.name) as archive:
+    with tempfile.TemporaryDirectory(suffix=".ratarmount-benchmark") as folder:
+        archive_path = Path(folder) / "archive.zip"
+        files = create_encrypted_test_file(archive_path)
+        with zipfile.ZipFile(archive_path) as archive:
             archive.setpassword(password.encode())
             assert set(archive.namelist()) == set(files.keys())
 
@@ -151,9 +152,10 @@ def benchmark_fast_zipfile_decryption():
 
 
 def benchmark_fast_decryption():
-    with tempfile.NamedTemporaryFile(suffix=".zip") as archive_path:
-        files = create_encrypted_test_file(archive_path.name)
-        with ZipMountSource(archive_path.name, passwords=[password.encode()]) as mountSource:
+    with tempfile.TemporaryDirectory(suffix=".ratarmount-benchmark") as folder:
+        archive_path = Path(folder) / "archive.zip"
+        files = create_encrypted_test_file(archive_path)
+        with ZipMountSource(archive_path, passwords=[password.encode()]) as mountSource:
             t0 = time.time()
             for name, contents in files.items():
                 with mountSource.open(mountSource.lookup(name)) as file:

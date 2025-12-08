@@ -7,7 +7,6 @@ import os
 import stat
 import sys
 import tarfile
-import tempfile
 import time
 from pathlib import Path
 
@@ -270,8 +269,7 @@ class TestLibarchiveMountSource:
 
     @staticmethod
     @pytest.mark.parametrize('compression', ['bz2', 'gz', 'xz'])
-    def test_large_file(compression):
-        path = "tar-with-300-folders-with-1000-files-1B-files.tar." + compression
-        with tempfile.NamedTemporaryFile(suffix='.' + path) as tmpTarFile:
-            TestLibarchiveMountSource.create_large_file(tmpTarFile.name, compression=compression, fileCount=300_000)
-            TestLibarchiveMountSource._test_large_file(tmpTarFile.name)
+    def test_large_file(compression, tmpdir):
+        path = Path(tmpdir) / f"tar-with-300-folders-with-1000-files-1B-files.tar.{compression}"
+        TestLibarchiveMountSource.create_large_file(path, compression=compression, fileCount=300_000)
+        TestLibarchiveMountSource._test_large_file(path)

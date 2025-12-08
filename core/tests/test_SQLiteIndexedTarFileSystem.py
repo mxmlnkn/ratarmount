@@ -70,23 +70,22 @@ def test_url():
         assert file.read() == b"foo\n"
 
 
-def test_pandas():
+def test_pandas(tmpdir):
     if pd is None:
         return
 
-    with tempfile.TemporaryDirectory(suffix=".test.ratarmount") as folderPath:
-        oldPath = os.getcwd()
-        os.chdir(folderPath)
-        try:
-            Path("test.csv").write_bytes(b"1,2\n3,4")
-            with tarfile.open("test-csv.tar", "w") as archive:
-                archive.add("test.csv")
+    oldPath = os.getcwd()
+    os.chdir(tmpdir)
+    try:
+        Path("test.csv").write_bytes(b"1,2\n3,4")
+        with tarfile.open("test-csv.tar", "w") as archive:
+            archive.add("test.csv")
 
-            # Pandas seems
-            data = pd.read_csv("ratar://test.csv::file://test-csv.tar", compression=None, header=None)
-            assert data.iloc[0, 1] == 2
-        finally:
-            os.chdir(oldPath)
+        # Pandas seems
+        data = pd.read_csv("ratar://test.csv::file://test-csv.tar", compression=None, header=None)
+        assert data.iloc[0, 1] == 2
+    finally:
+        os.chdir(oldPath)
 
 
 if False:
