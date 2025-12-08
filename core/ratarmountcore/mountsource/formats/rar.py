@@ -2,6 +2,7 @@ import builtins
 import contextlib
 import datetime
 import os
+import posixpath
 import stat
 import sys
 import time
@@ -53,7 +54,7 @@ class RarMountSource(MountSource):
 
     @staticmethod
     def _clean_path(path):
-        result = os.path.normpath(path) + ('/' if path.endswith('/') else '')
+        result = posixpath.normpath(path) + ('/' if path.endswith('/') else '')
         while result.startswith('../'):
             result = result[3:]
         return result

@@ -111,7 +111,7 @@ class FolderMountSource(MountSource):
             # Resolve relative links that point outside the source folder because they will become invalid
             # if they are mounted onto a different path. This relatively simply logic only works under the
             # assumption that "path" is normalized, i.e., it does not contain links in its path and no double
-            # slashes and no '/./'. Calling os.path.normpath would remedy the latter but ONLY under the
+            # slashes and no '/./'. Calling posixpath.normpath would remedy the latter but ONLY under the
             # assumption that there are no symbolic links in the path, else it might make things worse.
             if (
                 not os.path.isabs(linkname)

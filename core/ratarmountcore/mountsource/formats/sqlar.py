@@ -1,4 +1,5 @@
 import os
+import posixpath
 import shutil
 import sqlite3
 import sys
@@ -190,10 +191,10 @@ class SQLARMountSource(MountSource):
         # Check for denormal names and store a normalized list if necessary.
         self._files: dict[str, int] = {}
         if any(
-            os.path.normpath(name.lstrip('/')) != name for name, in self.connection.execute("SELECT name FROM sqlar;")
+            posixpath.normpath(name.lstrip('/')) != name for name, in self.connection.execute("SELECT name FROM sqlar;")
         ):
             self._files = {
-                os.path.normpath(name.lstrip('/')): rowid
+                posixpath.normpath(name.lstrip('/')): rowid
                 for name, rowid in self.connection.execute("SELECT name,rowid FROM sqlar ORDER BY rowid;")
             }
 

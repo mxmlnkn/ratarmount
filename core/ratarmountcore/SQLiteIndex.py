@@ -2,6 +2,7 @@ import contextlib
 import json
 import logging
 import os
+import posixpath
 import re
 import shutil
 import sqlite3
@@ -848,17 +849,17 @@ class SQLiteIndex:
         # Add a leading '/' as a convention where '/' represents the TAR root folder.
         # Also strips trailing '/' except for a single '/'.
         # Partly, done because fusepy specifies paths in a mounted directory like this
-        # os.normpath does not delete duplicate '/' at beginning of string!
-        # os.path.normpath can remove suffixed folder/./ path specifications but it can't remove
+        # posixpath.normpath does not delete duplicate '/' at beginning of string!
+        # posixpath.normpath can remove suffixed folder/./ path specifications but it can't remove
         # a leading dot that's why we prefix a leading slash also before calling normpath.
-        return '/' + os.path.normpath('/' + path).lstrip('/')
+        return '/' + posixpath.normpath('/' + path).lstrip('/')
 
     @staticmethod
     def _query_normpath(path: str):
-        # os.path.normpath also collapses /../ into / and, because we prepend /, ../ gets collapsed to /.
+        # posixpath.normpath also collapses /../ into / and, because we prepend /, ../ gets collapsed to /.
         # Note that normpath does not collapse leading double slash, but all other number of leading slashes!
         # This effect is good to have for inserting rows but not for querying rows.
-        return '/' + os.path.normpath(path if path.startswith('../') else '/' + path).lstrip('/')
+        return '/' + posixpath.normpath(path if path.startswith('../') else '/' + path).lstrip('/')
 
     def list(self, path: str) -> Optional[dict[str, FileInfo]]:
         """

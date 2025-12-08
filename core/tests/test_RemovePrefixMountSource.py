@@ -3,6 +3,7 @@
 
 import io
 import os
+import posixpath
 import stat
 import sys
 
@@ -23,7 +24,7 @@ class TestRemovePrefixMountSource:
 
         # The mount source API expects normalized paths. Only the one-time constructor is lenient enough to
         # accept non-normalized paths.
-        path = os.path.normpath('/' + path + '/file').lstrip('/')
+        path = posixpath.normpath('/' + path + '/file').lstrip('/')
 
         fileInfo = ms.lookup(path)
         assert fileInfo

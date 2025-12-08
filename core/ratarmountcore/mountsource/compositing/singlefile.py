@@ -1,6 +1,7 @@
 import contextlib
 import io
 import os
+import posixpath
 import stat
 import threading
 import time
@@ -33,7 +34,7 @@ class SingleFileMountSource(MountSource):
         fileobj: The given file object to be mounted. It may be advisable for this file object to be unbuffered
                  because opening file objects via this mount source will add additional buffering if not disabled.
         """
-        self.path = os.path.normpath('/' + path).lstrip('/')
+        self.path = posixpath.normpath('/' + path).lstrip('/')
         if not self.path or '/' in self.path:
             raise ValueError("File object must belong to a non-folder path!")
 

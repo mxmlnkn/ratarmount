@@ -1,6 +1,7 @@
 import errno
 import io
 import os
+import posixpath
 import stat
 from collections.abc import Iterable
 from typing import IO, Optional, Union, cast
@@ -95,7 +96,7 @@ class FATMountSource(MountSource):
 
     def _list(self, path: str) -> Optional[Iterable]:
         try:
-            directories, files, _ = self.fileSystem.root_dir.get_entry(os.path.normpath(path)).get_entries()
+            directories, files, _ = self.fileSystem.root_dir.get_entry(posixpath.normpath(path)).get_entries()
         except PyFATException as exception:
             if exception.errno in [errno.ENOENT, errno.ENOTDIR]:
                 return None
