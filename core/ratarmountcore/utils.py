@@ -10,7 +10,6 @@ import platform
 import sys
 import types
 from collections.abc import Iterable
-from functools import cached_property  # noqa: F401  pylint: disable=unused-import  # Re-exported
 from pathlib import Path
 from typing import Generic, Optional, TypeVar, Union, get_type_hints
 
