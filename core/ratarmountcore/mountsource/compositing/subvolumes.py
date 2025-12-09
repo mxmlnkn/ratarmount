@@ -1,5 +1,5 @@
 import builtins
-import os
+import posixpath
 from collections.abc import Iterable
 from typing import IO, Any, Optional, Union
 
@@ -36,7 +36,7 @@ class SubvolumesMountSource(MountSource):
 
     def is_mountable(self, path: str) -> bool:
         # Ensuring a leading slash before calling normpath has the effect of eating all leading '/..'.
-        parent, name = ('/' + os.path.normpath('/' + path).strip('/')).rsplit('/', maxsplit=1)
+        parent, name = ('/' + posixpath.normpath('/' + path).strip('/')).rsplit('/', maxsplit=1)
         try:
             folder = self._get_by_path(parent, create=True)
         except RatarmountError:
@@ -47,7 +47,7 @@ class SubvolumesMountSource(MountSource):
         """Adds a mount source at the specified path. Must not overlap with existing mounts. Return true on success."""
 
         # Ensuring a leading slash before calling normpath has the effect of eating all leading '/..'.
-        parent, name = ('/' + os.path.normpath('/' + path).strip('/')).rsplit('/', maxsplit=1)
+        parent, name = ('/' + posixpath.normpath('/' + path).strip('/')).rsplit('/', maxsplit=1)
         if not name:
             raise RatarmountError("Mount points may not be empty!")
 
@@ -68,7 +68,7 @@ class SubvolumesMountSource(MountSource):
         """
 
         # Ensuring a leading / before calling normpath has the effect of eating all leading '/..'.
-        path = os.path.normpath('/' + path).strip('/')
+        path = posixpath.normpath('/' + path).strip('/')
 
         parents = [self.mountSources]
         names: list[str] = []
@@ -216,7 +216,7 @@ class SubvolumesMountSource(MountSource):
         mountSource = self.mountSources[subvolume]
 
         subpath, subMountSource, subFileInfo = mountSource.get_mount_source(sourceFileInfo)
-        return os.path.normpath(f"/{subvolume}/{subpath}"), subMountSource, subFileInfo
+        return posixpath.normpath(f"/{subvolume}/{subpath}"), subMountSource, subFileInfo
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):

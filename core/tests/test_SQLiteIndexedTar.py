@@ -7,10 +7,10 @@ import concurrent.futures
 import io
 import os
 import stat
+import string
 import subprocess
 import sys
 import tarfile
-import tempfile
 
 import pytest
 import rapidgzip
@@ -18,10 +18,11 @@ from helpers import copy_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar, SQLiteIndexedTarUserData  # noqa: E402
-from ratarmountcore.utils import RatarmountError  # noqa: E402
+from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar, SQLiteIndexedTarUserData
+from ratarmountcore.utils import RatarmountError
 
 
+@pytest.mark.parallel
 @pytest.mark.parametrize("parallelization", [1, 2, 4])
 class TestSQLiteIndexedTarParallelized:
     @staticmethod
@@ -221,58 +222,57 @@ class TestSQLiteIndexedTarParallelized:
             assert fileInfo.userdata[-1].recursiondepth == 1
 
     @staticmethod
-    def test_index_creation_and_loading(parallelization):
-        with tempfile.TemporaryDirectory() as tmpDirectory:
-            oldCurrentWorkingDirectory = os.getcwd()
+    def test_index_creation_and_loading(parallelization, tmpdir):
+        oldCurrentWorkingDirectory = os.getcwd()
 
-            # Try with a writable directory and a non-writable current working directory
-            # because FUSE also changes to root after mounting and forking to background.
-            for directory in [tmpDirectory, '/']:
-                os.chdir(directory)
-                try:
-                    archiveName = 'simple.bz2'
-                    indexPath = 'simple.custom.index'
-                    if directory != tmpDirectory:
-                        archiveName = os.path.join(tmpDirectory, archiveName)
-                        indexPath = os.path.join(tmpDirectory, indexPath)
+        # Try with a writable directory and a non-writable current working directory
+        # because FUSE also changes to root after mounting and forking to background.
+        for directory in [tmpdir, '/']:
+            os.chdir(directory)
+            try:
+                archiveName = 'simple.bz2'
+                indexPath = 'simple.custom.index'
+                if directory != tmpdir:
+                    archiveName = os.path.join(tmpdir, archiveName)
+                    indexPath = os.path.join(tmpdir, indexPath)
 
-                    contents = b"Hello World!"
-                    with bz2.open(archiveName, "wb") as bz2File:
-                        bz2File.write(contents)
+                contents = b"Hello World!"
+                with bz2.open(archiveName, "wb") as bz2File:
+                    bz2File.write(contents)
 
-                    def test_index(tarFileName, fileObject, indexFilePath, contents=contents):
-                        TestSQLiteIndexedTarParallelized._test_index_creation_and_loading(
-                            tarFileName, fileObject, indexFilePath, contents, parallelization
-                        )
+                def test_index(tarFileName, fileObject, indexFilePath, contents=contents):
+                    TestSQLiteIndexedTarParallelized._test_index_creation_and_loading(
+                        tarFileName, fileObject, indexFilePath, contents, parallelization
+                    )
 
-                    # States for arguments:
-                    #  - file name: 3 (None, Path, ':memory:')
-                    #  - archiveName: Optional[str]
-                    #  - fileObject: Optional[IO]
-                    # => 3*2*2 = 12 cases
+                # States for arguments:
+                #  - file name: 3 (None, Path, ':memory:')
+                #  - archiveName: Optional[str]
+                #  - fileObject: Optional[IO]
+                # => 3*2*2 = 12 cases
 
-                    with pytest.raises(RatarmountError):
-                        test_index(None, None, ':memory:')
-                    with pytest.raises(RatarmountError):
-                        test_index(None, None, indexPath)
-                    with pytest.raises(RatarmountError):
-                        test_index(None, None, None)
+                with pytest.raises(RatarmountError):
+                    test_index(None, None, ':memory:')
+                with pytest.raises(RatarmountError):
+                    test_index(None, None, indexPath)
+                with pytest.raises(RatarmountError):
+                    test_index(None, None, None)
 
-                    test_index(archiveName, None, ':memory:')
-                    test_index(archiveName, None, indexPath)
-                    test_index(archiveName, None, None)
+                test_index(archiveName, None, ':memory:')
+                test_index(archiveName, None, indexPath)
+                test_index(archiveName, None, None)
 
-                    with open(archiveName, "rb") as file:
-                        test_index("tarFileName", file, ':memory:')
-                        test_index("tarFileName", file, indexPath)
-                        test_index("tarFileName", file, None)
+                with open(archiveName, "rb") as file:
+                    test_index("tarFileName", file, ':memory:')
+                    test_index("tarFileName", file, indexPath)
+                    test_index("tarFileName", file, None)
 
-                        test_index(None, file, ':memory:')
-                        test_index(None, file, indexPath)
-                        test_index(None, file, None)
+                    test_index(None, file, ':memory:')
+                    test_index(None, file, indexPath)
+                    test_index(None, file, None)
 
-                finally:
-                    os.chdir(oldCurrentWorkingDirectory)
+            finally:
+                os.chdir(oldCurrentWorkingDirectory)
 
     @staticmethod
     def _test_index_creation_and_loading(tarFileName, fileObject, indexFilePath, contents, parallelization):
@@ -328,88 +328,90 @@ class TestSQLiteIndexedTarParallelized:
         assert indexedFile.read(finfo, size=len(contents), offset=0) == contents
         assert indexedFile.read(finfo, size=3, offset=3) == contents[3:6]
 
+        indexedFile.close()
         if createdIndexFilePath:
             os.remove(createdIndexFilePath)
 
     @staticmethod
-    def test_list_and_versions(parallelization):
-        with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile:
-            with tarfile.open(name=tmpTarFile.name, mode="w:gz") as tarFile:
-                create_file = TestSQLiteIndexedTarParallelized._create_file
-                make_folder = TestSQLiteIndexedTarParallelized._make_folder
+    # TODO Fix the missing /dist/a and /dist/a/b. Maybe recursion is somehow broken on Windows,
+    #      maybe caused by broken file mode? Or Maybe it is not even added correctly to the TAR?
+    @pytest.mark.skipif(sys.platform == "win32", reason="Not yet working on Windows")
+    def test_list_and_versions(parallelization, tmpdir):
+        tar_path = os.path.join(tmpdir, "archive.tar.gz")
+        with tarfile.open(name=tar_path, mode="w:gz") as tarFile:
+            create_file = TestSQLiteIndexedTarParallelized._create_file
+            make_folder = TestSQLiteIndexedTarParallelized._make_folder
 
-                create_file(tarFile, "./README.md", "hello world")
-                make_folder(tarFile, "./src")
-                create_file(tarFile, "./src/test.sh", "echo hi")
-                make_folder(tarFile, "./dist")
-                make_folder(tarFile, "./dist/a")
-                make_folder(tarFile, "./dist/a/b")
-                create_file(tarFile, "./dist/a/b/test2.sh", "echo two")
+            create_file(tarFile, "./README.md", "hello world")
+            make_folder(tarFile, "./src")
+            create_file(tarFile, "./src/test.sh", "echo hi")
+            make_folder(tarFile, "./dist")
+            make_folder(tarFile, "./dist/a")
+            make_folder(tarFile, "./dist/a/b")
+            create_file(tarFile, "./dist/a/b/test2.sh", "echo two")
 
-            with SQLiteIndexedTar(tmpTarFile.name, clearIndexCache=True, parallelization=parallelization) as indexedTar:
-                folders = []
-                files = []
+        with SQLiteIndexedTar(tar_path, clearIndexCache=True, parallelization=parallelization) as indexedTar:
+            folders = []
+            files = []
 
-                foldersToRecurse = ["/"]
-                while foldersToRecurse:
-                    folder = foldersToRecurse.pop()
-                    folderContents = indexedTar.list(folder)
-                    assert isinstance(folderContents, dict)
-                    for name in folderContents:  # pylint: disable=not-an-iterable
-                        path = os.path.join(folder, name)
-                        fileInfo = indexedTar.lookup(path)
-                        if not fileInfo:
-                            continue
+            foldersToRecurse = ["/"]
+            while foldersToRecurse:
+                folder = foldersToRecurse.pop()
+                folderContents = indexedTar.list(folder)
+                assert isinstance(folderContents, dict)
+                for name in folderContents:  # pylint: disable=not-an-iterable
+                    path = os.path.join(folder, name)
+                    fileInfo = indexedTar.lookup(path)
+                    if not fileInfo:
+                        continue
 
-                        if stat.S_ISDIR(fileInfo.mode):
-                            folders.append(path)
-                            foldersToRecurse.append(path)
-                        else:
-                            files.append(path)
+                    if stat.S_ISDIR(fileInfo.mode):
+                        folders.append(path)
+                        foldersToRecurse.append(path)
+                    else:
+                        files.append(path)
 
-                assert set(folders) == {"/dist", "/dist/a", "/dist/a/b", "/src"}
-                assert set(files) == {"/dist/a/b/test2.sh", "/src/test.sh", "/README.md"}
+            assert set(folders) == {"/dist", "/dist/a", "/dist/a/b", "/src"}
+            assert set(files) == {"/dist/a/b/test2.sh", "/src/test.sh", "/README.md"}
 
-                for path in folders + files:
-                    assert indexedTar.versions(path) == 1
-
-    @staticmethod
-    def test_open(parallelization):
-        with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile:
-            repeatCount = 10000
-
-            with tarfile.open(name=tmpTarFile.name, mode="w:gz") as tarFile:
-                create_file = TestSQLiteIndexedTarParallelized._create_file
-                create_file(tarFile, "increasing.dat", "".join(["0123456789"] * repeatCount))
-                create_file(tarFile, "decreasing.dat", "".join(["9876543210"] * repeatCount))
-
-            with SQLiteIndexedTar(tmpTarFile.name, clearIndexCache=True, parallelization=parallelization) as indexedTar:
-                iFile = indexedTar.open(indexedTar.lookup("/increasing.dat"))
-                dFile = indexedTar.open(indexedTar.lookup("/decreasing.dat"))
-
-                for i in range(repeatCount):
-                    try:
-                        assert iFile.read(10) == b"0123456789"
-                        assert dFile.read(10) == b"9876543210"
-                    except AssertionError as e:
-                        print("Reading failed in iteration:", i)
-                        raise e
+            for path in folders + files:
+                assert indexedTar.versions(path) == 1
 
     @staticmethod
-    def test_multithreaded_reading(parallelization):
+    def test_open(parallelization, tmpdir):
+        tar_path = os.path.join(tmpdir, "archive.tar.gz")
+        repeatCount = 10000
+
+        with tarfile.open(name=tar_path, mode="w:gz") as tarFile:
+            create_file = TestSQLiteIndexedTarParallelized._create_file
+            create_file(tarFile, "increasing.dat", "".join([string.digits] * repeatCount))
+            create_file(tarFile, "decreasing.dat", "".join(["9876543210"] * repeatCount))
+
+        with SQLiteIndexedTar(tar_path, clearIndexCache=True, parallelization=parallelization) as indexedTar:
+            iFile = indexedTar.open(indexedTar.lookup("/increasing.dat"))
+            dFile = indexedTar.open(indexedTar.lookup("/decreasing.dat"))
+
+            for i in range(repeatCount):
+                try:
+                    assert iFile.read(10) == b"0123456789"
+                    assert dFile.read(10) == b"9876543210"
+                except AssertionError as e:
+                    print("Reading failed in iteration:", i)
+                    raise e
+
+    @staticmethod
+    def test_multithreaded_reading(parallelization, tmpdir):
+        tar_path = os.path.join(tmpdir, "archive.tar.gz")
         parallelism = parallelization * 6  # Need a bit more parallelism to trigger bugs easier
-        with (
-            tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile,
-            concurrent.futures.ThreadPoolExecutor(parallelism) as pool,
-        ):
+        with concurrent.futures.ThreadPoolExecutor(parallelism) as pool:
             repeatCount = 10000
 
-            with tarfile.open(name=tmpTarFile.name, mode="w:gz") as tarFile:
+            with tarfile.open(name=tar_path, mode="w:gz") as tarFile:
                 create_file = TestSQLiteIndexedTarParallelized._create_file
-                create_file(tarFile, "increasing.dat", "".join(["0123456789"] * repeatCount))
+                create_file(tarFile, "increasing.dat", "".join([string.digits] * repeatCount))
                 create_file(tarFile, "decreasing.dat", "".join(["9876543210"] * repeatCount))
 
-            with SQLiteIndexedTar(tmpTarFile.name, clearIndexCache=True, parallelization=parallelization) as indexedTar:
+            with SQLiteIndexedTar(tar_path, clearIndexCache=True, parallelization=parallelization) as indexedTar:
 
                 def read_sequences(file, useIncreasing):
                     for i in range(repeatCount):

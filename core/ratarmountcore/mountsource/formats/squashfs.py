@@ -67,7 +67,7 @@ except ImportError:
 from ratarmountcore.formats import find_squashfs_offset
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
-from ratarmountcore.SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
+from ratarmountcore.SQLiteIndex import SQLiteIndex
 from ratarmountcore.utils import overrides
 
 logger = logging.getLogger(__name__)
@@ -459,9 +459,10 @@ class SquashFSMountSource(SQLiteIndexMountSource):
             fileInfos.append(self._convert_to_row(inodeOffset, info))
         self.index.set_file_infos(fileInfos)
 
+    @overrides(SQLiteIndexMountSource)
     def close(self) -> None:
-        if hasattr(self, 'rawFileObject'):
-            self.rawFileObject.close()
+        if rawFileObject := getattr(self, 'rawFileObject', None):
+            rawFileObject.close()
 
         # There is no "closed" method and it can only be closed once, else we get:
         # PySquashfsImage/__init__.py", line 131, in close
@@ -470,11 +471,6 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         # AttributeError: 'NoneType' object has no attribute 'close'
         with contextlib.suppress(AttributeError):
             self.image.close()  # pytype: disable=attribute-error
-
-    @overrides(SQLiteIndexMountSource)
-    def __exit__(self, exception_type, exception_value, exception_traceback) -> None:
-        super().__exit__(exception_type, exception_value, exception_traceback)
-        self.close()
 
     def __del__(self):
         self.close()
@@ -487,10 +483,7 @@ class SquashFSMountSource(SQLiteIndexMountSource):
         # configured in the SquashFS image. It probably makes no sense to reduce or increase that buffer size.
         # Decreasing may reduce memory usage, but with Python and other things, memory usage is not a priority
         # in ratarmount as long as it is bounded for very large archives.
-        assert fileInfo.userdata
-        extendedFileInfo = fileInfo.userdata[-1]
-        assert isinstance(extendedFileInfo, SQLiteIndexedTarUserData)
-        return self.image.open(self.image.read_inode(extendedFileInfo.offsetheader))
+        return self.image.open(self.image.read_inode(SQLiteIndex.get_index_userdata(fileInfo.userdata).offsetheader))
 
     @overrides(MountSource)
     def statfs(self) -> dict[str, Any]:

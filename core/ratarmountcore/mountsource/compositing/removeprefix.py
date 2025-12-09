@@ -1,5 +1,5 @@
 import builtins
-import os
+import posixpath
 from collections.abc import Iterable
 from typing import IO, Any, Callable, Optional, Union
 
@@ -15,7 +15,7 @@ class RemovePrefixMountSource(MountSource):
 
     def __init__(self, path: str, mountSource: MountSource):
         # Beware, normpath leaves leading // but collapses /// and more repetitions to /!
-        self.prefix = os.path.normpath('/' + path.lstrip('/')).rstrip('/') + '/'
+        self.prefix = posixpath.normpath('/' + path.lstrip('/')).rstrip('/') + '/'
         self.mountSource = mountSource
         self._directory_info = create_root_file_info([])
 

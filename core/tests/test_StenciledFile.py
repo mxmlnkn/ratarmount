@@ -8,16 +8,20 @@ import sys
 import tempfile
 import threading
 
+import pytest
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-import pytest  # noqa: E402
-from ratarmountcore.StenciledFile import (  # noqa: E402
+from ratarmountcore.StenciledFile import (
     JoinedFile,
     JoinedFileFromFactory,
     RawStenciledFile,
     StenciledFile,
     ZeroFile,
 )
+
+pytestmark = pytest.mark.order(0)
+
 
 testData = b"1234567890"
 tmpFile = tempfile.TemporaryFile()

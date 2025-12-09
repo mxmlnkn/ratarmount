@@ -1,13 +1,13 @@
 import errno
 import io
-import os
+import posixpath
 import stat
 from collections.abc import Iterable
 from typing import IO, Optional, Union, cast
 
 from ratarmountcore.formats import FileFormatID, replace_format_check
 from ratarmountcore.mountsource import FileInfo, MountSource
-from ratarmountcore.utils import overrides
+from ratarmountcore.utils import get_groupid, get_userid, overrides
 
 try:
     from ratarmountcore._external.pyfatfs import PyFATException
@@ -73,8 +73,8 @@ class FATMountSource(MountSource):
             mtime    = entry.get_mtime().timestamp(),
             mode     = mode,
             linkname = "",  # FAT has no support for hard or symbolic links
-            uid      = os.getuid(),
-            gid      = os.getgid(),
+            uid      = get_userid(),
+            gid      = get_groupid(),
             userdata = [path],
         )
         # fmt: on
@@ -95,7 +95,7 @@ class FATMountSource(MountSource):
 
     def _list(self, path: str) -> Optional[Iterable]:
         try:
-            directories, files, _ = self.fileSystem.root_dir.get_entry(os.path.normpath(path)).get_entries()
+            directories, files, _ = self.fileSystem.root_dir.get_entry(posixpath.normpath(path)).get_entries()
         except PyFATException as exception:
             if exception.errno in [errno.ENOENT, errno.ENOTDIR]:
                 return None

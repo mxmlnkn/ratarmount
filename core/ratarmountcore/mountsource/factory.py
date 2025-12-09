@@ -1,6 +1,7 @@
 # pylint: disable=no-member,abstract-method
 # Disable pylint errors. See https://github.com/fsspec/filesystem_spec/issues/1678
 
+import contextlib
 import http
 import logging
 import os
@@ -13,7 +14,7 @@ from pathlib import Path
 from typing import IO, Union
 
 from ratarmountcore.compressions import COMPRESSION_BACKENDS, check_for_split_file_in_folder
-from ratarmountcore.formats import FILE_FORMATS, FileFormatID
+from ratarmountcore.formats import FILE_FORMATS, FileFormatID, might_be_format
 from ratarmountcore.StenciledFile import JoinedFileFromFactory
 from ratarmountcore.utils import CompressionError, RatarmountError
 
@@ -321,36 +322,52 @@ def open_mount_source(fileOrPath: Union[str, IO[bytes], os.PathLike], **options)
         backend: info.delegatedArchiveBackend for backend, info in COMPRESSION_BACKENDS.items()
     }
 
-    for name in prioritizedBackends + autoPrioritizedBackends + list(ARCHIVE_BACKENDS.keys()):
-        name = mapToArchiveBackend.get(name, name)
-        if name in triedBackends:
-            continue
-        triedBackends.add(name)
-        if name not in ARCHIVE_BACKENDS:
-            logger.warning("Skipping unknown archive backend: %s", name)
-            continue
+    # Beware, caching the first bytes does not work anymore when we make the file check a required condition,
+    # instead of a filtering condition because is_zipfile checks the file end!
+    with (
+        open(fileOrPath, 'rb') if isinstance(fileOrPath, (str, os.PathLike)) else contextlib.nullcontext(fileOrPath)
+    ) as file:
+        for name in prioritizedBackends + autoPrioritizedBackends + list(ARCHIVE_BACKENDS.keys()):
+            name = mapToArchiveBackend.get(name, name)
+            if name in triedBackends:
+                continue
+            triedBackends.add(name)
+            if name not in ARCHIVE_BACKENDS:
+                logger.warning("Skipping unknown archive backend: %s", name)
+                continue
 
-        try:
-            logger.debug("Try to open with: %s", name)
-            result = ARCHIVE_BACKENDS[name].open(fileOrPath, **options)
-            if result:
-                logger.info("Opened archive with %s backend.", name)
-                return result
-        except Exception as exception:
-            logger.info(
-                "Trying to open with %s raised an exception: %s",
-                name,
-                exception,
-                exc_info=logger.isEnabledFor(logging.DEBUG),
-            )
+            backend = ARCHIVE_BACKENDS[name]
+
+            # Do some file type checks first.
+            if backend.formats and not any(might_be_format(file, fid) for fid in backend.formats):
+                logger.info(
+                    "Skipping archive backend: %s because magic byte check for all formats (%s) failed",
+                    name,
+                    backend.formats,
+                )
+                continue
 
             try:
-                if hasattr(fileOrPath, 'seek'):
-                    fileOrPath.seek(0)  # type: ignore
-            except Exception as seekException:
-                logger.warning(
-                    "seek(0) raised an exception: %s", seekException, exc_info=logger.isEnabledFor(logging.DEBUG)
+                logger.debug("Try to open with: %s", name)
+                result = backend.open(fileOrPath, **options)
+                if result:
+                    logger.info("Opened archive with %s backend.", name)
+                    return result
+            except Exception as exception:
+                logger.info(
+                    "Trying to open with %s raised an exception: %s",
+                    name,
+                    exception,
+                    exc_info=logger.isEnabledFor(logging.DEBUG),
                 )
+
+                try:
+                    if hasattr(fileOrPath, 'seek'):
+                        fileOrPath.seek(0)  # type: ignore
+                except Exception as seekException:
+                    logger.warning(
+                        "seek(0) raised an exception: %s", seekException, exc_info=logger.isEnabledFor(logging.DEBUG)
+                    )
 
     if joinedFileName and not isinstance(fileOrPath, (str, os.PathLike)):
         return SingleFileMountSource(joinedFileName, fileOrPath)

@@ -3,7 +3,7 @@ import os
 import shutil
 import tempfile
 
-from ratarmountcore.compressions import COMPRESSION_FORMATS, find_available_backend  # noqa: E402
+from ratarmountcore.compressions import COMPRESSION_FORMATS, find_available_backend
 
 
 def find_test_file(relativePathOrName):

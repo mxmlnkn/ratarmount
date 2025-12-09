@@ -7,6 +7,7 @@ import math
 import os
 import pathlib
 import platform
+import string
 import sys
 import types
 from collections.abc import Iterable
@@ -177,9 +178,7 @@ class Prefetcher:
         return range(self.lastFetched[-1] + 1, self.lastFetched[-1] + 1 + prefetchCount)
 
 
-ALPHA = ''.join(chr(ord('a') + i) for i in range(ord('z') - ord('a') + 1))
-DIGITS = ''.join(chr(ord('0') + i) for i in range(ord('9') - ord('0') + 1))
-HEX = DIGITS + ALPHA[:6]
+HEX = string.digits + string.ascii_lowercase[:6]
 
 
 def is_latin_alpha(text: str):
@@ -260,7 +259,7 @@ def find_module_version(moduleOrName: Union[str, types.ModuleType]) -> Optional[
 
     moduleFilePath = getattr(module, '__file__', None)
     if moduleFilePath:
-        import importlib.metadata as imeta  # noqa: E402  # Based on -X importtime seems to be pretty slow.
+        import importlib.metadata as imeta  # Based on -X importtime seems to be pretty slow.
 
         for distribution in imeta.distributions():
             try:
@@ -396,3 +395,11 @@ def is_random(data: bytes) -> bool:
 
     diffData = bytes((data[i + 1] - data[i] + 256) % 256 for i in range(len(data) - 1))
     return is_in_threshold(data) and is_in_threshold(diffData)
+
+
+def get_userid():
+    return os.getuid() if hasattr(os, 'getuid') else 0
+
+
+def get_groupid():
+    return os.getgid() if hasattr(os, 'getgid') else 0

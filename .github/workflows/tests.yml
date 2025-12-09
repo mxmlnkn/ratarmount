@@ -8,7 +8,7 @@ on:
 
 jobs:
   Static-Code-Checks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
 
     env:
       RATARMOUNT_CHECK_OVERRIDES: 1
@@ -27,13 +27,14 @@ jobs:
         sudo apt-get -y update
         sudo apt-get -y install liblzo2-dev
         python3 -m pip install --upgrade pip
-        python3 -m pip install --user pytest lz4 PySquashfsImage asyncssh fsspec pygit2 sqlcipher3-wheels
+        python3 -m pip install --user pytest fsspec
         ( cd core && python3 -m pip install --user .[full,ext4,fsspec,sqlar] )
         python3 -m pip install --user .
 
     - name: Style Check With Ruff
       run: |
-        python3 -m pip install ruff
+        # I hate when the CI fails after not pushing for a while because ruff has new default rules.
+        python3 -m pip install ruff~=0.14
         ruff check --config tests/.ruff.toml -- $( git ls-tree -r --name-only HEAD | 'grep' -E '[.]py$' | 'grep' -v '/_external/' )
 
     - name: Style Check With Black
@@ -93,7 +94,7 @@ jobs:
         sudo apt-get -y update
         sudo apt-get -y install liblzo2-dev
         python3 -m pip install --upgrade pip
-        python3 -m pip install --user pytest lz4 PySquashfsImage asyncssh fsspec pygit2 sqlcipher3-wheels
+        python3 -m pip install --user pytest asyncssh
         ( cd core && python3 -m pip install --user .[full,ext4,fsspec,sqlar] )
         python3 -m pip install --user .
 
@@ -102,18 +103,13 @@ jobs:
         python3 -m pip install pytype
         pytype -j auto -d import-error -P$( cd core && pwd ):$( pwd ) --exclude=core/ratarmountcore/_external ratarmount core/ratarmountcore core/tests
 
-  Tests:
+  Micro-Tests:
     runs-on: ${{ matrix.os }}
-    needs: [Static-Code-Checks]
 
     strategy:
-      # Disable because it makes no sense. Most often, they run in parallel, i.e., they would fail in roughly the
-      # same time anyway if the error persists on every system, and if not, it would be nice to know which systems
-      # work and which don't. If multiple systems are affected it might only extend debugging because I would only
-      # notice the error on the next CI run.
-      fail-fast: false
       matrix:
         os: ['macos-15-intel', 'ubuntu-latest']
+        # ubuntu-slim does not work because the simple startup tests require FUSE.
         # macos-13 / macos-latest does not work anymore because the dependencies don't have any wheels,
         # probably because it is M1 based.
         # ToDo: Add windows-latest but it requires a lot of setup of the dependencies!
@@ -137,6 +133,17 @@ jobs:
         - os: ubuntu-latest
           python-version: '3.12'
           libfuse-version: '3.17.2'
+        # Windows won't install easily in the full version because python-lzo has been missing Python 3.12+
+        # wheels since at least 2025-04: https://github.com/jd-boyd/python-lzo/issues/90
+        # WinFsp installation does not fully work yet and therefore mfusepy cannot be imported.
+        # The WinFsp installation seems to hang. Seems like it does not work fully unattended.
+        # Maybe some command line options are missing.
+        #- os: windows-latest
+        #  python-version: '3.9'
+        #  libfuse-version: 'system'
+        #- os: windows-latest
+        #  python-version: '3.11'
+        #  libfuse-version: 'system'
 
     defaults:
       run:
@@ -154,9 +161,6 @@ jobs:
         # This is BROKEN! God damn it. Is anything working at all...
         # https://github.com/actions/checkout/issues/1781
         fetch-tags: true
-
-    - name: Fetch tag for tests
-      run: git fetch origin refs/tags/v0.15.2:refs/tags/v0.15.2
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
@@ -176,6 +180,18 @@ jobs:
       with:
         install: gcc make liblzma-devel libzstd-devel zlib-devel
 
+    - name: Install WinFsp and FUSE compatibility layer (Windows)
+      if: startsWith( matrix.os, 'windows' )
+      run: |
+        # https://winfsp.dev/
+        curl -L -o winfsp.msi https://github.com/winfsp/winfsp/releases/download/v2.1/winfsp-2.1.25156.msi
+        msiexec /i winfsp.msi /quiet
+        sleep 10
+        # Install Cygwin FUSE compatibility layer
+        sh "$( cat /proc/registry32/HKEY_LOCAL_MACHINE/SOFTWARE/WinFsp/InstallDir | tr -d '\0' )/opt/cygfuse/install.sh"
+        # Add WinFsp binaries to PATH
+        echo "$( cat /proc/registry32/HKEY_LOCAL_MACHINE/SOFTWARE/WinFsp/InstallDir | tr -d '\0' )/bin" >> $GITHUB_PATH
+
     - name: Install Dependencies (Linux)
       if: startsWith( matrix.os, 'ubuntu' )
       run: |
@@ -186,18 +202,6 @@ jobs:
         sudo apt-get -y update
         sudo apt-get -y install libfuse2 fuse3 bzip2 pbzip2 pixz zstd unar lrzip lzop gcc liblzo2-dev ruby-webrick
         sudo apt-get -y install liblzma-dev*
-
-    - name: Install Dependencies For Unreleased Python Versions (Linux)
-      if: startsWith( matrix.os, 'ubuntu' ) && startsWith( matrix.python-version, '3.14.0-' )
-      run: |
-        #libgit2-dev is too old on Ubuntu 22.04. Leads to error about missing git2/sys/errors.h
-        #sudo apt-get -y install libgit2-dev
-        sudo apt-get -y install cmake
-        git clone --branch v1.8.1 --depth 1 https://github.com/libgit2/libgit2.git
-        ( cd libgit2 && mkdir build && cd build && cmake .. && cmake --build . && sudo cmake --build . -- install )
-        echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib" >> "$GITHUB_ENV"
-        # Expects exactly libgit2 1.8.x! Therefore install it here instead via the non-pinned ratarmount dependencies.
-        python3 -m pip install pygit2==1.15
 
     - name: Install Dependencies (MacOS)
       if: startsWith( matrix.os, 'macos' )
@@ -211,17 +215,6 @@ jobs:
         brew install -q macfuse coreutils pixz pbzip2 zstd unar libarchive lrzip lzop lzo
         # Add brew installation binary folder to PATH so that command line tools like zstd can be found
         echo PATH="$PATH:/usr/local/bin" >> "$GITHUB_ENV"
-
-    - name: Install Dependencies For Unreleased Python Versions (MacOS)
-      if: >
-        startsWith( matrix.os, 'macos' ) && (
-          matrix.python-version == '3.13' ||
-          startsWith( matrix.python-version, '3.14' ) )
-      run: |
-        brew install -q libgit2@1.8
-        brew link libgit2@1.8 --force
-        # Expects exactly libgit2 1.8.x! Therefore install it here instead via the non-pinned ratarmount dependencies.
-        python3 -m pip install pygit2==1.15
 
     - name: Install pip Dependencies
       run: |
@@ -254,16 +247,17 @@ jobs:
       run: |
         python3 -m build
         twine check dist/*
-        python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )"[full,ext4,fsspec,sqlar]
+        python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )"
         python3 -m pip install mfusepy
 
     - name: Test Startup Without Compression Dependencies
-      if: ${{ !startsWith( matrix.os, 'macos' ) }}
+      if: ${{ startsWith( matrix.os, 'ubuntu' ) }}
       run: |
         # Segfaults (139) are not allowed but other exit codes are valid!
         python3 -m ratarmount tests/simple.bz2 || [ $? != 139 ]
 
     - name: Test Startup With Only One Compression Dependency
+      if: ${{ !startsWith( matrix.os, 'windows' ) }}
       run: |
         for module in indexed_gzip indexed_zstd lzmaffi python-xz; do
             if [[ $module == lzmaffi ]]; then
@@ -310,7 +304,7 @@ jobs:
     - name: Test Simple Mount
       # macOS 11+ is too uptight about "security" and is not able to fully load the macfuse kernel extension.
       # https://github.com/actions/runner-images/issues/4731
-      if: ${{ !startsWith( matrix.os, 'macos' ) }}
+      if: ${{ startsWith( matrix.os, 'ubuntu' ) }}
       run: |
         ratarmount tests/single-file.tar mimi
         ls -la mimi
@@ -319,7 +313,7 @@ jobs:
         ratarmount -u mimi
 
     - name: CLI Tests (Linux)
-      if: ${{ !startsWith( matrix.os, 'macos' ) }}
+      if: ${{ startsWith( matrix.os, 'ubuntu' ) }}
       run: |
         python3 -m pip install pytest
         # First off, n=auto seems to use the physical cores and ignores virtual ones.
@@ -334,39 +328,239 @@ jobs:
             -c "import pytest, sys; sys.exit(pytest.console_main())" \
             --disable-warnings tests/test_cli.py
 
+    - name: Module tests without fusepy
+      run: |
+        python3 -m pip uninstall -y fusepy mfusepy
+        python3 tests/tests.py
+
+
+  Unit-Tests:
+    runs-on: ${{ matrix.os }}
+    needs: [Micro-Tests, Static-Code-Checks]
+
+    strategy:
+      # Disable because it makes no sense. Most often, they run in parallel, i.e., they would fail in roughly the
+      # same time anyway if the error persists on every system, and if not, it would be nice to know which systems
+      # work and which don't. If multiple systems are affected it might only extend debugging because I would only
+      # notice the error on the next CI run.
+      fail-fast: false
+      matrix:
+        os: ['macos-15-intel', 'ubuntu-latest']
+        # ubuntu-slim is limited to 15 min jobs, which is insufficient for Python 3.9 and 3.14 tests.
+        #   The Python 3.12 tests only need ~12.5 min for some reason.
+        # macos-13 / macos-latest does not work anymore because the dependencies don't have any wheels,
+        # probably because it is M1 based.
+        # https://endoflife.date/python
+        #   Oldest and newest versions should be enough. Python versions are supported 5 years from release date.
+        #   3.n is released October of 2011+n and EOL in 2016+n for n>=8.
+        # Supported versions: https://github.com/actions/python-versions/blob/main/versions-manifest.json
+        python-version: ['3.9', '3.12', '3.14']
+        include:
+        # Windows won't install easily in the full version because python-lzo has been missing Python 3.12+
+        # wheels since at least 2025-04: https://github.com/jd-boyd/python-lzo/issues/90
+        - os: windows-latest
+          python-version: '3.9'
+        - os: windows-latest
+          python-version: '3.11'
+
+    defaults:
+      run:
+        # This is especially important for windows because it seems to default to powershell
+        shell: bash
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        # We need one tag for testing the git mount.
+        # This is BROKEN! God damn it. Is anything working at all...
+        # https://github.com/actions/checkout/issues/1781
+        fetch-tags: true
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - uses: msys2/setup-msys2@v2
+      if: startsWith( matrix.os, 'windows' )
+      with:
+        install: gcc make liblzma-devel libzstd-devel zlib-devel
+
+    - name: Install Dependencies (Linux)
+      if: startsWith( matrix.os, 'ubuntu' )
+      run: |
+        # Libarchive calls the grzip, lrzip, lzop binaries for lrzip support. Others, such as bzip2, gzip, lz4, lzma,
+        # zstd, may also call external binaries depending on how libarchive was compiled!
+        # https://github.com/libarchive/libarchive/blob/ad5a0b542c027883d7069f6844045e6788c7d70c/libarchive/
+        #   archive_read_support_filter_lrzip.c#L68
+        sudo apt-get -y update
+        sudo apt-get -y install bzip2 pbzip2 pixz zstd unar lrzip lzop gcc liblzo2-dev
+        sudo apt-get -y install liblzma-dev*
+
+    - name: Install Dependencies (Linux)
+      if: startsWith( matrix.os, 'ubuntu' ) && startsWith( matrix.python-version, '3.14' )
+      run: |
+        # indexed_zstd is missing wheels for Python 3.14+
+        sudo apt-get -y install libzstd-dev
+
+    - name: Install Dependencies (MacOS)
+      if: startsWith( matrix.os, 'macos' )
+      run: |
+        # coreutils is required for the tests written in shell, e.g., for the 'realpath' command
+        # unar is required for rar tests with passwords. By default, bsdtar is installed but that is the only
+        # one of the three supported tools (the third is unrar) that does not support passwords.
+        # And the error message is atrocious:
+        #   cmdline.extend(args)
+        #   TypeError: 'NoneType' object is not iterable
+        brew install -q coreutils pixz pbzip2 zstd unar libarchive lrzip lzop lzo
+        # Add brew installation binary folder to PATH so that command line tools like zstd can be found
+        echo PATH="$PATH:/usr/local/bin" >> "$GITHUB_ENV"
+
+    - name: Install pip Dependencies
+      run: |
+        python3 -m pip install --upgrade pip
+        # Still needed for building lzmaffi without build isolation
+        python3 -m pip install --upgrade wheel
+        python3 -m pip install --upgrade setuptools
+        python3 -m pip install --upgrade-strategy eager --upgrade twine build cffi
+
+    - name: Test Installation From Source
+      run: |
+        python3 -m pip install core/[full,ext4,fsspec,sqlar]
+        python3 -m pip install .[full,ext4,fsspec,sqlar]
+
     - name: Unit Tests
       run: |
-        python3 -m pip install pytest pytest-xdist pandas
-        for file in core/tests/test_*.py; do
-            case "$file" in
-                "core/tests/test_AutoMountLayer.py"\
-                |"core/tests/test_BlockParallelReaders.py"\
-                |"core/tests/test_LibarchiveMountSource.py"\
-                |"core/tests/test_SQLiteIndexedTar.py")
-                    echo "$file"  # pytest-xdist seems to omit the test file name
-                    pytest -n auto --disable-warnings "$file"
-                    ;;
-                *)
-                  # Fusepy warns about usage of use_ns because the implicit behavior is deprecated.
-                  # But there has been no development to fusepy for 4 years, so I think it should be fine to ignore.
-                  pytest --disable-warnings "$file"
-            esac
-        done
-        python3 tests/tests.py
+        python3 -m pip install pytest pytest-xdist pytest-order pandas
+        pytest -rs -v -m 'not parallel' core/tests/test_*.py
+        pytest -rs -v -n auto -m parallel core/tests/test_*.py
+        pytest -rs -v tests/tests.py
+
+
+  Regression-Tests:
+    runs-on: ${{ matrix.os }}
+    needs: [Micro-Tests, Static-Code-Checks]
+
+    strategy:
+      # Disable because it makes no sense. Most often, they run in parallel, i.e., they would fail in roughly the
+      # same time anyway if the error persists on every system, and if not, it would be nice to know which systems
+      # work and which don't. If multiple systems are affected it might only extend debugging because I would only
+      # notice the error on the next CI run.
+      fail-fast: false
+      matrix:
+        os: ['ubuntu-latest']
+        # macos-13 / macos-latest does not work anymore because the dependencies don't have any wheels,
+        # probably because it is M1 based and because of FUSE permissions lockdown.
+        # https://endoflife.date/python
+        #   Oldest and newest versions should be enough. Python versions are supported 5 years from release date.
+        #   3.n is released October of 2011+n and EOL in 2016+n for n>=8.
+        # Supported versions: https://github.com/actions/python-versions/blob/main/versions-manifest.json
+        python-version: ['3.9', '3.12', '3.14']
+        libfuse-version: ['system']
+        parallelization: [1, 2]
+        include:
+        - os: ubuntu-latest
+          python-version: '3.12'
+          libfuse-version: '3.17.2'
+          parallelization: 2
+
+    defaults:
+      run:
+        # This is especially important for windows because it seems to default to powershell
+        shell: bash
+
+    env:
+      LIBFUSE_VERSION: ${{ matrix.libfuse-version }}
+      RATARMOUNT_CHECK_OVERRIDES: 1
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        # We need one tag for testing the git mount.
+        # This is BROKEN! God damn it. Is anything working at all...
+        # https://github.com/actions/checkout/issues/1781
+        fetch-tags: true
+
+    - name: Fetch tag for tests
+      run: git fetch origin refs/tags/v0.15.2:refs/tags/v0.15.2
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - uses: msys2/setup-msys2@v2
+      if: startsWith( matrix.os, 'windows' )
+      with:
+        install: gcc make liblzma-devel libzstd-devel zlib-devel
+
+    - name: Install Dependencies (Linux)
+      if: startsWith( matrix.os, 'ubuntu' )
+      run: |
+        # Libarchive calls the grzip, lrzip, lzop binaries for lrzip support. Others, such as bzip2, gzip, lz4, lzma,
+        # zstd, may also call external binaries depending on how libarchive was compiled!
+        # https://github.com/libarchive/libarchive/blob/ad5a0b542c027883d7069f6844045e6788c7d70c/libarchive/
+        #   archive_read_support_filter_lrzip.c#L68
+        sudo apt-get -y update
+        sudo apt-get -y install libfuse2 fuse3 bzip2 pbzip2 pixz zstd unar lrzip lzop gcc liblzo2-dev ruby-webrick
+        sudo apt-get -y install liblzma-dev*
+
+    - name: Install Dependencies For Unreleased Python Versions (Linux)
+      if: startsWith( matrix.os, 'ubuntu' ) && startsWith( matrix.python-version, '3.14.0-' )
+      run: |
+        #libgit2-dev is too old on Ubuntu 22.04. Leads to error about missing git2/sys/errors.h
+        #sudo apt-get -y install libgit2-dev
+        sudo apt-get -y install cmake
+        git clone --branch v1.8.1 --depth 1 https://github.com/libgit2/libgit2.git
+        ( cd libgit2 && mkdir build && cd build && cmake .. && cmake --build . && sudo cmake --build . -- install )
+        echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib" >> "$GITHUB_ENV"
+        # Expects exactly libgit2 1.8.x! Therefore install it here instead via the non-pinned ratarmount dependencies.
+        python3 -m pip install pygit2==1.15
+
+    - name: Install pip Dependencies
+      run: |
+        python3 -m pip install --upgrade pip
+        # Still needed for building lzmaffi without build isolation
+        python3 -m pip install --upgrade wheel
+        python3 -m pip install --upgrade setuptools
+        python3 -m pip install --upgrade-strategy eager --upgrade twine build cffi
+
+    - name: Install Custom libFUSE
+      if: matrix.libfuse-version != 'system'
+      run: |
+        NAME=fuse-${LIBFUSE_VERSION}
+        wget https://github.com/libfuse/libfuse/releases/download/${NAME}/${NAME}.tar.gz
+        tar -xf "${NAME}.tar.gz"
+        cd -- "${NAME}"
+        mkdir -p build
+        cd build
+        sudo apt-get -y install meson python*-pytest
+        meson ..
+        ninja
+        #sudo python3 -m pytest test/
+        sudo ninja install
+        sudo ln -s /usr/local/bin/fusermount{3,}
+        cd ../..
+        rm -rf -- "${NAME}"
+
+    - name: Test Installation From Source
+      run: |
+        python3 -m pip install core/[full,ext4,fsspec,sqlar]
+        python3 -m pip install .[full,ext4,fsspec,sqlar]
 
     - name: Install pip Test Dependencies
       run: |
         python3 -m pip install -r tests/requirements-tests.txt
 
     - name: Install Test Dependencies (Linux)
-      if: ${{ !startsWith( matrix.os, 'macos' ) }}
       run: |
         sudo bash tests/install-smbd.sh
 
     - name: Regression Tests (FUSE 3)
-      if: ${{ !startsWith( matrix.os, 'macos' ) && matrix.libfuse-version != 'system' }}
+      if: ${{ matrix.libfuse-version != 'system' }}
       env:
         DROPBOX_TOKEN: ${{ secrets.DROPBOX_TOKEN }}
+        PARALLELIZATIONS: ${{ matrix.parallelization }}
       run: |
         if [[ $LIBFUSE_VERSION == system ]]; then
             export FUSE_LIBRARY_PATH=$( dpkg -L libfuse3-3 | 'grep' -F .so | head -1 )
@@ -377,14 +571,10 @@ jobs:
         bash tests/runtests.sh
 
     - name: Regression Tests (FUSE 2)
-      if: ${{ !startsWith( matrix.os, 'macos' ) && matrix.libfuse-version == 'system' }}
+      if: ${{ matrix.libfuse-version == 'system' }}
       env:
         DROPBOX_TOKEN: ${{ secrets.DROPBOX_TOKEN }}
+        PARALLELIZATIONS: ${{ matrix.parallelization }}
       run: |
         ratarmount --version | grep -i fuse
         bash tests/runtests.sh
-
-    - name: Module tests without fusepy
-      run: |
-        python3 -m pip uninstall -y fusepy mfusepy
-        python3 tests/tests.py

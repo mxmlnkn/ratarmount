@@ -4,6 +4,7 @@ import itertools
 import logging
 import os
 import platform
+import string
 import struct
 import sys
 from collections.abc import Iterable, Sequence
@@ -12,8 +13,6 @@ from typing import IO, Any, Callable, Optional, cast
 from .BlockParallelReaders import ParallelXZReader
 from .formats import ARCHIVE_FORMATS, COMPRESSION_FORMATS, FID, FileFormatID, might_be_format
 from .utils import (
-    ALPHA,
-    DIGITS,
     HEX,
     CompressionError,
     format_number,
@@ -62,7 +61,6 @@ except ImportError:
 try:
     # Must be imported because find_available_backend checks for it to be in sys.modules!
     # Although, I'm unsure whether it gets implicitly added to sys.modules below when importing file_reader.
-    # OSError can happen when dependencies are missing, e.g., libicuuc.so.74.
     import libarchive  # pylint: disable=unused-import
 except Exception:
     libarchive = None  # type: ignore
@@ -105,7 +103,7 @@ COMPRESSION_BACKENDS: dict[str, CompressionBackendInfo] = {
     ),
     'rapidgzip': CompressionBackendInfo(
         (lambda x, parallelization=1: rapidgzip.RapidgzipFile(x, parallelization=parallelization)),
-        {FID.GZIP, FID.ZLIB},
+        {FID.GZIP, FID.ZLIB, FID.DEFLATE},
         [('rapidgzip', 'rapidgzip')],
         'tarfile',
     ),
@@ -281,7 +279,7 @@ def check_for_split_file_in(path: str, candidateNames: Iterable[str]) -> Optiona
     # Note that even if something consists only of letters or only digits it still might be hexadecimal encoding!
     maxFormatSpecifier = ''
     maxExtensions: list[str] = []
-    for formatSpecifier, baseDigits in [('a', ALPHA), ('0', DIGITS), ('x', HEX)]:
+    for formatSpecifier, baseDigits in [('a', string.ascii_lowercase), ('0', string.digits), ('x', HEX)]:
         extensionSequence = check_for_sequence(
             extensions, lambda i, baseDigits=baseDigits: format_number(i, baseDigits, len(extension))  # type: ignore
         )

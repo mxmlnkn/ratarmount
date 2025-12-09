@@ -11,11 +11,12 @@ from helpers import change_working_directory, find_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.mountsource.factory import open_mount_source  # noqa: E402
-from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar  # noqa: E402
-from ratarmountcore.mountsource.formats.zip import ZipMountSource  # noqa: E402
+from ratarmountcore.mountsource.factory import open_mount_source
+from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar
+from ratarmountcore.mountsource.formats.zip import ZipMountSource
 
 
+@pytest.mark.order(-1)
 @pytest.mark.parametrize("transform_path", [str, Path])
 class TestOpenMountSource:
     @staticmethod

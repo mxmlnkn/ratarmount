@@ -149,7 +149,11 @@ class SQLiteIndexMountSource(MountSource):
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
-        self.index.close()
+        self.close()
+
+    def close(self):
+        if index := getattr(self, 'index', None):
+            index.close()
 
     @overrides(MountSource)
     def is_immutable(self) -> bool:

@@ -7,7 +7,6 @@ import os
 import stat
 import sys
 import tarfile
-import tempfile
 import time
 from pathlib import Path
 
@@ -16,9 +15,11 @@ from helpers import copy_test_file, find_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.mountsource.formats.libarchive import IterableArchive, LibarchiveMountSource  # noqa: E402
+from ratarmountcore.mountsource.formats.libarchive import IterableArchive, LibarchiveMountSource
 
 
+@pytest.mark.parallel
+@pytest.mark.skipif(sys.platform == "win32", reason="Need to find out how to properly install libarchive on Windows.")
 class TestLibarchiveMountSource:
     @staticmethod
     @pytest.mark.parametrize('compression', ['7z', 'rar', 'zip'])
@@ -270,8 +271,7 @@ class TestLibarchiveMountSource:
 
     @staticmethod
     @pytest.mark.parametrize('compression', ['bz2', 'gz', 'xz'])
-    def test_large_file(compression):
-        path = "tar-with-300-folders-with-1000-files-1B-files.tar." + compression
-        with tempfile.NamedTemporaryFile(suffix='.' + path) as tmpTarFile:
-            TestLibarchiveMountSource.create_large_file(tmpTarFile.name, compression=compression, fileCount=300_000)
-            TestLibarchiveMountSource._test_large_file(tmpTarFile.name)
+    def test_large_file(compression, tmpdir):
+        path = Path(tmpdir) / f"tar-with-300-folders-with-1000-files-1B-files.tar.{compression}"
+        TestLibarchiveMountSource.create_large_file(path, compression=compression, fileCount=300_000)
+        TestLibarchiveMountSource._test_large_file(path)

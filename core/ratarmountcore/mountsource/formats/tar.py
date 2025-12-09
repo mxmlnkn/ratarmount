@@ -48,11 +48,11 @@ logger = logging.getLogger(__name__)
 
 # Patch https://github.com/python/cpython/issues/136602
 def patch_tarfile():
-    _proc_gnusparse_10 = getattr(tarfile.TarInfo, '_proc_gnusparse_10', None)
+    proc_gnusparse_10 = getattr(tarfile.TarInfo, '_proc_gnusparse_10', None)
     if (
-        not callable(_proc_gnusparse_10)
+        not callable(proc_gnusparse_10)
         or not hasattr(tarfile.TarInfo, '_link_target')
-        or inspect.getfullargspec(_proc_gnusparse_10).args != ['self', 'next', 'pax_headers', 'tarfile']
+        or inspect.getfullargspec(proc_gnusparse_10).args != ['self', 'next', 'pax_headers', 'tarfile']
     ):
         return
 
@@ -62,7 +62,7 @@ def patch_tarfile():
         # This member is only used for extracting anyway and we only use extract* methods for sparse files.
         # And it makes wrapping __init__ unnecessary.
         next._link_target = next.offset_data
-        return _proc_gnusparse_10(self, next, pax_headers, tarfile, *args, **kwargs)
+        return proc_gnusparse_10(self, next, pax_headers, tarfile, *args, **kwargs)
 
     tarfile.TarInfo._proc_gnusparse_10 = _wrapped_proc_gnusparse_10
 
@@ -769,17 +769,15 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
         return False
 
-    def close(self):
-        if self.tarFileObject:
-            self.tarFileObject.close()
+    @overrides(SQLiteIndexMountSource)
+    def close(self) -> None:
+        super().close()
+
+        if tarFileObject := getattr(self, 'tarFileObject', None):
+            tarFileObject.close()
 
         if not self.isFileObject and self.rawFileObject:
             self.rawFileObject.close()
-
-    @overrides(MountSource)
-    def __exit__(self, exception_type, exception_value, exception_traceback):
-        self.close()
-        super().__exit__(exception_type, exception_value, exception_traceback)
 
     def _get_archive_path(self) -> Optional[str]:
         return None if self.tarFileName == '<file object>' else self.tarFileName
@@ -1112,10 +1110,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
     @overrides(MountSource)
     def read(self, fileInfo: FileInfo, size: int, offset: int) -> bytes:
-        assert fileInfo.userdata
-        tarFileInfo = fileInfo.userdata[-1]
-        assert isinstance(tarFileInfo, SQLiteIndexedTarUserData)
-
+        tarFileInfo = SQLiteIndex.get_index_userdata(fileInfo.userdata)
         if tarFileInfo.issparse:
             with self.open(fileInfo) as file:
                 file.seek(offset, os.SEEK_SET)

@@ -113,7 +113,7 @@ class Py7zrMountSource(SQLiteIndexMountSource):
     def _convert_to_row(self, info) -> tuple:
         mode = 0o777 | (stat.S_IFDIR if info.is_directory else stat.S_IFREG)
         mtime = info.creationtime.timestamp()
-        path, name = SQLiteIndex.normpath(info.filename).rsplit("/", 1)
+        path, name = SQLiteIndex.normpath(self.transform(info.filename)).rsplit("/", 1)
 
         # fmt: off
         fileInfo : tuple = (
@@ -167,9 +167,10 @@ class Py7zrMountSource(SQLiteIndexMountSource):
         raise RuntimeError("Could not find a matching password!")
 
     @overrides(SQLiteIndexMountSource)
-    def __exit__(self, exception_type, exception_value, exception_traceback):
-        super().__exit__(exception_type, exception_value, exception_traceback)
-        self.fileObject.close()
+    def close(self) -> None:
+        super().close()
+        if fileObject := getattr(self, 'fileObject', None):
+            fileObject.close()
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:

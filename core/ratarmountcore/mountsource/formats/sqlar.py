@@ -1,4 +1,4 @@
-import os
+import posixpath
 import shutil
 import sqlite3
 import sys
@@ -7,11 +7,10 @@ import urllib.parse
 from collections.abc import Iterable, Sequence
 from typing import IO, Any, Optional, Union
 
-from ratarmountcore.formats import FileFormatID, replace_format_check
 from ratarmountcore.mountsource import FileInfo, MountSource, create_root_file_info
 from ratarmountcore.SQLiteBlobFile import SQLiteBlobFile
 from ratarmountcore.StenciledFile import LambdaReaderFile
-from ratarmountcore.utils import overrides
+from ratarmountcore.utils import get_groupid, get_userid, overrides
 
 try:
     import rapidgzip
@@ -100,14 +99,11 @@ try:
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     from sqlcipher3 import dbapi2 as sqlcipher3  # type:ignore
-
-    # No way to detect encrypted SQLAR.
-    replace_format_check(FileFormatID.SQLAR, lambda x: True)
 except ImportError:
     # The cryptography imports can fail pretty badly and it does not seem to be catchable :(
     #
     #    core/tests/test_formats.py:13: in <module>
-    #        import ratarmountcore.mountsource.archives  # noqa: E402, F401
+    #        import ratarmountcore.mountsource.archives  # noqa: F401
     #        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     #    core/ratarmountcore/mountsource/archives.py:14: in <module>
     #        from .formats.sqlar import SQLARMountSource
@@ -194,10 +190,10 @@ class SQLARMountSource(MountSource):
         # Check for denormal names and store a normalized list if necessary.
         self._files: dict[str, int] = {}
         if any(
-            os.path.normpath(name.lstrip('/')) != name for name, in self.connection.execute("SELECT name FROM sqlar;")
+            posixpath.normpath(name.lstrip('/')) != name for name, in self.connection.execute("SELECT name FROM sqlar;")
         ):
             self._files = {
-                os.path.normpath(name.lstrip('/')): rowid
+                posixpath.normpath(name.lstrip('/')): rowid
                 for name, rowid in self.connection.execute("SELECT name,rowid FROM sqlar ORDER BY rowid;")
             }
 
@@ -267,8 +263,8 @@ class SQLARMountSource(MountSource):
             mtime    = int(mtime),
             mode     = mode,
             linkname = linkname,
-            uid      = os.getuid(),
-            gid      = os.getgid(),
+            uid      = get_userid(),
+            gid      = get_groupid(),
             userdata = [rowid],
         )
         # fmt: on

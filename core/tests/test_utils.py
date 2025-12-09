@@ -2,13 +2,14 @@
 # pylint: disable=protected-access
 
 import os
+import string
 import sys
+
+import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.utils import (  # noqa: E402
-    ALPHA,
-    DIGITS,
+from ratarmountcore.utils import (
     HEX,
     LRUCache,
     Prefetcher,
@@ -19,6 +20,8 @@ from ratarmountcore.utils import (  # noqa: E402
     is_latin_hex_alpha,
     is_random,
 )
+
+pytestmark = pytest.mark.order(0)
 
 
 def test_ceil_div():
@@ -126,8 +129,7 @@ def test_lru_cache():
 
 
 def test_is_latin_alpha():
-    assert ALPHA == 'abcdefghijklmnopqrstuvwxyz'
-    assert is_latin_alpha(ALPHA)
+    assert is_latin_alpha(string.ascii_lowercase)
 
     assert is_latin_alpha("a")
     assert is_latin_alpha("ab")
@@ -147,8 +149,7 @@ def test_is_latin_alpha():
 
 
 def test_is_latin_digit():
-    assert DIGITS == '0123456789'
-    assert is_latin_digit(DIGITS)
+    assert is_latin_digit(string.digits)
 
     assert is_latin_digit("0")
     assert is_latin_digit("10")
@@ -189,19 +190,19 @@ def test_is_latin_hex_alpha():
 
 
 def test_format_number():
-    assert format_number(0, ALPHA) == 'a'
-    assert format_number(1, ALPHA) == 'b'
-    assert format_number(25, ALPHA) == 'z'
-    assert format_number(26, ALPHA) == 'ba'
-    assert format_number(26 * 26, ALPHA) == 'baa'
-    assert format_number(26 * 26 + 3, ALPHA) == 'bad'
+    assert format_number(0, string.ascii_lowercase) == 'a'
+    assert format_number(1, string.ascii_lowercase) == 'b'
+    assert format_number(25, string.ascii_lowercase) == 'z'
+    assert format_number(26, string.ascii_lowercase) == 'ba'
+    assert format_number(26 * 26, string.ascii_lowercase) == 'baa'
+    assert format_number(26 * 26 + 3, string.ascii_lowercase) == 'bad'
 
-    assert format_number(0, ALPHA, 3) == 'aaa'
-    assert format_number(1, ALPHA, 3) == 'aab'
-    assert format_number(25, ALPHA, 3) == 'aaz'
-    assert format_number(26, ALPHA, 3) == 'aba'
-    assert format_number(26 * 26, ALPHA, 3) == 'baa'
-    assert format_number(26 * 26 + 3, ALPHA, 3) == 'bad'
+    assert format_number(0, string.ascii_lowercase, 3) == 'aaa'
+    assert format_number(1, string.ascii_lowercase, 3) == 'aab'
+    assert format_number(25, string.ascii_lowercase, 3) == 'aaz'
+    assert format_number(26, string.ascii_lowercase, 3) == 'aba'
+    assert format_number(26 * 26, string.ascii_lowercase, 3) == 'baa'
+    assert format_number(26 * 26 + 3, string.ascii_lowercase, 3) == 'bad'
 
     assert format_number(0, HEX) == '0'
     assert format_number(1, HEX) == '1'
@@ -221,7 +222,7 @@ def test_format_number():
     assert format_number(16 * 16, HEX, 3) == '100'
     assert format_number(16 * 16 + 3, HEX, 3) == '103'
 
-    assert format_number(357641610, DIGITS) == '357641610'
+    assert format_number(357641610, string.digits) == '357641610'
 
 
 def test_is_random():

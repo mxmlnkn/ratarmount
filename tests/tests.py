@@ -8,7 +8,6 @@ import os
 import stat
 import sys
 import tarfile
-import tempfile
 
 if __name__ == '__main__' or __package__ is not None:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../core')))
@@ -31,11 +30,10 @@ def make_folder(tarArchive, folderName):
     tarArchive.addfile(tinfo, io.BytesIO())
 
 
-with (
-    tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmpTarFile,
-    tempfile.NamedTemporaryFile(suffix=".sqlite") as tmpIndexFile,
-):
-    with tarfile.open(name=tmpTarFile.name, mode="w:gz") as tarFile:
+def test_example(tmpdir):
+    tar_path = os.path.join(tmpdir, "archive.tar.gz")
+    index_path = tar_path + ".index.sqlite"
+    with tarfile.open(name=tar_path, mode="w:gz") as tarFile:
         create_file(tarFile, "./README.md", "hello world")
         make_folder(tarFile, "./src")
         create_file(tarFile, "./src/test.sh", "echo hi")
@@ -44,13 +42,13 @@ with (
         make_folder(tarFile, "./dist/a/b")
         create_file(tarFile, "./dist/a/b/test2.sh", "echo two")
 
-    print("Created temp tar:", tmpTarFile.name)
+    print("Created temp tar:", tar_path)
 
     testKwargs: dict[str, dict] = {
-        "file paths": {'fileObject': None, 'tarFileName': tmpTarFile.name},
-        "file objects": {'fileObject': open(tmpTarFile.name, "rb"), 'tarFileName': "tarFileName"},
+        "file paths": {'fileObject': None, 'tarFileName': tar_path},
+        "file objects": {'fileObject': open(tar_path, "rb"), 'tarFileName': "tarFileName"},
         "file objects with no fileno": {
-            'fileObject': io.BytesIO(open(tmpTarFile.name, "rb").read()),
+            'fileObject': io.BytesIO(open(tar_path, "rb").read()),
             'tarFileName': "tarFileName",
         },
     }
@@ -59,20 +57,21 @@ with (
         print(f"\n== Test with {name} ==")
 
         # Create index
-        SQLiteIndexedTar(
+        with SQLiteIndexedTar(
             **kwargs,
             writeIndex=True,
             clearIndexCache=True,
-            indexFilePath=tmpIndexFile.name,
+            indexFilePath=index_path,
             printDebug=3,
-        )
+        ):
+            pass
 
         # Read from index
         indexedFile = SQLiteIndexedTar(
             **kwargs,
             writeIndex=False,
             clearIndexCache=False,
-            indexFilePath=tmpIndexFile.name,
+            indexFilePath=index_path,
             printDebug=3,
         )
 
@@ -164,3 +163,8 @@ with (
         assert finfo.size == 11
         assert indexedFile.read(finfo, size=11, offset=0) == b"hello world"
         assert indexedFile.read(finfo, size=3, offset=3) == b"lo "
+
+        # Needs to be properly closed so that the index can be removed on Windows in the next loop iteration.
+        indexedFile.close()
+        # Second close should simply result in a no-op
+        indexedFile.close()

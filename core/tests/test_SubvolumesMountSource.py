@@ -14,12 +14,12 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.mountsource.compositing.singlefile import SingleFileMountSource  # noqa: E402
-from ratarmountcore.mountsource.compositing.subvolumes import SubvolumesMountSource  # noqa: E402
-from ratarmountcore.mountsource.formats.folder import FolderMountSource  # noqa: E402
-from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar  # noqa: E402
-from ratarmountcore.mountsource.MountSource import MountSource  # noqa: E402
-from ratarmountcore.utils import RatarmountError  # noqa: E402
+from ratarmountcore.mountsource.compositing.singlefile import SingleFileMountSource
+from ratarmountcore.mountsource.compositing.subvolumes import SubvolumesMountSource
+from ratarmountcore.mountsource.formats.folder import FolderMountSource
+from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar
+from ratarmountcore.mountsource.MountSource import MountSource
+from ratarmountcore.utils import RatarmountError
 
 
 @dataclasses.dataclass

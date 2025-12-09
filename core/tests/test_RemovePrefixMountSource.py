@@ -3,6 +3,7 @@
 
 import io
 import os
+import posixpath
 import stat
 import sys
 
@@ -10,8 +11,8 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.mountsource.compositing.removeprefix import RemovePrefixMountSource  # noqa: E402
-from ratarmountcore.mountsource.compositing.singlefile import SingleFileMountSource  # noqa: E402
+from ratarmountcore.mountsource.compositing.removeprefix import RemovePrefixMountSource
+from ratarmountcore.mountsource.compositing.singlefile import SingleFileMountSource
 
 
 class TestRemovePrefixMountSource:
@@ -23,7 +24,7 @@ class TestRemovePrefixMountSource:
 
         # The mount source API expects normalized paths. Only the one-time constructor is lenient enough to
         # accept non-normalized paths.
-        path = os.path.normpath('/' + path + '/file').lstrip('/')
+        path = posixpath.normpath('/' + path + '/file').lstrip('/')
 
         fileInfo = ms.lookup(path)
         assert fileInfo

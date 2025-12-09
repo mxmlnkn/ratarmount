@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+
+<!-- アドマネージャー-->
+<head>
+    <title>Test HTML</title>
+    <!--
+    Seems like entity references inside style are not allowed. Replacing space after background-color:
+    results in the background color being ignored and Python's HTML parser also does not replace the refs.
+    -->
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: /*savepage-url=https://example.com/background.png*/url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAADUlEQVR42mP8z/C/HwAGgwJ/lQdFZgAAAABJRU5ErkJggg==);
+        }
+
+        .header {
+            background-color: #ee0000;
+        }
+    </style>
+    <link rel="stylesheet"
+        data-savepage-href="https://example.com/style.css"
+        href="data:text/css;base64,Ym9keSB7IGZvbnQtZmFtaWx5OiBBcmlhbCwgc2Fucy1zZXJpZiB9OwpoZWFkZXIgeyBiYWNrZ3JvdW5kLWNvbG9yOiAjZjBmMGYwOyB9">
+</head>
+
+<body>
+    <div class="header">
+        &#32;
+        <h1>Test&#32;Page</h1>
+    </div>
+
+    <img data-savepage-src="https://example.com/images/logo.png"
+        src="data:image&#47;png;nitro-empty-id=A=3;base64,iVBORw0KGgo&#65;&#65;&#65;&#65;NSUhEUg&#65;&#65;&#65;&#65;E&#65;&#65;&#65;&#65;BC&#65;Y&#65;&#65;&#65;&#65;fFcSJ&#65;&#65;&#65;&#65;DUlEQVR42mNkYPhfDw&#65;ChwG&#65;60e6kg&#65;&#65;&#65;&#65;BJRU5ErkJggg=="
+        width=100px>
+
+    <!--
+    Even a combination of char refs and URL-encoding is legal: &#37;20 -> %20 -> space
+    -->
+    <embed data-savepage-src="https://example.com/css/style.css"
+        src="data:text/css;utf8,body {&#37;20font-family: Arial, sans-serif };">
+
+    <embed
+        src="data:text/javascript;base&#54;4,ZG%39jdW1lbnQuYm9keS5zdHlsZS5iYWNrZ3JvdW5kQ29sb3I9IiNmMGYwZjA7"></embed>
+
+    <p>This is a complex test HTML file with embedded images, CSS, and JavaScript.<br></p>
+
+    <!--
+    Entity refs are insane. They seem to act on a completely higher leven than HTML and can appear almost
+    ANYWHERE. Even the : in data: can be replaced and it works. But the " after src=" cannot be replaced
+    with &#34;
+    -->
+    <embed data-savepage-src="https://example.com/docs/readme.txt"
+        src="data&#58;text/plain;b&#97;se64,VGVzdCBQYWdlIHdpdGggZW1iZWQu"/>
+
+     <iframe src="https://www.w3schools.com"></iframe>
+     <iframe src="https://www.w3schools.com"/>
+</body>
+
+</html>

@@ -22,12 +22,23 @@ See:
  - https://en.wikipedia.org/wiki/List_of_archive_formats
 """
 
+import contextlib
 import dataclasses
 import enum
+import re
 import struct
+import sys
 import tarfile
 import zipfile
 from typing import IO, Callable, Optional, Union
+
+with contextlib.suppress(ImportError):
+    import rapidgzip
+
+try:
+    import sqlcipher3  # noqa: F401
+except ImportError:
+    sqlcipher3 = None  # type:ignore
 
 
 class FileFormatID(enum.Enum):
@@ -55,6 +66,7 @@ class FileFormatID(enum.Enum):
     # Other archive  formats
     RATARMOUNT_INDEX = 0x901
     WARC             = 0x902
+    HTML             = 0x903
 
     # Compression formats (compresses a single file / stream)
     BZIP2            = 0x1001
@@ -64,6 +76,7 @@ class FileFormatID(enum.Enum):
     ZLIB             = 0x1005
     LZ4              = 0x1006
     LZMA             = 0x1007
+    DEFLATE          = 0x1008
 
     GRZIP            = 0x1021
     LRZIP            = 0x1022
@@ -76,6 +89,28 @@ class FileFormatID(enum.Enum):
 
 
 FID = FileFormatID
+
+
+HTML_REGEX = re.compile(br"<(head|title|html|script|style|table|a\s+href)[\s>]")
+
+
+def is_html_file(fileobj: IO[bytes]) -> bool:
+    offset = fileobj.tell()
+    try:
+        # Do not read more than 512 B because else we might match the first TAR entry contents!
+        chunk = fileobj.read(512).lower()
+        if b'\x00' in chunk:
+            return False
+        # Trying to decode the chunk can be inconclusive because we may not know the encoding and
+        # because the chunk end might be inside a multi-byte UTF-8 character.
+
+        # See https://github.com/file/file/blob/FILE5_46/magic/Magdir/sgml
+        # This is a very trimmed-down heuristic. In the future, we might have to add a proper
+        # file detection dependency such as libmagic (for Python).
+        return (b'<!doctype html' in chunk) or bool(HTML_REGEX.search(chunk))
+    finally:
+        fileobj.seek(offset)
+    return False
 
 
 def is_tar(fileobj: IO[bytes], encoding: str = tarfile.ENCODING) -> bool:
@@ -111,12 +146,12 @@ def find_asar_header(fileobj: IO[bytes]) -> tuple[int, int, int]:
         struct.unpack('<LLLL', fileobj.read(ASAR_MAGIC_SIZE))
     )
     if sizeOfPickledSize != 4:
-        raise ValueError("First magic bytes quadruplet does not match SQLAR!")
+        raise ValueError("First magic bytes quadruplet does not match ASAR!")
     if sizeOfPickledPickledPickledHeader != sizeOfPickledPickledHeader + 4:
-        raise ValueError("Second magic bytes quadruplet does not match SQLAR!")
+        raise ValueError("Second magic bytes quadruplet does not match ASAR!")
     padding = (4 - sizeOfPickledHeader % 4) % 4
     if sizeOfPickledPickledHeader != sizeOfPickledHeader + padding + 4:
-        raise ValueError("Third magic bytes quadruplet does not match SQLAR!")
+        raise ValueError("Third magic bytes quadruplet does not match ASAR!")
 
     dataOffset = ASAR_MAGIC_SIZE + sizeOfPickledHeader + padding
 
@@ -165,6 +200,9 @@ def is_squashfs(fileobj: IO[bytes]) -> bool:
         # Compressions: 0:None, 1:GZIP, 2:LZMA, 3:LZO, 4:XZ, 5:LZ4, 6:ZSTD
         if compressor > 6:
             return False
+
+    except struct.error:
+        return False
 
     finally:
         fileobj.seek(offset)
@@ -219,6 +257,8 @@ def _is_iso9660(fileobj: IO[bytes]) -> bool:
 
 def _check_zlib_header(fileobj: IO[bytes]) -> bool:
     header = fileobj.read(2)
+    if len(header) < 2:
+        return False
     cmf = header[0]
     if cmf & 0xF != 8:
         return False
@@ -231,35 +271,70 @@ def _check_zlib_header(fileobj: IO[bytes]) -> bool:
     return not usesDictionary
 
 
+def _check_deflate(fileobj: IO[bytes]) -> bool:
+    if 'rapidgzip' not in sys.modules:
+        return False
+
+    determineFileType = getattr(rapidgzip, 'determineFileType', None)
+    if not callable(determineFileType):
+        return False
+
+    if determineFileType(fileobj).lower() != 'deflate':
+        return False
+
+    try:
+        # determineFileType only checks the header, which is almost nothing for 'deflate'.
+        # Therefore try to read a bit.
+        with rapidgzip.RapidgzipFile(fileobj, parallelization=1, chunk_size=128 * 1024) as file:
+            file.read(108 * 1024)  # Read a bit less than the chunk size.
+        return True
+    except Exception:
+        pass
+
+    return False
+
+
 def _is_bzip2(fileobj: IO[bytes]) -> bool:
     return fileobj.read(4)[:3] == b'BZh' and fileobj.read(6) == (0x314159265359).to_bytes(6, 'big')
 
 
 def _check_lz4_header(fileobj: IO[bytes]) -> bool:
     SKIPPABLE_FRAME_MAGIC = 0x184D2A50
-    (magic,) = struct.unpack('<L', fileobj.read(4))
-
-    # https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md#skippable-frames
-    while magic & 0xFFFF_FFF0 == SKIPPABLE_FRAME_MAGIC:
-        (frame_size,) = struct.unpack('<L', fileobj.read(4))
-        fileobj.seek(fileobj.tell() + frame_size)
+    try:
         (magic,) = struct.unpack('<L', fileobj.read(4))
 
-    # https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md#general-structure-of-lz4-frame-format
-    return magic == 0x184D2204
+        # https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md#skippable-frames
+        while magic & 0xFFFF_FFF0 == SKIPPABLE_FRAME_MAGIC:
+            (frame_size,) = struct.unpack('<L', fileobj.read(4))
+            fileobj.seek(fileobj.tell() + frame_size)
+            (magic,) = struct.unpack('<L', fileobj.read(4))
+
+        # https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md#general-structure-of-lz4-frame-format
+        return magic == 0x184D2204
+    except struct.error:
+        return False
 
 
 def _check_zstandard_header(fileobj: IO[bytes]) -> bool:
     SKIPPABLE_FRAME_MAGIC = 0x184D2A50
-    (magic,) = struct.unpack('<L', fileobj.read(4))
-
-    # https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md#skippable-frames
-    while magic & 0xFFFF_FFF0 == SKIPPABLE_FRAME_MAGIC:
-        (frame_size,) = struct.unpack('<L', fileobj.read(4))
-        fileobj.seek(fileobj.tell() + frame_size)
+    try:
         (magic,) = struct.unpack('<L', fileobj.read(4))
 
-    return magic == 0xFD2FB528
+        # https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md#skippable-frames
+        while magic & 0xFFFF_FFF0 == SKIPPABLE_FRAME_MAGIC:
+            (frame_size,) = struct.unpack('<L', fileobj.read(4))
+            fileobj.seek(fileobj.tell() + frame_size)
+            (magic,) = struct.unpack('<L', fileobj.read(4))
+
+        return magic == 0xFD2FB528
+    except struct.error:
+        return False
+
+
+def _check_encrypted_sqlar(fileobj: IO[bytes]) -> bool:
+    # File must at least contain the AES encryption salt, probably even many more bytes.
+    salt = fileobj.read(16)
+    return len(salt) >= 16
 
 
 @dataclasses.dataclass
@@ -287,9 +362,12 @@ ARCHIVE_FORMATS: dict[FileFormatID, FileFormatInfo] = {
     # is_zipfile might yields some false positives, we want it to err on the positive side.
     # See: https://bugs.python.org/issue42096
     FID.ZIP: FileFormatInfo(['zip'], None, zipfile.is_zipfile),
-    # SQLAR can be encrypted, for which it will not have any magic bytes! The first 16 B are the salt.
-    # lambda x: x.read(16) == b'SQLite format 3\x00'
-    FID.SQLAR: FileFormatInfo(['sqlar'], None, None),
+    # SQLAR can be encrypted, for which it will not have any magic bytes! Instead, the first 16 B are the salt.
+    FID.SQLAR: (
+        FileFormatInfo(['sqlar'], b'SQLite format 3\x00', None)
+        if sqlcipher3 is None
+        else FileFormatInfo(['sqlar'], None, _check_encrypted_sqlar)
+    ),
     # https://download.microsoft.com/download/4/d/a/4da14f27-b4ef-4170-a6e6-5b1ef85b1baa/[ms-cab].pdf
     FID.CAB: FileFormatInfo(['cab'], b'MSCF'),
     # https://www.ibm.com/docs/en/aix/7.2.0?topic=formats-ar-file-format-small
@@ -313,6 +391,8 @@ ARCHIVE_FORMATS: dict[FileFormatID, FileFormatInfo] = {
     # https://www.iso.org/standard/68004.html
     # https://iipc.github.io/warc-specifications/specifications/warc-format/warc-1.1/#file-and-record-model
     FID.WARC: FileFormatInfo(['warc'], b'WARC/1.'),
+    # HTML files with embedded data URLs
+    FID.HTML: FileFormatInfo(['html', 'htm'], None, is_html_file),
 }
 
 COMPRESSION_FORMATS: dict[FileFormatID, FileFormatInfo] = {
@@ -321,6 +401,7 @@ COMPRESSION_FORMATS: dict[FileFormatID, FileFormatInfo] = {
     FID.XZ: FileFormatInfo(['xz'], b"\xfd7zXZ\x00"),
     FID.ZSTANDARD: FileFormatInfo(['zst', 'zstd', 'pzstd'], None, _check_zstandard_header),
     FID.ZLIB: FileFormatInfo(['zz', 'zlib'], None, _check_zlib_header),
+    FID.DEFLATE: FileFormatInfo(['deflate'], None, _check_deflate),
     # https://github.com/libarchive/libarchive/blob/6110e9c82d8ba830c3440f36b990483ceaaea52c/libarchive/
     # archive_read_support_filter_grzip.c#L46
     # It is almost impossible to find the original sources or a specification:
@@ -362,7 +443,7 @@ _FORMATS_WITHOUT_MAGIC_BYTES: list[FileFormatID] = []
 
 
 def recompute_cached_magic_bytes():
-    """Should be called when injecting new file formats from outsfide."""
+    """Should be called when injecting new file formats from outside."""
     for fid, info in FILE_FORMATS.items():
         if info.magicBytes is None or len(info.magicBytes) < 2:
             _FORMATS_WITHOUT_MAGIC_BYTES.append(fid)
@@ -388,8 +469,7 @@ def might_be_format(fileobj: IO[bytes], fid: Union[FileFormatID, FileFormatInfo]
     finally:
         fileobj.seek(oldOffset)
 
-    # No magic bytes and no header check, reject it because there seems to be the necessary module to read
-    # that format missing anyway.
+    # For no magic bytes and no header check, reject it because the necessary module to read it seems to be missing.
     return bool(formatInfo.magicBytes or formatInfo.checkHeader)
 
 

@@ -12,11 +12,12 @@ import sys
 from pathlib import Path
 from typing import IO
 
-import indexed_zstd
 import pytest
 import xz
 
 try:
+    import indexed_zstd
+
     # May not be installed with Python 3.14 because of incompatibilities.
     import zstandard
 except ImportError:
@@ -24,7 +25,7 @@ except ImportError:
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.BlockParallelReaders import ParallelXZReader, ParallelZstdReader  # noqa: E402
+from ratarmountcore.BlockParallelReaders import ParallelXZReader, ParallelZstdReader
 
 
 def test_find_block():
@@ -70,6 +71,7 @@ def test_block_size():
     assert blockSize([0, 2, 4], 2) == 0
 
 
+@pytest.mark.parallel
 @pytest.mark.parametrize("parallelization", [1, 2, 3, os.cpu_count()])
 class TestParallelXZReader:
     @staticmethod
@@ -196,6 +198,8 @@ class SeekableZstd:
             self.fileobj.close()
 
 
+@pytest.mark.parallel
+@pytest.mark.skipif(sys.platform == "win32", reason="Need to find out how to properly install indexed_zstd on Windows.")
 @pytest.mark.parametrize("parallelization", [1, 2, 3, os.cpu_count()])
 class TestParallelZstdReader:
     @staticmethod

@@ -28,7 +28,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     container: quay.io/pypa/manylinux_2_28_${{ matrix.arch }}
     env:
-      APP_PYTHON_VERSION: "3.12"
+      APP_PYTHON_VERSION: "3.14"
       APPIMAGE_VARIANT: ${{ matrix.variant }}
     steps:
     - uses: actions/checkout@v4
@@ -127,7 +127,7 @@ jobs:
         bash tests/runtests.sh
 
   AppImage-Nightly-Release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     needs: [AppImage-Tests]
     if: github.ref_name == 'master'
     steps:
@@ -159,7 +159,7 @@ jobs:
 
   AppImage-Release:
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     needs: [AppImage-Tests]
     steps:
     - uses: actions/checkout@v4

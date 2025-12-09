@@ -4,11 +4,12 @@ import logging
 import stat
 import sys
 import zipfile
+from pathlib import Path
 from typing import IO, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
-from ratarmountcore.SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
+from ratarmountcore.SQLiteIndex import SQLiteIndex
 from ratarmountcore.utils import overrides
 
 try:
@@ -23,10 +24,12 @@ logger = logging.getLogger(__name__)
 
 
 class ZipMountSource(SQLiteIndexMountSource):
-    def __init__(self, fileOrPath: Union[str, IO[bytes]], **options) -> None:
+    def __init__(self, fileOrPath: Union[str, IO[bytes], Path], **options) -> None:
         if 'zipfile' not in sys.modules:
             raise RuntimeError("Did not find the zipfile module. Please use Python 3.7+.")
 
+        if isinstance(fileOrPath, Path):
+            fileOrPath = str(fileOrPath)
         self.fileObject = zipfile.ZipFile(fileOrPath, 'r')
 
         ZipMountSource._find_password(self.fileObject, options.get("passwords", []))
@@ -57,6 +60,8 @@ class ZipMountSource(SQLiteIndexMountSource):
         # file_redir is (type, flags, target) or None. Only tested for type == RAR5_XREDIR_UNIX_SYMLINK.
         linkname = ""
         mode = (info.external_attr >> 16) & 0o777
+        if mode == 0:
+            mode = 0o770 if info.is_dir() else 0o660
         if stat.S_ISLNK(info.external_attr >> 16):
             linkname = self.fileObject.read(info).decode()
             mode = mode | stat.S_IFLNK
@@ -124,17 +129,15 @@ class ZipMountSource(SQLiteIndexMountSource):
         raise RuntimeError("Could not find a matching password!")
 
     @overrides(SQLiteIndexMountSource)
-    def __exit__(self, exception_type, exception_value, exception_traceback):
-        super().__exit__(exception_type, exception_value, exception_traceback)
-        self.fileObject.close()
+    def close(self) -> None:
+        super().close()
+        if fileObject := getattr(self, 'fileObject', None):
+            fileObject.close()
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
         # I do not see any obvious option to zipfile.ZipFile to apply the specified buffer size.
-        assert fileInfo.userdata
-        extendedFileInfo = fileInfo.userdata[-1]
-        assert isinstance(extendedFileInfo, SQLiteIndexedTarUserData)
-        info = self.files[extendedFileInfo.offsetheader]
+        info = self.files[SQLiteIndex.get_index_userdata(fileInfo.userdata).offsetheader]
         assert isinstance(info, zipfile.ZipInfo)
         # CPython's zipfile module does handle multiple file objects being opened and reading from the
         # same underlying file object concurrently by using a _SharedFile class that even includes a lock.

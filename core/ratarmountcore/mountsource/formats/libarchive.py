@@ -9,20 +9,34 @@ import os
 import stat
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 from typing import IO, Callable, Optional, Union, cast
 
 from ratarmountcore.compressions import COMPRESSION_BACKENDS
 from ratarmountcore.formats import FILE_FORMATS
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
-from ratarmountcore.SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
+from ratarmountcore.SQLiteIndex import SQLiteIndex
 from ratarmountcore.utils import InvalidIndexError, overrides
 
 try:
     # Use the FFI directly because the higher-level interface does not work sufficiently for our use case.
     import libarchive.ffi as laffi
     from libarchive.exception import ArchiveError
-except (ImportError, AttributeError):
+except Exception:
+    # I have encountered AttributeError, and on Windows also TypeError:
+    #   File "C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\site-packages\libarchive\ffi.py", line 26, in <module>
+    #     libarchive = ctypes.cdll.LoadLibrary(libarchive_path)
+    #                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    #   File "C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\ctypes\__init__.py", line 454, in LoadLibrary
+    #     return self._dlltype(name)
+    #            ^^^^^^^^^^^^^^^^^^^
+    #   File "C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\ctypes\__init__.py", line 366, in __init__
+    #     if '/' in name or '\\' in name:
+    #        ^^^^^^^^^^^
+    #   TypeError: argument of type 'NoneType' is not iterable
+    #
+    # OSError can happen when dependencies are missing, e.g., libicuuc.so.74.
     pass
 
 try:
@@ -228,6 +242,8 @@ class IterableArchive:
 
         if isinstance(self._file, str):
             laffi.read_open_filename_w(self._archive, self._file, os.stat(self._file).st_blksize)
+        elif isinstance(self._file, Path):
+            laffi.read_open_filename_w(self._archive, str(self._file), self._file.stat().st_blksize)
         elif isinstance(self._file, int):
             laffi.read_open_fd(self._archive, self._file, os.fstat(self._file).st_blksize)
         elif hasattr(self._file, 'readinto'):
@@ -491,7 +507,6 @@ class LibarchiveFile(io.RawIOBase):
         return result
 
 
-# The implementation is similar to ZipMountSource and SQLiteIndexedTarUserData.
 class LibarchiveMountSource(SQLiteIndexMountSource):
     def __init__(self, fileOrPath: Union[str, IO[bytes]], tarFileName: Optional[str] = None, **options) -> None:
         self.fileOrPath = fileOrPath
@@ -583,14 +598,11 @@ class LibarchiveMountSource(SQLiteIndexMountSource):
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
-        assert fileInfo.userdata
-        tarFileInfo = fileInfo.userdata[-1]
-        assert isinstance(tarFileInfo, SQLiteIndexedTarUserData)
         return cast(
             IO[bytes],
             LibarchiveFile(
                 self.fileOrPath,
-                tarFileInfo.offsetheader,
+                SQLiteIndex.get_index_userdata(fileInfo.userdata).offsetheader,
                 fileSize=fileInfo.size,
                 passwords=self.passwords,
                 archiveCache=self._archiveCache,

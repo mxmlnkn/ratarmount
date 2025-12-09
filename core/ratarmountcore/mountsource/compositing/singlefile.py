@@ -1,6 +1,7 @@
 import contextlib
 import io
 import os
+import posixpath
 import stat
 import threading
 import time
@@ -9,7 +10,7 @@ from typing import IO, Any, Callable, Optional, Union, cast, final
 
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.StenciledFile import RawStenciledFile, StenciledFile
-from ratarmountcore.utils import overrides
+from ratarmountcore.utils import get_groupid, get_userid, overrides
 
 
 def _get_mode(fileobj: IO[bytes]) -> int:
@@ -33,7 +34,7 @@ class SingleFileMountSource(MountSource):
         fileobj: The given file object to be mounted. It may be advisable for this file object to be unbuffered
                  because opening file objects via this mount source will add additional buffering if not disabled.
         """
-        self.path = os.path.normpath('/' + path).lstrip('/')
+        self.path = posixpath.normpath('/' + path).lstrip('/')
         if not self.path or '/' in self.path:
             raise ValueError("File object must belong to a non-folder path!")
 
@@ -125,8 +126,8 @@ class SingleFileMountSource(MountSource):
             mtime    = self.mtime,
             mode     = mode | (stat.S_IFDIR if isdir else stat.S_IFREG),
             linkname = '',
-            uid      = self._file_info.uid if self._file_info else os.getuid(),
-            gid      = self._file_info.gid if self._file_info else os.getgid(),
+            uid      = self._file_info.uid if self._file_info else get_userid(),
+            gid      = self._file_info.gid if self._file_info else get_groupid(),
             userdata = [],
         )
         # fmt: on

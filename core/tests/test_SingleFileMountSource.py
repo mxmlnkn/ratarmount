@@ -3,6 +3,7 @@
 
 import io
 import os
+import posixpath
 import stat
 import sys
 
@@ -10,9 +11,10 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.mountsource.compositing.singlefile import SingleFileMountSource  # noqa: E402
+from ratarmountcore.mountsource.compositing.singlefile import SingleFileMountSource
 
 
+@pytest.mark.order(0)
 class TestSingleFileMountSource:
     @staticmethod
     @pytest.mark.parametrize('path', ["foo", "/foo", "/folder/../foo"])
@@ -22,7 +24,7 @@ class TestSingleFileMountSource:
 
         # The mount source API expects normalized paths. Only the one-time constructor is lenient enough to
         # accept non-normalized paths.
-        path = os.path.normpath('/' + path).lstrip('/')
+        path = posixpath.normpath('/' + path).lstrip('/')
 
         fileInfo = ms.lookup(path)
         assert fileInfo
