@@ -20,7 +20,7 @@ def _create_multi_mount(mountSources: list[tuple[str, MountSource]], options: di
     This is a copy of the actual implementation to avoid import issues.
     """
     # Extract mount sources from tuples
-    sources = [x[1] for x in mountSources]
+    _, sources = zip(*mountSources)
 
     # Check if we should use LinkResolutionUnionMountSource
     resolveSymbolicLinks = bool(options.get('resolveSymbolicLinks', False))
