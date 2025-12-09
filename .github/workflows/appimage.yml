@@ -28,7 +28,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     container: quay.io/pypa/manylinux_2_28_${{ matrix.arch }}
     env:
-      APP_PYTHON_VERSION: "3.12"
+      APP_PYTHON_VERSION: "3.14"
       APPIMAGE_VARIANT: ${{ matrix.variant }}
     steps:
     - uses: actions/checkout@v4
