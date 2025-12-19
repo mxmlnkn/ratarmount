@@ -517,6 +517,7 @@ These are some possibilities to create seekable ZStandard files:
    If that cannot be used, it has to be compiled from the C sources using CMake.
  - [zstd-seekable-format-go](https://github.com/SaveTheRbtz/zstd-seekable-format-go): Some of the releases, e.g., [v0.7.1](https://github.com/SaveTheRbtz/zstd-seekable-format-go/releases/tag/v0.7.1) contain static binaries that can be downloaded and used without installation.
    Unfortunately, not all releases seem to have static binaries. So, if some other version is required it might be necessary to [install from source](https://github.com/SaveTheRbtz/zstd-seekable-format-go/issues/199) with a Go compiler.
+ - [zeekstd](https://github.com/rorosen/zeekstd): Rust implementation of the Zstandard Seekable Format, there is a [CLI Tool](https://github.com/rorosen/zeekstd/tree/main/cli#zeekstd-cli) when installed can be used standalone or used as a tar compressor `tar -I 'zeekstd -' -cvf sample.tzst sample`.
  - You can manually split the original file into parts, compress those parts, and then concatenate those parts together to get a suitable multiframe ZStandard file.
    Here is a bash function, which can be used for that:
 
