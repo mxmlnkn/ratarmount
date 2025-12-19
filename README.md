@@ -520,6 +520,8 @@ These are some possibilities to create seekable ZStandard files:
  - You can manually split the original file into parts, compress those parts, and then concatenate those parts together to get a suitable multiframe ZStandard file.
    Here is a bash function, which can be used for that:
 
+ - [zeekstd](https://github.com/rorosen/zeekstd): Rust implementation of the Zstandard Seekable Format, there is a [CLI Tool](https://github.com/rorosen/zeekstd/tree/main/cli#zeekstd-cli) when installed can be used standalone or used as a tar compressor `tar -I 'zeekstd -' -cvf sample.tzst sample`.
+
    <details>
    <summary>Bash script: createMultiFrameZstd</summary>
 
