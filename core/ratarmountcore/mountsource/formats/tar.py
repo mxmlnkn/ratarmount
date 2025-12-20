@@ -834,8 +834,8 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         if self.tarFileObject:
             self.tarFileObject.close()
 
-        if not self.isFileObject and self.rawFileObject:
-            self.rawFileObject.close()
+        if not getattr(self, 'isFileObject', True) and (rawFileObject := getattr(self, 'rawFileObject', None)):
+            rawFileObject.close()
 
     @overrides(MountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
