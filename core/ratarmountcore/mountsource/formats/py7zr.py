@@ -229,7 +229,12 @@ class Py7zrMountSource(SQLiteIndexMountSource):
     @overrides(SQLiteIndexMountSource)
     def __exit__(self, exception_type, exception_value, exception_traceback):
         super().__exit__(exception_type, exception_value, exception_traceback)
-        self.fileObject.close()
+        if fileObject := getattr(self, 'fileObject', None):
+            fileObject.close()
+            # Throws: AttributeError: 'SevenZipFile' object has no attribute 'worker'
+            # on double close and has no 'closed' method -.-, so we have to keep track of it ourselves by
+            # setting it to None after it was closed.
+            self.fileObject = None
 
     @overrides(MountSource)
     def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
