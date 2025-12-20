@@ -100,7 +100,8 @@ class RawStenciledFile(FixedRawIOBase):
 
     @overrides(io.RawIOBase)
     def seekable(self) -> bool:
-        return all(fobj.seekable() for fobj in self.fileObjects)
+        with self.fileObjectLock or contextlib.nullcontext():
+            return not self.closed and all(fobj.seekable() for fobj in self.fileObjects)
 
     @overrides(io.RawIOBase)
     def readable(self) -> bool:
