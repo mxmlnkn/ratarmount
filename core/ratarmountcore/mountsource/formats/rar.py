@@ -186,7 +186,7 @@ class RarMountSource(MountSource):
                     mode     = 0o777 | stat.S_IFDIR,
                     linkname = "",
                     uid      = get_userid(),
-                    gid      = os.getgid(),
+                    gid      = get_groupid(),
                     userdata = [None],
                 )
             )
