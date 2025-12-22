@@ -63,6 +63,9 @@ function installAppImagePythonPackages()
         "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir rapidgzip || exit 1
     fi
 
+    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir \
+        'git+https://github.com/mxmlnkn/mfusepy.git@master#egginfo=mfusepy'
+
     # Install first, because it exactly pins cachetools to 6.0.0, nothing else allowed, instead of doing
     # more relaxed matching. It works with major version 5 as well as 6, so it is fine to force a downgrade
     # to make it work with: # https://github.com/googleapis/google-auth-library-python/blob/main/setup.py

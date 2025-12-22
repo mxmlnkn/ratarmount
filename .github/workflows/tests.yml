@@ -248,7 +248,7 @@ jobs:
         python3 -m build
         twine check dist/*
         python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )"
-        python3 -m pip install mfusepy
+        python3 -m pip install --user --force-reinstall 'git+https://github.com/mxmlnkn/mfusepy.git@master#egginfo=mfusepy'
 
     - name: Test Startup Without Compression Dependencies
       if: ${{ startsWith( matrix.os, 'ubuntu' ) }}
@@ -545,6 +545,7 @@ jobs:
 
     - name: Test Installation From Source
       run: |
+        python3 -m pip install --user --force-reinstall 'git+https://github.com/mxmlnkn/mfusepy.git@master#egginfo=mfusepy'
         python3 -m pip install core/[full,ext4,fsspec,sqlar]
         python3 -m pip install .[full,ext4,fsspec,sqlar]
 
