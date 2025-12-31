@@ -71,7 +71,7 @@ class PrintOSSAttributionAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         from .dependencies import print_oss_attributions
 
-        print_oss_attributions()
+        print_oss_attributions(with_licenses=True)
         parser.exit()
 
 
