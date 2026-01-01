@@ -116,14 +116,14 @@ NON_PYTHON_LIB_LICENSES = {
 def get_url_and_license_from_github_subpath(subpath: str) -> tuple[str, str]:
     licenseUrl = "https://raw.githubusercontent.com" + subpath
     try:
-        licenseContents = urllib.request.urlopen(licenseUrl).read().decode()
-    except urllib.error.HTTPError as error:
+        licenseContents = urllib.request.urlopen(licenseUrl, timeout=3).read().decode()
+    except urllib.error.URLError as error:
         licenseContents = f"Failed to get license at {licenseUrl} because of: {error!s}"
     url = "https://github.com" + '/'.join(subpath.split('/', 3)[:3])
     return url, licenseContents
 
 
-def gather_system_software_versions() -> list[tuple[str, VersionInformation]]:
+def gather_system_software_versions(with_licenses: bool = True) -> list[tuple[str, VersionInformation]]:
     non_python_libs = [
         (sys.implementation.name, '.'.join(str(i) for i in sys.implementation.version[:3])),
         ("libsqlite3", sqlite3.sqlite_version),
@@ -138,7 +138,8 @@ def gather_system_software_versions() -> list[tuple[str, VersionInformation]]:
         license_short = ''
         if name in NON_PYTHON_LIB_LICENSES:
             subpath, license_short = NON_PYTHON_LIB_LICENSES[name]
-            url, license_contents = get_url_and_license_from_github_subpath(subpath)
+            if with_licenses:
+                url, license_contents = get_url_and_license_from_github_subpath(subpath)
         system_software.append(
             (
                 name,
@@ -251,7 +252,7 @@ def gather_versions(with_licenses: bool = True) -> dict[Any, list[tuple[str, Ver
 
     if gathered:
         versions_by_depth[max(versions_by_depth.keys()) + 1] = copy.deepcopy(gathered)
-    versions_by_depth["System Software"] = gather_system_software_versions()
+    versions_by_depth["System Software"] = gather_system_software_versions(with_licenses=with_licenses)
     versions_by_depth["Versioned Loaded Shared Libraries"] = gather_shared_library_versions()
     return versions_by_depth
 
@@ -334,12 +335,12 @@ def create_oss_markdown(version_info: VersionInformation) -> str:
     return result
 
 
-def print_oss_attributions(short: bool = False) -> None:
+def print_oss_attributions(short: bool = False, with_licenses: bool = False) -> None:
     def do_for_distribution(distribution):
         if 'Name' not in distribution.metadata:
             return
 
-        version_info = gather_version_information(distribution)
+        version_info = gather_version_information(distribution, with_licenses=with_licenses)
         if short:
             print(f"{version_info.name:20} {distribution.version:12} {version_info.license_short}")
             return
@@ -354,7 +355,7 @@ def print_oss_attributions(short: bool = False) -> None:
 
     print("\nSystem Software:\n")
 
-    system_software_versions = gather_system_software_versions()
+    system_software_versions = gather_system_software_versions(with_licenses=with_licenses)
     shared_library_versions = gather_shared_library_versions()
     for name, values in sorted(NON_PYTHON_LIB_LICENSES.items()):
         githubPath, shortLicense = values
@@ -366,6 +367,6 @@ def print_oss_attributions(short: bool = False) -> None:
             # {version:12} in the middle is missing because I don't have this information here.
             print(f"{name:20} {version:12} {shortLicense}")
             continue
-
-        homepage, licenseContents = get_url_and_license_from_github_subpath(githubPath)
-        print(f"# {name}\n\n{homepage}\n\n\n```\n{licenseContents}\n```\n\n")
+        if with_licenses:
+            homepage, licenseContents = get_url_and_license_from_github_subpath(githubPath)
+            print(f"# {name}\n\n{homepage}\n\n\n```\n{licenseContents}\n```\n\n")
