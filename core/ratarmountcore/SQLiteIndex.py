@@ -937,7 +937,7 @@ class SQLiteIndex:
         Return a dictionary for the given directory path: { fileName : FileInfo, ... } or None
         if the path does not exist.
 
-        There is no file version argument because it is hard to apply correctl.y
+        There is no file version argument because it is hard to apply correctly.
         Even if a folder was overwritten by a file, which is already not well supported by tar,
         then list for that path will still list all contents of the overwritten folder or folders,
         no matter the specified version. The file system layer has to take care that a directory

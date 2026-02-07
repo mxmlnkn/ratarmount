@@ -68,6 +68,7 @@ class FileFormatID(enum.Enum):
     RATARMOUNT_INDEX = 0x901
     WARC             = 0x902
     HTML             = 0x903
+    PDF              = 0x904
 
     # Compression formats (compresses a single file / stream)
     BZIP2            = 0x1001
@@ -395,6 +396,8 @@ ARCHIVE_FORMATS: dict[FileFormatID, FileFormatInfo] = {
     FID.WARC: FileFormatInfo(['warc'], b'WARC/1.'),
     # HTML files with embedded data URLs
     FID.HTML: FileFormatInfo(['html', 'htm'], None, is_html_file),
+    # PDF files with embedded files
+    FID.PDF: FileFormatInfo(['pdf'], b'%PDF-', None),
 }
 
 COMPRESSION_FORMATS: dict[FileFormatID, FileFormatInfo] = {

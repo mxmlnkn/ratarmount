@@ -11,6 +11,7 @@ from .formats.ext4 import EXT4MountSource
 from .formats.fat import FATMountSource
 from .formats.html import HTMLMountSource
 from .formats.libarchive import LibarchiveMountSource
+from .formats.pdf import PDFMountSource
 from .formats.py7zr import Py7zrMountSource
 from .formats.rar import RarMountSource
 from .formats.sqlar import SQLARMountSource
@@ -141,5 +142,6 @@ ARCHIVE_BACKENDS: dict[str, ArchiveBackendInfo] = {
     "asar": ArchiveBackendInfo(ASARMountSource, {FID.ASAR}, []),
     "sqlar": ArchiveBackendInfo(SQLARMountSource, {FID.SQLAR}, []),
     "html": ArchiveBackendInfo(HTMLMountSource, {FID.HTML}, []),
+    "pdf": ArchiveBackendInfo(PDFMountSource, {FID.PDF}, [('pypdf', 'pypdf')]),
     "RatarmountIndex": ArchiveBackendInfo(SQLiteIndexMountSource, {FID.RATARMOUNT_INDEX}, []),
 }

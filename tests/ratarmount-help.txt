@@ -228,7 +228,7 @@ Advanced Options:
                         be opened with multiple backends. Arguments specified last will have the
                         highest priority. A comma-separated list may be specified. Possible
                         backends: PySquashfsImage, RatarmountIndex, ar, asar, ext4, html,
-                        indexed_gzip, indexed_zstd, libarchive, lzmaffi, py7zr, pyfatfs,
+                        indexed_gzip, indexed_zstd, libarchive, lzmaffi, pdf, py7zr, pyfatfs,
                         rapidgzip, rapidgzip-bzip2, rarfile, sqlar, tarfile, xz, zipfile
                         (default: None)
   -f, --foreground, --no-foreground

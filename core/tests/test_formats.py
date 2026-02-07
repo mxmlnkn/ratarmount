@@ -34,7 +34,7 @@ def test_format_detection():
     folder = os.path.dirname(find_test_file("tests/single-file.tar"))
     for name in os.listdir(folder):
         path = os.path.join(folder, name)
-        if not os.path.isfile(path):
+        if name.rsplit('.')[-1].lower() in {'aux', 'log', 'tex', 'out'} or not os.path.isfile(path):
             continue
 
         with open(path, 'rb') as file:

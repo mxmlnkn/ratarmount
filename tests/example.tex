@@ -1,0 +1,39 @@
+% latexmk example.tex
+\documentclass[a4paper]{article}
+
+\usepackage{attachfile}
+\usepackage{graphicx}
+\usepackage{listings}
+
+\title{Ratarmount PDF Backend Test Sample}
+\author{Ratarmount}
+\date{}
+
+\begin{document}
+\maketitle
+
+This PDF demonstrates the PDF backend functionality.
+It contains both visible content and embedded files.
+
+\section{Visible Content}
+\begin{itemize}
+  \item This text is visible when you open the PDF
+  \item The PDF also contains images and graphics
+\end{itemize}
+
+\clearpage
+
+\section{Image}
+Included is the smallest PNG that was committed at the time.
+Determined with \lstinline!git ls-files '*.png' -z | xargs -0 wc -c | sort -n | head -1!.
+
+\centerline{\includegraphics[width=6cm]{../benchmarks/plots/sqlite cache size benchmark 128k files.png}}
+
+\section{Embedded Files}
+The following files are embedded in the PDF:
+\begin{itemize}
+  \item \attachfile{example.tex}
+  \item \attachfile{single-file.tar}
+\end{itemize}
+
+\end{document}

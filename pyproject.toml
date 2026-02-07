@@ -75,6 +75,7 @@ sqlar = ["ratarmountcore[sqlar]"]
 fat = ["ratarmountcore[fat]"]
 ext4 = ["ratarmountcore[ext4]"]
 git = ["ratarmountcore[git]"]
+pdf = ["ratarmountcore[pdf]"]
 
 [project.scripts]
 ratarmount = "ratarmount.cli:cli"
