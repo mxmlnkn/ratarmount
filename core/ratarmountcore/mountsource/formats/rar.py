@@ -1,7 +1,6 @@
 import builtins
 import contextlib
 import datetime
-import os
 import posixpath
 import stat
 import sys

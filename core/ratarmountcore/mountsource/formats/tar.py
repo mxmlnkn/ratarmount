@@ -27,7 +27,7 @@ from ratarmountcore.formats import FileFormatID, might_be_format
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
 from ratarmountcore.ProgressBar import ProgressBar
-from ratarmountcore.SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData
+from ratarmountcore.SQLiteIndex import SQLiteIndex, SQLiteIndexedTarUserData  # noqa: F401
 from ratarmountcore.StenciledFile import RawStenciledFile, StenciledFile, ZeroFile
 from ratarmountcore.utils import (
     CompressionError,
