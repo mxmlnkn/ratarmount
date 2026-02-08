@@ -16,20 +16,13 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from helpers import find_test_file
 from ratarmountcore.mountsource.formats.zip import ZipMountSource
 
 try:
     import pyminizip
 except ImportError:
     pyminizip = None  # type: ignore
-
-
-def find_test_file(relativePathOrName):
-    for i in range(3):
-        path = os.path.sep.join([".."] * i + ["tests", relativePathOrName])
-        if os.path.exists(path):
-            return path
-    return relativePathOrName
 
 
 password = "foo"
