@@ -39,7 +39,7 @@ jobs:
 
     - name: Style Check With Black
       run: |
-        python3 -m pip install black
+        python3 -m pip install black~=25.0
         black -q --diff --line-length 120 --skip-string-normalization $( git ls-tree -r --name-only HEAD | 'grep' '[.]py$' | 'grep' -v '/_external/' ) > black.diff
         if [ -s black.diff ]; then
             cat black.diff
