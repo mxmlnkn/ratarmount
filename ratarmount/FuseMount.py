@@ -122,6 +122,7 @@ class FuseMount(fuse.Operations):
 
         self.writeOverlay: Optional[WritableFolderMountSource] = None
         self.overlayPath: Optional[str] = None
+        self._temporaryOverlayFolder: Optional[tempfile.TemporaryDirectory] = None
 
         # Maps handles to either opened I/O objects or os module file handles for the writeOverlay and the open flags.
         self.openedFiles: dict[int, tuple[int, Union[IO[bytes], int]]] = {}
@@ -165,9 +166,14 @@ class FuseMount(fuse.Operations):
 
         # Add write overlay as folder mount source to read from with highest priority.
         if 'writeOverlay' in options and isinstance(options['writeOverlay'], str) and options['writeOverlay']:
-            self.overlayPath = os.path.realpath(options['writeOverlay'])
-            if not os.path.exists(self.overlayPath):
-                os.makedirs(self.overlayPath, exist_ok=True)
+            if options['writeOverlay'] == ':temp:':
+                self._temporaryOverlayFolder = tempfile.TemporaryDirectory()
+                self.overlayPath = self._temporaryOverlayFolder.name
+                logger.info("Created temporary overlay directory: %s", self.overlayPath)
+            else:
+                self.overlayPath = os.path.realpath(options['writeOverlay'])
+                if not os.path.exists(self.overlayPath):
+                    os.makedirs(self.overlayPath, exist_ok=True)
             pathToMount.append(self.overlayPath)
 
         # Take care that bind-mounting folders to itself works
@@ -301,6 +307,17 @@ class FuseMount(fuse.Operations):
         self._close()
 
     def _close(self) -> None:
+        if _temporaryOverlayFolder := getattr(self, '_temporaryOverlayFolder', None):
+            try:
+                _temporaryOverlayFolder.cleanup()  # ignore_cleanup_errors=True is a Python 3.10+ feature!
+            except Exception as exception:
+                logger.warning(
+                    "Failed to cleanup temporary overlay directory %s because of: %s",
+                    _temporaryOverlayFolder,
+                    exception,
+                    exc_info=logger.isEnabledFor(logging.DEBUG),
+                )
+
         if logFile := getattr(self, 'logFile', None):
             try:
                 if sys.stdout == logFile:
