@@ -286,7 +286,7 @@ jobs:
     - name: CLI Tests (Linux)
       if: ${{ startsWith( matrix.os, 'ubuntu' ) }}
       run: |
-        python3 -m pip install pytest
+        python3 -m pip install pytest pytest-order
         # First off, n=auto seems to use the physical cores and ignores virtual ones.
         # Secondly, these tests scale much better than the others because most time is spent waiting for
         # the FUSE mount point to appear or disappear, which doesn't seem to be bottlenecked by CPU usage.
