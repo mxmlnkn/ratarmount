@@ -29,6 +29,7 @@ from ratarmount import CLIHelpers
 from .cli import create_parser
 from .fuse import fuse
 from .WriteOverlay import WritableFolderMountSource
+from .MemoryMountSource import MemoryMountSource
 
 logger = logging.getLogger(__name__)
 
@@ -164,16 +165,21 @@ class FuseMount(fuse.Operations):
         options['writeIndex'] = True
 
         # Add write overlay as folder mount source to read from with highest priority.
+        memoryOverlay: Optional[MemoryOverlay] = None
         if 'writeOverlay' in options and isinstance(options['writeOverlay'], str) and options['writeOverlay']:
             if options['writeOverlay'] == ':temp:':
                 self._temporaryOverlayFolder = tempfile.TemporaryDirectory(prefix="ratarmount-write-overlay.")
                 self.overlayPath = self._temporaryOverlayFolder.name
                 logger.info("Created temporary overlay directory: %s", self.overlayPath)
+                pathToMount.append(self.overlayPath)
+            elif options['writeOverlay'] == ':memory:':
+                self.overlayPath = ''
+                memoryOverlay = MemoryOverlay()
             else:
                 self.overlayPath = os.path.realpath(options['writeOverlay'])
                 if not os.path.exists(self.overlayPath):
                     os.makedirs(self.overlayPath, exist_ok=True)
-            pathToMount.append(self.overlayPath)
+                pathToMount.append(self.overlayPath)
 
         # Take care that bind-mounting folders to itself works
         mountSources: list[tuple[str, MountSource]] = []
@@ -199,6 +205,9 @@ class FuseMount(fuse.Operations):
             # FUSE mount point.
             if options.get('lazyMounting', False):
                 self._filter_index_locations_in_fuse_mount(options)
+
+        if memoryOverlay:
+            mountSources.append(memoryOverlay)
 
         # Open log file.
         openLog: Optional[Callable[[int], IO[bytes]]] = None
@@ -261,13 +270,13 @@ class FuseMount(fuse.Operations):
         if join_threads is not None:
             join_threads()
 
-        if self.overlayPath:
+        if self.overlayPath is not None:
             ignoredPrefixes: list[str] = []
             if self._enableControlInterface:
                 ignoredPrefixes.append(self._controlLayerPrefix)
             self.writeOverlay = WritableFolderMountSource(
                 self.overlayPath, self.mountSource, ignoredPrefixes=ignoredPrefixes
-            )
+            ) if self.overlayPath else memoryOverlay
 
             self.chmod = self.writeOverlay.chmod
             self.chown = self.writeOverlay.chown
