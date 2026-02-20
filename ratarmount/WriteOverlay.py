@@ -69,7 +69,7 @@ class WritableFolderMountSource(fuse.Operations):
     hiddenDatabaseName = '.ratarmount.overlay.sqlite'
 
     def __init__(self, path: str, mountSource: MountSource, ignoredPrefixes: Optional[list[str]] = None) -> None:
-        if os.path.exists(path):
+        if os.path.lexists(path):
             if not os.path.isdir(path):
                 raise ValueError("Overlay path must be a folder!")
         else:
@@ -261,7 +261,7 @@ class WritableFolderMountSource(fuse.Operations):
         # This is only because it might be confusing for the user else but in general, the metadata in the SQLite
         # database should take precedence if e.g. the underlying file systems does not support them.
         try:
-            if os.path.exists(self._realpath(path)):
+            if os.path.lexists(self._realpath(path)):
                 applyMetadataToFile(self._realpath(path))
         except Exception:
             traceback.print_exc()
@@ -331,7 +331,7 @@ class WritableFolderMountSource(fuse.Operations):
         self.sqlConnection.execute('DELETE FROM "files" WHERE "path" == (?) and "name" == (?)', (folder, name))
         self._set_file_metadata(old, lambda p: None, {'path': folder, 'name': name})
 
-        if os.path.exists(self._realpath(old)):
+        if os.path.lexists(self._realpath(old)):
             os.rename(self._realpath(old), self._realpath(new))
         else:
             self._ensure_parent_exists(new)
@@ -357,7 +357,7 @@ class WritableFolderMountSource(fuse.Operations):
     def link(self, target: str, source: str):
         # Can only hardlink to files which are also in the overlay folder.
         overlaySource = self._realpath(source)
-        if not os.path.exists(overlaySource) and self.mountSource.lookup(source):
+        if not os.path.lexists(overlaySource) and self.mountSource.lookup(source):
             raise fuse.FuseOSError(errno.EXDEV)
 
         target = self._realpath(target)
@@ -429,7 +429,7 @@ class WritableFolderMountSource(fuse.Operations):
             raise fuse.FuseOSError(errno.ENOENT)
 
         try:
-            if os.path.exists(self._realpath(path)):
+            if os.path.lexists(self._realpath(path)):
                 os.unlink(self._realpath(path))
         except Exception as exception:
             traceback.print_exc()
