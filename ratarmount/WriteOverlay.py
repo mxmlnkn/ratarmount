@@ -331,11 +331,10 @@ class WritableFolderMountSource(fuse.Operations):
         self.sqlConnection.execute('DELETE FROM "files" WHERE "path" == (?) and "name" == (?)', (folder, name))
         self._set_file_metadata(old, lambda p: None, {'path': folder, 'name': name})
 
+        self._ensure_parent_exists(new)
         if os.path.lexists(self._realpath(old)):
             os.rename(self._realpath(old), self._realpath(new))
         else:
-            self._ensure_parent_exists(new)
-
             fileInfo = self.mountSource.lookup(old)
             if fileInfo is None:
                 raise fuse.FuseOSError(errno.ENOENT)
