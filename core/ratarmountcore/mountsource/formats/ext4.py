@@ -1,3 +1,4 @@
+import types
 from collections.abc import Iterable
 from typing import IO, Any, Optional, Union
 
@@ -37,6 +38,18 @@ class EXT4MountSource(MountSource):
         self.encoding = encoding
         self.fileObject = open(fileOrPath, 'rb') if isinstance(fileOrPath, str) else fileOrPath
         self.fileObjectWasOpened = isinstance(fileOrPath, str)
+
+        # pyext4 1.2.2 -> 1.2.3 suddenly checks for the peek method even though it is only ever required
+        # when calling ext4.block.BlockIO.peek. So, for now, simply inject a dummy peek method to placate
+        # this major version API break change introduced in this bugfix release.
+        # I actually have pinned ext4 to 1.1 for similar reasons, but it is not available for Python 3.14.
+        if not hasattr(self.fileObject, "peek"):
+
+            def _dummy_peek(self, *args, **kwargs):
+                raise NotImplementedError
+
+            self.fileObject.peek = types.MethodType(_dummy_peek, self.fileObject)  # type: ignore
+
         self.fileSystem = ext4.Volume(self.fileObject)
         self.options = options
 
