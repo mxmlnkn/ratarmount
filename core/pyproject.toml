@@ -213,8 +213,76 @@ zstd = [
 ]
 # Bundled with fix because of https://github.com/nathanhi/pyfatfs/issues/41
 fat = []
+
 # Not part of 'full' because it does exact pinning for its dependencies, which does lead to dependency conflicts.
-ext4 = ['ext4 ~= 1.1']
+#
+# 1.2.3 seems to cause segfaults in "Micro-Tests (ubuntu-latest, 3.12, system)!
+#
+#   tests/test_cli.py::test_file_in_archive
+#     [2709a3348eb2c52302a7606ecf5860bc-nested-tar-1M.ext4.bz2-nested-tar-1M.ext4/foo/fighter/ufo-2] PASSED [ 98%]
+#   Fatal Python error: Segmentation fault
+#
+#   Current thread 0x00007f950f1996c0 (most recent call first):
+#     File "/opt//python3.12/site-packages/ext4/directory.py", line 24 in read_from_volume
+#     File "/opt//python3.12/site-packages/ext4/struct.py", line 32 in __init__
+#     File "/opt//python3.12/site-packages/ext4/directory.py", line 20 in __init__
+#     File "/opt//python3.12/site-packages/ext4/inode.py", line 437 in _opendir
+#     File "/opt//python3.12/site-packages/ext4/inode.py", line 505 in opendir
+#     File "/opt//python3.12/site-packages/ratarmountcore/mountsource/formats/ext4.py", line 92 in _list
+#     File "/opt//python3.12/site-packages/ratarmountcore/mountsource/formats/ext4.py", line 98 in list
+#     File "/opt//python3.12/site-packages/ratarmountcore/mountsource/compositing/automount.py", line 339 in list
+#     File "/opt//python3.12/site-packages/ratarmountcore/mountsource/compositing/automount.py", line 71 in __init__
+#     File "/home/runner/work/ratarmount/ratarmount/ratarmount/FuseMount.py", line 244 in __init__
+#     File "/home/runner/work/ratarmount/ratarmount/ratarmount/actions.py", line 264 in create_fuse_mount
+#     File "/home/runner/work/ratarmount/ratarmount/ratarmount/actions.py", line 232 in process_parsed_arguments
+#     File "/home/runner/work/ratarmount/ratarmount/ratarmount/actions.py", line 64 in wrapper
+#     File "/home/runner/work/ratarmount/ratarmount/ratarmount/cli.py", line 559 in cli
+#     File "/opt//python3.12/threading.py", line 1012 in run
+#     File "/opt//python3.12/threading.py", line 1075 in _bootstrap_inner
+#     File "/opt//python3.12/threading.py", line 1032 in _bootstrap
+#
+#   Thread 0x00007f97b58f4b80 (most recent call first):
+#     File "/home/runner/work/ratarmount/ratarmount/tests/test_cli.py", line 116 in wait_for_mount_point
+#     File "/home/runner/work/ratarmount/ratarmount/tests/test_cli.py", line 55 in __enter__
+#     File "/home/runner/work/ratarmount/ratarmount/tests/test_cli.py", line 378 in test_file_in_archive
+#     File "/opt//python3.12/site-packages/_pytest/python.py", line 166 in pytest_pyfunc_call
+#     File "/opt//python3.12/site-packages/pluggy/_callers.py", line 121 in _multicall
+#     File "/opt//python3.12/site-packages/pluggy/_manager.py", line 120 in _hookexec
+#     File "/opt//python3.12/site-packages/pluggy/_hooks.py", line 512 in __call__
+#     File "/opt//python3.12/site-packages/_pytest/python.py", line 1720 in runtest
+#     File "/opt//python3.12/site-packages/_pytest/runner.py", line 179 in pytest_runtest_call
+#     File "/opt//python3.12/site-packages/pluggy/_callers.py", line 121 in _multicall
+#     File "/opt//python3.12/site-packages/pluggy/_manager.py", line 120 in _hookexec
+#     File "/opt//python3.12/site-packages/pluggy/_hooks.py", line 512 in __call__
+#     File "/opt//python3.12/site-packages/_pytest/runner.py", line 245 in <lambda>
+#     File "/opt//python3.12/site-packages/_pytest/runner.py", line 353 in from_call
+#     File "/opt//python3.12/site-packages/_pytest/runner.py", line 244 in call_and_report
+#     File "/opt//python3.12/site-packages/_pytest/runner.py", line 137 in runtestprotocol
+#     File "/opt//python3.12/site-packages/_pytest/runner.py", line 118 in pytest_runtest_protocol
+#     File "/opt//python3.12/site-packages/pluggy/_callers.py", line 121 in _multicall
+#     File "/opt//python3.12/site-packages/pluggy/_manager.py", line 120 in _hookexec
+#     File "/opt//python3.12/site-packages/pluggy/_hooks.py", line 512 in __call__
+#     File "/opt//python3.12/site-packages/_pytest/main.py", line 396 in pytest_runtestloop
+#     File "/opt//python3.12/site-packages/pluggy/_callers.py", line 121 in _multicall
+#     File "/opt//python3.12/site-packages/pluggy/_manager.py", line 120 in _hookexec
+#     File "/opt//python3.12/site-packages/pluggy/_hooks.py", line 512 in __call__
+#     File "/opt//python3.12/site-packages/_pytest/main.py", line 372 in _main
+#     File "/opt//python3.12/site-packages/_pytest/main.py", line 318 in wrap_session
+#     File "/opt//python3.12/site-packages/_pytest/main.py", line 365 in pytest_cmdline_main
+#     File "/opt//python3.12/site-packages/pluggy/_callers.py", line 121 in _multicall
+#     File "/opt//python3.12/site-packages/pluggy/_manager.py", line 120 in _hookexec
+#     File "/opt//python3.12/site-packages/pluggy/_hooks.py", line 512 in __call__
+#     File "/opt//python3.12/site-packages/_pytest/config/__init__.py", line 199 in main
+#     File "/opt//python3.12/site-packages/_pytest/config/__init__.py", line 223 in console_main
+#     File "<string>", line 1 in <module>
+#
+#   /home/runner/work/_temp/71e5ee6e-2c4d-454b-ab78-a26705d4cc3d.sh: line 12:  4414 Segmentation fault
+#     (core dumped) python3 -X dev -W ignore::DeprecationWarning:fuse -u -c
+#     "import pytest, sys; sys.argv=['-rs', '-v']; sys.exit(pytest.console_main())"
+#     --disable-warnings tests/test_cli.py
+#   tests/test_cli.py::test_file_in_archive
+#     [2709a3348eb2c52302a7606ecf5860bc-nested-tar-1M.ext4.bz2-nested-tar-1M.ext4/foo/fighter/ufo-0]
+ext4 = ['ext4 ~= 1.1, <1.2.3']
 # All optional dependencies of asyncssh via sshfs. I have not yet needed any of these.
 # Half of these are installed anyway via other dependencies.
 full-ssh = [
