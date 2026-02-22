@@ -228,9 +228,9 @@ Advanced Options:
                         be opened with multiple backends. Arguments specified last will have the
                         highest priority. A comma-separated list may be specified. Possible
                         backends: PySquashfsImage, RatarmountIndex, ar, asar, ext4, html,
-                        indexed_gzip, indexed_zstd, libarchive, lzmaffi, pdf, py7zr, pyfatfs,
-                        rapidgzip, rapidgzip-bzip2, rarfile, sqlar, tarfile, xz, zipfile
-                        (default: None)
+                        indexed_gzip, indexed_zstd, libarchive, lzmaffi, ogg, pdf, py7zr,
+                        pyfatfs, rapidgzip, rapidgzip-bzip2, rarfile, sqlar, tarfile, xz,
+                        zipfile (default: None)
   -f, --foreground, --no-foreground
                         Keeps the python program in foreground so it can print debug output when
                         the mounted path is accessed. (default: False)

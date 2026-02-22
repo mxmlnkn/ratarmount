@@ -87,6 +87,13 @@ class FileFormatID(enum.Enum):
     RPM              = 0x1025
     UU               = 0x1026
     Z                = 0x1027
+
+    # Multimedia container formats
+    AVI              = 0x1101
+    MKV              = 0x1102
+    MP4              = 0x1103
+    RMVB             = 0x1104
+    OGG              = 0x1105
     # fmt: on
 
 
@@ -171,6 +178,23 @@ def is_asar(fileobj: IO[bytes]) -> bool:
         # The unnecessary pickling already should introduce enough redundancy for checks and detection.
         find_asar_header(fileobj)
         return True
+    except Exception:
+        pass
+    finally:
+        fileobj.seek(offset)
+    return False
+
+
+def is_avi(fileobj: IO[bytes]) -> bool:
+    offset = fileobj.tell()
+    try:
+        # AVI files start with 'RIFF' followed by file size and 'AVI '
+        header = fileobj.read(12)
+        if len(header) < 12:
+            return False
+        if header[:4] != b'RIFF':
+            return False
+        return header[8:12] == b'AVI '
     except Exception:
         pass
     finally:
@@ -398,6 +422,12 @@ ARCHIVE_FORMATS: dict[FileFormatID, FileFormatInfo] = {
     FID.HTML: FileFormatInfo(['html', 'htm'], None, is_html_file),
     # PDF files with embedded files
     FID.PDF: FileFormatInfo(['pdf'], b'%PDF-', None),
+    # Multimedia containers
+    FID.AVI: FileFormatInfo(['avi'], b'RIFF', is_avi),
+    FID.MKV: FileFormatInfo(['mkv', 'mka', 'mks', 'mk3d', 'webm'], b'\x1a\x45\xdf\xa3', None),
+    FID.MP4: FileFormatInfo(['mp4'], b'ftypMSNV', None),
+    FID.RMVB: FileFormatInfo(['rmvb', 'rmb'], b'.RMF', None),
+    FID.OGG: FileFormatInfo(['ogm', 'ogv'], b'OggS\x00', None),
 }
 
 COMPRESSION_FORMATS: dict[FileFormatID, FileFormatInfo] = {

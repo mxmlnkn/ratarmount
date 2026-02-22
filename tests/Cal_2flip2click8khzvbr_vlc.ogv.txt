@@ -1,0 +1,25 @@
+https://commons.wikimedia.org/wiki/File:Cal_2flip2click8khzvbr_vlc.ogv
+
+English: Calibration video of eight seconds duration at 25 frames per second with audio click track to test how well media players handle Theora OGG video files and audio video synchronisation.
+
+Derived from File:Calibration-test-white.png, see that file's page description for details of the test pattern.
+
+See User:84user/Video tests for details on how this video was created and selected test results.
+
+A correct Theora OGG media player should play this file at 25 frames per second as follows:
+
+    sound click number 1 at zero seconds
+    display pattern File:Calibration-test-white.png for one second
+    sound click number 2 at one second
+    display pattern File:Calibration-test-white.png horizontally flipped for one second
+    repeat the preceding two seconds three more times
+
+Each click should sound exactly one second apart and exactly when the pattern changes, and there should be eight clicks in total.
+
+Date: 2000 (image created); 15 November 2009 (video created)
+
+This file is licensed under the Creative Commons Attribution-Share Alike 3.0 Unported license.
+    Attribution:
+        Nevit Dilmen
+
+Nevit Dilmen (image created); 84user (video encoded)
