@@ -14,7 +14,12 @@ from ratarmountcore.mountsource.factory import open_mount_source
 from ratarmountcore.mountsource.formats.folder import FolderMountSource
 from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar, SQLiteIndexedTarUserData
 from ratarmountcore.StenciledFile import JoinedFileFromFactory
-from ratarmountcore.utils import RatarmountError, determine_recursion_depth, overrides
+from ratarmountcore.utils import (
+    RatarmountError,
+    create_folder_from_file_permissions,
+    determine_recursion_depth,
+    overrides,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -225,7 +230,7 @@ class AutoMountLayer(MountSource):
             return None
 
         rootFileInfo = archiveFileInfo.clone()
-        rootFileInfo.mode = (rootFileInfo.mode & 0o777) | stat.S_IFDIR
+        rootFileInfo.mode = create_folder_from_file_permissions(rootFileInfo.mode)
         rootFileInfo.linkname = ""
         rootFileInfo.userdata = [mountPoint]
         mountInfo = AutoMountLayer.MountInfo(mountSource, rootFileInfo, recursionDepth)
@@ -327,7 +332,13 @@ class AutoMountLayer(MountSource):
                         files.add(folderName)
                     else:
                         files.update(
-                            {folderName: mountInfo.rootFileInfo.mode if onlyMode else mountInfo.rootFileInfo.clone()}
+                            {
+                                folderName: (
+                                    mountInfo.rootFileInfo.mode | stat.S_IXUSR
+                                    if onlyMode
+                                    else mountInfo.rootFileInfo.clone()
+                                )
+                            }
                         )
 
         return files

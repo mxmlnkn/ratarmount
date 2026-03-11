@@ -7,6 +7,7 @@ import math
 import os
 import pathlib
 import platform
+import stat
 import string
 import sys
 import types
@@ -403,3 +404,13 @@ def get_userid():
 
 def get_groupid():
     return os.getgid() if hasattr(os, 'getgid') else 0
+
+
+def create_folder_from_file_permissions(mode: int) -> int:
+    return (
+        (mode & 0o777)
+        | stat.S_IFDIR
+        | (stat.S_IXUSR if mode & stat.S_IRUSR != 0 else 0)
+        | (stat.S_IXGRP if mode & stat.S_IRGRP != 0 else 0)
+        | (stat.S_IXOTH if mode & stat.S_IROTH != 0 else 0)
+    )

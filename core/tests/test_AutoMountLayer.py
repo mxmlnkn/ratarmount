@@ -143,6 +143,42 @@ class TestAutoMountLayer:
             # assert recursivelyMounted.open(recursivelyMounted.lookup('/ufo_00/ufo')).read() == b'iriya\n'
 
     @staticmethod
+    def test_permissions(parallelization):
+        options = {
+            'clearIndexCache': True,
+            'recursive': True,
+            'parallelization': parallelization,
+        }
+
+        with (
+            copy_test_file("tests/nested-without-execution-flag.zip") as path,
+            open_mount_source(path, **options) as mountSource,
+        ):
+            recursivelyMounted = AutoMountLayer(mountSource, **options)
+
+            for folder in ['/', '/foo', '/foo/lighter.tar', '/foo/lighter.tar/fighter']:
+                fileInfo = recursivelyMounted.lookup(folder)
+                assert fileInfo
+                assert recursivelyMounted.list(folder)
+                assert recursivelyMounted.versions(folder) > 0
+
+                # Folders must have the executable flag. It may work without those in FUSE,
+                # but it will lead to permission errors when copying folders out of the mount point!
+                assert stat.S_ISDIR(fileInfo.mode)
+                assert fileInfo.mode & stat.S_IRUSR != 0
+                assert fileInfo.mode & stat.S_IXUSR != 0
+
+            for mountedFile in ['/foo/fighter/ufo', '/foo/lighter.tar/fighter/bar']:
+                fileInfo = recursivelyMounted.lookup(mountedFile)
+                assert fileInfo
+                assert recursivelyMounted.versions(folder) > 0
+
+                assert stat.S_ISREG(fileInfo.mode)
+                assert fileInfo.mode & stat.S_IRUSR != 0
+                if 'lighter.tar' not in mountedFile:
+                    assert fileInfo.mode & stat.S_IRWXG == 0
+
+    @staticmethod
     @pytest.mark.parametrize("recursive", [False])
     @pytest.mark.parametrize("maxRecursionDepth", range(7))
     def test_recursion_depth(parallelization, recursive, maxRecursionDepth):
