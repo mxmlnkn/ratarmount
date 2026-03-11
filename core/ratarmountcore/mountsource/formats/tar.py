@@ -33,6 +33,7 @@ from ratarmountcore.utils import (
     InvalidIndexError,
     RatarmountError,
     ceil_div,
+    create_folder_from_file_permissions,
     decode_unpadded_base64,
     determine_recursion_depth,
     overrides,
@@ -911,20 +912,6 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
             if isTar:
                 modifiedFileInfo = list(fileInfo)
-
-                # if the TAR file contents could be read, we need to adjust the actual
-                # TAR file's metadata to be a directory instead of a file.
-                # Avoid overwriting that data, instead add new one such that it can be versioned
-                # or ignored on depending on the recursion depth!
-                mode = modifiedFileInfo[6]
-                mode = (
-                    (mode & 0o777)
-                    | stat.S_IFDIR
-                    | (stat.S_IXUSR if mode & stat.S_IRUSR != 0 else 0)
-                    | (stat.S_IXGRP if mode & stat.S_IRGRP != 0 else 0)
-                    | (stat.S_IXOTH if mode & stat.S_IROTH != 0 else 0)
-                )
-
                 if modifiedFolder != modifiedFileInfo[0] or modifiedName != modifiedFileInfo[1]:
                     modifiedFileInfo[0] = modifiedFolder
                     modifiedFileInfo[1] = modifiedName
@@ -936,7 +923,11 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
                     # to be 0 modulo 512, so the original offsets can be reconstructed even after adding 1.
                     modifiedFileInfo[2] = modifiedFileInfo[2] + 1
                     modifiedFileInfo[3] = modifiedFileInfo[3] + 1
-                modifiedFileInfo[6] = mode
+                # if the TAR file contents could be read, we need to adjust the actual
+                # TAR file's metadata to be a directory instead of a file.
+                # Avoid overwriting that data, instead add new one such that it can be versioned
+                # or ignored on depending on the recursion depth!
+                modifiedFileInfo[6] = create_folder_from_file_permissions(modifiedFileInfo[6])
                 modifiedFileInfo[11] = isTar
                 modifiedFileInfo[13] = True  # is generated, i.e., does not have xattr
                 modifiedFileInfo[14] += 1  # recursion depth
