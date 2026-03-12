@@ -142,7 +142,7 @@ class HTMLDataURLParser(HTMLParser):
         self._entity_refs: list[LineOffset] = []
 
     @overrides(HTMLParser)
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str]]) -> None:
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
         """
         For instance, for the tag <A HREF="https://www.cwi.nl/">, this method would be called as
         handle_starttag('a', [('href', 'https://www.cwi.nl/')]).
@@ -150,10 +150,11 @@ class HTMLDataURLParser(HTMLParser):
         self._update_end_offset()
 
         # getpos gives the start offset of the current tag.
-        if not any(v.startswith('data:') for _, v in attrs):
-            return
-
-        attributes = dict(attrs)
+        attributes = {
+            attribute: value
+            for attribute, value in attrs
+            if value and (value.startswith('data:') or value.startswith('data-savepage-'))
+        }
         for attribute, value in attributes.items():
             if not value.startswith('data:'):
                 continue
