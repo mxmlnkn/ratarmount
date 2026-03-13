@@ -330,8 +330,9 @@ jobs:
 
     - name: Module tests without fusepy
       run: |
+        python3 -m pip install pytest
         python3 -m pip uninstall -y fusepy mfusepy
-        python3 tests/tests.py
+        pytest -rs -v tests/tests.py
 
 
   Unit-Tests:
