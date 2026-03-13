@@ -8,7 +8,8 @@
 # https://setuptools.readthedocs.io/en/latest/history.html#id284
 # Use setuptools <= 82 because the license specification changes backward-incompatible in 2026-02.
 # https://github.com/pypa/setuptools/issues/4903#issuecomment-2923109576
-requires = ["setuptools >= 61, <= 82", "wheel"]
+# <= major must not be used for pinning because it will only match major.0.0 not any higher version!
+requires = ["setuptools >= 61, < 83", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
