@@ -1,4 +1,4 @@
-__version__ = '1.2.1'
+__version__ = '1.2.2'
 
 # Ideas that would require a new major version:
 #  - Adhere to PEP 8 for FuseMount arguments and so on.

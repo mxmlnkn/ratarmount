@@ -1,3 +1,14 @@
+# Version 1.2.2 built on 2026-03-13
+
+## Fixes
+
+ - `WriteOverlay`: Moving a newly created file into a subfolder of the read-only source failed.
+ - `WriteOverlay`: Broken symbolic links were not correctly removed from the overlay folder.
+ - Avoid network requests for `--version` and `--oss-attributions-short`.
+ - Automatically create parent paths to log file specified with `--log-file` if they do not exist.
+ - Make format detection more robust against empty or small files and without `sqlcipher3` installed.
+
+
 # Version 1.2.1 built on 2025-11-19
 
 ## Fixes

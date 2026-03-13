@@ -1,3 +1,21 @@
+# Version 0.10.3 built on 2026-03-13
+
+## Fixes
+
+ - Narrow `python-ext4` pinning to < 1.2.3 to avoid spurious segfaults.
+ - Do not crash on Windows when libarchive is not installed.
+ - Make format detection more robust against empty or small files and without `sqlcipher3` installed.
+ - Add fallback for `os.getuid()` and `os.getgid()` because they do not work on Windows.
+ - Use `posixpath.normpath` because even on Windows the `libfuse` and archive interfaces use forward slashes.
+ - Accept `pathlib.Path` as input for `LibarchiveMountSource` and `ZipMountSource`.
+ - Ensure that recursively mounted folders have the executable flag set.
+ - Fix setuptools pinning so that AUR `--no-isolation` build and similar ones work for just a little while longer.
+ - `SQLiteIndexedTar`: Avoid exception when closing half-initialized state.
+ - `StenciledFile`: Some (fsspec) file objects do not like being queried when closed, so check against that.
+ - `py7zr`: Improve file closing.
+ - `ZipMountSource`: Default to read-write permissions if no permissions are set.
+
+
 # Version 0.10.2 built on 2025-11-19
 
 ## Fixes
