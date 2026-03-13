@@ -4,6 +4,7 @@ import errno
 import io
 import logging
 import os
+import stat
 import subprocess
 import sys
 import tempfile
@@ -16,6 +17,7 @@ from ratarmountcore.mountsource import FileInfo, MountSource
 
 # These imports can be particularly expensive when all fsspec backends are installed.
 from ratarmountcore.mountsource.compositing.automount import AutoMountLayer
+from ratarmountcore.mountsource.compositing.link import LinkResolutionUnionMountSource
 from ratarmountcore.mountsource.compositing.removeprefix import RemovePrefixMountSource
 from ratarmountcore.mountsource.compositing.singlefile import SingleFileMountSource
 from ratarmountcore.mountsource.compositing.subvolumes import SubvolumesMountSource
@@ -234,9 +236,10 @@ class FuseMount(fuse.Operations):
         if not mountSources:
             raise ValueError("Mount point is empty! Either specify some input files or enable the control interface!")
 
-        self.mountSource: MountSource = (
-            mountSources[0][1] if len(mountSources) == 1 else self._create_multi_mount(mountSources, options)
-        )
+        # Create mount source using unified entry point
+        # _create_multi_mount handles both single and multiple sources
+        self.mountSource = self._create_multi_mount(mountSources, options)
+
         if isinstance(self.mountSource, SubvolumesMountSource):
             self._subvolumes = self.mountSource
 
@@ -445,10 +448,51 @@ class FuseMount(fuse.Operations):
 
     @staticmethod
     def _create_multi_mount(mountSources: list[tuple[str, MountSource]], options: dict) -> MountSource:
-        if not options.get('disableUnionMount', False):
-            return UnionMountSource([x[1] for x in mountSources], **options)
+        # Extract mount sources from tuples
+        sources = [x[1] for x in mountSources]
 
-        # Create unique keys.
+        # Check if we should use LinkResolutionUnionMountSource
+        resolveSymbolicLinks = bool(options.get('resolveSymbolicLinks', False))
+
+        # Define the link resolution function once, used for both single and multiple sources
+        def should_resolve_link(linkname: str, fileType: int) -> bool:
+            """
+            Determine whether to resolve a link based on user configuration.
+            For now, only resolve symbolic links if the option is enabled.
+            Hard links are not resolved for now, as it will be resolved by FileVersionLayer.
+            """
+            # TODO Resolve hard links in LinkResolutionUnionMountSource
+            # and remove hard link handling from FileVersionLayer.
+            return bool(fileType == stat.S_IFLNK)
+
+        # Handle single mount source case
+        if len(sources) == 1:
+            singleSource = sources[0]
+            if resolveSymbolicLinks:
+                # Apply link resolution for single source
+                return LinkResolutionUnionMountSource([singleSource], shouldResolveLink=should_resolve_link)
+            return singleSource
+
+        # Handle multiple mount sources
+        disableUnionMount = options.get('disableUnionMount', False)
+
+        if resolveSymbolicLinks:
+            # LinkResolutionUnionMountSource is a type of union mount
+            # so it conflicts with disableUnionMount
+            if disableUnionMount:
+                raise ValueError(
+                    "Cannot use 'resolveSymbolicLinks' with multiple mount sources when "
+                    "'disableUnionMount' is enabled. Resolving symbolic links across multiple sources "
+                    "requires union mount functionality."
+                )
+
+            # Use LinkResolutionUnionMountSource which combines union and link resolution functionality
+            return LinkResolutionUnionMountSource(sources, shouldResolveLink=should_resolve_link)
+
+        if not disableUnionMount:
+            return UnionMountSource(sources, **options)
+
+        # Create unique keys for subvolumes
         submountSources: dict[str, MountSource] = {}
         suffix = 1
         for key, mountSource in mountSources:
@@ -827,7 +871,7 @@ class FuseMount(fuse.Operations):
             return self._add_new_handle(self.writeOverlay.create(path, mode, fi), 0)
         raise fuse.FuseOSError(errno.EROFS)
 
-    @fuse.overrides(fuse.Operations)
+    @overrides(fuse.Operations)
     def truncate(self, path: str, length: int, fh: Optional[int] = None) -> int:
         # The existence of this method is sufficient. Without this, the 'write' callback would not be called by
         # libfuse because it seems to think that the file system is not writable, and the control layer would not work.
