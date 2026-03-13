@@ -1,3 +1,25 @@
+# Version 0.11.0 built on 2026-mm-dd
+
+## Feature
+
+ - Centralize `XDG_HOME` default index folder handling to make it available for mount sources
+   other than `SQLiteIndexedTAR`.
+ - Add direct support for [AR](https://en.wikipedia.org/wiki/Ar_(Unix)) archives, which should be faster than
+   libarchive for large archives, including `.deb` and `.a` files.
+ - `Py7zrMountSource`: Apply `transform` argument.
+ - Add
+
+## API
+
+ - Centralize lots of boilerplate for handling of `verifyModificationTime`, `writeIndex`, `clearIndexCache`,
+   `transform`, `archiveFilePath`, `encoding`, index finalization, and others into `SQLiteIndexMountSource`
+   and `SQLiteIndex` classes.
+ - Remove assertions for `userdata` in production code in favor of `RatarmountError` exceptions,
+   so that they are also triggered even when running CPython with `-O`.
+ - Make `ASARMountSource` work with `Path` input.
+ - Add `close` method to `SQLiteIndexMountSource`-derived mount sources.
+
+
 # Version 0.10.3 built on 2026-03-13
 
 ## Fixes

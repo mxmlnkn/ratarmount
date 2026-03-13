@@ -1,3 +1,22 @@
+# Version 1.3.0 built on 2026-mm-dd
+
+## Feature
+
+ - Add `--recreate-index-on-errors` and make `--no-recreate-index` only use existing indexes and never modify them.
+ - Add `--no-mount`, `--mount` toggle option to only trigger index creation without mounting.
+ - Add direct support for [AR](https://en.wikipedia.org/wiki/Ar_(Unix)) archives, which should be faster than
+   libarchive for large archives, including `.deb` and `.a` files.
+ - Apply `--transform` to 7z files.
+ - Add `HTMLMountSource` to expose embedded base64-encoded files, such as images, CSS, and JavaScript files,
+   as a filesystem. Works particularly well with files created by the Save Page WE browser extension because
+   it also stores the original URL and name of embedded files.
+
+## Performance
+
+ - Apply file type checks associated with a backend before trying to open a file with it.
+   This should clean out exceptions from more verbose log levels and may speed up mounting of many files.
+
+
 # Version 1.2.2 built on 2026-03-13
 
 ## Fixes
