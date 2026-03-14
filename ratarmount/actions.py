@@ -13,7 +13,7 @@ import time
 import zipfile
 from pathlib import Path
 
-from ratarmountcore.compressions import strip_suffix_from_archive
+from ratarmountcore.compressions import compile_suffix_rules, strip_suffix
 from ratarmountcore.utils import RatarmountError, remove_duplicates_stable
 
 with contextlib.suppress(ImportError):
@@ -143,7 +143,7 @@ def unmount_list_checked(mountPoints: list[str]) -> int:
 
 @forbid_call_from_fuse
 def determine_mount_point(mount_source: str):
-    mount_point = strip_suffix_from_archive(mount_source)
+    mount_point = strip_suffix(mount_source, compile_suffix_rules(['/all/']))
 
     if '://' in mount_point:
         # There will be at least 2 slashes in mount_point, namely from ://.

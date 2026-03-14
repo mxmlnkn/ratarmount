@@ -381,55 +381,6 @@ class FileFormatInfo:
     checkHeader: Optional[Callable[[IO[bytes]], bool]] = None
 
 
-ARCHIVE_FORMATS: dict[FileFormatID, FileFormatInfo] = {
-    # "Normal" Archive formats with compression
-    FID.SEVEN_ZIP: FileFormatInfo(['7z', '7zip'], b'7z\xbc\xaf\x27\x1c'),
-    FID.RAR: FileFormatInfo(['rar'], b'Rar!\x1a\x07'),
-    # is_zipfile might yields some false positives, we want it to err on the positive side.
-    # See: https://bugs.python.org/issue42096
-    FID.ZIP: FileFormatInfo(['zip'], None, zipfile.is_zipfile),
-    # SQLAR can be encrypted, for which it will not have any magic bytes! Instead, the first 16 B are the salt.
-    FID.SQLAR: (
-        FileFormatInfo(['sqlar'], b'SQLite format 3\x00', None)
-        if sqlcipher3 is None
-        else FileFormatInfo(['sqlar'], None, _check_encrypted_sqlar)
-    ),
-    # https://download.microsoft.com/download/4/d/a/4da14f27-b4ef-4170-a6e6-5b1ef85b1baa/[ms-cab].pdf
-    FID.CAB: FileFormatInfo(['cab'], b'MSCF'),
-    # https://www.ibm.com/docs/en/aix/7.2.0?topic=formats-ar-file-format-small
-    FID.AIX_SMALL: FileFormatInfo(['ar'], b'<aiaff>\n'),
-    # https://www.ibm.com/docs/en/aix/7.2.0?topic=formats-ar-file-format-big#ar_big
-    # https://en.wikipedia.org/wiki/Ar_(Unix)
-    FID.AR: FileFormatInfo(['a', 'ar', 'lib', 'deb'], b'!<arch>\n'),
-    FID.AR_THIN: FileFormatInfo(['a', 'ar', 'lib'], b'!<thin>\n'),
-    FID.XAR: FileFormatInfo(['xar'], b'xar!'),
-    FID.CPIO: FileFormatInfo(['cpio'], None, _is_cpio),
-    # "TAR"-like compression formats without compression
-    FID.TAR: FileFormatInfo(['tar'], None, is_tar),
-    FID.ASAR: FileFormatInfo(['asar'], b'\x04\x00\x00\x00', is_asar),
-    # Read-Only File systems
-    FID.SQUASHFS: FileFormatInfo(['squashfs', 'AppImage', 'snap'], None, lambda x: find_squashfs_offset(x) >= 0),
-    FID.ISO9660: FileFormatInfo(['iso'], None, _is_iso9660),
-    # Fully-fledged file systems
-    FID.FAT: FileFormatInfo(['fat', 'img', 'dd', 'fat12', 'fat16', 'fat32', 'raw'], None),
-    FID.EXT4: FileFormatInfo(['ext4', 'img', 'dd', 'raw'], None),
-    # Other archive formats
-    FID.RATARMOUNT_INDEX: FileFormatInfo(['index.sqlite'], b'SQLite format 3\x00'),
-    # https://www.iso.org/standard/68004.html
-    # https://iipc.github.io/warc-specifications/specifications/warc-format/warc-1.1/#file-and-record-model
-    FID.WARC: FileFormatInfo(['warc'], b'WARC/1.'),
-    # HTML files with embedded data URLs
-    FID.HTML: FileFormatInfo(['html', 'htm'], None, is_html_file),
-    # PDF files with embedded files
-    FID.PDF: FileFormatInfo(['pdf'], b'%PDF-', None),
-    # Multimedia containers
-    FID.AVI: FileFormatInfo(['avi'], b'RIFF', is_avi),
-    FID.MKV: FileFormatInfo(['mkv', 'mka', 'mks', 'mk3d', 'webm'], b'\x1a\x45\xdf\xa3', None),
-    FID.MP4: FileFormatInfo(['mp4'], b'ftypMSNV', None),
-    FID.RMVB: FileFormatInfo(['rmvb', 'rmb'], b'.RMF', None),
-    FID.OGG: FileFormatInfo(['ogm', 'ogv'], b'OggS\x00', None),
-}
-
 COMPRESSION_FORMATS: dict[FileFormatID, FileFormatInfo] = {
     FID.BZIP2: FileFormatInfo(['bz2', 'bzip2'], b'BZh', _is_bzip2),
     FID.GZIP: FileFormatInfo(['gz', 'gzip'], b'\x1f\x8b'),
@@ -462,7 +413,168 @@ COMPRESSION_FORMATS: dict[FileFormatID, FileFormatInfo] = {
 }
 
 
-FILE_FORMATS = {**ARCHIVE_FORMATS, **COMPRESSION_FORMATS}
+ARCHIVE_FORMATS: dict[FileFormatID, FileFormatInfo] = {
+    # "Normal" Archive formats with compression
+    FID.SEVEN_ZIP: FileFormatInfo(['7z', '7zip', 'cb7'], b'7z\xbc\xaf\x27\x1c'),
+    FID.RAR: FileFormatInfo(['rar', 'cbr'], b'Rar!\x1a\x07'),
+    # is_zipfile might yields some false positives, we want it to err on the positive side.
+    # See: https://bugs.python.org/issue42096
+    # https://en.wikipedia.org/wiki/Comic_book_archive
+    FID.ZIP: FileFormatInfo(['zip', 'cbz'], None, zipfile.is_zipfile),
+    # SQLAR can be encrypted, for which it will not have any magic bytes! Instead, the first 16 B are the salt.
+    FID.SQLAR: (
+        FileFormatInfo(['sqlar'], b'SQLite format 3\x00', None)
+        if sqlcipher3 is None
+        else FileFormatInfo(['sqlar'], None, _check_encrypted_sqlar)
+    ),
+    # https://download.microsoft.com/download/4/d/a/4da14f27-b4ef-4170-a6e6-5b1ef85b1baa/[ms-cab].pdf
+    FID.CAB: FileFormatInfo(['cab'], b'MSCF'),
+    # https://www.ibm.com/docs/en/aix/7.2.0?topic=formats-ar-file-format-small
+    FID.AIX_SMALL: FileFormatInfo(['ar'], b'<aiaff>\n'),
+    # https://www.ibm.com/docs/en/aix/7.2.0?topic=formats-ar-file-format-big#ar_big
+    # https://en.wikipedia.org/wiki/Ar_(Unix)
+    FID.AR: FileFormatInfo(['a', 'ar', 'lib', 'deb'], b'!<arch>\n'),
+    FID.AR_THIN: FileFormatInfo(['a', 'ar', 'lib'], b'!<thin>\n'),
+    FID.XAR: FileFormatInfo(['xar'], b'xar!'),
+    FID.CPIO: FileFormatInfo(['cpio'], None, _is_cpio),
+    # "TAR"-like compression formats without compression
+    FID.TAR: FileFormatInfo(
+        ['tar', 'tb2', 'tbz', 'tbz2', 'tz2', 'taz', 'tgz', 'txz', 'tzst', 'cbt']
+        + ['t' + extension for format_info in COMPRESSION_FORMATS.values() for extension in format_info.extensions]
+        + ['tar.' + extension for format_info in COMPRESSION_FORMATS.values() for extension in format_info.extensions],
+        None,
+        is_tar,
+    ),
+    FID.ASAR: FileFormatInfo(['asar'], b'\x04\x00\x00\x00', is_asar),
+    FID.SQUASHFS: FileFormatInfo(['squashfs', 'AppImage', 'snap'], None, lambda x: find_squashfs_offset(x) >= 0),
+}
+
+
+DISK_FORMATS: dict[FileFormatID, FileFormatInfo] = {
+    FID.ISO9660: FileFormatInfo(['iso'], None, _is_iso9660),
+    # Fully-fledged file systems
+    FID.FAT: FileFormatInfo(['fat', 'img', 'dd', 'fat12', 'fat16', 'fat32', 'raw'], None),
+    FID.EXT4: FileFormatInfo(['ext4', 'img', 'dd', 'raw'], None),
+}
+
+
+DOCUMENT_FORMATS: dict[FileFormatID, FileFormatInfo] = {
+    # https://www.iso.org/standard/68004.html
+    # https://iipc.github.io/warc-specifications/specifications/warc-format/warc-1.1/#file-and-record-model
+    FID.WARC: FileFormatInfo(['warc'], b'WARC/1.'),
+    # HTML files with embedded data URLs
+    FID.HTML: FileFormatInfo(['html', 'htm'], None, is_html_file),
+    # PDF files with embedded files
+    FID.PDF: FileFormatInfo(['pdf'], b'%PDF-', None),
+    FID.RATARMOUNT_INDEX: FileFormatInfo(['index.sqlite'], b'SQLite format 3\x00'),
+}
+
+
+MULTIMEDIA_FORMATS: dict[FileFormatID, FileFormatInfo] = {
+    FID.AVI: FileFormatInfo(['avi'], b'RIFF', is_avi),
+    FID.MKV: FileFormatInfo(['mkv', 'mka', 'mks', 'mk3d', 'webm'], b'\x1a\x45\xdf\xa3', None),
+    FID.MP4: FileFormatInfo(['mp4'], b'ftypMSNV', None),
+    FID.RMVB: FileFormatInfo(['rmvb', 'rmb'], b'.RMF', None),
+    FID.OGG: FileFormatInfo(['ogm', 'ogv'], b'OggS\x00', None),
+}
+
+
+def _get_extensions(formats: dict[FileFormatID, FileFormatInfo]) -> set[str]:
+    return {extension for info in formats.values() for extension in info.extensions}
+
+
+# Some formats, such as ZIP and AR, have further subcategories, sometimes only discerned by their extension.
+# This makes categorizing file formats a bit more complicated.
+# https://en.wikipedia.org/wiki/XPInstall
+# https://learn.microsoft.com/de-de/visualstudio/extensibility/anatomy-of-a-vsix-package
+# https://en.wikipedia.org/wiki/Apk_(file_format)
+_BINARY_EXTENSIONS = {
+    'a',
+    'lib',
+    'deb',
+    'AppImage',
+    'jar',
+    'nupkg',
+    # Various extension packages for firefox, VSCode, Android, ...
+    'xpi',
+    'vsix',
+    'apk',
+    # Microsoft application formats
+    'appx',
+    'appxbundle',
+    'appv',
+}
+_DOCUMENT_EXTENSIONS = {
+    # https://en.wikipedia.org/wiki/Office_Open_XML_file_formats
+    # https://support.microsoft.com/en-gb/office/
+    #   file-formats-that-are-supported-in-powerpoint-252c6fa0-a4bc-41be-ac82-b77c9773f9dc
+    # https://www.loc.gov/preservation/digital/formats/fdd/fdd000363.shtml
+    # https://learn.microsoft.com/de-de/office/client-developer/visio/introduction-to-the-visio-file-formatvsdx
+    # The suffix 'm' stands for "macro-enabled".
+    # pptx - PowerPoint Presentation
+    # potx - PowerPoint Design Templates
+    # ppsx - PowerPoint Show
+    # dotx - Word Document Templates
+    # xltx - Excel Templates
+    f'{suffix}{macro}'
+    for suffix in ('doc', 'dot', 'ppt', 'pot', 'pps', 'vsd', 'vss', 'vst', 'xls', 'xlt')
+    for macro in ('x', 'm')
+} | {
+    # https://en.wikipedia.org/wiki/OpenDocument
+    'odt',
+    'ods',
+    'odg',
+    'epub',
+    # https://en.wikipedia.org/wiki/3D_Manufacturing_Format
+    '3mf',
+    # https://en.wikipedia.org/wiki/Design_Web_Format
+    'dwf',
+    'dwfx',
+    # https://www.circuit-diagram.org/docs/cddx
+    'cddx',
+    # https://learn.microsoft.com/en-us/azure/cloud-services-extended-support/cloud-services-model-and-package
+    'cspkg',
+    # https://en.wikipedia.org/wiki/Open_Packaging_Conventions
+    'familyx',
+    'fdix',
+    'appv',
+    'semblio',
+    'xps',
+    'oxps',
+    'mmzx',
+    'aasx',
+    'slx',
+    'smpk',
+    'scdoc',
+    'jtx',
+    'amlx',
+    'pbix',
+    'pbit',
+    # https://www.loc.gov/preservation/digital/formats/fdd/fdd000547.shtml
+    'kmlz',
+    # https://vrarwiki.com/wiki/USDZ
+    'usdz',
+    # https://www.loc.gov/preservation/digital/formats/fdd/fdd000586.shtml
+    'wacz',
+}
+EXTENSIONS_BY_CATEGORY: dict[str, set[str]] = {
+    'archive': _get_extensions(ARCHIVE_FORMATS) - _BINARY_EXTENSIONS,
+    'compressed': _get_extensions(COMPRESSION_FORMATS),
+    'disk': _get_extensions(DISK_FORMATS),
+    # https://7-zip.opensource.jp/chm/general/formats.htm
+    'document': _get_extensions(DOCUMENT_FORMATS) | _DOCUMENT_EXTENSIONS,
+    'binary': _BINARY_EXTENSIONS,
+    'multimedia': _get_extensions(MULTIMEDIA_FORMATS),
+}
+EXTENSIONS_BY_CATEGORY['all'] = set().union(*EXTENSIONS_BY_CATEGORY.values())
+
+
+FILE_FORMATS: dict[FileFormatID, FileFormatInfo] = {
+    fid: info
+    for formats in (ARCHIVE_FORMATS, COMPRESSION_FORMATS, DISK_FORMATS, DOCUMENT_FORMATS, MULTIMEDIA_FORMATS)
+    for fid, info in formats.items()
+}
+
 
 # Check that all defined format IDs have FileFormatInfo, so that we can assume FORMATS[FID] to not fail.
 for _formatInfo in FileFormatID:

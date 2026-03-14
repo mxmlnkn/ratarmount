@@ -103,6 +103,24 @@ class PrintOSSAttributionShortAction(argparse.Action):
         parser.exit()
 
 
+class AppendCommaSeparatedOverwriteDefault(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        seen_flag = f"_{self.dest}_seen"
+
+        if not getattr(namespace, seen_flag, False):
+            setattr(namespace, self.dest, [])
+            setattr(namespace, seen_flag, True)
+
+        if isinstance(values, str):
+            placeholder = '\0'
+            parts = values.replace(',,', placeholder).split(',')
+            getattr(namespace, self.dest).extend(
+                [part.replace(placeholder, ',').strip() for part in parts if part.strip()]
+            )
+        else:
+            getattr(namespace, self.dest).append(values)
+
+
 def create_parser(useColor: Optional[bool] = True) -> argparse.ArgumentParser:
     if useColor is None:
         useColor = RichHandler is not None and any(
@@ -313,6 +331,30 @@ For further information, see the ReadMe on the project's homepage:
         help='If true, then recursively mounted TARs named <file>.tar will be mounted at <file>/. '
              'This might lead to folders of the same name being overwritten, so use with care. '
              'The index needs to be (re)created to apply this option!')
+
+    recursionGroup.add_argument(
+        '--recursive-extensions', type=str, action=AppendCommaSeparatedOverwriteDefault,
+        default=['/archive', '/compressed', '/disk', '/split'],
+        help='Configure which file extensions trigger recursive mounting using comma-separated glob expressions. '
+             'Looking at the magic bytes of each file by opening it and reading from it, is expensive. '
+             'For this reason, the decision to try and recursively mount some file is based solely on the extension. '
+             'If you want to try to mount all files, effectively disable the extension preselection by matching '
+             'anything using a wildcard (*). Matching is done case-insensitively. '
+             'Predefined sets of extensions are available:\n\n'
+             '   /archive    : tar, zip, rar, ...\n'
+             '   /compressed : gz, bz2, xz, ...\n'
+             '   /disk       : iso, img, ...\n'
+             '   /document   : pdf, html, ...\n'
+             '   /multimedia : avi, ogg, ...\n'
+             '   /split      : 001, 002, ...\n'
+             '   /all        : all of the above\n'
+             '   .xxx/-      : Remove extension xxx from the current selection.\n'
+             '   /xxx/-      : Remove the extension set xxx from the current selection.\n'
+             '   ,,          : Literal comma.\n\n'
+             'Examples:\n\n'
+             '   /archive,.gz*      : All archives and even gzip-compressed non-archives.\n'
+             '   /archive,.zip/-    : All archives except files ending with ".zip".\n'
+             '   /all,/multimedia/- : All known files except for (demuxable) multimedia.')
 
     recursionGroup.add_argument(
         '--transform-recursive-mount-point', type=str, nargs=2, metavar=('REGEX_PATTERN', 'REPLACEMENT'),

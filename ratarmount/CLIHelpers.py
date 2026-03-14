@@ -226,6 +226,7 @@ def parsed_args_to_options(args) -> dict[str, Any]:
         'clearIndexCache'              : bool(args.recreate_index),
         'readOnlyIndex'                : not args.recreate_index and args.recreate_index is not None,
         'recursive'                    : bool(args.recursive),
+        'recursiveExtensions'          : args.recursive_extensions,
         'recursionDepth'               : args.recursion_depth,
         'gzipSeekPointSpacing'         : int(args.gzipSeekPointSpacing),
         'mountPoint'                   : args.mount_point,

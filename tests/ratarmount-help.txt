@@ -7,6 +7,7 @@ Usage: ratarmount
                   [--index-folders INDEX_FOLDERS] [--recursion-depth RECURSION_DEPTH]
                   [-l | --lazy | --no-lazy]
                   [-s | --strip-recursive-tar-extension | --no-strip-recursive-tar-extension]
+                  [--recursive-extensions RECURSIVE_EXTENSIONS]
                   [--transform-recursive-mount-point REGEX_PATTERN REPLACEMENT] [-e ENCODING]
                   [-i | --ignore-zeros | --no-ignore-zeros]
                   [--gnu-incremental | --no-gnu-incremental] [--detect-gnu-incremental]
@@ -137,6 +138,35 @@ Recursion Options:
                         already exists, then this option will be effectively ignored. Recreate
                         the index if you want change the recursive mounting policy anyways.
                         (default: None)
+  --recursive-extensions RECURSIVE_EXTENSIONS
+                        Configure which file extensions trigger recursive mounting using
+                        comma-separated glob expressions. Looking at the magic bytes of each
+                        file by opening it and reading from it, is expensive. For this reason,
+                        the decision to try and recursively mount some file is based solely on
+                        the extension. If you want to try to mount all files, effectively
+                        disable the extension preselection by matching anything using a wildcard
+                        (*). Matching is done case-insensitively. Predefined sets of extensions
+                        are available:
+
+                           /archive    : tar, zip, rar, ...
+                           /compressed : gz, bz2, xz, ...
+                           /disk       : iso, img, ...
+                           /document   : pdf, html, ...
+                           /multimedia : avi, ogg, ...
+                           /split      : 001, 002, ...
+                           /all        : all of the above
+                           .xxx/-      : Remove extension xxx from the current selection.
+                           /xxx/-      : Remove the extension set xxx from the current
+                        selection.
+                           ,,          : Literal comma.
+
+                        Examples:
+
+                           /archive,.gz*      : All archives and even gzip-compressed
+                        non-archives.
+                           /archive,.zip/-    : All archives except files ending with ".zip".
+                           /all,/multimedia/- : All known files except for (demuxable)
+                        multimedia. (default: ['/archive', '/compressed', '/disk', '/split'])
   --transform-recursive-mount-point REGEX_PATTERN REPLACEMENT
                         Specify a regex pattern and a replacement string, which will be applied
                         via Python's re module to the full path of the archive to be recursively

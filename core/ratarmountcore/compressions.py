@@ -1,9 +1,10 @@
 import concurrent.futures
 import dataclasses
-import itertools
+import fnmatch
 import logging
 import os
 import platform
+import re
 import string
 import struct
 import sys
@@ -11,7 +12,7 @@ from collections.abc import Iterable, Sequence
 from typing import IO, Any, Callable, Optional, cast
 
 from .BlockParallelReaders import ParallelXZReader
-from .formats import ARCHIVE_FORMATS, COMPRESSION_FORMATS, FID, FileFormatID, might_be_format
+from .formats import COMPRESSION_FORMATS, EXTENSIONS_BY_CATEGORY, FID, FileFormatID, might_be_format
 from .utils import (
     HEX,
     CompressionError,
@@ -71,14 +72,6 @@ except Exception:
 
     def libarchive_file_reader(path):
         raise ImportError("Please install python-libarchive-c with: pip install libarchive-c")
-
-
-TAR_CONTRACTED_EXTENSIONS: dict[FileFormatID, list[str]] = {
-    FID.BZIP2: ['tb2', 'tbz', 'tbz2', 'tz2'],
-    FID.GZIP: ['taz', 'tgz'],
-    FID.XZ: ['txz'],
-    FID.ZSTANDARD: ['tzst'],
-}
 
 
 @dataclasses.dataclass
@@ -185,19 +178,90 @@ def find_available_backend(
     return None
 
 
-def strip_suffix_from_archive(path: str) -> str:
-    """Strips extensions like .tar.gz or .gz or .tgz, .rar, .zip ..."""
-    extensions = itertools.chain(
-        (e for extensions in TAR_CONTRACTED_EXTENSIONS.values() for e in extensions),
-        ('t' + e for formatInfo in COMPRESSION_FORMATS.values() for e in formatInfo.extensions),
-        ('tar.' + e for formatInfo in COMPRESSION_FORMATS.values() for e in formatInfo.extensions),
-        (e for formatInfo in COMPRESSION_FORMATS.values() for e in formatInfo.extensions),
-        (e for formatInfo in ARCHIVE_FORMATS.values() for e in formatInfo.extensions),
-    )
-    for extension in extensions:
-        if path.lower().endswith('.' + extension.lower()):
-            return path[: -(len(extension) + 1)]
-    return path
+@dataclasses.dataclass
+class ExtensionRule:
+    include: bool
+    regex: re.Pattern
+
+
+FIRST_SPLIT_EXTENSION_REGEX = re.compile("[.]([a]+|[A]+|0*[01])")
+
+
+def compile_suffix_rules(patterns: Iterable[str]) -> list[ExtensionRule]:
+    def glob_patterns_to_regex(patterns: list[str]) -> re.Pattern:
+        # Translates 'a*' into '(?s:a.*)\Z' ?s enables . also matching \n and \Z is like $ but also with \n.
+        # I am a bit surprised that this adds \Z, but this is perfect for our use case!
+        combined = '|'.join(
+            fnmatch.translate(f'{"" if pattern.startswith(".") else "."}{pattern}').removesuffix(r'\Z')
+            for pattern in patterns
+        )
+        return re.compile(fr"(?:{combined})\Z", re.IGNORECASE)
+
+    rules = []
+    last_include = True
+    last_patterns: list[str] = []
+
+    for pattern in patterns:
+        include = True
+        # Remove negations for normal patterns.
+        negation_suffix = '/-'
+        while pattern.endswith(negation_suffix):
+            include = not include
+            pattern = pattern.removesuffix(negation_suffix)
+
+        category = pattern.strip('/') if pattern.startswith('/') else ''
+
+        if include != last_include or category == 'split':
+            if last_patterns:
+                rules.append(ExtensionRule(last_include, glob_patterns_to_regex(last_patterns)))
+            last_patterns = []
+            last_include = include
+
+        if category:
+            if category == 'split':
+                # Match file extension usually created with the "split" command line tool, e.g., '.aa', '.01', ...
+                # I have never seen hexadecimal numbering but for some reason those are the default for 'split'.
+                rules.append(ExtensionRule(include, FIRST_SPLIT_EXTENSION_REGEX))
+            elif category in EXTENSIONS_BY_CATEGORY:
+                last_patterns.extend(EXTENSIONS_BY_CATEGORY[category])
+            else:
+                logger.warning("Ignoring unknown file extension category '%s'!", category)
+        else:
+            last_patterns.append(pattern)
+
+    if last_patterns:
+        rules.append(ExtensionRule(last_include, glob_patterns_to_regex(last_patterns)))
+    return rules
+
+
+def strip_suffix(path: str, rules: list[ExtensionRule]) -> str:
+    # This strips a suffix. A suffix is any arbitrary string.
+    # A suffix is the dot (.) plus the extension concatenated.
+    parts = path.rsplit('/', 1)
+    original_name = parts.pop()
+    name = original_name
+    for rule in rules:
+        matches = list(rule.regex.finditer(original_name))
+        # We require to match until the end of the string!
+        # Using finditer and using the last match is a workaround in case the pattern does not end with $.
+        if matches and matches[-1].end() == len(original_name):
+            if rule.include:
+                new_name = original_name[: matches[-1].start()]
+                # 1. Always assign new name, if it has not changed yet
+                # 2. Also assign it if the stripped name has become empty (wildcard glob)
+                #    as long as the new name is different from the original.
+                # 3. Assign it, if it is shorter, e.g., prefer to strip .tar.bz2 instead of only .bz2.
+                #    With the exception of the new name being empty!
+                if (
+                    name == original_name
+                    or (not name and new_name != original_name)
+                    or (new_name and len(new_name) < len(name))
+                ):
+                    name = new_name
+            else:
+                name = original_name  # If excluded, then restore to full path
+    parts.append(name)
+    return '/'.join(parts)
 
 
 def has_matching_alphabets(a: str, b: str):

@@ -419,3 +419,25 @@ def test_file_in_archive(archivePath, checksumPathPairs, parallelization):
                                     "Looks like index was not loaded while executing: ratarmount "
                                     + ' '.join([*testArgs, mountPoint])
                                 )
+
+
+@pytest.mark.parametrize(
+    ("recursiveExtensions", "pathInArchive", "shouldExist"),
+    [
+        ("rar", "natsu.rar/ufo", True),
+        ("rar/-", "natsu.rar/ufo", False),
+        ("RAR/-", "natsu.rar/ufo", False),
+        ("/archive/", "natsu.rar/ufo", True),
+        ("/archive,.rar/-", "natsu.rar/ufo", False),
+        (".r*", "natsu.rar/ufo", True),
+        (".r*,.r*/-", "natsu.rar/ufo", False),
+    ],
+)
+def test_recursive_extensions_patterns(recursiveExtensions, pathInArchive, shouldExist):
+    with copy_test_file("rar.zip") as tmpArchive:
+        assert os.path.isfile(tmpArchive)
+        mountPoint = os.path.join(os.path.dirname(tmpArchive), "mountPoint")
+        args = ["--recursive", "--recursive-extensions", recursiveExtensions, tmpArchive]
+        with RunRatarmount(mountPoint, args):
+            path = Path(mountPoint) / pathInArchive
+            assert path.is_file() == shouldExist

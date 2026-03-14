@@ -11,32 +11,59 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from ratarmountcore.compressions import (
     check_for_sequence,
+    compile_suffix_rules,
     has_matching_alphabets,
-    strip_suffix_from_archive,
+    strip_suffix,
 )
 from ratarmountcore.utils import HEX, format_number
 
 pytestmark = pytest.mark.order(0)
 
 
+def test_strip_suffix_from_compressed_file():
+    rules = compile_suffix_rules(['/compressed/'])
+
+    def ssc(path):
+        return strip_suffix(path, rules)
+
+    assert ssc('a.tar.bz2') == 'a.tar'
+    assert ssc('a.tar.BZ2') == 'a.tar'
+    assert ssc('a.tar.BZIP2') == 'a.tar'
+    assert ssc('a.tar.gz') == 'a.tar'
+    assert ssc('a.tar.gzip') == 'a.tar'
+    assert ssc('a.tar.xz') == 'a.tar'
+    assert ssc('a.tar.zst') == 'a.tar'
+
+    assert ssc('a.tar') == 'a.tar'
+    assert ssc('a.mp3') == 'a.mp3'
+
+
 def test_strip_suffix_from_archive():
-    sst = strip_suffix_from_archive
+    for rules in (['/archive/'], ['/archive/', '/compressed/']):
 
-    assert sst('a.tar.bz2') == 'a'
-    assert sst('a.tar.BZ2') == 'a'
-    assert sst('a.tar.BZIP2') == 'a'
-    assert sst('a.tar.gz') == 'a'
-    assert sst('a.tar.gzip') == 'a'
-    assert sst('a.tar.xz') == 'a'
-    assert sst('a.tar.zst') == 'a'
-    assert sst('a.tar') == 'a'
-    assert sst('a.mp3') == 'a.mp3'
+        def sst(path, rules=tuple(rules)):
+            return strip_suffix(path, compile_suffix_rules(rules))
 
-    assert sst('a.tbz2') == 'a'
-    assert sst('a.TBZ2') == 'a'
-    assert sst('a.tgz') == 'a'
-    assert sst('a.txz') == 'a'
-    assert sst('a.tzst') == 'a'
+        assert sst('a.tar.bz2') == 'a'
+        assert sst('a.tar.BZ2') == 'a'
+        assert sst('a.tar.BZIP2') == 'a'
+        assert sst('a.tar.gz') == 'a'
+        assert sst('a.tar.gzip') == 'a'
+        assert sst('a.tar.xz') == 'a'
+        assert sst('a.tar.zst') == 'a'
+        assert sst('a.tar') == 'a'
+        assert sst('a.mp3') == 'a.mp3'
+
+        assert sst('a.tbz2') == 'a'
+        assert sst('a.TBZ2') == 'a'
+        assert sst('a.tgz') == 'a'
+        assert sst('a.txz') == 'a'
+        assert sst('a.tzst') == 'a'
+
+        if '/compressed/' in rules:
+            assert sst('a.mp3.bz2') == 'a.mp3'
+        else:
+            assert sst('a.mp3.bz2') == 'a.mp3.bz2'
 
 
 def test_has_matching_alphabets():

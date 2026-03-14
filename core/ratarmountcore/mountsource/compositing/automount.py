@@ -7,7 +7,12 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import IO, Any, Optional, Union
 
-from ratarmountcore.compressions import check_for_split_file_in, strip_suffix_from_archive
+from ratarmountcore.compressions import (
+    FIRST_SPLIT_EXTENSION_REGEX,
+    check_for_split_file_in,
+    compile_suffix_rules,
+    strip_suffix,
+)
 from ratarmountcore.mountsource import FileInfo, MountSource, merge_statfs
 from ratarmountcore.mountsource.compositing.singlefile import SingleFileMountSource
 from ratarmountcore.mountsource.factory import open_mount_source
@@ -30,10 +35,6 @@ class AutoMountLayer(MountSource):
     The detailed behavior can be controlled using options.
     """
 
-    __slots__ = ('mounted', 'options')
-
-    _FIRST_SPLIT_EXTENSION_REGEX = re.compile("[.]([a]+|[A]+|0*[01])")
-
     @dataclass
     class MountInfo:
         mountSource: MountSource
@@ -48,6 +49,9 @@ class AutoMountLayer(MountSource):
         self.options = options
         self.maxRecursionDepth: int = determine_recursion_depth(**options)
         self.lazyMounting: bool = self.options.get('lazyMounting', False)
+        self._recursive_suffix_rules = compile_suffix_rules(
+            self.options.get('recursiveExtensions', ['/archive', '/compressed', '/disk', '/split'])
+        )
 
         rootFileInfo = mountSource.lookup('/')
         assert rootFileInfo
@@ -134,13 +138,7 @@ class AutoMountLayer(MountSource):
             return None
 
         # For better performance, only look at the suffix not at the magic bytes.
-        strippedFilePath = strip_suffix_from_archive(path)
-        maybeSplitFile = strippedFilePath == path
-        if maybeSplitFile:
-            # Do this manual check first to avoid an expensive MountSource.list call.
-            strippedFilePath, extension = os.path.splitext(path)
-            if not AutoMountLayer._FIRST_SPLIT_EXTENSION_REGEX.fullmatch(extension):
-                return None
+        strippedFilePath = strip_suffix(path, self._recursive_suffix_rules)
         if strippedFilePath == path:
             return None
 
@@ -180,7 +178,7 @@ class AutoMountLayer(MountSource):
         # Now comes the expensive final check for a split file after we did all the cheaper checks.
         # We need to list the whole parent folder to successfully check for split files.
         joinedFile: Optional[IO[bytes]] = None
-        if maybeSplitFile:
+        if FIRST_SPLIT_EXTENSION_REGEX.fullmatch(os.path.splitext(path)[1]):
             parentFolder, splitCandidateName = os.path.split(path)
             listResult = parentMountSource.list_mode(parentFolder)
             if not listResult:
