@@ -508,7 +508,9 @@ class LibarchiveFile(io.RawIOBase):
 
 
 class LibarchiveMountSource(SQLiteIndexMountSource):
-    def __init__(self, fileOrPath: Union[str, IO[bytes]], tarFileName: Optional[str] = None, **options) -> None:
+    def __init__(self, fileOrPath: Union[str, IO[bytes], Path], tarFileName: Optional[str] = None, **options) -> None:
+        if isinstance(fileOrPath, Path):
+            fileOrPath = str(fileOrPath)
         self.fileOrPath = fileOrPath
         self.passwords = options.get("passwords", [])
         self.tarFileName = tarFileName

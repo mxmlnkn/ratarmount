@@ -14,6 +14,7 @@ import time
 import urllib.parse
 from dataclasses import dataclass
 from html.parser import HTMLParser
+from pathlib import Path
 from typing import IO, Optional, Union
 
 from ratarmountcore.formats import is_html_file
@@ -423,7 +424,9 @@ def gather_embedded_files(fileobj: IO[str]) -> list[EmbeddedFile]:
 
 
 class HTMLMountSource(SQLiteIndexMountSource):
-    def __init__(self, fileOrPath: Union[str, IO[bytes]], encoding: str = tarfile.ENCODING, **options):
+    def __init__(self, fileOrPath: Union[str, IO[bytes], Path], encoding: str = tarfile.ENCODING, **options):
+        if isinstance(fileOrPath, Path):
+            fileOrPath = str(fileOrPath)
         self.mtime = os.stat(fileOrPath).st_mtime if isinstance(fileOrPath, str) else time.time()
 
         # html.parser seems to be very lenient. Therefore, check manually and hope that the check is lenient enough.

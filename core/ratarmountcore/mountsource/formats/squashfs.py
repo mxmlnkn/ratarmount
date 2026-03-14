@@ -6,6 +6,7 @@ import logging
 import os
 import stat
 import zlib
+from pathlib import Path
 from typing import IO, Any, Optional, Union
 
 try:
@@ -387,7 +388,9 @@ class SquashFSImage(SquashFsImage):
 
 
 class SquashFSMountSource(SQLiteIndexMountSource):
-    def __init__(self, fileOrPath: Union[str, IO[bytes]], **options) -> None:
+    def __init__(self, fileOrPath: Union[str, IO[bytes], Path], **options) -> None:
+        if isinstance(fileOrPath, Path):
+            fileOrPath = str(fileOrPath)
         if isinstance(fileOrPath, str):
             openedFile = True
             file: IO[bytes] = open(fileOrPath, 'rb')

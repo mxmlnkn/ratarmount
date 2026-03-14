@@ -2,6 +2,7 @@ import io
 import logging
 import stat
 import sys
+from pathlib import Path
 from typing import IO, Optional, Union
 
 from ratarmountcore.formats import FileFormatID, replace_format_check
@@ -82,7 +83,10 @@ logger = logging.getLogger(__name__)
 
 
 class Py7zrMountSource(SQLiteIndexMountSource):
-    def __init__(self, fileOrPath: Union[str, IO[bytes]], **options) -> None:
+    def __init__(self, fileOrPath: Union[str, IO[bytes], Path], **options) -> None:
+        if isinstance(fileOrPath, Path):
+            fileOrPath = str(fileOrPath)
+
         # TODO I doubt that symbolic links work because py7zr.FileInfo does not have information regarding links.
 
         def open_file(password: Optional[Union[str, bytes]] = None):
