@@ -179,7 +179,7 @@ class TestSQLiteIndexedTarParallelized:
                 if depth > recursionDepth:
                     return
 
-                assert fileInfo
+                assert fileInfo, path
                 userdata = fileInfo.userdata[-1]
                 assert isinstance(userdata, SQLiteIndexedTarUserData)
                 if depth <= recursionDepth:
