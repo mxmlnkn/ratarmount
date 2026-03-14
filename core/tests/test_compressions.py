@@ -13,25 +13,10 @@ from ratarmountcore.compressions import (
     check_for_sequence,
     has_matching_alphabets,
     strip_suffix_from_archive,
-    strip_suffix_from_compressed_file,
 )
 from ratarmountcore.utils import HEX, format_number
 
 pytestmark = pytest.mark.order(0)
-
-
-def test_strip_suffix_from_compressed_file():
-    ssc = strip_suffix_from_compressed_file
-
-    assert ssc('a.tar.bz2') == 'a.tar'
-    assert ssc('a.tar.BZ2') == 'a.tar'
-    assert ssc('a.tar.BZIP2') == 'a.tar'
-    assert ssc('a.tar.gz') == 'a.tar'
-    assert ssc('a.tar.gzip') == 'a.tar'
-    assert ssc('a.tar.xz') == 'a.tar'
-    assert ssc('a.tar.zst') == 'a.tar'
-    assert ssc('a.tar') == 'a.tar'
-    assert ssc('a.mp3') == 'a.mp3'
 
 
 def test_strip_suffix_from_archive():

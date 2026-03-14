@@ -185,15 +185,6 @@ def find_available_backend(
     return None
 
 
-def strip_suffix_from_compressed_file(path: str) -> str:
-    """Strips compression suffixes like .bz2, .gz, ..."""
-    for formatInfo in COMPRESSION_FORMATS.values():
-        for extension in formatInfo.extensions:
-            if path.lower().endswith('.' + extension.lower()):
-                return path[: -(len(extension) + 1)]
-    return path
-
-
 def strip_suffix_from_archive(path: str) -> str:
     """Strips extensions like .tar.gz or .gz or .tgz, .rar, .zip ..."""
     extensions = itertools.chain(
