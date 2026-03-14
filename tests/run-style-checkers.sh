@@ -62,7 +62,7 @@ mypy --config-file tests/.mypy.ini ratarmount core/ratarmountcore core/tests || 
 pytype -j auto -d import-error -P"$( cd core && pwd ):$( pwd )" --exclude=core/ratarmountcore/_external \
     ratarmount core/ratarmountcore core/tests || returnError "$LINENO" 'Pytype failed!'
 
-black -q --line-length 120 --skip-string-normalization "${allPythonFiles[@]}"
+black -q --line-length 120 --skip-string-normalization --target-version=py39 "${allPythonFiles[@]}"
 
 filesToSpellCheck=()
 while read -r file; do
