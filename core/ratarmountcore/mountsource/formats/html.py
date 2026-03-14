@@ -153,10 +153,10 @@ class HTMLDataURLParser(HTMLParser):
         attributes = {
             attribute: value
             for attribute, value in attrs
-            if value and (value.startswith('data:') or value.startswith('data-savepage-'))
+            if (value and value.startswith('data:')) or (attribute and attribute.startswith('data-savepage-'))
         }
         for attribute, value in attributes.items():
-            if not value.startswith('data:'):
+            if not value or not value.startswith('data:'):
                 continue
 
             # We are only interested in non-zero length payloads, and the comma is required by RFC 2397.
@@ -166,7 +166,7 @@ class HTMLDataURLParser(HTMLParser):
 
             self.files.append(
                 EmbeddedFileCandidate(
-                    original_url=attributes.get("data-savepage-" + attribute, ""),
+                    original_url=attributes.get('data-savepage-' + attribute, '') or '',
                     attribute=attribute,
                     start=LineOffset(*self.getpos()),
                 )
