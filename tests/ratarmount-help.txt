@@ -51,9 +51,9 @@ Mount Options:
                         decoders will use the specified amount of block decoder threads. Further
                         threads with lighter work may be started. A value of 0 will use all the
                         available cores (24). Fine-granular parallelization for each backend can
-                        be specified with: "<backend>:<parallelization>,:<default
-                        parallelization>,<backend 2>:<parallelization>,..." (default:
-                        :1,rapidgzip-bzip2:0)
+                        be specified with:
+                        "<backend>:<parallelization>,:<default parallelization>,<backend
+                        2>:<parallelization>,..." (default: :1,rapidgzip-bzip2:0)
   -r, --recursive, --no-recursive
                         Mount archives inside archives recursively. Same as --recursion-depth
                         -1. (default: False)
@@ -97,12 +97,14 @@ Index Options:
                         begins with a bracket "[", then it will be interpreted as a
                         JSON-formatted list. If the argument contains a comma ",", it will be
                         interpreted as a comma-separated list of folders. Else, the whole string
-                        will be interpreted as one folder path. Examples: --index-folders
-                        ",~/.foo" will try to save besides the TAR and if that does not work, in
-                        ~/.foo. --index-folders '["~/.ratarmount", "foo,9000"]' will never try
-                        to save besides the TAR. --index-folder ~/.ratarmount will only test
-                        ~/.ratarmount as a storage location and nothing else. Instead, it will
-                        first try ~/.ratarmount and the folder "foo,9000". (default:
+                        will be interpreted as one folder path. Examples:
+                           --index-folders ",~/.foo" : will try to save besides the TAR and if
+                        that does not work, in ~/.foo.
+                           --index-folders '["~/.ratarmount", "foo,9000"]' : will never try to
+                        save besides the TAR.
+                           --index-folder ~/.ratarmount : will only test ~/.ratarmount as a
+                        storage location and nothing else. Instead, it will first try
+                        ~/.ratarmount and the folder "foo,9000".  (default:
                         ,~/.cache/ratarmount,~/.ratarmount)
   --mount, --no-mount   When --no-mount is specified, exit after indexes for the specified files
                         have been created. Do not create a mount point. (default: True)
@@ -225,10 +227,10 @@ Advanced Options:
                         Specify a backend to be used with higher priority for files which might
                         be opened with multiple backends. Arguments specified last will have the
                         highest priority. A comma-separated list may be specified. Possible
-                        backends: ['PySquashfsImage', 'RatarmountIndex', 'asar', 'ext4', 'html',
-                        'indexed_gzip', 'indexed_zstd', 'libarchive', 'lzmaffi', 'py7zr',
-                        'pyfatfs', 'rapidgzip', 'rapidgzip-bzip2', 'rarfile', 'sqlar',
-                        'tarfile', 'xz', 'zipfile'] (default: None)
+                        backends: PySquashfsImage, RatarmountIndex, ar, asar, ext4, html,
+                        indexed_gzip, indexed_zstd, libarchive, lzmaffi, py7zr, pyfatfs,
+                        rapidgzip, rapidgzip-bzip2, rarfile, sqlar, tarfile, xz, zipfile
+                        (default: None)
   -f, --foreground, --no-foreground
                         Keeps the python program in foreground so it can print debug output when
                         the mounted path is accessed. (default: False)

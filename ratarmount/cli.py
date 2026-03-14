@@ -13,6 +13,7 @@ import os
 import sys
 import tarfile
 import tempfile
+import textwrap
 from typing import Any, Optional
 
 from ratarmountcore.utils import RatarmountError, get_xdg_cache_home
@@ -23,6 +24,8 @@ with contextlib.suppress(ImportError):
 if "_ARGCOMPLETE" not in os.environ:
     try:
         import rich_argparse
+        from rich.containers import Lines
+        from rich.text import Text
 
         class _RichFormatter(
             rich_argparse.ArgumentDefaultsRichHelpFormatter,
@@ -31,6 +34,15 @@ if "_ARGCOMPLETE" not in os.environ:
             def add_arguments(self, actions):
                 actions = sorted(actions, key=lambda action: action.option_strings)
                 super().add_arguments(actions)
+
+            def _rich_split_lines(self, text: Text, width: int) -> Lines:
+                # https://github.com/hamdanal/rich-argparse/issues/78#issuecomment-1627395697
+                # Add newlines (call wrap) but keep existing ones.
+                lines = Lines()
+                for line in text.split():
+                    line.rstrip()
+                    lines.extend(line.wrap(self.console, width))
+                return lines
 
     except ImportError:
         _RichFormatter = None  # type: ignore
@@ -57,6 +69,14 @@ class _CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescr
     def add_arguments(self, actions):
         actions = sorted(actions, key=lambda action: action.option_strings)
         super().add_arguments(actions)
+
+    def _split_lines(self, text, width: int):
+        wrapper = textwrap.TextWrapper(width=width)
+        lines = []
+        for line in text.splitlines():
+            line = line.rstrip()
+            lines.extend(wrapper.wrap(line) if line else [''])
+        return lines
 
 
 class PrintVersionAction(argparse.Action):
@@ -257,10 +277,10 @@ For further information, see the ReadMe on the project's homepage:
              'in the given order. An empty path will be interpreted as the location in which the TAR resides. '
              'If the argument begins with a bracket "[", then it will be interpreted as a JSON-formatted list. '
              'If the argument contains a comma ",", it will be interpreted as a comma-separated list of folders. '
-             'Else, the whole string will be interpreted as one folder path. Examples: '
-             '--index-folders ",~/.foo" will try to save besides the TAR and if that does not work, in ~/.foo. '
-             '--index-folders \'["~/.ratarmount", "foo,9000"]\' will never try to save besides the TAR. '
-             '--index-folder ~/.ratarmount will only test ~/.ratarmount as a storage location and nothing else. '
+             'Else, the whole string will be interpreted as one folder path. Examples:\n'
+             '   --index-folders ",~/.foo" : will try to save besides the TAR and if that does not work, in ~/.foo.\n'
+             '   --index-folders \'["~/.ratarmount", "foo,9000"]\' : will never try to save besides the TAR.\n'
+             '   --index-folder ~/.ratarmount : will only test ~/.ratarmount as a storage location and nothing else. '
              'Instead, it will first try ~/.ratarmount and the folder "foo,9000". ')
 
     # Recursion Options
@@ -347,7 +367,7 @@ For further information, see the ReadMe on the project's homepage:
     advancedGroup.add_argument(
         '-o', '--fuse', type=str, default='',
         help='Comma separated FUSE options. See "man mount.fuse" for help. '
-             'Example: --fuse "allow_other,entry_timeout=2.8,gid=0". ')
+             'Example: --fuse "allow_other,entry_timeout=2.8,gid=0".')
 
     advancedGroup.add_argument(
         '-f', '--foreground', action=argparse.BooleanOptionalAction, default=False,
@@ -393,7 +413,7 @@ For further information, see the ReadMe on the project's homepage:
         '--use-backend', type=str, action='append',
         help='Specify a backend to be used with higher priority for files which might be opened with multiple '
              'backends. Arguments specified last will have the highest priority. A comma-separated list may be '
-             f'specified. Possible backends: {backendNames}')
+             f'specified. Possible backends: {", ".join(backendNames)}')
 
     advancedGroup.add_argument(
         '--disable-union-mount', action='store_true', default=False,
