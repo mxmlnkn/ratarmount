@@ -161,7 +161,7 @@ class TestAutoMountLayer:
 
             for folder in ['/', '/foo', '/foo/lighter.tar', '/foo/lighter.tar/fighter']:
                 fileInfo = recursivelyMounted.lookup(folder)
-                assert fileInfo
+                assert fileInfo, folder
                 assert recursivelyMounted.list(folder)
                 assert recursivelyMounted.versions(folder) > 0
 
@@ -173,7 +173,7 @@ class TestAutoMountLayer:
 
             for mountedFile in ['/foo/fighter/ufo', '/foo/lighter.tar/fighter/bar']:
                 fileInfo = recursivelyMounted.lookup(mountedFile)
-                assert fileInfo
+                assert fileInfo, mountedFile
                 assert recursivelyMounted.versions(folder) > 0
 
                 assert stat.S_ISREG(fileInfo.mode)

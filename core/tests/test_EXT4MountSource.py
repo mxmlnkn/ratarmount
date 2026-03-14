@@ -37,7 +37,7 @@ class TestEXT4MountSource:
             mountSource = EXT4MountSource(tmpFileObject)
             for folder in ['/', '/foo', '/foo/fighter']:
                 fileInfo = mountSource.lookup(folder)
-                assert fileInfo
+                assert fileInfo, folder
                 assert stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(folder) == 1
@@ -45,7 +45,7 @@ class TestEXT4MountSource:
 
             for filePath in ['/foo/fighter/ufo', '/foo/lighter.tar']:
                 fileInfo = mountSource.lookup(filePath)
-                assert fileInfo
+                assert fileInfo, filePath
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1

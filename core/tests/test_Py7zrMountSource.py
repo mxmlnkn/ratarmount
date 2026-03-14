@@ -25,7 +25,7 @@ class TestPy7zrMountSource:
         ):
             for folder in ['/', '/foo', '/foo/fighter']:
                 fileInfo = mountSource.lookup(folder)
-                assert fileInfo
+                assert fileInfo, folder
                 assert stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(folder) == 1
@@ -33,7 +33,7 @@ class TestPy7zrMountSource:
 
             for filePath in ['/foo/fighter/ufo']:
                 fileInfo = mountSource.lookup(filePath)
-                assert fileInfo
+                assert fileInfo, filePath
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1

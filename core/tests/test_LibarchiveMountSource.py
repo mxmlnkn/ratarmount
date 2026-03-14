@@ -27,7 +27,7 @@ class TestLibarchiveMountSource:
         with copy_test_file('folder-symlink.' + compression) as path, LibarchiveMountSource(path) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
                 fileInfo = mountSource.lookup(folder)
-                assert fileInfo
+                assert fileInfo, folder
                 assert stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(folder) == 1
@@ -35,7 +35,7 @@ class TestLibarchiveMountSource:
 
             for filePath in ['/foo/fighter/ufo']:
                 fileInfo = mountSource.lookup(filePath)
-                assert fileInfo
+                assert fileInfo, filePath
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1
@@ -61,13 +61,13 @@ class TestLibarchiveMountSource:
         ):
             for folder in ['/', '/foo', '/foo_fighter']:
                 fileInfo = mountSource.lookup(folder)
-                assert fileInfo
+                assert fileInfo, folder
                 assert stat.S_ISDIR(fileInfo.mode)
                 assert mountSource.versions(folder) == 1
 
             for filePath in ['/foo_fighter_ufo']:
                 fileInfo = mountSource.lookup(filePath)
-                assert fileInfo
+                assert fileInfo, filePath
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1
@@ -91,7 +91,7 @@ class TestLibarchiveMountSource:
         ):
             for folder in ['/', '/foo', '/foo/fighter']:
                 fileInfo = mountSource.lookup(folder)
-                assert fileInfo
+                assert fileInfo, folder
                 assert stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(folder) == 1
@@ -99,7 +99,7 @@ class TestLibarchiveMountSource:
 
             for filePath in ['/foo/fighter/ufo']:
                 fileInfo = mountSource.lookup(filePath)
-                assert fileInfo
+                assert fileInfo, filePath
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1
@@ -116,7 +116,7 @@ class TestLibarchiveMountSource:
         ):
             for folder in ['/']:
                 fileInfo = mountSource.lookup(folder)
-                assert fileInfo
+                assert fileInfo, folder
                 assert stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(folder) == 1
@@ -124,7 +124,7 @@ class TestLibarchiveMountSource:
 
             for filePath in ['/simple']:
                 fileInfo = mountSource.lookup(filePath)
-                assert fileInfo
+                assert fileInfo, filePath
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1

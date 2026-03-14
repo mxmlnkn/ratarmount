@@ -93,14 +93,14 @@ class TestHTMLDataURLParser:
                     folder = '/'.join(path_split[:n])
 
                     fileInfo = mountSource.lookup(folder)
-                    assert fileInfo
+                    assert fileInfo, folder
                     assert stat.S_ISDIR(fileInfo.mode)
 
                     assert mountSource.versions(folder) == 1
                     assert mountSource.list(folder)
 
                 fileInfo = mountSource.lookup(path)
-                assert fileInfo
+                assert fileInfo, path
                 assert not stat.S_ISDIR(fileInfo.mode)
                 assert stat.S_ISREG(fileInfo.mode)
 

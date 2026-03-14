@@ -27,7 +27,7 @@ class TestRemovePrefixMountSource:
         path = posixpath.normpath('/' + path + '/file').lstrip('/')
 
         fileInfo = ms.lookup(path)
-        assert fileInfo
+        assert fileInfo, path
         assert stat.S_ISREG(fileInfo.mode)
         assert not stat.S_ISDIR(fileInfo.mode)
         assert fileInfo.size == len(contents)
@@ -41,7 +41,7 @@ class TestRemovePrefixMountSource:
             subpath = '/'.join(['', *splitPath[:i]])
             for queryPath in (subpath, subpath.lstrip('/')):
                 fileInfo = ms.lookup(queryPath)
-                assert fileInfo
+                assert fileInfo, queryPath
                 assert stat.S_ISDIR(fileInfo.mode)
                 assert not stat.S_ISREG(fileInfo.mode)
 

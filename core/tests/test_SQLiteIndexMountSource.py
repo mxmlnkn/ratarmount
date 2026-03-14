@@ -19,14 +19,14 @@ class TestSQLiteIndexMountSource:
         with copy_test_file("nested-tar.index.sqlite") as path, SQLiteIndexMountSource(path) as mountSource:
             for folder in ['/', '/foo', '/foo/fighter']:
                 fileInfo = mountSource.lookup(folder)
-                assert fileInfo
+                assert fileInfo, folder
                 assert stat.S_ISDIR(fileInfo.mode)
                 assert mountSource.versions(folder) == 1
                 assert mountSource.list(folder)
 
             for filePath in ['/foo/fighter/ufo', '/foo/lighter.tar']:
                 fileInfo = mountSource.lookup(filePath)
-                assert fileInfo
+                assert fileInfo, filePath
                 assert not stat.S_ISDIR(fileInfo.mode)
 
                 assert mountSource.versions(filePath) == 1

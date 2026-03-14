@@ -101,7 +101,7 @@ def test_ar_archives(archive):
     with ARMountSource(find_test_file(archive[0])) as mountSource:
         for folder in ['/']:
             fileInfo = mountSource.lookup(folder)
-            assert fileInfo
+            assert fileInfo, folder
             assert stat.S_ISDIR(fileInfo.mode)
 
             assert mountSource.versions(folder) == 1
@@ -109,7 +109,7 @@ def test_ar_archives(archive):
 
         for path, content in archive[1]:
             fileInfo = mountSource.lookup(path)
-            assert fileInfo
+            assert fileInfo, path
             assert not stat.S_ISDIR(fileInfo.mode)
 
             assert mountSource.versions(path) == 1
