@@ -116,6 +116,14 @@ pytestedTests+=(
 )
 fi
 
+# No wheels for python-lzo and installing lzo1.h via brew is not implemented and not user-friendly.
+if ! uname | 'grep' -q -i darwin; then
+pytestedTests+=(
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lzo.squashfs            foo/fighter/ufo
+    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lzo.squashfs            foo/jet/ufo
+)
+fi
+
 pytestedTests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/nested-tar.asar                        foo/fighter/ufo
     2b87e29fca6ee7f1df6c1a76cb58e101 tests/nested-tar.asar                        foo/lighter.tar/fighter/bar
@@ -132,14 +140,12 @@ pytestedTests+=(
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.gzip.squashfs           foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lz4.squashfs            foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lzma.squashfs           foo/fighter/ufo
-    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lzo.squashfs            foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.no-compression.squashfs foo/fighter/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.xz.squashfs             foo/fighter/ufo
 
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.gzip.squashfs           foo/jet/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lz4.squashfs            foo/jet/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lzma.squashfs           foo/jet/ufo
-    2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.lzo.squashfs            foo/jet/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.no-compression.squashfs foo/jet/ufo
     2709a3348eb2c52302a7606ecf5860bc tests/folder-symlink.xz.squashfs             foo/jet/ufo
 
