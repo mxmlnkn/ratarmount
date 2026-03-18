@@ -79,7 +79,7 @@ function installAppImagePythonPackages()
         return
     fi
 
-    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ..[full,sqlar] || exit 1
+    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ..[full,sqlar,lzo] || exit 1
 
     # These lines are only to document the individual package sizes. They are all installed with [full] above.
     # ratarmount-0.10.0-manylinux2014_x86_64.AppImage (the first one!) was 13.6 MB

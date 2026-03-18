@@ -123,7 +123,9 @@ full = [
     "py7zr ~= 1.0",
     "PySquashfsImage == 0.9.0",
     "lz4 ~= 4.0.0",
-    "python-lzo ~= 1.0",
+    # Should be installed manually because it requires lzo1.h to be installed, which is often missing.
+    # python-lzo also has not seen an update in 3 years. If recent wheels existed, the above would not be a problem.
+    #"python-lzo ~= 1.0",
     # Need at least 0.23.0 for Python 3.13 support.
     # https://github.com/indygreg/python-zstandard/issues/223
     # Need at least 0.24.0 for Python 3.14
@@ -191,7 +193,9 @@ sqlar = [
 squashfs = [
     "PySquashfsImage == 0.9.0",
     "lz4 ~= 4.0.0",
-    "python-lzo ~= 1.0",
+    # Should be installed manually because it requires lzo1.h to be installed, which is often missing.
+    # python-lzo also has not seen an update in 3 years. If recent wheels existed, the above would not be a problem.
+    #"python-lzo ~= 1.0",
     # Need at least 0.23.0 for Python 3.13 support.
     # https://github.com/indygreg/python-zstandard/issues/223
     # With Python 3.14, I get ImportError: cannot import name 'ByteString' from 'typing' via
@@ -202,6 +206,7 @@ squashfs = [
     # /usr/bin/ld: cannot find /tmp/tmpcuw21d78/bin/isa-l.a: No such file or directory
     'isal ~= 1.0; python_version < "3.14.0"',
 ]
+lzo = ["python-lzo ~= 1.0"]
 xz = ["python-xz ~= 0.4.0"]
 zip = ["fast_zip_decryption"]
 zstd = [

@@ -501,8 +501,8 @@ jobs:
 
     - name: Test Installation From Source
       run: |
-        python3 -m pip install core/[full,ext4,fsspec,sqlar]
-        python3 -m pip install .[full,ext4,fsspec,sqlar]
+        python3 -m pip install core/[full,ext4,fsspec,lzo,sqlar]
+        python3 -m pip install .[full,ext4,fsspec,lzo,sqlar]
 
     - name: Install pip Test Dependencies
       run: |
