@@ -349,9 +349,16 @@ if ext4:
     ARCHIVES_TO_TEST += EXT4_TO_TEST
 
 
+# Must be in a stable sorting for xdist to work! No set() usage allowed!
+ARCHIVES_TO_TEST_COLLATED = {
+    archive: [(path, checksum) for checksum, a, path in ARCHIVES_TO_TEST if a == archive]
+    for archive in dict.fromkeys(values[1] for values in ARCHIVES_TO_TEST)
+}
+
+
 @pytest.mark.parametrize("parallelization", [1, 2, 0])
-@pytest.mark.parametrize(("checksum", "archivePath", "pathInArchive"), ARCHIVES_TO_TEST)
-def test_file_in_archive(archivePath, pathInArchive, checksum, parallelization):
+@pytest.mark.parametrize(("archivePath", "checksumPathPairs"), ARCHIVES_TO_TEST_COLLATED.items())
+def test_file_in_archive(archivePath, checksumPathPairs, parallelization):
     with copy_test_file(archivePath) as tmpArchive:
         assert os.path.isfile(tmpArchive)
         mountPoint = os.path.join(os.path.dirname(tmpArchive), "mountPoint")
@@ -370,42 +377,45 @@ def test_file_in_archive(archivePath, pathInArchive, checksum, parallelization):
         if 'ext4' not in archivePath:
             args.insert(0, "--ignore-zeros")
 
-        print(f"ratarmount -P {parallelization} {tmpArchive} mounted at {mountPoint} -> access: {pathInArchive}")
-
         # Test with forced index recreation first and then with index loading.
         for forceIndexCreation in [True, False]:
             testArgs = ["-c", *args] if forceIndexCreation else args
             with RunRatarmount(mountPoint, testArgs) as ratarmountInstance:
-                path = Path(mountPoint) / pathInArchive
-                assert path.is_file()
-                stats = path.stat()  # implicitly tests that this does not throw
-                assert stats.st_size > 0
+                for pathInArchive, checksum in checksumPathPairs:
+                    print(
+                        f"ratarmount -P {parallelization} {tmpArchive} mounted at {mountPoint} with index forced: "
+                        f"{forceIndexCreation} -> access: {pathInArchive}"
+                    )
+                    path = Path(mountPoint) / pathInArchive
+                    assert path.is_file()
+                    stats = path.stat()  # implicitly tests that this does not throw
+                    assert stats.st_size > 0
 
-                if pathInArchive == "02.normal.bin":
-                    assert stats.st_size == 10 * 1024 * 1024 + 1
-                    # https://linux.die.net/man/2/stat The number of blocks is ALWAYS with 512 B block size.
-                    assert stats.st_blocks == ceil_div(10 * 1024 * 1024 + 1, 512)
+                    if pathInArchive == "02.normal.bin":
+                        assert stats.st_size == 10 * 1024 * 1024 + 1
+                        # https://linux.die.net/man/2/stat The number of blocks is ALWAYS with 512 B block size.
+                        assert stats.st_blocks == ceil_div(10 * 1024 * 1024 + 1, 512)
 
-                hash_md5 = hashlib.md5()
-                with path.open('rb') as file:
-                    while True:
-                        contents = file.read(1024 * 1024)
-                        if not contents:
-                            break
-                        hash_md5.update(contents)
-                assert hash_md5.hexdigest() == checksum
+                    hash_md5 = hashlib.md5()
+                    with path.open('rb') as file:
+                        while True:
+                            contents = file.read(1024 * 1024)
+                            if not contents:
+                                break
+                            hash_md5.update(contents)
+                    assert hash_md5.hexdigest() == checksum
 
-                if '.tar' in tmpArchive and '.7z' not in tmpArchive:
-                    output = ratarmountInstance.get_stdout() + ratarmountInstance.get_stderr()
-                    if forceIndexCreation:
-                        if "Creating offset dictionary" not in output:
-                            print(
-                                "Looks like index was not created while executing: ratarmount "
-                                + ' '.join([*testArgs, mountPoint])
-                            )
-                    else:
-                        if "Successfully loaded offset dictionary" not in output:
-                            print(
-                                "Looks like index was not loaded while executing: ratarmount "
-                                + ' '.join([*testArgs, mountPoint])
-                            )
+                    if '.tar' in tmpArchive and '.7z' not in tmpArchive:
+                        output = ratarmountInstance.get_stdout() + ratarmountInstance.get_stderr()
+                        if forceIndexCreation:
+                            if "Creating offset dictionary" not in output:
+                                print(
+                                    "Looks like index was not created while executing: ratarmount "
+                                    + ' '.join([*testArgs, mountPoint])
+                                )
+                        else:
+                            if "Successfully loaded offset dictionary" not in output:
+                                print(
+                                    "Looks like index was not loaded while executing: ratarmount "
+                                    + ' '.join([*testArgs, mountPoint])
+                                )
