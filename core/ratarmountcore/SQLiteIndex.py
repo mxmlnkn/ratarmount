@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_sqlite_tables(connection: sqlite3.Connection):
-    return [x[0] for x in connection.execute('SELECT name FROM sqlite_master WHERE type="table" OR type="view"')]
+    return [x[0] for x in connection.execute("SELECT name FROM sqlite_master WHERE type='table' OR type='view'")]
 
 
 def _to_version_tuple(version: str) -> Optional[tuple[int, int, int]]:
@@ -717,6 +717,12 @@ class SQLiteIndex:
             PRAGMA SYNCHRONOUS = OFF;
             """
         )
+
+        if hasattr(sqlConnection, 'setconfig'):
+            ENVIRONMENT_YES_VALUES = ('1', 'yes', 'on', 'enable', 'enabled')
+            enable_double_quotes = os.getenv('RATARMOUNT_SQLITE_DOUBLE_QUOTES', '').lower() in ENVIRONMENT_YES_VALUES
+            sqlConnection.setconfig(sqlite3.SQLITE_DBCONFIG_DQS_DDL, enable_double_quotes)
+            sqlConnection.setconfig(sqlite3.SQLITE_DBCONFIG_DQS_DML, enable_double_quotes)
         return sqlConnection
 
     @staticmethod
@@ -794,7 +800,7 @@ class SQLiteIndex:
             libSqliteVersion = (0, 0, 0)
 
         searchByTuple = """(path,name) NOT IN ( SELECT path,name"""
-        searchByConcat = """path || "/" || name NOT IN ( SELECT path || "/" || name"""
+        searchByConcat = """path || '/' || name NOT IN ( SELECT path || '/' || name"""
 
         cleanUpDatabase = f"""
             INSERT OR REPLACE INTO "files" SELECT * FROM "filestmp" ORDER BY "path","name",rowid;
@@ -803,7 +809,7 @@ class SQLiteIndex:
                 /* path name offsetheader offset size mtime mode type */
                 SELECT path,name,offsetheader,offset,0,0,{int(0o555 | stat.S_IFDIR)},{int(tarfile.DIRTYPE)},
                        /* linkname uid gid istar issparse isgenerated recursiondepth */
-                       "",0,0,0,0,0,0
+                       '',0,0,0,0,0,0
                 FROM "parentfolders"
                 WHERE {searchByTuple if libSqliteVersion >= (3, 22, 0) else searchByConcat}
                     FROM "files" WHERE mode & (1 << 14) != 0
