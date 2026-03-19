@@ -1329,7 +1329,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
             # Then, it would be better to update the index to contain the 'isGnuIncremental' metadata key.
             self._isGnuIncremental = bool(
                 self.index.sqlConnection.execute(
-                    """SELECT 1 FROM "files" WHERE hex(type) = hex("D") LIMIT 1"""
+                    """SELECT 1 FROM "files" WHERE hex(type) = hex('D') LIMIT 1"""
                 ).fetchone()
             )
 

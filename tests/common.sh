@@ -3,6 +3,7 @@
 cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." || { echo 'Failed to cd to git root!'; exit 1; }
 
 export RATARMOUNT_CHECK_OVERRIDES=1
+export RATARMOUNT_SQLITE_DOUBLE_QUOTES=0
 
 #export PYTHONTRACEMALLOC=1
 

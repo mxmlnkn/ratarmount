@@ -86,7 +86,7 @@ class WritableFolderMountSource(fuse.Operations):
         )
 
         # Add table if necessary
-        tables = [row[0] for row in self.sqlConnection.execute('SELECT name FROM sqlite_master WHERE type = "table";')]
+        tables = [row[0] for row in self.sqlConnection.execute("SELECT name FROM sqlite_master WHERE type = 'table';")]
         if "files" not in tables:
             self.sqlConnection.executescript(WritableFolderMountSource._overlayMetadataSchema)
 
