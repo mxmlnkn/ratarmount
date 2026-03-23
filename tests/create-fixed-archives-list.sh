@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
 
-tests=(
-    # Not done with pytest because it takes more than 10x longer for some reason.
-    # Without pytest, mounting takes 4.5 s and md5sum takes 17.5 s.
-    cb5d4faf665db396dc34df1689ef1da8 tests/sparse-file-larger-than-8GiB-followed-by-normal-file.tar.zst sparse
-    c157a79031e1c40f85931829bc5fc552 tests/sparse-file-larger-than-8GiB-followed-by-normal-file.tar.zst foo
-)
+tests=()
 pytestedTests=()
 
 
@@ -94,6 +89,11 @@ tests+=(
     8f30b20831bade7a2236edf09a55af60 tests/2k-recursive-tars.tar.bz2              mimi/01333.tar/foo
     f95f8943f6dcf7b3c1c8c2cab5455f8b tests/2k-recursive-tars.tar.bz2              mimi/02000.tar/foo
     c157a79031e1c40f85931829bc5fc552 tests/2k-recursive-tars.tar.bz2              mimi/foo
+
+    # Not done with pytest because it takes more than 10x longer for some reason.
+    # Without pytest, mounting takes 4.5 s and md5sum takes 17.5 s.
+    cb5d4faf665db396dc34df1689ef1da8 tests/sparse-file-larger-than-8GiB-followed-by-normal-file.tar.zst sparse
+    c157a79031e1c40f85931829bc5fc552 tests/sparse-file-larger-than-8GiB-followed-by-normal-file.tar.zst foo
 )
 
 # https://github.com/indygreg/python-zstandard/issues/238

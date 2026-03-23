@@ -204,8 +204,11 @@ export parallelization
 checkFileInTAR()
 {
     local archive="$1"; shift
-    local fileInTar="$1"; shift
-    local correctChecksum="$1"
+    local checks=( "$@" )
+
+    if (( ${#checks[@]} < 2 || ${#checks[@]} % 2 != 0 )); then
+        returnError "$LINENO" "Expected at least one file/checksum pair but got ${#checks[@]} trailing arguments."
+    fi
 
     local startTime
     startTime=$( date +%s )
@@ -220,11 +223,13 @@ checkFileInTAR()
 
     # try with index recreation
     args+=( -P "$parallelization" -c --detect-gnu-incremental --ignore-zeros "$archive" "$mountFolder" )
-    {
-        runAndCheckRatarmount "${args[@]}" &&
-        checkStat "$mountFolder/$fileInTar" &&
-        verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
-    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+    runAndCheckRatarmount "${args[@]}" || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+    for (( iTest = 0; iTest < ${#checks[@]}; iTest += 2 )); do
+        checkStat "$mountFolder/${checks[iTest]}" ||
+            returnError "$LINENO" "stat ${checks[iTest]}"
+        verifyCheckSum "$mountFolder" "${checks[iTest]}" "$archive" "${checks[iTest+1]}" ||
+            returnError "$LINENO" "check ${checks[iTest]}"
+    done
     funmount "$mountFolder"
     if [[ "$archive" =~ [.]tar && ! "$archive" =~ tar:: ]]; then
         'grep' -q 'Creating offset dictionary' ratarmount.stdout.log ratarmount.stderr.log ||
@@ -235,11 +240,13 @@ checkFileInTAR()
     args=()
     if [[ "$archive" != *"://"* ]]; then args+=( '--recursive' ); fi
     args+=( -P "$parallelization" --detect-gnu-incremental --ignore-zeros "$archive" "$mountFolder" )
-    {
-        runAndCheckRatarmount "${args[@]}" &&
-        checkStat "$mountFolder/$fileInTar" &&
-        verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum"
-    } || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+    runAndCheckRatarmount "${args[@]}" || returnError "$LINENO" "$RATARMOUNT_CMD ${args[*]}"
+    for (( iTest = 0; iTest < ${#checks[@]}; iTest += 2 )); do
+        checkStat "$mountFolder/${checks[iTest]}"||
+            returnError "$LINENO" "stat ${checks[iTest]}"
+        verifyCheckSum "$mountFolder" "${checks[iTest]}" "$archive" "${checks[iTest+1]}"||
+            returnError "$LINENO" "check ${checks[iTest]}"
+    done
     funmount "$mountFolder"
 
     # The libarchive backend does not create indexes for now because it doesn't help the poor performance much and
@@ -253,7 +260,7 @@ checkFileInTAR()
 
     local duration
     duration=$(( $( date +%s ) - startTime ))
-    echoerr "Tested successfully '$fileInTar' in '$archive' for checksum $correctChecksum in ${duration}s"
+    echoerr "Tested successfully $(( ${#checks[@]} / 2 )) file checks in '$archive' in ${duration}s"
 
     return 0
 }
