@@ -22,10 +22,32 @@ for parallelization in $PARALLELIZATIONS; do
         tests+=( "${pytestedTests[@]}" )
     fi
 
+    uniqueArchives=()
     for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
-        checksum=${tests[iTest]}
         tarPath=${tests[iTest+1]}
-        fileName=${tests[iTest+2]}
+
+        seenArchive=0
+        for uniqueArchive in "${uniqueArchives[@]}"; do
+            if [[ "$uniqueArchive" == "$tarPath" ]]; then
+                seenArchive=1
+                break
+            fi
+        done
+
+        if [[ $seenArchive -eq 0 ]]; then
+            uniqueArchives+=( "$tarPath" )
+        fi
+    done
+
+    for tarPath in "${uniqueArchives[@]}"; do
+        fileChecks=()
+        for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
+            if [[ "${tests[iTest+1]}" != "$tarPath" ]]; then
+                continue
+            fi
+
+            fileChecks+=( "${tests[iTest+2]}" "${tests[iTest]}" )
+        done
 
         # Only test some larger files for all compression backends because most of the files are minimal
         # tests which all have the same size of 20*512B. In the first place, the compression backends
@@ -44,11 +66,14 @@ for parallelization in $PARALLELIZATIONS; do
 
         for file in "${files[@]}"; do
             TMP_FILES_TO_CLEANUP+=( "${file}.index.sqlite" )
-            checkFileInTAR "$file" "$fileName" "$checksum"
-            (( ++nFiles ))
+            checkFileInTAR "$file" "${fileChecks[@]}"
+            nFiles=$(( nFiles + ${#fileChecks[@]} / 2 ))
         done
+
         cleanup
-        safeRmdir "$( dirname -- "$file" )"
+        for file in "${files[@]}"; do
+            safeRmdir "$( dirname -- "$file" )"
+        done
     done
 
     cleanup
