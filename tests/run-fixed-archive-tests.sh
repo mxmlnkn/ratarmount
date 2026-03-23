@@ -30,7 +30,7 @@ for parallelization in $PARALLELIZATIONS; do
         # Only test some larger files for all compression backends because most of the files are minimal
         # tests which all have the same size of 20*512B. In the first place, the compression backends
         # should be tested more rigorously inside their respective projects not by ratarmount.
-        if [[ "$fileName" =~ 2k-recursive ]]; then
+        if [[ "$tarPath" =~ 2k-recursive ]]; then
             # readarray does not work on macOS!
             #readarray -t files < <( recompressFile "$tarPath" )
             files=()
