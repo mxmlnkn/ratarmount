@@ -157,7 +157,7 @@ def test_password_list(tmpdir, passwords, compression):
         file.writelines(password + '\n' for password in passwords)
 
     with (
-        copy_test_file("tests/encrypted-nested-tar." + compression) as encryptedFile,
+        copy_test_file("encrypted-nested-tar." + compression) as encryptedFile,
         RunRatarmount(mountPoint, ['--password-file', passwordFile, encryptedFile]),
     ):
         assert os.path.isdir(os.path.join(mountPoint, "foo"))
