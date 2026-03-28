@@ -128,7 +128,7 @@ class TestAutoMountLayer:
         }
 
         with (
-            copy_test_file("tests/double-compressed-nested-tar.tgz.tgz") as path,
+            copy_test_file("double-compressed-nested-tar.tgz.tgz") as path,
             open_mount_source(path, **options) as mountSource,
         ):
             recursivelyMounted = AutoMountLayer(mountSource, **options)
@@ -154,7 +154,7 @@ class TestAutoMountLayer:
         }
 
         with (
-            copy_test_file("tests/nested-without-execution-flag.zip") as path,
+            copy_test_file("nested-without-execution-flag.zip") as path,
             open_mount_source(path, **options) as mountSource,
         ):
             recursivelyMounted = AutoMountLayer(mountSource, **options)
@@ -187,7 +187,7 @@ class TestAutoMountLayer:
     @pytest.mark.parametrize("maxRecursionDepth", range(7))
     def test_recursion_depth(parallelization, recursive, maxRecursionDepth):
         name = "triple-compressed-nested-tar"
-        archivePath = f"tests/{name}.tgz.tgz.gz"
+        archivePath = f"{name}.tgz.tgz.gz"
         options = {
             'clearIndexCache': True,
             'recursive': recursive,
