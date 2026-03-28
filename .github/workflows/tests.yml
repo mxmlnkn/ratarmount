@@ -16,16 +16,12 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - name: Setup Shared Test Environment
+      uses: ./.github/actions/setup-test-env
       with:
-        python-version: '3.12'
-        cache: 'pip'
-
-    - name: Install Dependencies
-      uses: awalsh128/cache-apt-pkgs-action@v1.4.3
-      with:
-        packages: 'liblzo2-dev shellcheck'
+        os: ${{ matrix.os }}
+        python-version: 3.12
+        linux-packages: 'liblzo2-dev shellcheck'
 
     - name: Install pip Dependencies
       run: |
@@ -63,6 +59,7 @@ jobs:
     - name: Lint With Pylint
       run: |
         python3 -m pip install pylint
+        # ubuntu-slim runs on one core, so parallelism with -j would only add overhead.
         pylint --rcfile tests/.pylintrc ratarmount core/ratarmountcore tests/*.py core/tests/*.py | tee pylint.log
         ! 'egrep' ': E[0-9]{4}: ' pylint.log
 
@@ -86,20 +83,16 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - name: Setup Shared Test Environment
+      uses: ./.github/actions/setup-test-env
       with:
+        os: ${{ matrix.os }}
         # Pytype does not support Python 3.13 as of 2025-06.
         # https://news.ycombinator.com/item?id=44963724
         # https://github.com/google/pytype
         # > The last supported Python version for Pytype will be 3.12.
-        python-version: '3.12'
-        cache: 'pip'
-
-    - name: Install Dependencies
-      uses: awalsh128/cache-apt-pkgs-action@v1.4.3
-      with:
-        packages: 'liblzo2-dev'
+        python-version: 3.12
+        linux-packages: 'liblzo2-dev'
 
     - name: Install pip Dependencies
       run: |
@@ -155,68 +148,21 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+    - name: Setup Shared Test Environment
+      uses: ./.github/actions/setup-test-env
       with:
+        os: ${{ matrix.os }}
         python-version: ${{ matrix.python-version }}
-
-    - name: Print System Information
-      run: |
-        echo "uname -a: $( uname -a )"
-        echo "Shell: $SHELL"
-        echo "Cores: $( nproc )"
-        echo "Mount points:"; mount
-        echo "/etc/fuse.conf:"; cat /etc/fuse.conf || true
+        install-winfsp: 'true'
+        libfuse-version: ${{ matrix.libfuse-version }}
 
     - name: Install Dependencies (Linux)
       if: startsWith( matrix.os, 'ubuntu' )
       run: |
-        # Libarchive calls the grzip, lrzip, lzop binaries for lrzip support. Others, such as bzip2, gzip, lz4, lzma,
-        # zstd, may also call external binaries depending on how libarchive was compiled!
-        # https://github.com/libarchive/libarchive/blob/ad5a0b542c027883d7069f6844045e6788c7d70c/libarchive/
-        #   archive_read_support_filter_lrzip.c#L68
+        # It seems like this is necessary because the cached apt install actions does not work.
+        # Maybe because of post-install actions not being run?
         sudo apt-get -y update
-        sudo apt-get -y install libfuse2 fuse3 bzip2 pbzip2 pixz zstd unar lrzip lzop gcc liblzo2-dev ruby-webrick
-        sudo apt-get -y install liblzma-dev*
-
-    - name: Install Dependencies (MacOS)
-      if: startsWith( matrix.os, 'macos' )
-      run: |
-        # coreutils is required for the tests written in shell, e.g., for the 'realpath' command
-        # unar is required for rar tests with passwords. By default, bsdtar is installed but that is the only
-        # one of the three supported tools (the third is unrar) that does not support passwords.
-        # And the error message is atrocious:
-        #   cmdline.extend(args)
-        #   TypeError: 'NoneType' object is not iterable
-        brew install -q macfuse coreutils pixz pbzip2 zstd unar libarchive lrzip lzop lzo
-        # Add brew installation binary folder to PATH so that command line tools like zstd can be found
-        echo PATH="$PATH:/usr/local/bin" >> "$GITHUB_ENV"
-
-    - name: Install pip Dependencies
-      run: |
-        python3 -m pip install --upgrade pip
-        # Still needed for building lzmaffi without build isolation
-        python3 -m pip install --upgrade wheel
-        python3 -m pip install --upgrade setuptools
-        python3 -m pip install --upgrade-strategy eager --upgrade twine build cffi
-
-    - name: Install Custom libFUSE
-      if: matrix.libfuse-version != 'system'
-      run: |
-        NAME=fuse-${LIBFUSE_VERSION}
-        wget https://github.com/libfuse/libfuse/releases/download/${NAME}/${NAME}.tar.gz
-        tar -xf "${NAME}.tar.gz"
-        cd -- "${NAME}"
-        mkdir -p build
-        cd build
-        sudo apt-get -y install meson python*-pytest
-        meson ..
-        ninja
-        #sudo python3 -m pytest test/
-        sudo ninja install
-        sudo ln -s /usr/local/bin/fusermount{3,}
-        cd ../..
-        rm -rf -- "${NAME}"
+        sudo apt-get -y install libfuse2 fuse3
 
     - name: Test ratarmountcore Installation From Tarball
       working-directory: core
@@ -340,48 +286,14 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+    - name: Setup Shared Test Environment
+      uses: ./.github/actions/setup-test-env
       with:
+        os: ${{ matrix.os }}
         python-version: ${{ matrix.python-version }}
-
-    - name: Install Dependencies (Linux)
-      if: startsWith( matrix.os, 'ubuntu' )
-      run: |
-        # Libarchive calls the grzip, lrzip, lzop binaries for lrzip support. Others, such as bzip2, gzip, lz4, lzma,
-        # zstd, may also call external binaries depending on how libarchive was compiled!
-        # https://github.com/libarchive/libarchive/blob/ad5a0b542c027883d7069f6844045e6788c7d70c/libarchive/
-        #   archive_read_support_filter_lrzip.c#L68
-        sudo apt-get -y update
-        sudo apt-get -y install bzip2 pbzip2 pixz zstd unar lrzip lzop gcc liblzo2-dev
-        sudo apt-get -y install liblzma-dev*
-
-    - name: Install Dependencies (Linux)
-      if: startsWith( matrix.os, 'ubuntu' ) && startsWith( matrix.python-version, '3.14' )
-      run: |
-        # indexed_zstd is missing wheels for Python 3.14+
-        sudo apt-get -y install libzstd-dev
-
-    - name: Install Dependencies (MacOS)
-      if: startsWith( matrix.os, 'macos' )
-      run: |
-        # coreutils is required for the tests written in shell, e.g., for the 'realpath' command
-        # unar is required for rar tests with passwords. By default, bsdtar is installed but that is the only
-        # one of the three supported tools (the third is unrar) that does not support passwords.
-        # And the error message is atrocious:
-        #   cmdline.extend(args)
-        #   TypeError: 'NoneType' object is not iterable
-        brew install -q coreutils pixz pbzip2 zstd unar libarchive lrzip lzop lzo
-        # Add brew installation binary folder to PATH so that command line tools like zstd can be found
-        echo PATH="$PATH:/usr/local/bin" >> "$GITHUB_ENV"
-
-    - name: Install pip Dependencies
-      run: |
-        python3 -m pip install --upgrade pip
-        # Still needed for building lzmaffi without build isolation
-        python3 -m pip install --upgrade wheel
-        python3 -m pip install --upgrade setuptools
-        python3 -m pip install --upgrade-strategy eager --upgrade twine build cffi
+        install-winfsp: 'false'
+        linux-packages: bzip2 pbzip2 pixz zstd unar lrzip lzop gcc liblzo2-dev liblzma-dev*
+        macos-packages: coreutils pixz pbzip2 zstd unar libarchive lrzip lzop lzo
 
     - name: Test Installation From Source
       run: |
@@ -435,24 +347,15 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Setup Shared Test Environment
+      uses: ./.github/actions/setup-test-env
+      with:
+        os: ${{ matrix.os }}
+        python-version: ${{ matrix.python-version }}
+        libfuse-version: ${{ matrix.libfuse-version }}
+
     - name: Fetch tag for tests
       run: git fetch origin refs/tags/v0.15.2:refs/tags/v0.15.2
-
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    - name: Install Dependencies (Linux)
-      if: startsWith( matrix.os, 'ubuntu' )
-      run: |
-        # Libarchive calls the grzip, lrzip, lzop binaries for lrzip support. Others, such as bzip2, gzip, lz4, lzma,
-        # zstd, may also call external binaries depending on how libarchive was compiled!
-        # https://github.com/libarchive/libarchive/blob/ad5a0b542c027883d7069f6844045e6788c7d70c/libarchive/
-        #   archive_read_support_filter_lrzip.c#L68
-        sudo apt-get -y update
-        sudo apt-get -y install libfuse2 fuse3 bzip2 pbzip2 pixz zstd unar lrzip lzop gcc liblzo2-dev ruby-webrick
-        sudo apt-get -y install liblzma-dev*
 
     - name: Install Dependencies For Unreleased Python Versions (Linux)
       if: startsWith( matrix.os, 'ubuntu' ) && startsWith( matrix.python-version, '3.14.0-' )
@@ -465,32 +368,6 @@ jobs:
         echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib" >> "$GITHUB_ENV"
         # Expects exactly libgit2 1.8.x! Therefore install it here instead via the non-pinned ratarmount dependencies.
         python3 -m pip install pygit2==1.15
-
-    - name: Install pip Dependencies
-      run: |
-        python3 -m pip install --upgrade pip
-        # Still needed for building lzmaffi without build isolation
-        python3 -m pip install --upgrade wheel
-        python3 -m pip install --upgrade setuptools
-        python3 -m pip install --upgrade-strategy eager --upgrade twine build cffi
-
-    - name: Install Custom libFUSE
-      if: matrix.libfuse-version != 'system'
-      run: |
-        NAME=fuse-${LIBFUSE_VERSION}
-        wget https://github.com/libfuse/libfuse/releases/download/${NAME}/${NAME}.tar.gz
-        tar -xf "${NAME}.tar.gz"
-        cd -- "${NAME}"
-        mkdir -p build
-        cd build
-        sudo apt-get -y install meson python*-pytest
-        meson ..
-        ninja
-        #sudo python3 -m pytest test/
-        sudo ninja install
-        sudo ln -s /usr/local/bin/fusermount{3,}
-        cd ../..
-        rm -rf -- "${NAME}"
 
     - name: Test Installation From Source
       run: |
