@@ -21,7 +21,7 @@ inputs:
     # zstd, may also call external binaries depending on how libarchive was compiled!
     # https://github.com/libarchive/libarchive/blob/ad5a0b542c027883d7069f6844045e6788c7d70c/libarchive/
     #   archive_read_support_filter_lrzip.c#L68
-    default: 'libfuse2 fuse3 bzip2 pbzip2 pixz zstd unar lrzip lzop gcc liblzo2-dev ruby-webrick liblzma-dev*'
+    default: 'libfuse2 fuse3 bzip2 pbzip2 pixz zstd unar lrzip lzop gcc liblzo2-dev ruby-webrick liblzma-dev'
   macos-packages:
     description: Space-separated Homebrew packages to install
     required: false
@@ -84,13 +84,12 @@ runs:
 
     - name: Install Dependencies (Linux)
       if: ${{ startsWith(inputs.os, 'ubuntu') && inputs.linux-packages != '' }}
-      shell: bash
-      run: |
-        sudo apt-get -y update
-        sudo apt-get -y install ${{ inputs.linux-packages }}
+      uses: awalsh128/cache-apt-pkgs-action@v1.6.0
+      with:
+        packages: ${{ inputs.linux-packages }}
 
     - name: Install Dependencies (Linux)
-      if: startsWith(inputs.os, 'ubuntu') && startsWith(inputs.python-version, '3.15')
+      if: ${{ startsWith(inputs.os, 'ubuntu') && startsWith(inputs.python-version, '3.15') }}
       shell: bash
       run: |
         # indexed_zstd is missing wheels for unreleased Python versions.
@@ -107,6 +106,10 @@ runs:
     - name: Install pip Dependencies
       shell: bash
       run: |
+        # https://news.ycombinator.com/item?id=47547405
+        # Would be nice to limit to "tested" packages, but the current solution is not cross-platform:
+        #   --uploaded-prior-to="$(date -u -d '3 days ago' '+%Y-%m-%dT%H:%M:%SZ')"
+        # We will have to wait for pip 26.1 for --uploaded-prior-to=P7D
         python3 -m pip install --upgrade pip
         # Still needed for building lzmaffi without build isolation
         python3 -m pip install --upgrade wheel
