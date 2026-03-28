@@ -64,6 +64,17 @@ runs:
           core/pyproject.toml
           tests/requirements-tests.txt
 
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        enable-cache: true
+
+    - name: Configure uv package age policy
+      shell: bash
+      run: |
+        echo "UV_EXCLUDE_NEWER=7 days" >> "$GITHUB_ENV"
+        echo "UV_SYSTEM_PYTHON=1" >> "$GITHUB_ENV"
+
     - uses: msys2/setup-msys2@v2
       if: ${{ startsWith(inputs.os, 'windows') }}
       with:
@@ -121,14 +132,8 @@ runs:
       shell: bash
       run: |
         # https://news.ycombinator.com/item?id=47547405
-        # Would be nice to limit to "tested" packages, but the current solution is not cross-platform:
-        #   --uploaded-prior-to="$(date -u -d '3 days ago' '+%Y-%m-%dT%H:%M:%SZ')"
-        # We will have to wait for pip 26.1 for --uploaded-prior-to=P7D
-        python3 -m pip install --upgrade pip
         # Still needed for building lzmaffi without build isolation
-        python3 -m pip install --upgrade wheel
-        python3 -m pip install --upgrade setuptools
-        python3 -m pip install --upgrade-strategy eager --upgrade twine build cffi
+        uv pip install --system --upgrade wheel setuptools twine build cffi
 
     - name: Install Custom libFUSE
       if: ${{ startsWith(inputs.os, 'ubuntu') && inputs.libfuse-version != 'system' }}
