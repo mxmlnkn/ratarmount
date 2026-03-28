@@ -14,7 +14,7 @@ jobs:
       RATARMOUNT_CHECK_OVERRIDES: 1
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Setup Shared Test Environment
       uses: ./.github/actions/setup-test-env
@@ -74,7 +74,7 @@ jobs:
       RATARMOUNT_CHECK_OVERRIDES: 1
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Setup Shared Test Environment
       uses: ./.github/actions/setup-test-env
@@ -133,7 +133,7 @@ jobs:
       RATARMOUNT_CHECK_OVERRIDES: 1
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Setup Shared Test Environment
       uses: ./.github/actions/setup-test-env
@@ -267,7 +267,7 @@ jobs:
         shell: bash
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Setup Shared Test Environment
       uses: ./.github/actions/setup-test-env
@@ -323,7 +323,7 @@ jobs:
       RATARMOUNT_CHECK_OVERRIDES: 1
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Setup Shared Test Environment
       uses: ./.github/actions/setup-test-env

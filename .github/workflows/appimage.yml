@@ -31,13 +31,13 @@ jobs:
       APP_PYTHON_VERSION: "3.14"
       APPIMAGE_VARIANT: ${{ matrix.variant }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Build AppImage
       working-directory: AppImage
       run: bash build-ratarmount-appimage.sh
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v5
       with:
         name: ratarmount-${{ matrix.variant }}-${{ matrix.arch }}.AppImage
         path: "AppImage/ratarmount*-${{ matrix.arch }}.AppImage"
@@ -60,12 +60,12 @@ jobs:
           parallelization: 2
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Fetch tag for tests
       run: git fetch origin refs/tags/v0.15.2:refs/tags/v0.15.2
 
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v5
       with:
         name: ratarmount-full-${{ matrix.arch }}.AppImage
 
@@ -121,7 +121,7 @@ jobs:
     needs: [AppImage-Tests]
     if: github.ref_name == 'master'
     steps:
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v5
       with:
         pattern: ratarmount-*.AppImage
 
@@ -152,9 +152,9 @@ jobs:
     runs-on: ubuntu-slim
     needs: [AppImage-Tests]
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v5
       with:
         pattern: ratarmount-*.AppImage
 

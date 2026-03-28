@@ -55,7 +55,7 @@ runs:
         echo "/etc/fuse.conf:"; cat /etc/fuse.conf || true
 
     - name: Set up Python ${{ inputs.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ inputs.python-version }}
         cache: 'pip'
@@ -65,7 +65,7 @@ runs:
           tests/requirements-tests.txt
 
     - name: Set up uv
-      uses: astral-sh/setup-uv@v6
+      uses: astral-sh/setup-uv@v7
       with:
         enable-cache: true
 
@@ -115,7 +115,7 @@ runs:
 
     - name: Cache Homebrew Downloads
       if: ${{ startsWith(inputs.os, 'macos') && inputs.macos-packages != '' }}
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ~/Library/Caches/Homebrew
         key: ${{ env.BREW_CACHE_KEY }}
