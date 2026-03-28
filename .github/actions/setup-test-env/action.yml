@@ -1,0 +1,133 @@
+name: Setup Test Environment
+description: Shared bootstrap for ratarmount test jobs
+
+inputs:
+  os:
+    description: Runner OS label (e.g. ubuntu-latest, macos-15-intel, windows-latest)
+    required: true
+  python-version:
+    description: Python version for actions/setup-python
+    required: true
+    default: '3.12'
+  install-winfsp:
+    description: Whether to install WinFsp and Cygwin FUSE compatibility layer
+    required: false
+    default: 'false'
+
+  linux-packages:
+    description: Space-separated Ubuntu packages to install
+    required: false
+    # Libarchive calls the grzip, lrzip, lzop binaries for lrzip support. Others, such as bzip2, gzip, lz4, lzma,
+    # zstd, may also call external binaries depending on how libarchive was compiled!
+    # https://github.com/libarchive/libarchive/blob/ad5a0b542c027883d7069f6844045e6788c7d70c/libarchive/
+    #   archive_read_support_filter_lrzip.c#L68
+    default: 'libfuse2 fuse3 bzip2 pbzip2 pixz zstd unar lrzip lzop gcc liblzo2-dev ruby-webrick liblzma-dev*'
+  macos-packages:
+    description: Space-separated Homebrew packages to install
+    required: false
+    # coreutils is required for the tests written in shell, e.g., for the 'realpath' command
+    # unar is required for rar tests with passwords. By default, bsdtar is installed but that is the only
+    # one of the three supported tools (the third is unrar) that does not support passwords.
+    # And the error message is atrocious:
+    #   cmdline.extend(args)
+    #   TypeError: 'NoneType' object is not iterable
+    default: 'macfuse coreutils pixz pbzip2 zstd unar libarchive lrzip lzop lzo'
+  windows-packages:
+    description: Space-separated MSYS2 packages to install
+    required: false
+    default: 'gcc make liblzma-devel libzstd-devel zlib-devel'
+
+  libfuse-version:
+    description: libfuse version to install
+    required: false
+    default: 'system'
+
+runs:
+  using: composite
+  steps:
+    - name: Print System Information
+      shell: bash
+      if: ${{ !startsWith(inputs.os, 'windows') }}
+      run: |
+        echo "uname -a: $( uname -a )"
+        echo "Cores: $( nproc )"
+        echo "Mount points:"; mount
+        echo "/etc/fuse.conf:"; cat /etc/fuse.conf || true
+
+    - name: Set up Python ${{ inputs.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: 'pip'
+        cache-dependency-path: |
+          pyproject.toml
+          core/pyproject.toml
+          tests/requirements-tests.txt
+
+    - uses: msys2/setup-msys2@v2
+      if: ${{ startsWith(inputs.os, 'windows') }}
+      with:
+        install: ${{ inputs.windows-packages }}
+
+    - name: Install WinFsp and FUSE compatibility layer (Windows)
+      if: ${{ inputs.install-winfsp == 'true' && startsWith(inputs.os, 'windows') }}
+      shell: bash
+      run: |
+        # https://winfsp.dev/
+        curl -L -o winfsp.msi https://github.com/winfsp/winfsp/releases/download/v2.1/winfsp-2.1.25156.msi
+        msiexec /i winfsp.msi /quiet
+        sleep 10
+        # Install Cygwin FUSE compatibility layer
+        sh "$( cat /proc/registry32/HKEY_LOCAL_MACHINE/SOFTWARE/WinFsp/InstallDir | tr -d '\0' )/opt/cygfuse/install.sh"
+        # Add WinFsp binaries to PATH
+        echo "$( cat /proc/registry32/HKEY_LOCAL_MACHINE/SOFTWARE/WinFsp/InstallDir | tr -d '\0' )/bin" >> $GITHUB_PATH
+
+    - name: Install Dependencies (Linux)
+      if: ${{ startsWith(inputs.os, 'ubuntu') && inputs.linux-packages != '' }}
+      shell: bash
+      run: |
+        sudo apt-get -y update
+        sudo apt-get -y install ${{ inputs.linux-packages }}
+
+    - name: Install Dependencies (Linux)
+      if: startsWith(inputs.os, 'ubuntu') && startsWith(inputs.python-version, '3.15')
+      shell: bash
+      run: |
+        # indexed_zstd is missing wheels for unreleased Python versions.
+        sudo apt-get -y install libzstd-dev
+
+    - name: Install Dependencies (MacOS)
+      if: ${{ startsWith(inputs.os, 'macos') && inputs.macos-packages != '' }}
+      shell: bash
+      run: |
+        brew install -q ${{ inputs.macos-packages }}
+        # Add brew installation binary folder to PATH so that command line tools like zstd can be found
+        echo PATH="$PATH:/usr/local/bin" >> "$GITHUB_ENV"
+
+    - name: Install pip Dependencies
+      shell: bash
+      run: |
+        python3 -m pip install --upgrade pip
+        # Still needed for building lzmaffi without build isolation
+        python3 -m pip install --upgrade wheel
+        python3 -m pip install --upgrade setuptools
+        python3 -m pip install --upgrade-strategy eager --upgrade twine build cffi
+
+    - name: Install Custom libFUSE
+      if: ${{ startsWith(inputs.os, 'ubuntu') && inputs.libfuse-version != 'system' }}
+      shell: bash
+      run: |
+        NAME=fuse-${{ inputs.libfuse-version }}
+        wget https://github.com/libfuse/libfuse/releases/download/${NAME}/${NAME}.tar.gz
+        tar -xf "${NAME}.tar.gz"
+        cd -- "${NAME}"
+        mkdir -p build
+        cd build
+        sudo apt-get -y install meson python*-pytest
+        meson ..
+        ninja
+        #sudo python3 -m pytest test/
+        sudo ninja install
+        sudo ln -s /usr/local/bin/fusermount{3,}
+        cd ../..
+        rm -rf -- "${NAME}"
