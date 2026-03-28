@@ -25,20 +25,17 @@ jobs:
 
     - name: Install pip Dependencies
       run: |
-        python3 -m pip install --upgrade pip
-        python3 -m pip install --user pytest fsspec
-        ( cd core && python3 -m pip install --user .[full,ext4,fsspec,sqlar] )
-        python3 -m pip install --user .
+        uv pip install pytest fsspec ruff~=0.14 black~=25.0 codespell flake8 pylint mypy
+        ( cd core && uv pip install .[full,ext4,fsspec,sqlar] )
+        uv pip install .
 
     - name: Style Check With Ruff
       run: |
         # I hate when the CI fails after not pushing for a while because ruff has new default rules.
-        python3 -m pip install ruff~=0.14
         ruff check --config tests/.ruff.toml -- $( git ls-tree -r --name-only HEAD | 'grep' -E '[.]py$' | 'grep' -v '/_external/' )
 
     - name: Style Check With Black
       run: |
-        python3 -m pip install black~=25.0
         black -q --diff --line-length 120 --skip-string-normalization --target-version=py39 \
             $( git ls-tree -r --name-only HEAD | 'grep' '[.]py$' | 'grep' -v '/_external/' ) > black.diff
         if [ -s black.diff ]; then
@@ -48,26 +45,22 @@ jobs:
 
     - name: Lint With Codespell
       run: |
-        python3 -m pip install codespell
         codespell $( git ls-tree -r --name-only HEAD | 'grep' -E '[.](py|md|txt|sh|yml)$' | 'grep' -v '/_external/' )
 
     - name: Lint With Flake8
       run: |
-        python3 -m pip install flake8
         flake8 --config tests/.flake8 {ratarmount,tests}/[^_]*.py core/{ratarmountcore,tests}/[^_]*.py
 
     - name: Lint With Pylint
       run: |
-        python3 -m pip install pylint
         # ubuntu-slim runs on one core, so parallelism with -j would only add overhead.
         pylint --rcfile tests/.pylintrc ratarmount core/ratarmountcore tests/*.py core/tests/*.py | tee pylint.log
         ! 'egrep' ': E[0-9]{4}: ' pylint.log
 
     - name: Lint With Mypy
       run: |
-        yes | python3 -m pip install --upgrade-strategy eager --upgrade types-dataclasses mypy
+        yes | uv pip install --upgrade types-dataclasses
         mypy --config-file tests/.mypy.ini ratarmount core/ratarmountcore core/tests
-        yes | python3 -m pip uninstall types-dataclasses
 
     - name: Lint With ShellCheck
       run: |
@@ -96,10 +89,9 @@ jobs:
 
     - name: Install pip Dependencies
       run: |
-        python3 -m pip install --upgrade pip
-        python3 -m pip install --user pytype
-        ( cd core && python3 -m pip install --user .[full,ext4,fsspec,sqlar] )
-        python3 -m pip install --user .
+        uv pip install pytype
+        ( cd core && uv pip install .[full,ext4,fsspec,sqlar] )
+        uv pip install .
 
     - name: Lint With Pytype
       run: |
@@ -169,8 +161,8 @@ jobs:
       run: |
         python3 -m build
         twine check dist/*
-        python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )"
-        python3 -m pip install mfusepy
+        uv pip install "$( find dist -name '*.tar.gz' | head -1 )"
+        uv pip install mfusepy
 
     - name: Test Startup Without Compression Dependencies
       if: ${{ startsWith( matrix.os, 'ubuntu' ) }}
@@ -183,16 +175,16 @@ jobs:
         for module in indexed_gzip indexed_zstd lzmaffi python-xz; do
             if [[ $module == lzmaffi ]]; then
                 # --use-pep517 to fix deprecation warning: https://github.com/pypa/pip/issues/6334
-                python3 -m pip install --use-pep517 --no-build-isolation --upgrade "$module"
+                uv pip install --no-build-isolation --upgrade "$module"
             elif [[ $module == indexed_gzip ]]; then
-                python3 -m pip install --upgrade "indexed_gzip >= 1.6.3, < 1.9.3"
+                uv pip install --upgrade "indexed_gzip >= 1.6.3, < 1.9.3"
             fi
             # Segfaults (139) are not allowed but other exit codes are valid!
             # indexed_zstd=1.2.0 did segfault here!
             python3 -m ratarmount README.md || [ $? != 139 ]
-            python3 -m pip uninstall --yes "$module"
+            uv pip uninstall --system "$module"
         done
-        python3 -m pip install --upgrade 'git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=rapidgzip&subdirectory=python/rapidgzip'
+        uv pip install --upgrade 'git+https://github.com/mxmlnkn/indexed_bzip2.git@master#egginfo=rapidgzip&subdirectory=python/rapidgzip'
 
     - name: Test Installation From Tarball
       run: |
@@ -211,11 +203,11 @@ jobs:
             done
         fi
         twine check dist/*
-        python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )"[full]
+        uv pip install "$( find dist -name '*.tar.gz' | head -1 )"[full]
 
     - name: Test Installation From Source
       run: |
-        python3 -m pip install .[full,ext4,fsspec,sqlar]
+        uv pip install .[full,ext4,fsspec,sqlar]
 
     - name: Test Simple Startup
       run: |
@@ -236,7 +228,7 @@ jobs:
     - name: CLI Tests (Linux)
       if: ${{ startsWith( matrix.os, 'ubuntu' ) }}
       run: |
-        python3 -m pip install pytest pytest-order
+        uv pip install pytest pytest-order
         # First off, n=auto seems to use the physical cores and ignores virtual ones.
         # Secondly, these tests scale much better than the others because most time is spent waiting for
         # the FUSE mount point to appear or disappear, which doesn't seem to be bottlenecked by CPU usage.
@@ -251,8 +243,8 @@ jobs:
 
     - name: Module tests without fusepy
       run: |
-        python3 -m pip install pytest
-        python3 -m pip uninstall -y fusepy mfusepy
+        uv pip install pytest
+        uv pip uninstall --system fusepy mfusepy
         pytest -rs -v tests/tests.py
 
 
@@ -297,12 +289,12 @@ jobs:
 
     - name: Test Installation From Source
       run: |
-        python3 -m pip install core/[full,ext4,fsspec,sqlar]
-        python3 -m pip install .[full,ext4,fsspec,sqlar]
+        uv pip install core/[full,ext4,fsspec,sqlar]
+        uv pip install .[full,ext4,fsspec,sqlar]
 
     - name: Unit Tests
       run: |
-        python3 -m pip install pytest pytest-xdist pytest-order pandas
+        uv pip install pytest pytest-xdist pytest-order pandas
         pytest -rs -v -m 'not parallel' core/tests/test_*.py
         pytest -rs -v -n auto -m parallel core/tests/test_*.py
         python3 tests/tests.py
@@ -367,16 +359,16 @@ jobs:
         ( cd libgit2 && mkdir build && cd build && cmake .. && cmake --build . && sudo cmake --build . -- install )
         echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib" >> "$GITHUB_ENV"
         # Expects exactly libgit2 1.8.x! Therefore install it here instead via the non-pinned ratarmount dependencies.
-        python3 -m pip install pygit2==1.15
+        uv pip install pygit2==1.15
 
     - name: Test Installation From Source
       run: |
-        python3 -m pip install core/[full,ext4,fsspec,lzo,sqlar]
-        python3 -m pip install .[full,ext4,fsspec,lzo,sqlar]
+        uv pip install core/[full,ext4,fsspec,lzo,sqlar]
+        uv pip install .[full,ext4,fsspec,lzo,sqlar]
 
     - name: Install pip Test Dependencies
       run: |
-        python3 -m pip install -r tests/requirements-tests.txt
+        uv pip install -r tests/requirements-tests.txt
 
     - name: Install Test Dependencies (Linux)
       run: |
