@@ -99,6 +99,20 @@ runs:
       if: ${{ startsWith(inputs.os, 'macos') && inputs.macos-packages != '' }}
       shell: bash
       run: |
+        echo "HOMEBREW_NO_AUTO_UPDATE=1" >> "$GITHUB_ENV"
+        echo "BREW_CACHE_KEY=brew-${{ inputs.os }}-${{ runner.arch }}-$( printf %s "${{ inputs.macos-packages }}" | sha256sum | cut -d' ' -f1 )" >> "$GITHUB_ENV"
+
+    - name: Cache Homebrew Downloads
+      if: ${{ startsWith(inputs.os, 'macos') && inputs.macos-packages != '' }}
+      uses: actions/cache@v4
+      with:
+        path: ~/Library/Caches/Homebrew
+        key: ${{ env.BREW_CACHE_KEY }}
+
+    - name: Install Dependencies (MacOS)
+      if: ${{ startsWith(inputs.os, 'macos') && inputs.macos-packages != '' }}
+      shell: bash
+      run: |
         brew install -q ${{ inputs.macos-packages }}
         # Add brew installation binary folder to PATH so that command line tools like zstd can be found
         echo PATH="$PATH:/usr/local/bin" >> "$GITHUB_ENV"
