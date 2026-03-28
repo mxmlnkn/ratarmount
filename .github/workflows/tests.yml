@@ -19,13 +19,16 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        # Pytype does not support Python 3.13 as of 2025-06.
         python-version: '3.12'
+        cache: 'pip'
+
+    - name: Install Dependencies
+      uses: awalsh128/cache-apt-pkgs-action@v1.4.3
+      with:
+        packages: 'liblzo2-dev shellcheck'
 
     - name: Install pip Dependencies
       run: |
-        sudo apt-get -y update
-        sudo apt-get -y install liblzo2-dev
         python3 -m pip install --upgrade pip
         python3 -m pip install --user pytest fsspec
         ( cd core && python3 -m pip install --user .[full,ext4,fsspec,sqlar] )
@@ -71,7 +74,6 @@ jobs:
 
     - name: Lint With ShellCheck
       run: |
-        sudo apt-get -y install shellcheck
         shellcheck -e SC2064 tests/*.sh
 
   Longer-Running-Checks:
@@ -88,20 +90,26 @@ jobs:
       uses: actions/setup-python@v5
       with:
         # Pytype does not support Python 3.13 as of 2025-06.
+        # https://news.ycombinator.com/item?id=44963724
+        # https://github.com/google/pytype
+        # > The last supported Python version for Pytype will be 3.12.
         python-version: '3.12'
+        cache: 'pip'
+
+    - name: Install Dependencies
+      uses: awalsh128/cache-apt-pkgs-action@v1.4.3
+      with:
+        packages: 'liblzo2-dev'
 
     - name: Install pip Dependencies
       run: |
-        sudo apt-get -y update
-        sudo apt-get -y install liblzo2-dev
         python3 -m pip install --upgrade pip
-        python3 -m pip install --user pytest asyncssh
+        python3 -m pip install --user pytype
         ( cd core && python3 -m pip install --user .[full,ext4,fsspec,sqlar] )
         python3 -m pip install --user .
 
     - name: Lint With Pytype
       run: |
-        python3 -m pip install pytype
         pytype -j auto -d import-error -P$( cd core && pwd ):$( pwd ) --exclude=core/ratarmountcore/_external ratarmount core/ratarmountcore core/tests
 
   Micro-Tests:
