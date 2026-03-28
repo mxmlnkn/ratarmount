@@ -87,14 +87,9 @@ jobs:
         python-version: 3.12
         linux-packages: 'liblzo2-dev'
 
-    - name: Install pip Dependencies
-      run: |
-        uv pip install pytype
-        ( cd core && uv pip install .[full,ext4,fsspec,sqlar] )
-        uv pip install .
-
     - name: Lint With Pytype
       run: |
+        uv pip install pytype
         pytype -j auto -d import-error -P$( cd core && pwd ):$( pwd ) --exclude=core/ratarmountcore/_external ratarmount core/ratarmountcore core/tests
 
   Micro-Tests:
@@ -205,10 +200,6 @@ jobs:
         twine check dist/*
         uv pip install "$( find dist -name '*.tar.gz' | head -1 )"[full]
 
-    - name: Test Installation From Source
-      run: |
-        uv pip install .[full,ext4,fsspec,sqlar]
-
     - name: Test Simple Startup
       run: |
         ratarmount --help
@@ -287,11 +278,6 @@ jobs:
         linux-packages: bzip2 pbzip2 pixz zstd unar lrzip lzop gcc liblzo2-dev liblzma-dev*
         macos-packages: coreutils pixz pbzip2 zstd unar libarchive lrzip lzop lzo
 
-    - name: Test Installation From Source
-      run: |
-        uv pip install core/[full,ext4,fsspec,sqlar]
-        uv pip install .[full,ext4,fsspec,sqlar]
-
     - name: Unit Tests
       run: |
         uv pip install pytest pytest-xdist pytest-order pandas
@@ -349,21 +335,10 @@ jobs:
     - name: Fetch tag for tests
       run: git fetch origin refs/tags/v0.15.2:refs/tags/v0.15.2
 
-    - name: Install Dependencies For Unreleased Python Versions (Linux)
-      if: startsWith( matrix.os, 'ubuntu' ) && startsWith( matrix.python-version, '3.14.0-' )
-      run: |
-        #libgit2-dev is too old on Ubuntu 22.04. Leads to error about missing git2/sys/errors.h
-        #sudo apt-get -y install libgit2-dev
-        sudo apt-get -y install cmake
-        git clone --branch v1.8.1 --depth 1 https://github.com/libgit2/libgit2.git
-        ( cd libgit2 && mkdir build && cd build && cmake .. && cmake --build . && sudo cmake --build . -- install )
-        echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib" >> "$GITHUB_ENV"
-        # Expects exactly libgit2 1.8.x! Therefore install it here instead via the non-pinned ratarmount dependencies.
-        uv pip install pygit2==1.15
-
     - name: Test Installation From Source
+      # This is still needed because the setup above installs ratarmount without lzo.
+      shell: bash
       run: |
-        uv pip install core/[full,ext4,fsspec,lzo,sqlar]
         uv pip install .[full,ext4,fsspec,lzo,sqlar]
 
     - name: Install pip Test Dependencies

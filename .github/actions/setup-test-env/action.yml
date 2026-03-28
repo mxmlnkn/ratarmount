@@ -153,3 +153,22 @@ runs:
         sudo ln -s /usr/local/bin/fusermount{3,}
         cd ../..
         rm -rf -- "${NAME}"
+
+    - name: Install Dependencies For Unreleased Python Versions (Linux)
+      if: startsWith(inputs.os, 'ubuntu') && startsWith(inputs.python-version, '3.15.0-')
+      shell: bash
+      run: |
+        #libgit2-dev is too old on Ubuntu 22.04. Leads to error about missing git2/sys/errors.h
+        #sudo apt-get -y install libgit2-dev
+        sudo apt-get -y install cmake
+        git clone --branch v1.8.1 --depth 1 https://github.com/libgit2/libgit2.git
+        ( cd libgit2 && mkdir build && cd build && cmake .. && cmake --build . && sudo cmake --build . -- install )
+        echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib" >> "$GITHUB_ENV"
+        # Expects exactly libgit2 1.8.x! Therefore install it here instead via the non-pinned ratarmount dependencies.
+        uv pip install pygit2==1.15
+
+    - name: Install From Source
+      shell: bash
+      run: |
+        uv pip install core/[full,ext4,fsspec,sqlar]
+        uv pip install .[full,ext4,fsspec,sqlar]
