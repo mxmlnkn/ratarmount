@@ -14,8 +14,6 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from .fuse import fuse
-
 
 def parse_requirement(requirement: str) -> Optional[tuple[str, list[str], Optional[str]]]:
     # https://packaging.python.org/en/latest/specifications/name-normalization/
@@ -128,8 +126,12 @@ def gather_system_software_versions(with_licenses: bool = True) -> list[tuple[st
         (sys.implementation.name, '.'.join(str(i) for i in sys.implementation.version[:3])),
         ("libsqlite3", sqlite3.sqlite_version),
     ]
-    if hasattr(fuse, 'fuse_version_major') and hasattr(fuse, 'fuse_version_minor'):
-        non_python_libs.append(("libfuse", f"{fuse.fuse_version_major}.{fuse.fuse_version_minor}"))
+
+    with contextlib.suppress(ModuleNotFoundError):
+        from .fuse import fuse
+
+        if hasattr(fuse, 'fuse_version_major') and hasattr(fuse, 'fuse_version_minor'):
+            non_python_libs.append(("libfuse", f"{fuse.fuse_version_major}.{fuse.fuse_version_minor}"))
 
     system_software: list[tuple[str, VersionInformation]] = []
     for name, version in non_python_libs:
