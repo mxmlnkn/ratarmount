@@ -97,24 +97,14 @@ jobs:
 
     strategy:
       matrix:
-        os: ['macos-15-intel', 'ubuntu-latest']
+        os: ['ubuntu-latest']
         # ubuntu-slim does not work because the simple startup tests require FUSE.
         # macos-13 / macos-latest does not work anymore because the dependencies don't have any wheels,
         # probably because it is M1 based.
-        # ToDo: Add windows-latest but it requires a lot of setup of the dependencies!
-        #       Maybe only test ratarmount-core without most dependencies after I have split that off.
         # Oldest and newest versions should be enough. Python versions are supported 5 years from release date.
         # https://endoflife.date/python
-        # 3.5 was released 2015-09-13 and end-of-life was 2020-09-13
-        # 3.6 was released 2016-12-23 and end-of-life was 2021-12-23
-        # 3.7 was released 2018-06-27 and end-of-life was 2023-06-27
-        # 3.8 was released 2019-10-14 and end-of-life was 2024-10-14
-        # 3.9 was released 2020-10-05 and end-of-life will be 2025-10-25
-        # 3.10 was released 2021-10-04 and end-of-life will be 2026-10-04
-        # 3.11 was released 2022-10-24 and end-of-life will be 2027-10
-        # 3.12 was released 2023-10-02 and end-of-life will be 2028-10
-        # 3.13 was released 2024-10-07 and end-of-life will be 2029-10
-        # 3.14 was released 2025-10-07 and end-of-life will be 2030-10
+        #   Oldest and newest versions should be enough. Python versions are supported 5 years from release date.
+        #   3.n is released October of 2011+n and EOL in 2016+n for n>=8.
         # Supported versions: https://github.com/actions/python-versions/blob/main/versions-manifest.json
         python-version: ['3.9', '3.12', '3.14']
         libfuse-version: ['system']
@@ -200,11 +190,6 @@ jobs:
         twine check dist/*
         uv pip install "$( find dist -name '*.tar.gz' | head -1 )"[full]
 
-    - name: Test Simple Startup
-      run: |
-        ratarmount --help
-        ratarmount --version
-
     - name: Test Simple Mount
       # macOS 11+ is too uptight about "security" and is not able to fully load the macfuse kernel extension.
       # https://github.com/actions/runner-images/issues/4731
@@ -232,16 +217,10 @@ jobs:
             -c "import pytest, sys; sys.exit(pytest.console_main())" \
             --disable-warnings -rs -v tests/test_cli.py
 
-    - name: Module tests without fusepy
-      run: |
-        uv pip install pytest
-        uv pip uninstall --system fusepy mfusepy
-        pytest -rs -v tests/tests.py
-
 
   Unit-Tests:
     runs-on: ${{ matrix.os }}
-    needs: [Micro-Tests, Static-Code-Checks]
+    needs: [Static-Code-Checks]
 
     strategy:
       # Disable because it makes no sense. Most often, they run in parallel, i.e., they would fail in roughly the
@@ -274,9 +253,11 @@ jobs:
       with:
         os: ${{ matrix.os }}
         python-version: ${{ matrix.python-version }}
-        install-winfsp: 'false'
-        linux-packages: bzip2 pbzip2 pixz zstd unar lrzip lzop gcc liblzo2-dev liblzma-dev*
-        macos-packages: coreutils pixz pbzip2 zstd unar libarchive lrzip lzop lzo
+
+    - name: Test Simple Startup
+      run: |
+        ratarmount --help
+        ratarmount --version
 
     - name: Unit Tests
       run: |
@@ -284,6 +265,12 @@ jobs:
         pytest -rs -v -m 'not parallel' core/tests/test_*.py
         pytest -rs -v -n auto -m parallel core/tests/test_*.py
         python3 tests/tests.py
+
+    - name: Module tests without fusepy
+      run: |
+        uv pip install pytest
+        uv pip uninstall --system fusepy mfusepy
+        python3 -v tests/tests.py
 
 
   Regression-Tests:
