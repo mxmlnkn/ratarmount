@@ -294,7 +294,7 @@ jobs:
 
   Regression-Tests:
     runs-on: ${{ matrix.os }}
-    needs: [Micro-Tests, Static-Code-Checks]
+    needs: [Static-Code-Checks]
 
     strategy:
       # Disable because it makes no sense. Most often, they run in parallel, i.e., they would fail in roughly the
