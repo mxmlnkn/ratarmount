@@ -56,14 +56,6 @@ if 'grep' -E -q ': E[0-9]{4}: ' pylint.log; then
 fi
 rm pylint.log
 
-# No parallelism yet: https://github.com/python/mypy/issues/933
-mypy --config-file tests/.mypy.ini ratarmount core/ratarmountcore core/tests || returnError "$LINENO" 'Mypy failed!'
-
-pytype -j auto -d import-error -P"$( cd core && pwd ):$( pwd )" --exclude=core/ratarmountcore/_external \
-    ratarmount core/ratarmountcore core/tests || returnError "$LINENO" 'Pytype failed!'
-
-black -q --line-length 120 --skip-string-normalization --target-version=py39 "${allPythonFiles[@]}"
-
 filesToSpellCheck=()
 while read -r file; do
     filesToSpellCheck+=( "$file" )
@@ -72,6 +64,14 @@ done < <( git ls-tree -r --name-only HEAD | 'grep' -E '[.](py|md|txt|sh|yml)' | 
 codespell "${filesToSpellCheck[@]}"
 
 flake8 --config tests/.flake8 "${files[@]}" "${testFiles[@]}" || returnError "$LINENO" 'Flake8 failed!'
+
+black -q --line-length 120 --skip-string-normalization --target-version=py39 "${allPythonFiles[@]}"
+
+# No parallelism yet: https://github.com/python/mypy/issues/933
+mypy --config-file tests/.mypy.ini ratarmount core/ratarmountcore core/tests || returnError "$LINENO" 'Mypy failed!'
+
+pytype -j auto -d import-error -P"$( cd core && pwd ):$( pwd )" --exclude=core/ratarmountcore/_external \
+    ratarmount core/ratarmountcore core/tests || returnError "$LINENO" 'Pytype failed!'
 
 # Test runtimes 2024-04-04 on Ryzen 3900X. On the CI with nproc=4, the speedup is roughly 2x.
 # Note that pytest-xdist doesn't scale arbitrarily because it seems to start up threads sequentially,
