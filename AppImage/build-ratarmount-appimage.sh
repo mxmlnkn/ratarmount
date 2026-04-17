@@ -69,6 +69,7 @@ function installAppImagePythonPackages()
     # which requires "cachetools>=2.0.0,<6.0" and is required by gcsfs.
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ext4 &>/dev/null
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir cachetools==5 &>/dev/null
+    "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir argcomplete &>/dev/null
 
     "$APP_PYTHON_BIN" -I -m pip install --no-cache-dir ../core || exit 1
 
