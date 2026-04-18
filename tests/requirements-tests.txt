@@ -31,6 +31,9 @@ pyminizip; sys_platform != "darwin"
 pyopenssl>=23
 rangehttpserver
 boto3
+# Rough version guess: https://github.com/boto/botocore/commit/731a4dcfed0858fd519175b909ca3138e4715d1c
+# This constraint is necessary because else boto3 would use a newer version.
+botocore < 1.41.6; python_version < '3.10'
 wsgidav
 cheroot
 
