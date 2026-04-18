@@ -549,6 +549,9 @@ APPIMAGE_EXTRACT_AND_RUN=1 ARCH="$APPIMAGE_ARCH" appimagetool \
 # done
 # done
 
+echo "Patch AppImage with argcomplete marker"
+python3 patch-elf-with-argcomplete.py "$APP_BASE.AppImage"
+
 chmod u+x "$APP_BASE.AppImage"
 version=$( ./"$APP_BASE.AppImage" --version | sed -n -E 's|ratarmount ([0-9.]+)|\1|p' &>/dev/null )
 if [[ -z "$version" ]]; then
