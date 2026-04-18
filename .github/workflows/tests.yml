@@ -25,7 +25,7 @@ jobs:
 
     - name: Install pip Dependencies
       run: |
-        uv pip install pytest fsspec ruff~=0.14 black~=26.0 codespell flake8 pylint mypy
+        uv pip install pytest fsspec ruff~=0.14 black~=26.0 codespell flake8 pylint mypy!=1.20.0
         ( cd core && uv pip install .[full,ext4,fsspec,sqlar] )
         uv pip install .
 

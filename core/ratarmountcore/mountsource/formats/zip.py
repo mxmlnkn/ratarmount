@@ -5,7 +5,7 @@ import stat
 import sys
 import zipfile
 from pathlib import Path
-from typing import IO, Union
+from typing import IO, Optional, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
@@ -102,7 +102,7 @@ class ZipMountSource(SQLiteIndexMountSource):
         return fileInfo
 
     @staticmethod
-    def _find_password(fileobj: "zipfile.ZipFile", passwords):
+    def _find_password(fileobj: "zipfile.ZipFile", passwords: list[bytes]) -> Optional[bytes]:
         # If headers are encrypted, then infolist will simply return an empty list!
         files = fileobj.infolist()
         if not files:
@@ -117,12 +117,13 @@ class ZipMountSource(SQLiteIndexMountSource):
         if not files:
             return None
 
-        for password in [None, *passwords]:
-            fileobj.setpassword(password)
+        for password_or_none in [None, *passwords]:
+            if password_or_none:
+                fileobj.setpassword(password_or_none)
             try:
                 with fileobj.open(files[0]) as file:
                     file.read(1)
-                return password
+                return password_or_none
             except Exception:
                 pass
 

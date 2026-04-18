@@ -50,7 +50,8 @@ ARCHIVES = [
         "ar-llvm-19-darwin.ar",
         [
             # For some reason, this formats pads each file contents with newlines to 8 B!
-            # There is NO reliable way to strip them out because the file might end with one or more newlines originally.
+            # There is NO reliable way to strip them out because the file might end with
+            # one or more newlines originally.
             # Maybe it makes sense for binary object files for which this is intended for.
             # Libarchive, as tested with bsdtar -x is also not able to undo this padding.
             ('/bar', b'foo\n\n\n\n\n'),
