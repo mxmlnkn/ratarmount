@@ -11,7 +11,7 @@
 </br>
 [![Changelog](https://img.shields.io/badge/Changelog-Markdown-blue)](https://github.com/mxmlnkn/ratarmount/blob/master/CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](http://opensource.org/licenses/MIT)
-[![DOI](https://zenodo.org/badge/171697459.svg)](https://doi.org/10.5281/zenodo.10683766)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15710334.svg)](https://doi.org/10.5281/zenodo.10683766)
 ![GitHub repo size](https://img.shields.io/github/repo-size/mxmlnkn/ratarmount)
 [![Build Status](https://github.com/mxmlnkn/ratarmount/actions/workflows/tests.yml/badge.svg)](https://github.com/mxmlnkn/ratarmount/actions/workflows/tests.yml)
 [![Discord](https://img.shields.io/discord/783411320354766878?label=discord)](https://discord.gg/Wra6t6akh2)
