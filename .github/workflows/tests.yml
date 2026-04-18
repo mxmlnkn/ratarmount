@@ -291,7 +291,7 @@ jobs:
         #   Oldest and newest versions should be enough. Python versions are supported 5 years from release date.
         #   3.n is released October of 2011+n and EOL in 2016+n for n>=8.
         # Supported versions: https://github.com/actions/python-versions/blob/main/versions-manifest.json
-        python-version: ['3.9', '3.12', '3.14']
+        python-version: ['3.9', '3.10', '3.12', '3.14']
         libfuse-version: ['system']
         parallelization: [1, 2]
         include:
@@ -347,7 +347,7 @@ jobs:
         else
             export FUSE_LIBRARY_PATH=/usr/local/lib/x86_64-linux-gnu/libfuse3.so.$LIBFUSE_VERSION
         fi
-        ratarmount --version | grep -i fuse
+        ratarmount --version
         bash tests/runtests.sh
 
     - name: Regression Tests (FUSE 2)
@@ -356,5 +356,5 @@ jobs:
         DROPBOX_TOKEN: ${{ secrets.DROPBOX_TOKEN }}
         PARALLELIZATIONS: ${{ matrix.parallelization }}
       run: |
-        ratarmount --version | grep -i fuse
+        ratarmount --version
         bash tests/runtests.sh
