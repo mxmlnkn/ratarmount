@@ -495,7 +495,7 @@ class SQLiteIndex:
     def drop_metadata(self):
         self.get_connection().executescript("DELETE FROM metadata; DELETE FROM versions;")
 
-    def try_to_open_first_file(self, openByPath):
+    def try_to_open_first_file(self, openByPath: Callable[[str], IO[bytes]]):
         # Get first row that has the regular file bit set in mode (stat.S_IFREG == 32768 == 1<<15).
         firstFile = (
             self.get_connection()
@@ -506,7 +506,8 @@ class SQLiteIndex:
             return
 
         logger.info(
-            "The index contains no backend name. Therefore, will try to open the first file as an integrity check."
+            "The index contains no backend name. Will try to open the first file (%s) as an integrity check.",
+            dict(firstFile),
         )
         try:
             with openByPath(firstFile[0] + '/' + firstFile[1]) as file:

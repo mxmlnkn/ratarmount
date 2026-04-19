@@ -305,6 +305,10 @@ For further information, see the ReadMe on the project's homepage:
              'Instead, it will first try ~/.ratarmount and the folder "foo,9000". ')
 
     indexGroup.add_argument(
+        '--force-folder-index', action=argparse.BooleanOptionalAction, default=False,
+        help='Force index usage for folders, which usually do not use an index by default because they are mutable.')
+
+    indexGroup.add_argument(
         '--hashes', type=str, action=AppendCommaSeparatedOverwriteDefault, default=None,
         help='Comma-separated list of hashes to compute for indexed files. They are stored as xattrs in the index '
              'with key user.hash.<hash_name>. Disabled by default because it is expensive. '

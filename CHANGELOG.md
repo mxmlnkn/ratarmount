@@ -10,6 +10,8 @@
  - Add `HTMLMountSource` to expose embedded base64-encoded files, such as images, CSS, and JavaScript files,
    as a filesystem. Works particularly well with files created by the Save Page WE browser extension because
    it also stores the original URL and name of embedded files.
+ - Add `--hashes` option for computing hashes and storing them as `user.hash.<name>` xattrs in the index.
+ - Add `--force-folder-index` option to create indexes for folders intended for indexing cold storage HDD backups.
 
 ## Performance
 

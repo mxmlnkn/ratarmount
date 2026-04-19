@@ -7,7 +7,11 @@
  - Add direct support for [AR](https://en.wikipedia.org/wiki/Ar_(Unix)) archives, which should be faster than
    libarchive for large archives, including `.deb` and `.a` files.
  - `Py7zrMountSource`: Apply `transform` argument.
- - Add
+ - Add `Path` support for HTML, libarchive, py7zr, and squashfs backends.
+ - Add `--recursive-extensions` option to configure files that should trigger recursive mounting.
+ - Make `--write-overlay :temp:` create a temporary overlay in `/tmp`.
+ - Add experimental PDF support to show contained images and attachments.
+ - Add experimental OGG support to show demuxed video, audio, subtitle streams.
 
 ## API
 
@@ -18,6 +22,16 @@
    so that they are also triggered even when running CPython with `-O`.
  - Make `ASARMountSource` work with `Path` input.
  - Add `close` method to `SQLiteIndexMountSource`-derived mount sources.
+
+## Performance
+
+ - Reduce number of files in TAR to verify.
+
+## Fixes
+
+ - Fix problem with python-ext4 API change from version 1.3.1->1.3.2.
+ - Avoid multiple archives overwriting the same index when combining `--recursive` with `--index-file-path`.
+ - `SQLiteIndex`: Make `metadata.key` and `versions.name` the primary key to avoid nonsensical duplicates.
 
 
 # Version 0.10.4 built on 2026-04-19
