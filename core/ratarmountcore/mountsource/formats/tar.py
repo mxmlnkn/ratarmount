@@ -504,6 +504,15 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
 
     DEFAULT_GZIP_SEEK_POINT_SPACING = 16 * 1024 * 1024
 
+    INDEX_ARGUMENTS_TO_CHECK = (
+        'mountRecursively',
+        'encoding',
+        'stripRecursiveTarExtension',
+        'transformRecursiveMountPoint',
+        'transformPattern',
+        'ignoreZeros',
+    )
+
     # fmt: off
     def __init__(
         self,
@@ -784,16 +793,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         return None if self.tarFileName == '<file object>' else self.tarFileName
 
     def _store_metadata(self) -> None:
-        argumentsToSave = [
-            'mountRecursively',
-            'gzipSeekPointSpacing',
-            'encoding',
-            'stripRecursiveTarExtension',
-            'transformRecursiveMountPoint',
-            'transformPattern',
-            'ignoreZeros',
-        ]
-
+        argumentsToSave = list(self.INDEX_ARGUMENTS_TO_CHECK) + ['gzipSeekPointSpacing']
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
         # The second argument must be a path to a file to call os.stat with, not simply a file name.
         self.index.store_metadata(argumentsMetadata, "" if self.isFileObject else self.tarFileName)
@@ -1303,20 +1303,10 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         # These are only warnings and not forcing a rebuild by default.
         # TODO: Add --force options?
         if 'arguments' in metadata:
-            indexArgs = json.loads(metadata['arguments'])
-            argumentsToCheck = [
-                'mountRecursively',
-                'encoding',
-                'stripRecursiveTarExtension',
-                'transformRecursiveMountPoint',
-                'transformPattern',
-                'ignoreZeros',
-            ]
-
+            argumentsToCheck = list(self.INDEX_ARGUMENTS_TO_CHECK)
             if self.compression == FileFormatID.GZIP:
                 argumentsToCheck.append('gzipSeekPointSpacing')
-
-            SQLiteIndex.check_metadata_arguments(indexArgs, self, argumentsToCheck)
+            SQLiteIndex.check_metadata_arguments(json.loads(metadata['arguments']), self, argumentsToCheck)
 
         # Restore the self._isGnuIncremental flag before doing any row validation because else there could be
         # false positive warnings regarding GNU incremental detection.
