@@ -6,6 +6,9 @@ from collections.abc import Iterable
 from typing import IO, Any, Optional, Union
 
 from ratarmountcore.mountsource import FileInfo, MountSource
+from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
+from ratarmountcore.ProgressBar import ProgressBar
+from ratarmountcore.SQLiteIndex import SQLiteIndex
 from ratarmountcore.utils import overrides
 
 
@@ -190,3 +193,150 @@ class FolderMountSource(MountSource):
         assert isinstance(path, str)
         # Path argument is only expected to be absolute for symbolic links pointing outside self.root.
         return path if path.startswith('/') else self._realpath(path)
+
+
+class IndexedFolderMountSource(SQLiteIndexMountSource):
+    # Note: In the future, this class might be extended to add a file watcher to keep the index updated
+    #       with any filesystem changes under the given path.
+    def __init__(self, path: Union[str, os.PathLike], **options) -> None:
+        self.root = str(path)
+        self._statfs = FolderMountSource._get_statfs_for_folder(self.root)
+        indexOptions = {
+            'archiveFilePath': self.root,
+            'backendName': 'IndexedFolderMountSource',
+            # IndexedFolderMountSource is only used if forceFolderIndex is true.
+            # I feel like than an option sounding like that is used, there should be no additional file count barrier.
+            'indexMinimumFileCount': 0,
+            # Same reasoning as for indexMinimumFileCount.
+            'writeIndex': True,
+        }
+        super().__init__(**(options | indexOptions))
+        self._finalize_index(
+            create_index=self._create_index,
+        )
+
+    def set_folder_descriptor(self, fd: int) -> None:
+        """
+        Make this mount source manage the special "." folder by changing to that directory.
+        Because we change to that directory it may only be used for one mount source but it also works
+        when that mount source is mounted on!
+        """
+        os.fchdir(fd)
+        self.root = '.'
+        self._statfs = FolderMountSource._get_statfs_for_folder(self.root)
+
+    def _realpath(self, path: str) -> str:
+        """Path given relative to folder root. Leading '/' is acceptable"""
+        return os.path.join(self.root, *path.strip('/').split('/'))
+
+    def _create_index(self) -> None:
+        with ProgressBar(0, description="File Statting", isBytes=False) as progressBar:
+            # Millions of stat calls can be expensive, so count the number of files first to show a progress bar.
+            totalEntries = 0
+            for _root, folderNames, fileNames in os.walk(self.root, followlinks=False):
+                totalEntries += len(folderNames) + len(fileNames)
+                progressBar.maxValue = totalEntries
+                progressBar.update(0)
+
+            rows: list[tuple] = []
+            offsetheader = 0
+            processedEntries = 0
+
+            for root, folderNames, fileNames in os.walk(self.root, topdown=True, followlinks=False):
+                folderNames.sort()
+                fileNames.sort()
+
+                relativeFolder = os.path.relpath(root, self.root).replace(os.path.sep, '/').strip('/')
+                if relativeFolder == '.':
+                    relativeFolder = ''
+
+                # Transforming paths is not allowed because we would have no column to query the original path with.
+                pathInIndex = '' if not relativeFolder else '/' + relativeFolder
+
+                # Process directories and files as entries (same semantics as previous implementation).
+                for name in [*folderNames, *fileNames]:
+                    processedEntries += 1
+                    progressBar.update(processedEntries)
+
+                    absolutePath = os.path.join(root, name)
+                    try:
+                        entryStat = os.lstat(absolutePath)
+                    except OSError:
+                        continue
+
+                    linkname = ""
+                    if stat.S_ISLNK(entryStat.st_mode):
+                        try:
+                            linkname = os.readlink(absolutePath)
+                        except OSError:
+                            linkname = ""
+
+                    # fmt: off
+                    fileInfo: tuple = (
+                        pathInIndex       ,  # 0  : path
+                        os.fsdecode(name) ,  # 1  : file name
+                        offsetheader      ,  # 2  : header offset
+                        None              ,  # 3  : data offset
+                        entryStat.st_size ,  # 4  : file size
+                        entryStat.st_mtime,  # 5  : modification time
+                        entryStat.st_mode ,  # 6  : file mode / permissions
+                        0                 ,  # 7  : TAR file type (unused)
+                        linkname          ,  # 8  : linkname
+                        entryStat.st_uid  ,  # 9  : user ID
+                        entryStat.st_gid  ,  # 10 : group ID
+                        False             ,  # 11 : is TAR
+                        False             ,  # 12 : is sparse
+                        False             ,  # 13 : is generated
+                        0                 ,  # 14 : recursion depth
+                    )
+                    # fmt: on
+
+                    rows.append(fileInfo)
+                    offsetheader += 1
+
+                    if len(rows) >= 1000:
+                        self.index.set_file_infos(rows)
+                        rows = []
+
+            if rows:
+                self.index.set_file_infos(rows)
+                rows = []
+
+            progressBar.update(totalEntries)
+
+        # Make lookup by almost-unique offsetheader fast even if it slightly increases the index!
+        # Automatically created parent folders can have the same offset as the first file in that folder.
+        # Without this, the lookup was 10x slower for a simple test with 150k files!
+        self.index.get_connection().execute(
+            'CREATE INDEX IF NOT EXISTS files_offsetheader_index ON "files" ("offsetheader");'
+        )
+
+    @overrides(MountSource)
+    def statfs(self) -> dict[str, Any]:
+        return self._statfs.copy()
+
+    def _get_path_in_index(self, fileInfo: FileInfo):
+        userdata = SQLiteIndex.get_index_userdata(fileInfo.userdata)
+        # Beware, parent folders may have the same offsetheader! We need to limit the query to actual files.
+        row = (
+            self.index.get_connection()
+            .execute(
+                f'SELECT path,name {SQLiteIndex.FROM_REGULAR_FILES} AND "offsetheader" == (?) LIMIT 1',
+                (userdata.offsetheader,),
+            )
+            .fetchone()
+        )
+        if not row:
+            raise ValueError("Could not resolve indexed file path!")
+
+        folder, name = row
+        return ('/' + name) if folder == '/' else (folder.rstrip('/') + '/' + name)
+
+    @overrides(MountSource)
+    def open(self, fileInfo: FileInfo, buffering=-1) -> IO[bytes]:
+        path = self._get_path_in_index(fileInfo)
+        realpath = self._realpath(path)
+        return open(realpath, 'rb', buffering=buffering)
+
+    def get_file_path(self, fileInfo: FileInfo) -> str:
+        return self._realpath(self._get_path_in_index(fileInfo))

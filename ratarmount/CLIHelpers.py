@@ -253,6 +253,7 @@ def parsed_args_to_options(args) -> dict[str, Any]:
         'enableFileVersions'           : args.file_versions,
         'controlInterface'             : args.control_interface,
         'hashes'                       : args.hashes,
+        'forceFolderIndex'             : args.force_folder_index,
         'writeIndex'                   : True,
     }
     # fmt: on

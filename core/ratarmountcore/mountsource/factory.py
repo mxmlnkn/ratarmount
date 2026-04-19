@@ -21,7 +21,7 @@ from ratarmountcore.utils import CompressionError, RatarmountError
 from . import MountSource
 from .archives import ARCHIVE_BACKENDS
 from .compositing.singlefile import SingleFileMountSource
-from .formats.folder import FolderMountSource
+from .formats.folder import FolderMountSource, IndexedFolderMountSource
 from .formats.fsspec import FSSpecMountSource
 from .formats.git import GitMountSource
 
@@ -295,7 +295,10 @@ def open_mount_source(fileOrPath: Union[str, IO[bytes], os.PathLike], **options)
             raise RatarmountError(f"Mount source does not exist: {fileOrPath!s}")
 
         if path.is_dir():
-            return FolderMountSource('.' if str(fileOrPath) == '.' else path.resolve())
+            folderPath = '.' if str(fileOrPath) == '.' else path.resolve()
+            if options.get('forceFolderIndex', False):
+                return IndexedFolderMountSource(folderPath, **options)
+            return FolderMountSource(folderPath)
 
         splitFileResult = check_for_split_file_in_folder(str(fileOrPath))
         if splitFileResult:

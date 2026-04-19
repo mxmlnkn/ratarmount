@@ -16,7 +16,6 @@ from ratarmountcore.compressions import (
 from ratarmountcore.mountsource import FileInfo, MountSource, merge_statfs
 from ratarmountcore.mountsource.compositing.singlefile import SingleFileMountSource
 from ratarmountcore.mountsource.factory import open_mount_source
-from ratarmountcore.mountsource.formats.folder import FolderMountSource
 from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar, SQLiteIndexedTarUserData
 from ratarmountcore.StenciledFile import JoinedFileFromFactory
 from ratarmountcore.utils import (
@@ -208,7 +207,7 @@ class AutoMountLayer(MountSource):
             _, deepestMountSource, deepestFileInfo = parentMountSource.get_mount_source(archiveFileInfo)
             if joinedFile:
                 mountSource: MountSource = SingleFileMountSource(os.path.split(mountPoint)[1], joinedFile)
-            elif isinstance(deepestMountSource, FolderMountSource):
+            elif (get_file_path := getattr(deepestMountSource, 'get_file_path', None)) and callable(get_file_path):
                 # Remove indexFilePath argument from options because all recursive archives would try to open
                 # the index intended for the parent archive / folder.
                 if 'indexFilePath' in options:
@@ -216,7 +215,7 @@ class AutoMountLayer(MountSource):
                 # Open from file path on host file system in order to write out TAR index files.
                 # Care has to be taken if a folder is bind mounted onto itself because then it can happen that
                 # the file open triggers a recursive FUSE call, which then hangs up everything.
-                mountSource = open_mount_source(deepestMountSource.get_file_path(deepestFileInfo), **options)
+                mountSource = open_mount_source(get_file_path(deepestFileInfo), **options)
             else:
                 # This will fail with StenciledFile objects as returned by SQLiteIndexedTar mount sources and when
                 # given to backends like indexed_zstd, which do expect the file object to have a valid fileno.

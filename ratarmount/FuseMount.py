@@ -22,7 +22,6 @@ from ratarmountcore.mountsource.compositing.subvolumes import SubvolumesMountSou
 from ratarmountcore.mountsource.compositing.union import UnionMountSource
 from ratarmountcore.mountsource.compositing.versioning import FileVersionLayer
 from ratarmountcore.mountsource.factory import open_mount_source
-from ratarmountcore.mountsource.formats.folder import FolderMountSource
 from ratarmountcore.utils import ceil_div, determine_recursion_depth, overrides, remove_duplicates_stable
 
 from ratarmount import CLIHelpers
@@ -118,7 +117,7 @@ class FuseMount(fuse.Operations):
         self.mountPoint = os.path.realpath(mountPoint)  # Strip trailing slashes and normalizes.
         self.mountPointFd: Optional[int] = None
         self.mountPointWasCreated = False
-        self.selfBindMount: Optional[FolderMountSource] = None
+        self.selfBindMount: Optional[MountSource] = None
 
         self.writeOverlay: Optional[WritableFolderMountSource] = None
         self.overlayPath: Optional[str] = None
@@ -188,7 +187,8 @@ class FuseMount(fuse.Operations):
             if self.mountPointFd is not None:
                 continue
 
-            mountSource = FolderMountSource(path)
+            # Create either FolderMountSource or IndexedFolderMountSource.
+            mountSource = open_mount_source(path, **options)
             mountSources.append((os.path.basename(path), mountSource))
             self.selfBindMount = mountSource
             self.mountPointFd = os.open(self.mountPoint, os.O_RDONLY)
@@ -703,7 +703,9 @@ class FuseMount(fuse.Operations):
             self._redirect_output('stderr', self.logFile)
 
         if self.selfBindMount is not None and self.mountPointFd is not None:
-            self.selfBindMount.set_folder_descriptor(self.mountPointFd)
+            set_folder_descriptor = getattr(self.selfBindMount, 'set_folder_descriptor', None)
+            if set_folder_descriptor and callable(set_folder_descriptor):
+                set_folder_descriptor(self.mountPointFd)  # pylint: disable=not-callable
             if self.writeOverlay and self.writeOverlay.root == self.mountPoint:
                 self.writeOverlay.set_folder_descriptor(self.mountPointFd)
 

@@ -18,10 +18,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../c
 
 from helpers import copy_test_file
 from ratarmountcore.compressions import libarchive
+from ratarmountcore.mountsource.formats.folder import IndexedFolderMountSource
 from ratarmountcore.utils import ceil_div
 
 from ratarmount.cli import cli as ratarmountcli
 from ratarmount.cli import create_parser
+from ratarmount.FuseMount import FuseMount
 
 try:
     import ext4
@@ -453,3 +455,18 @@ def test_hashes_cli_defaults_and_parsing():
     assert parse(['--hashes', 'sha256', '--hashes', 'smplayer', 'single-file.tar']) == ['sha256', 'smplayer']
     assert parse(['--hashes', 'sha256,smplayer', 'single-file.tar']) == ['sha256', 'smplayer']
     assert parse(['single-file.tar']) is None
+
+
+def test_fusemount_self_bind_uses_factory_for_force_index(tmp_path):
+    indexPath = tmp_path / "self-bind.index.sqlite"
+
+    with FuseMount(
+        pathToMount=str(tmp_path),
+        mountPoint=str(tmp_path),
+        mount=False,
+        forceFolderIndex=True,
+        indexFilePath=str(indexPath),
+    ) as fuseMount:
+        assert isinstance(fuseMount.selfBindMount, IndexedFolderMountSource)
+
+    assert indexPath.exists()
