@@ -1,3 +1,13 @@
+# Version 1.2.3 built on 2026-04-19
+
+## Fixes
+
+ - Avoid double quotes for strings in SQLite statements
+ - Make `--version` work without `mfusepy`.
+ - Make argument completion work with the AppImage when `python-argcomplete` is installed and global
+   completion mode is enabled (`activate-global-python-argcomplete`).
+
+
 # Version 1.2.2 built on 2026-03-13
 
 ## Fixes

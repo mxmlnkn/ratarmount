@@ -1,3 +1,12 @@
+# Version 0.10.4 built on 2026-04-19
+
+## Fixes
+
+ - Avoid double quotes for strings in SQLite statements.
+ - Remove unmaintained python-lzo from `full` requirements because of `lzo1.h` dependency.
+ - Two files with the same xattr key did not work. Only the xattr of the last file was shown.
+
+
 # Version 0.10.3 built on 2026-03-13
 
 ## Fixes
