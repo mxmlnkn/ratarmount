@@ -1230,7 +1230,9 @@ checkExtendedAttributes()
 user.tags="bar"
 user.tags="foo"
 user.tags="mytag"
+user.tags="mytag2"
 user.tags="mytag"
+user.tags="mytag2"
 EOF
     diff <( getfattr --dump -R -- "$mountFolder" | sed '/^#/d; /^$/d' ) <( sed '/^#/d; /^$/d' "$expectedOutput" ) ||
         returnError "$LINENO" 'Mismatching extended attributes'
