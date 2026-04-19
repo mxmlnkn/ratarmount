@@ -182,25 +182,29 @@ class SQLiteIndex:
         );"""
 
     _CREATE_XATTRS_TABLE = """
-        CREATE TABLE IF NOT EXISTS "xattrkeys" ( "name" VARCHAR(65535) PRIMARY KEY );
+        CREATE TABLE IF NOT EXISTS "xattrkeys" (
+            "id" INTEGER PRIMARY KEY,
+            "name" VARCHAR(65535) UNIQUE
+        );
 
         CREATE TABLE IF NOT EXISTS "xattrsdata" (
             "offsetheader" INTEGER,
             "keyid" INTEGER,
             "value" VARCHAR(65535),  /* Binary Data (Python Bytes) */
-            PRIMARY KEY (offsetheader,keyid)
+            PRIMARY KEY (offsetheader,keyid),
+            FOREIGN KEY (keyid) REFERENCES xattrkeys(id)
         );
 
         CREATE VIEW IF NOT EXISTS "xattrs" ( "offsetheader", "key", "value" ) AS
             SELECT offsetheader, xattrkeys.name, value FROM "xattrsdata"
-            INNER JOIN xattrkeys ON xattrkeys.rowid = xattrsdata.keyid;
+            INNER JOIN xattrkeys ON xattrkeys.id = xattrsdata.keyid;
 
         CREATE TRIGGER IF NOT EXISTS "xattrs_insert" INSTEAD OF INSERT ON "xattrs"
         BEGIN
             INSERT OR IGNORE INTO xattrkeys(name) VALUES (NEW.key);
-            INSERT OR IGNORE INTO xattrsdata(offsetheader, keyid, value) VALUES(
+            INSERT OR REPLACE INTO xattrsdata(offsetheader, keyid, value) VALUES (
                 NEW.offsetheader,
-                (SELECT xattrkeys.rowid FROM xattrkeys WHERE name = NEW.key),
+                (SELECT xattrkeys.id FROM xattrkeys WHERE name = NEW.key),
                 NEW.value
             );
         END;"""
@@ -1092,7 +1096,8 @@ class SQLiteIndex:
         return self._row_to_file_info(row) if row else None
 
     def setxattrs(self, rows: Sequence[tuple[int, str, bytes]]):
-        self.get_connection().executemany('INSERT OR REPLACE INTO "xattrs" VALUES (?,?,?)', rows)
+        # We cannot use "OR REPLACE" here, or else it will override the TRIGGER behavior on the xattrs view!
+        self.get_connection().executemany('INSERT INTO "xattrs" VALUES (?,?,?)', rows)
 
     def list_xattr(self, fileInfo: FileInfo) -> builtins.list[str]:
         if not fileInfo.userdata:

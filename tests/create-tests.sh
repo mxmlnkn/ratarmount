@@ -413,9 +413,11 @@ sudo umount mounted
 
 echo bar > foo
 setfattr --name user.tags --value mytag foo
+echo bar2 > foo2
+setfattr --name user.tags --value mytag2 foo2
 #getfattr --dump foo
-bsdtar --numeric-owner --xattrs -cf file-with-attribute.bsd.tar foo
-tar --numeric-owner --xattrs -cf file-with-attribute.gnu.tar foo
+bsdtar --numeric-owner --xattrs -cjf file-with-attribute.bsd.tar.bz2 foo foo2
+tar --numeric-owner --xattrs -cjf file-with-attribute.gnu.tar.bz2 foo foo2
 
 # sqlar
 # Alternatively, this also works: sqlite3 folder.sqlar -Ac folder
