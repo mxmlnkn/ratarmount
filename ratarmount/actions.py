@@ -180,9 +180,10 @@ def process_parsed_arguments(args) -> int:
     # This is a hack but because we have two positional arguments (and want that reflected in the auto-generated help),
     # all positional arguments, including the mountpath will be parsed into args.mount_source and we have to
     # manually separate them depending on the type.
-    lastArgument = args.mount_source[-1]
-    if '://' not in lastArgument and (os.path.isdir(lastArgument) or not os.path.exists(lastArgument)):
-        args.mount_point = args.mount_source.pop()
+    if args.mount:
+        lastArgument = args.mount_source[-1]
+        if '://' not in lastArgument and (os.path.isdir(lastArgument) or not os.path.exists(lastArgument)):
+            args.mount_point = args.mount_source.pop()
     if not args.mount_source and not args.write_overlay and not args.control_interface:
         raise argparse.ArgumentTypeError("You must specify at least one path to a valid archive or folder!")
 
@@ -219,11 +220,6 @@ def process_parsed_arguments(args) -> int:
         commit_overlay(args.write_overlay, args.mount_source[0], encoding=args.encoding, printDebug=args.debug)
         return 0
 
-    # Automatically generate a default mount path
-    if not args.mount_point:
-        args.mount_point = determine_mount_point(args.mount_source[0]) if args.mount_source else 'mounted'
-    args.mount_point = os.path.realpath(args.mount_point)
-
     CLIHelpers.process_trivial_parsed_arguments(args)
 
     if args.password_file:
@@ -231,6 +227,11 @@ def process_parsed_arguments(args) -> int:
     args.passwords = remove_duplicates_stable(args.passwords)
 
     if args.mount:
+        # Automatically generate a default mount path
+        if not args.mount_point:
+            args.mount_point = determine_mount_point(args.mount_source[0]) if args.mount_source else 'mounted'
+        args.mount_point = os.path.realpath(args.mount_point)
+
         create_fuse_mount(args)  # Throws on errors.
     else:
         # Simply calling the FuseMount constructor and destructor should create the indexes as a side effect.
