@@ -17,7 +17,7 @@ def _logging_uses_rich() -> bool:
 class ProgressBar:
     """Simple progress bar which keeps track of changes and prints the progress and a time estimate."""
 
-    def __init__(self, maxValue: float):
+    def __init__(self, maxValue: float, description: str = "Processing", showRate: bool = False, isBytes: bool = True):
         # Do not use thread_time here even if it is twice as fast because it does not count the time the thread
         # has been sleeping, which it does when it waits for I/O. This made the times incorrect for slow HDD accesses!
         self._get_time = time.time
@@ -29,6 +29,12 @@ class ProgressBar:
         self.creationTime = self._get_time()
         self._richProgress: Optional[rich.progress.Progress] = None
         self._taskID: Optional[Any] = None
+        self._description = description
+        self._isBytes = isBytes
+
+        self._showRate = showRate
+        self._rateTime = self._get_time()
+        self._rateValue = 0.0
 
     def __enter__(self):
         return self
@@ -57,7 +63,8 @@ class ProgressBar:
                 rich.progress.TextColumn("[progress.description]{task.description}"),
                 rich.progress.BarColumn(bar_width=None),
                 rich.progress.TaskProgressColumn(),
-                rich.progress.DownloadColumn(),
+                rich.progress.DownloadColumn() if self._isBytes else rich.progress.MofNCompleteColumn(),
+                rich.progress.TextColumn("{task.fields[postfix]}", justify="right"),
                 rich.progress.TimeElapsedColumn(),
                 rich.progress.TimeRemainingColumn(elapsed_when_finished=True),
                 # Auto-refreshing and capturing is only pain, especially as I have already taken care to call
@@ -70,7 +77,7 @@ class ProgressBar:
         if self._richProgress:
             self._richProgress.start()
             if self._taskID is None:
-                self._taskID = self._richProgress.add_task("Processing", total=self.maxValue)
+                self._taskID = self._richProgress.add_task(self._description, postfix='', total=self.maxValue)
             self.updateInterval = 0.2
 
     def stop(self) -> None:
@@ -87,7 +94,21 @@ class ProgressBar:
             self.start()
 
         if self._richProgress and self._taskID is not None:
-            self._richProgress.update(self._taskID, completed=value)
+            postfix = ''
+            if self._showRate:
+                self._rateValue += value - self.lastUpdateValue
+                now = self._get_time()
+                elapsed = now - self._rateTime
+                rate = self._rateValue / elapsed if elapsed > 0 else 0.0
+                postfix = f"{rate / 1e6:.2f} MB/s"
+
+                # Make it a (exponential?) moving average without keeping a sample list.
+                if elapsed > 2:
+                    newElapsed = 1
+                    self._rateTime = now - newElapsed
+                    self._rateValue = rate * newElapsed
+
+            self._richProgress.update(self._taskID, completed=value, postfix=postfix, total=self.maxValue)
             self._richProgress.refresh()
         else:
             # Use whole interval since start to estimate time

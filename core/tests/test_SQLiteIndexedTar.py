@@ -4,6 +4,7 @@
 
 import bz2
 import concurrent.futures
+import hashlib
 import io
 import os
 import stat
@@ -80,6 +81,9 @@ class TestSQLiteIndexedTarParallelized:
             assert not file.list('/mimi/00105.tar')
             info = file.lookup('/mimi/00105.tar')
             assert info.userdata[0].offset == 1248256
+
+            # There should especially be no hash xattrs without explicit options being set for that.
+            assert not file.list_xattr(info)
 
     @staticmethod
     def test_recursive_tar_bz2_with_parallelization(parallelization):
@@ -661,3 +665,60 @@ class TestSQLiteIndexedTarParallelized:
             assert indexedTar.exists("/bar")
             assert indexedTar.exists("/folder")
             assert indexedTar.exists("/bar2")
+
+
+@pytest.mark.parallel
+@pytest.mark.parametrize("parallelization", [1])
+class TestSQLiteIndexedTarXattrs:
+    @staticmethod
+    def test_hash_xattrs_for_regular_file(parallelization):
+        hashes = ['crc32', 'sha256', 'sha3-256', 'smplayer']
+        with (
+            copy_test_file("single-file.tar") as path,
+            SQLiteIndexedTar(path, writeIndex=False, parallelization=parallelization, hashes=hashes) as indexedTar,
+        ):
+            path = '/bar'
+            fileInfo = indexedTar.lookup(path)
+            assert fileInfo, path
+            assert set(indexedTar.list_xattr(fileInfo)) == {f'user.hash.{name}' for name in hashes}
+
+            data = indexedTar.open(fileInfo).read()
+            assert indexedTar.get_xattr(fileInfo, 'user.hash.crc32') == b'7e3265a8'
+            assert (
+                indexedTar.get_xattr(fileInfo, 'user.hash.sha256')
+                == b'b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c'
+            )
+            assert indexedTar.get_xattr(fileInfo, 'user.hash.sha3-256') == hashlib.sha3_256(data).hexdigest().encode()
+            assert indexedTar.get_xattr(fileInfo, 'user.hash.smplayer')
+
+    @staticmethod
+    def test_hashes_persist_in_written_sidecar_index(parallelization, tmpdir):
+        with copy_test_file('single-file.tar') as tarPath:
+            indexFilePath = os.path.join(tmpdir, 'single-file.tar.index')
+
+            # Open and force index creation.
+            with SQLiteIndexedTar(
+                tarFileName=tarPath,
+                writeIndex=True,
+                clearIndexCache=True,
+                indexFilePath=indexFilePath,
+                parallelization=parallelization,
+                hashes=['sha256'],
+            ) as indexedTar:
+                path = '/bar'
+                fileInfo = indexedTar.lookup(path)
+                assert fileInfo, path
+                assert indexedTar.get_xattr(fileInfo, 'user.hash.sha256')
+
+            # Load existing index with stored xattrs.
+            with SQLiteIndexedTar(
+                tarFileName=tarPath,
+                writeIndex=False,
+                clearIndexCache=False,
+                indexFilePath=indexFilePath,
+                parallelization=parallelization,
+            ) as indexedTar:
+                fileInfo = indexedTar.lookup('/bar')
+                assert fileInfo
+                digest = indexedTar.get_xattr(fileInfo, 'user.hash.sha256')
+                assert digest

@@ -21,6 +21,7 @@ from ratarmountcore.compressions import libarchive
 from ratarmountcore.utils import ceil_div
 
 from ratarmount.cli import cli as ratarmountcli
+from ratarmount.cli import create_parser
 
 try:
     import ext4
@@ -441,3 +442,14 @@ def test_recursive_extensions_patterns(recursiveExtensions, pathInArchive, shoul
         with RunRatarmount(mountPoint, args):
             path = Path(mountPoint) / pathInArchive
             assert path.is_file() == shouldExist
+
+
+def test_hashes_cli_defaults_and_parsing():
+    parser = create_parser(useColor=False)
+
+    def parse(args: list[str]):
+        return parser.parse_args(args).hashes
+
+    assert parse(['--hashes', 'sha256', '--hashes', 'smplayer', 'single-file.tar']) == ['sha256', 'smplayer']
+    assert parse(['--hashes', 'sha256,smplayer', 'single-file.tar']) == ['sha256', 'smplayer']
+    assert parse(['single-file.tar']) is None

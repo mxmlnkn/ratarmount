@@ -16,6 +16,7 @@ import tempfile
 import textwrap
 from typing import Any, Optional
 
+from ratarmountcore.hashing import HASH_REGISTRY
 from ratarmountcore.utils import RatarmountError, get_xdg_cache_home
 
 with contextlib.suppress(ImportError):
@@ -302,6 +303,12 @@ For further information, see the ReadMe on the project's homepage:
              '   --index-folders \'["~/.ratarmount", "foo,9000"]\' : will never try to save besides the TAR.\n'
              '   --index-folder ~/.ratarmount : will only test ~/.ratarmount as a storage location and nothing else. '
              'Instead, it will first try ~/.ratarmount and the folder "foo,9000". ')
+
+    indexGroup.add_argument(
+        '--hashes', type=str, action=AppendCommaSeparatedOverwriteDefault, default=None,
+        help='Comma-separated list of hashes to compute for indexed files. They are stored as xattrs in the index '
+             'with key user.hash.<hash_name>. Disabled by default because it is expensive. '
+             f'Available algorithms: {", ".join(sorted(HASH_REGISTRY.keys()))}.')
 
     # Recursion Options
 

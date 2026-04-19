@@ -2,15 +2,20 @@
 
 import builtins
 import json
+import logging
 import re
 import shutil
 import tempfile
 from collections.abc import Iterable
 from typing import IO, Any, Callable, Optional, Union
 
+from ratarmountcore.hashing import compute_hashes
 from ratarmountcore.mountsource import FileInfo, MountSource
+from ratarmountcore.ProgressBar import ProgressBar
 from ratarmountcore.SQLiteIndex import SQLiteIndex
 from ratarmountcore.utils import RatarmountError, overrides
+
+logger = logging.getLogger(__name__)
 
 
 class SQLiteIndexMountSource(MountSource):
@@ -21,6 +26,7 @@ class SQLiteIndexMountSource(MountSource):
         clearIndexCache: bool = False,
         checkMetadata: Optional[Callable[[dict[str, Any]], None]] = None,
         transform: Optional[tuple[str, str]] = None,
+        hashes: Optional[list[str]] = None,
         writeIndex: bool = False,
         verifyModificationTime: bool = False,
         indexMinimumFileCount: int = 1000,
@@ -48,6 +54,7 @@ class SQLiteIndexMountSource(MountSource):
         self.writeIndex = writeIndex
         self.verifyModificationTime = verifyModificationTime
         self.options = options
+        self.hashes = sorted(set(hashes or []))
 
         # Initialize index
         if index is None:
@@ -87,7 +94,7 @@ class SQLiteIndexMountSource(MountSource):
                 raise RatarmountError(f"Specified file {self.indexFilePath} is not a valid Ratarmount index.")
 
     def _store_default_metadata(self) -> None:
-        argumentsToSave = ['encoding', 'transformPattern']
+        argumentsToSave = ['encoding', 'transformPattern', 'hashes']
         argumentsMetadata = json.dumps(
             {argument: getattr(self, argument) for argument in argumentsToSave if hasattr(self, argument)}
         )
@@ -102,11 +109,104 @@ class SQLiteIndexMountSource(MountSource):
 
         if 'arguments' in metadata:
             SQLiteIndex.check_metadata_arguments(
-                json.loads(metadata['arguments']), self, argumentsToCheck=['encoding', 'transformPattern']
+                json.loads(metadata['arguments']), self, argumentsToCheck=['encoding', 'transformPattern', 'hashes']
             )
 
         if 'backendName' not in metadata:
             self.index.try_to_open_first_file(lambda path: self.open(self.lookup(path)))
+
+    def _compute_and_store_hashes(self) -> None:
+        if not self.hashes:
+            return
+
+        # We want to find all rows in "files" that are missing any of the self.hashes in "xattrs".
+        # This makes it possible to interrupt the slow checksumming and resume it later!
+        required_xattrs = [f"user.hash.{h}" for h in self.hashes]
+        # The LEFT JOIN "attaches" the xattrs rows onto the left ("files") rows.
+        # All "files" rows are returned. If 1+ xattr row(s) got matched with a file row (by the offsetheader),
+        # then 1+ rows will be returned. The file row contents will be duplicated for each separate xattr row.
+        # Example result: SELECT * FROM files LEFT JOIN xattrs ON files.offsetheader == xattrs.offsetheader;
+        #     /|0|0||1|0.0|33216|0||1000|1000|0|0|0|0|0|user.hash.crc32|f4dbdf21
+        #     /|0|0||1|0.0|33216|0||1000|1000|0|0|0|0|0|user.hash.smplayer|0000000000000031
+        #     /|1|1||1|0.0|33216|0||1000|1000|0|0|0|0|1|user.hash.crc32|83dcefb7
+        #     /|1|1||1|0.0|33216|0||1000|1000|0|0|0|0|1|user.hash.smplayer|0000000000000032
+        #     /|10|2||1|0.0|33216|0||1000|1000|0|0|0|0|2|user.hash.crc32|f4dbdf21
+        #     ...
+        #     /|99992|162301||1|0.0|33216|0||1000|1000|0|0|0|0|||
+        #     /|99991|162300||1|0.0|33216|0||1000|1000|0|0|0|0|||
+        #     /|99990|162299||1|0.0|33216|0||1000|1000|0|0|0|0|||
+        #  -> This is for a single folder with ~163k files containing 1 B each simply named with a number.
+        #     It is tests/tar-with-300-folders-with-1000-files-1B-files.tar.bz2 not fully extracted.
+        # After that LEFT JOIN, we need to use GROUP BY again to restore the "files" primary key and then
+        # count the number of distinct xattrs keys (already filtered to only be the hashes of interest) per grouped
+        # (primary) key triplet.
+        # HAVING filters >after< an aggregation (GROUP BY) whereas WHERE filters >before< aggregations.
+        subquery = f'''(
+            SELECT files.*
+            FROM "files"
+            LEFT JOIN xattrs
+                   ON xattrs.offsetheader = files.offsetheader
+                  AND xattrs.key IN ({",".join("?" for _ in required_xattrs)})
+            WHERE (mode & 0xF000) == 0x8000
+              AND files.offsetheader IS NOT NULL
+              AND NOT isgenerated
+            GROUP BY files.path, files.name, files.offsetheader
+            HAVING COUNT(DISTINCT xattrs.key) < ?
+        )'''
+
+        totals = (
+            self.index.get_connection()
+            .execute(f'SELECT SUM(size) FROM {subquery};', (*required_xattrs, len(required_xattrs)))
+            .fetchone()
+        )
+        totalBytes = int(totals[0]) if totals and totals[0] is not None else 0
+
+        # Simply go over all file rows instead of expensive and complicated recursive tree traversal.
+        rows = self.index.get_connection().execute(
+            f'SELECT * FROM {subquery} ORDER BY "offsetheader" ASC;', (*required_xattrs, len(required_xattrs))
+        )
+        xattrs: list[tuple[int, str, bytes]] = []
+        hashedBytes = 0
+        with ProgressBar(totalBytes, description="Checksumming", showRate=True) as progressBar:
+
+            def chunk_update(byteCount):
+                progressBar.update(hashedBytes + byteCount)
+
+            for row in rows:
+                fileInfo = self.index._row_to_file_info(row)  # pylint: disable=protected-access
+                if not fileInfo.userdata:
+                    continue
+                userData = fileInfo.userdata[-1]
+
+                try:
+                    with self.open(fileInfo) as fileObject:
+                        computed = compute_hashes(
+                            fileObject, fileInfo.size, self.hashes, progress_callback=chunk_update
+                        )
+                except Exception as exception:
+                    logger.warning(
+                        "Failed to compute hashes for indexed file %s/%s: %s",
+                        row['path'].rstrip('/'),
+                        row['name'],
+                        exception,
+                        exc_info=logger.isEnabledFor(logging.DEBUG),
+                    )
+                    continue
+                finally:
+                    hashedBytes += fileInfo.size
+
+                xattrs += [
+                    (userData.offsetheader, f"user.hash.{name}", value.encode('utf-8'))
+                    for name, value in computed.items()
+                ]
+                if len(xattrs) >= 1000:
+                    self.index.setxattrs(xattrs)
+                    xattrs.clear()
+
+            progressBar.update(totalBytes)
+
+        if xattrs:
+            self.index.setxattrs(xattrs)
 
     def _finalize_index(
         self,
@@ -115,15 +215,26 @@ class SQLiteIndexMountSource(MountSource):
         store_metadata: Optional[Callable[[], None]] = None,
         isFileObject: Optional[bool] = None,
     ):
-        """
-        metadata
-            Should either be a list of attributes on 'self' that should be stored or a callable that stores
-            metadata by calling self.index.store_metadata. If it is None a default selection of attributes
-            will be saved.
-        """
+        callable_store_metadata = store_metadata if callable(store_metadata) else self._store_default_metadata
+        if self.index.index_is_loaded():
+            # index_is_loaded checks for completed 'files' (stats etc.) table.
+            # It does not check regarding xattrs completenes. We need to check whether some hashes
+            # should still be computed.
+            self._compute_and_store_hashes()
+            callable_store_metadata()
+            self.index.reload_index_read_only()
+            return
+
+        def create_index_and_post_process(index=self.index):
+            create_index()
+            # Finalize the 'files' table from 'filestmp' and 'parentfolders' so that
+            # the by magnitudes costlier checksumming can be interrupted and resumed.
+            index.finalize()
+            self._compute_and_store_hashes()
+
         self.index.finalize_index(
-            create_index=create_index,
-            store_metadata=store_metadata if callable(store_metadata) else self._store_default_metadata,
+            create_index=create_index_and_post_process,
+            store_metadata=callable_store_metadata,
             isFileObject=isFileObject,
             writeIndex=self.writeIndex,
         )

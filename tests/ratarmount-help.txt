@@ -4,8 +4,8 @@ Usage: ratarmount
                   [-P PARALLELIZATION] [--password PASSWORD] [-w WRITE_OVERLAY]
                   [-c | --recreate-index | --no-recreate-index] [--recreate-index-on-errors]
                   [--verify-mtime | --no-verify-mtime] [--index-file INDEX_FILE]
-                  [--index-folders INDEX_FOLDERS] [--recursion-depth RECURSION_DEPTH]
-                  [-l | --lazy | --no-lazy]
+                  [--index-folders INDEX_FOLDERS] [--hashes HASHES]
+                  [--recursion-depth RECURSION_DEPTH] [-l | --lazy | --no-lazy]
                   [-s | --strip-recursive-tar-extension | --no-strip-recursive-tar-extension]
                   [--recursive-extensions RECURSIVE_EXTENSIONS]
                   [--transform-recursive-mount-point REGEX_PATTERN REPLACEMENT] [-e ENCODING]
@@ -81,6 +81,12 @@ Positional Options:
                         without a file extension. (default: None)
 
 Index Options:
+  --hashes HASHES       Comma-separated list of hashes to compute for indexed files. They are
+                        stored as xattrs in the index with key user.hash.<hash_name>. Disabled
+                        by default because it is expensive. Available algorithms: blake2b,
+                        blake2s, crc32, md5, md5-sha1, ripemd160, sha1, sha224, sha256,
+                        sha3-224, sha3-256, sha3-384, sha3-512, sha384, sha512, sha512-224,
+                        sha512-256, sm3, smplayer. (default: None)
   --index-file INDEX_FILE
                         Specify a path to the .index.sqlite file. Setting this will disable
                         fallback index folders. If the given path is ":memory:", then the index

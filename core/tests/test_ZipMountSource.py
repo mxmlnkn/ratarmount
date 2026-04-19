@@ -4,6 +4,7 @@
 # pylint: disable=wrong-import-position
 # pylint: disable=protected-access
 
+import hashlib
 import os
 import shutil
 import stat
@@ -120,6 +121,21 @@ class TestZipMountSource:
                 assert not mountSource.list(filePath)
                 with mountSource.open(mountSource.lookup(filePath)) as file:
                     assert file.read() == b'iriya\n'
+
+    @staticmethod
+    def test_hash_xattrs_for_regular_file():
+        with ZipMountSource(find_test_file('folder-symlink.zip'), hashes=['sha256']) as mountSource:
+            path = '/foo/fighter/ufo'
+            fileInfo = mountSource.lookup(path)
+            assert fileInfo, path
+
+            keys = mountSource.list_xattr(fileInfo)
+            assert 'user.hash.sha256' in keys
+            assert 'user.hash.crc32' not in keys
+
+            with mountSource.open(fileInfo) as file:
+                expected = hashlib.sha256(file.read()).hexdigest().encode('utf-8')
+            assert mountSource.get_xattr(fileInfo, 'user.hash.sha256') == expected
 
 
 def benchmark_fast_zipfile_decryption():

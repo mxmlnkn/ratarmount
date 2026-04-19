@@ -511,6 +511,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         'transformRecursiveMountPoint',
         'transformPattern',
         'ignoreZeros',
+        'hashes',
     )
 
     # fmt: off
@@ -793,7 +794,7 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
         return None if self.tarFileName == '<file object>' else self.tarFileName
 
     def _store_metadata(self) -> None:
-        argumentsToSave = list(self.INDEX_ARGUMENTS_TO_CHECK) + ['gzipSeekPointSpacing']
+        argumentsToSave = [*list(self.INDEX_ARGUMENTS_TO_CHECK), 'gzipSeekPointSpacing']
         argumentsMetadata = json.dumps({argument: getattr(self, argument) for argument in argumentsToSave})
         # The second argument must be a path to a file to call os.stat with, not simply a file name.
         self.index.store_metadata(argumentsMetadata, "" if self.isFileObject else self.tarFileName)
