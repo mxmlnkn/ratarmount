@@ -147,7 +147,10 @@ class SQLiteIndex:
     __version__ = '0.7.0'
 
     MAGIC_BYTES = b'SQLite format 3\x00'  # If it is encrypted, the first 16 B are the (random) salt.
-    NUMBER_OF_METADATA_TO_VERIFY = 1000  # shouldn't take more than 1 second according to benchmarks
+    # 1000 rows to verify shouldn't take more than 1 second on HDDs according to benchmarks.
+    # For remote/network/global filesystems and/or large block sizes, it can snowball, therefore it was reduced
+    # by more than one magnitude to 100.
+    NUMBER_OF_METADATA_TO_VERIFY = 100
 
     # The maximum blob size configured by SQLite is exactly 1 GB, see https://www.sqlite.org/limits.html
     # Therefore, this should be smaller. Another argument for making it smaller is that this blob size

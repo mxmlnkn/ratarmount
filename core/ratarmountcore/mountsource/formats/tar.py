@@ -1345,13 +1345,14 @@ class SQLiteIndexedTar(SQLiteIndexMountSource):
     def _check_index_validity(self) -> bool:
         # Check some of the first and last files in the archive and some random selection in between.
         selectFiles = "SELECT * " + SQLiteIndex.FROM_REGULAR_FILES
+        limit = int(max(1, SQLiteIndex.NUMBER_OF_METADATA_TO_VERIFY // 3))
         result = self.index.get_connection().execute(
             f"""
-            SELECT * FROM ( {selectFiles} ORDER BY offset ASC LIMIT 100 )
+            SELECT * FROM ( {selectFiles} ORDER BY offset ASC LIMIT {limit} )
             UNION
-            SELECT * FROM ( {selectFiles} ORDER BY RANDOM() LIMIT {SQLiteIndex.NUMBER_OF_METADATA_TO_VERIFY} )
+            SELECT * FROM ( {selectFiles} ORDER BY RANDOM() LIMIT {limit} )
             UNION
-            SELECT * FROM ( {selectFiles} ORDER BY offset DESC LIMIT 100 )
+            SELECT * FROM ( {selectFiles} ORDER BY offset DESC LIMIT {limit} )
             ORDER BY offset
         """
         )
