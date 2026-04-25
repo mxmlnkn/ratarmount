@@ -1,4 +1,5 @@
 import contextlib
+import importlib.resources
 import json
 import logging
 import os
@@ -159,100 +160,7 @@ class SQLiteIndex:
     # But, making it too small would result in too many non-backwards compatible indexes being created.
     _MAX_BLOB_SIZE = 256 * 1024 * 1024  # 256 MiB
 
-    _CREATE_FILES_TABLE = """
-        CREATE TABLE "files" (
-            "path"           VARCHAR(65535) NOT NULL,  /* path with leading and without trailing slash */
-            "name"           VARCHAR(65535) NOT NULL,
-            "offsetheader"   INTEGER,  /* seek offset from TAR file where the TAR metadata for this file resides */
-            "offset"         INTEGER,  /* seek offset from TAR file where these file's contents resides */
-            "size"           INTEGER,
-            "mtime"          REAL,
-            "mode"           INTEGER,
-            "type"           INTEGER,
-            "linkname"       VARCHAR(65535),
-            "uid"            INTEGER,
-            "gid"            INTEGER,
-            /* True for valid TAR files. Internally used to determine where to mount recursive TAR files. */
-            "istar"          BOOL   ,
-            "issparse"       BOOL   ,  /* For sparse files the file size refers to the expanded size! */
-            "isgenerated"    BOOL   ,  /* True for entries generated for parent folders by ratarmount. */
-            "recursiondepth" INTEGER,  /* Normally 0. 1+ if the file is recursively in an archive. */
-            /* See SQL benchmarks for decision on the primary key.
-             * See also https://www.sqlite.org/optoverview.html
-             * (path,name) tuples might appear multiple times in a TAR if it got updated.
-             * In order to also be able to show older versions, we need to add
-             * the offsetheader column to the primary key. */
-            PRIMARY KEY (path,name,offsetheader)
-        );"""
-
-    _CREATE_XATTRS_TABLE = """
-        CREATE TABLE IF NOT EXISTS "xattrkeys" (
-            "id" INTEGER PRIMARY KEY,
-            "name" VARCHAR(65535) UNIQUE
-        );
-
-        CREATE TABLE IF NOT EXISTS "xattrsdata" (
-            "offsetheader" INTEGER,
-            "keyid" INTEGER,
-            "value" VARCHAR(65535),  /* Binary Data (Python Bytes) */
-            PRIMARY KEY (offsetheader,keyid),
-            FOREIGN KEY (keyid) REFERENCES xattrkeys(id)
-        );
-
-        CREATE VIEW IF NOT EXISTS "xattrs" ( "offsetheader", "key", "value" ) AS
-            SELECT offsetheader, xattrkeys.name, value FROM "xattrsdata"
-            INNER JOIN xattrkeys ON xattrkeys.id = xattrsdata.keyid;
-
-        CREATE TRIGGER IF NOT EXISTS "xattrs_insert" INSTEAD OF INSERT ON "xattrs"
-        BEGIN
-            INSERT OR IGNORE INTO xattrkeys(name) VALUES (NEW.key);
-            INSERT OR REPLACE INTO xattrsdata(offsetheader, keyid, value) VALUES (
-                NEW.offsetheader,
-                (SELECT xattrkeys.id FROM xattrkeys WHERE name = NEW.key),
-                NEW.value
-            );
-        END;"""
-
-    _CREATE_FILESTMP_TABLE = """
-        /* "A table created using CREATE TABLE AS has no PRIMARY KEY and no constraints of any kind"
-         * Therefore, it will not be sorted and inserting will be faster! */
-        CREATE TABLE "filestmp" AS SELECT * FROM "files" WHERE 0;"""
-
-    _CREATE_PARENT_FOLDERS_TABLE = """
-        CREATE TABLE "parentfolders" (
-            "path"          VARCHAR(65535) NOT NULL,
-            "name"          VARCHAR(65535) NOT NULL,
-            "offsetheader"  INTEGER,
-            "offset"        INTEGER,
-            PRIMARY KEY (path,name)
-            UNIQUE (path,name)
-        );"""
-
-    _CREATE_METADATA_TABLE = """
-        /* Empty table whose sole existence specifies that the archive has been fully processed.
-         * Common keys: tarstats, arguments, isGnuIncremental, backendName */
-        CREATE TABLE IF NOT EXISTS "metadata" (
-            "key"      VARCHAR(65535) NOT NULL, /* e.g. "tarsize" */
-            "value"    VARCHAR(65535) NOT NULL, /* e.g. size in bytes as integer */
-            PRIMARY KEY (key)
-        );
-    """
-
-    _CREATE_VERSIONS_TABLE = """
-        /* This table's sole existence specifies that we finished iterating the tar for older ratarmount versions */
-        CREATE TABLE IF NOT EXISTS "versions" (
-            "name"     VARCHAR(65535) NOT NULL, /* which component the version belongs to */
-            "version"  VARCHAR(65535) NOT NULL, /* free form version string */
-            /* Semantic Versioning 2.0.0 (semver.org) parts if they can be specified:
-             *   MAJOR version when you make incompatible API changes,
-             *   MINOR version when you add functionality in a backwards compatible manner, and
-             *   PATCH version when you make backwards compatible bug fixes. */
-            "major"    INTEGER,
-            "minor"    INTEGER,
-            "patch"    INTEGER,
-            PRIMARY KEY (name)
-        );
-    """
+    _CREATE_TABLES = importlib.resources.files("ratarmountcore").joinpath("create-index-tables.sql").read_text()
 
     # Check some of the first and last files in the archive and some random selection in between.
     # Do not verify folders because parent folders and root get automatically added!
@@ -504,12 +412,6 @@ class SQLiteIndex:
         connection = self.get_connection()
 
         try:
-            connection.executescript(SQLiteIndex._CREATE_VERSIONS_TABLE)
-        except Exception as exception:
-            logger.error("There was an error when adding metadata information. Index loading might not work.")
-            logger.info("Exception: %s", exception, exc_info=logger.isEnabledFor(logging.DEBUG))
-
-        try:
 
             def make_version_row(
                 versionName: str, version: str
@@ -561,8 +463,6 @@ class SQLiteIndex:
 
     def store_metadata_key_value(self, key: AnyStr, value: Union[str, bytes]) -> None:
         connection = self.get_connection()
-        connection.executescript(SQLiteIndex._CREATE_METADATA_TABLE)
-
         try:
             connection.execute('INSERT OR REPLACE INTO "metadata" VALUES (?,?)', (key, value))
         except Exception as exception:
@@ -582,10 +482,7 @@ class SQLiteIndex:
         self.store_metadata_key_value('backendName', self.backendName)
 
     def drop_metadata(self):
-        self.get_connection().executescript("""
-            DROP TABLE IF EXISTS metadata;
-            DROP TABLE IF EXISTS versions;
-            """)
+        self.get_connection().executescript("DELETE FROM metadata; DELETE FROM versions;")
 
     def try_to_open_first_file(self, openByPath):
         # Get first row that has the regular file bit set in mode (stat.S_IFREG == 32768 == 1<<15).
@@ -739,12 +636,14 @@ class SQLiteIndex:
 
         sqlConnection = SQLiteIndex._open_sql_db(indexFilePath)
         tables = get_sqlite_tables(sqlConnection)
-        if {"files", "filestmp", "parentfolders"}.intersection(tables):
+        conflicting_tables = sorted({"files", "filestmp", "parentfolders", "xattrs"}.intersection(tables))
+        if conflicting_tables:
             raise InvalidIndexError(
-                f"The index file {indexFilePath} already seems to contain a table. Please specify --recreate-index."
+                f"The index file {indexFilePath} already contains tables ({', '.join(conflicting_tables)}) that would "
+                "conflict with our database schema. Please specify --recreate-index to overwrite the existing database."
             )
-        sqlConnection.executescript(SQLiteIndex._CREATE_FILES_TABLE)
-        sqlConnection.executescript(SQLiteIndex._CREATE_XATTRS_TABLE)
+
+        sqlConnection.executescript(SQLiteIndex._CREATE_TABLES)
 
         return indexFilePath, sqlConnection
 
@@ -779,20 +678,6 @@ class SQLiteIndex:
         oldSqlConnection.commit()
         oldSqlConnection.backup(self.sqlConnection)
         oldSqlConnection.close()
-
-    def ensure_intermediary_tables(self):
-        connection = self.get_connection()
-        tables = get_sqlite_tables(connection)
-
-        if ("filestmp" in tables) != ("parentfolders" in tables):
-            raise InvalidIndexError(
-                "The index file is in an invalid state because it contains some tables and misses others. "
-                "Please specify --recreate-index to overwrite the existing index."
-            )
-
-        if "filestmp" not in tables and "parentfolders" not in tables:
-            connection.execute(SQLiteIndex._CREATE_FILESTMP_TABLE)
-            connection.execute(SQLiteIndex._CREATE_PARENT_FOLDERS_TABLE)
 
     def finalize(self):
         tables = get_sqlite_tables(self.sqlConnection)
@@ -840,7 +725,8 @@ class SQLiteIndex:
             print(f"Creating offset dictionary for {self.archiveFilePath} ...")
         t0 = timer()
 
-        self.ensure_intermediary_tables()
+        # Ensure that all tables exist. This is necessary for TARs detected as being appended to.
+        self.get_connection().executescript(SQLiteIndex._CREATE_TABLES)
         create_index()
         self.finalize()
 
@@ -1238,7 +1124,12 @@ class SQLiteIndex:
         self._try_add_parent_folders(row[0], row[2], row[3])
 
     def index_is_loaded(self) -> bool:
-        """Returns true if the SQLite database has been opened for reading and a "files" table exists."""
+        """
+        Returns true if the SQLite database has been opened for reading and a "files" table exists.
+        It does not and should not check whether the "files" table (and others) are complete.
+        To differentiate this from actual (existing) index loading, a better name would have been:
+        index_is_open or something similar.
+        """
         if not self.sqlConnection:
             return False
 

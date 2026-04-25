@@ -309,5 +309,8 @@ ratar = "ratarmountcore.SQLiteIndexedTarFsspec.SQLiteIndexedTarFileSystem"
 [tool.setuptools]
 license-files = ["LICENSE", "ratarmountcore/_external/pyfatfs/LICENSE"]
 
+[tool.setuptools.package-data]
+ratarmountcore = ["*.sql"]
+
 [tool.setuptools.dynamic]
 version = {attr = "ratarmountcore.version.__version__"}

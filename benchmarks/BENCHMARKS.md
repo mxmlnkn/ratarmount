@@ -262,7 +262,7 @@ The x-axis shows the number of batches of 1000 already inserted. It goes up to 1
 For row counts > 2M, the database creation degrades quite a lot because each cache spill seems to trigger a complete resorting of the newly added values in memory into the existing database **on disk**, or something like that. Still, the total time to insert 10M rows is ~7min, so compared to my earlier benchmarks of the ILSVRC dataset, which has 2M images and took 45min to create, the SQL database creation should not be a too significant overhead.
 
 The later variants for the varchar-varchar tuple as primary key have constant insertion time because they make use of a temporary table that is not sorted.
-The time for sorting that temporary table into the final table is not included here, for that see [Doing the One-Time SQL Table Sorting](doing-the-one-time-sql-table-sorting)!
+The time for sorting that temporary table into the final table is not included here, for that see [Doing the One-Time SQL Table Sorting](#doing-the-one-time-sql-table-sorting)!
 
 ## SQL Database Benchmark with 16M Rows in Memory
 
@@ -375,7 +375,7 @@ However, the variance seems to be much larger than all other benchmarks, probabl
 ![sqlite primary key benchmark times over row count](data/sql-benchmark/primary-key-benchmark-up-to-16M-path-size-128B-dev-shm/sqlite%20primary%20key%20benchmark%20times%20over%20row%20count.png)
 
 Same as [previously](#scaling-with-respect-to-row-count-on-disk), all but the upper left plot, only shows that lookups will be slow if there is no index on the column, or if wildcard matching is used.
-In contrast to the [prior benchmarks](#Scaling%20with%20Respect%20to%20Row%20Count%20on%20Disk), the linearly scaling range for insertion after more than 2M rows is not reached, instead insertion seems to scale roughly logarithmically.
+In contrast to the [prior benchmarks](#scaling-with-respect-to-row-count-on-disk), the linearly scaling range for insertion after more than 2M rows is not reached, instead insertion seems to scale roughly logarithmically.
 Differences to the prior benchmark that might cause this:
  - Database in `/dev/shm` instead of presumably on an encrypted EXT4 SSD.
  - Uses file name length of 128 instead of 256.
@@ -404,7 +404,7 @@ If there is plenty to deduplicate, then insertion will be similarly fast to the 
 However, if all strings are unique, then the lookup string-to-ID seems to slow things down to logarithmic complexity.
 This is true for all versions I tried, including those with a post-processing step, for which insertion is constant-time, as shown in the plot below.
 
-There is no difference in the three versions of declaring the string-to-ID tables (`VARCHAR PRIMARY KEY`, `VARCHARY UNIQUE`, `CREATE UNIQUE INDEX`).
+There is no difference in the three versions of declaring the string-to-ID tables (`VARCHAR PRIMARY KEY`, `VARCHAR UNIQUE`, `CREATE UNIQUE INDEX`).
 However, all versions with manual post-processing are slower than simply inserting directly and using the INSERT trigger.
 This is likely because the post-processing creates the string-to-ID tables once and then looks up inside them, i.e., all lookups in total will take `O(rows log(rows))` time while looking each value up while inserting them will roughly yield approximately `O(rows(log(rows)-1)`, which is the integral of the logarithm.
 
