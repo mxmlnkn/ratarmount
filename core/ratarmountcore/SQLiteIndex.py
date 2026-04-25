@@ -821,6 +821,10 @@ class SQLiteIndex:
             connection.execute(SQLiteIndex._CREATE_PARENT_FOLDERS_TABLE)
 
     def finalize(self):
+        tables = get_sqlite_tables(self.sqlConnection)
+        if not {'filestmp', 'parentfolders'}.intersection(tables):
+            return
+
         try:
             # Note that the with-statement does not automatically close a connection!
             # https://discuss.python.org/t/implicitly-close-sqlite3-connections-with-context-managers/33320
