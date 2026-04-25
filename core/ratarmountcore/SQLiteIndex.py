@@ -62,6 +62,17 @@ def _to_version_tuple(version: str) -> Optional[tuple[int, int, int]]:
     return None
 
 
+def _get_libsqlite_version() -> tuple:
+    with contextlib.suppress(Exception):
+        # Note that the with-statement does not automatically close a connection!
+        # https://discuss.python.org/t/implicitly-close-sqlite3-connections-with-context-managers/33320
+        connection = sqlite3.connect(":memory:")
+        queriedLibSqliteVersion = connection.execute("select sqlite_version();").fetchone()
+        connection.close()
+        return tuple(int(x) for x in queriedLibSqliteVersion[0].split('.'))
+    return (0, 0, 0)
+
+
 @dataclass
 class SQLiteIndexedTarUserData:
     # fmt: off
@@ -679,24 +690,17 @@ class SQLiteIndex:
         oldSqlConnection.backup(self.sqlConnection)
         oldSqlConnection.close()
 
-    def finalize(self):
-        tables = get_sqlite_tables(self.sqlConnection)
+    @staticmethod
+    def _finalize_files_table(connection: sqlite3.Connection):
+        tables = get_sqlite_tables(connection)
         if not {'filestmp', 'parentfolders'}.intersection(tables):
             return
 
-        try:
-            # Note that the with-statement does not automatically close a connection!
-            # https://discuss.python.org/t/implicitly-close-sqlite3-connections-with-context-managers/33320
-            connection = sqlite3.connect(":memory:")
-            queriedLibSqliteVersion = connection.execute("select sqlite_version();").fetchone()
-            connection.close()
-            libSqliteVersion = tuple(int(x) for x in queriedLibSqliteVersion[0].split('.'))
-        except Exception:
-            libSqliteVersion = (0, 0, 0)
-
+        # For reference, CPython 3.14 requires (2026-04-26) at least libsqlite 3.15.2 (2016-11-28).
+        # https://github.com/python/cpython/blob/5d416324c56cd6f262fa123f41b97b48631bea79/Modules/_sqlite/module.c#L38
+        # libsqlite 3.22 was released 2018-01-22. https://www.sqlite.org/changes.html
         searchByTuple = """(path,name) NOT IN ( SELECT path,name"""
         searchByConcat = """path || '/' || name NOT IN ( SELECT path || '/' || name"""
-
         cleanUpDatabase = f"""
             INSERT OR REPLACE INTO "files" SELECT * FROM "filestmp" ORDER BY "path","name",rowid;
             DROP TABLE "filestmp";
@@ -706,7 +710,7 @@ class SQLiteIndex:
                        /* linkname uid gid istar issparse isgenerated recursiondepth */
                        '',0,0,0,0,0,0
                 FROM "parentfolders"
-                WHERE {searchByTuple if libSqliteVersion >= (3, 22, 0) else searchByConcat}
+                WHERE {searchByTuple if _get_libsqlite_version() >= (3, 22, 0) else searchByConcat}
                     FROM "files" WHERE mode & (1 << 14) != 0
                 )
                 ORDER BY "path","name";
@@ -718,7 +722,10 @@ class SQLiteIndex:
         # Resort by (path,name). This one-time resort is faster than resorting on each INSERT (cache spill)
         logger.info("Resorting files by path ...")
 
-        self.get_connection().executescript(cleanUpDatabase)
+        connection.executescript(cleanUpDatabase)
+
+    def finalize(self):
+        SQLiteIndex._finalize_files_table(self.sqlConnection)
 
     def create_index_timed(self, create_index: Callable[[], None]):
         if logger.isEnabledFor(logging.WARNING):
