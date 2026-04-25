@@ -268,7 +268,27 @@ class SQLiteIndex:
     # As an alternative, exempt the path from the consistency check.
     # Note also that for pure compressed files such as simple.bz2, the offsetheader can be None.
     # These rows should also be filtered.
-    FROM_REGULAR_FILES = f"""FROM "files" WHERE (mode & {stat.S_IFREG}) != 0 AND offsetheader IS NOT NULL"""
+    #
+    # How to test the mode for being of regular file type correctly:
+    #   https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_stat.h.html
+    #     -> Gives numeric values for permission flags, but not for file type flags.
+    #        The latter shall only exist as preprocessor macros with predefined names S_IFMT, S_IFREG, ...
+    #   https://github.com/torvalds/linux/blob/master/include/uapi/linux/stat.h
+    #       #define S_IFMT  00170000  // 0xF000
+    #       #define S_IFREG  0100000  // 0x8000
+    #       #define S_ISLNK(m)  (((m) & S_IFMT) == S_IFLNK)
+    #       #define S_ISREG(m)  (((m) & S_IFMT) == S_IFREG)
+    #       #define S_ISDIR(m)  (((m) & S_IFMT) == S_IFDIR)
+    #       #define S_ISCHR(m)  (((m) & S_IFMT) == S_IFCHR)
+    #       #define S_ISBLK(m)  (((m) & S_IFMT) == S_IFBLK)
+    #       #define S_ISFIFO(m) (((m) & S_IFMT) == S_IFIFO)
+    #       #define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)
+    #   -> Use hexadecimal because octal does not seem to be supported by SQLite.
+    # Beware that this explicitly does not match symlinks! I think that is the correct behavior though.
+    # This filter is used for IndexedFolderMountSource.open and for checking the index by reading file contents.
+    # Both of these should not match for symlinks. All other file types such as sockets, FIFO, block devices, ...
+    # are not fully tested and probably have other issues or simply are not supported by most archive formats.
+    FROM_REGULAR_FILES = 'FROM "files" WHERE (mode & 0xF000) == 0x8000 AND offsetheader IS NOT NULL'
 
     def __init__(
         self,
