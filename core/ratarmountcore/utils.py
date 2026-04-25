@@ -3,6 +3,7 @@ import collections
 import contextlib
 import importlib
 import io
+import logging
 import math
 import os
 import pathlib
@@ -14,6 +15,8 @@ import types
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Generic, Optional, TypeVar, Union, get_type_hints
+
+logger = logging.getLogger(__name__)
 
 
 class RatarmountError(Exception):
@@ -414,3 +417,53 @@ def create_folder_from_file_permissions(mode: int) -> int:
         | (stat.S_IXGRP if mode & stat.S_IRGRP != 0 else 0)
         | (stat.S_IXOTH if mode & stat.S_IROTH != 0 else 0)
     )
+
+
+def ensure_writable_path(path: str) -> bool:
+    """
+    Checks if the given path is writable by simply trying to write to it.
+    Ensures that parent folders to the path are created if they do not exist.
+    """
+    # Writing to remote filesystems is currently not supported and we need to take care that URLs
+    # are not interpreted as local file paths, i.e., creating an ftp: folder with a user:password@host subfolder.
+    if '://' in path:
+        return False
+
+    try:
+        file = Path(path)
+        if file.exists() and file.stat().st_size > 0:
+            logger.debug(
+                "Path already exists. Will not overwrite it: %s", path, exc_info=logger.isEnabledFor(logging.DEBUG)
+            )
+            return False
+
+        folder = os.path.dirname(path)
+        if folder:
+            os.makedirs(folder, exist_ok=True)
+
+        file.write_bytes(b'\0' * 1024 * 1024)
+        file.unlink()
+
+        return True
+
+    except PermissionError:
+        logger.debug("Insufficient permissions to write to: %s", path, exc_info=logger.isEnabledFor(logging.DEBUG))
+
+    except OSError:
+        logger.info("Could not create file: %s", path, exc_info=True)
+
+    return False
+
+
+def unchecked_remove(path: str):
+    """
+    Try to remove but do not crash. Intended for non-consequential removals such as cleanups.
+    Not intended for clearing space before writing or shredding private data.
+    """
+    if not path or not os.path.exists(path):
+        return
+
+    try:
+        os.remove(path)
+    except Exception:
+        logger.warning("Could not remove: %s", path, exc_info=logger.isEnabledFor(logging.DEBUG))

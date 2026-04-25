@@ -14,7 +14,6 @@ import time
 import urllib.parse
 from collections.abc import Sequence
 from dataclasses import dataclass
-from pathlib import Path
 from timeit import default_timer as timer
 from typing import IO, Any, AnyStr, Callable, Optional, Union
 
@@ -41,8 +40,10 @@ from .utils import (
     InvalidIndexError,
     MismatchingIndexError,
     RatarmountError,
+    ensure_writable_path,
     find_module_version,
     get_xdg_cache_home,
+    unchecked_remove,
 )
 from .version import __version__
 
@@ -455,7 +456,6 @@ class SQLiteIndex:
 
         if self.possibleIndexFilePaths and not self.preferMemory:
             for indexPath in self.possibleIndexFilePaths:
-                # This test will trash indexPath because of the write test!
                 if SQLiteIndex._path_can_be_used_for_sqlite(indexPath):
                     self.indexFilePath, self.sqlConnection = SQLiteIndex._open_path(indexPath)
                     break
@@ -685,42 +685,12 @@ class SQLiteIndex:
         return self.get_connection().execute("""SELECT version FROM versions WHERE name == 'index';""").fetchone()[0]
 
     @staticmethod
-    def _path_is_writable(path: str) -> bool:
-        # Writing indexes to remote filesystems currently not supported and we need to take care that URLs
-        # are not interpreted as local file paths, i.e., creating an ftp: folder with a user:password@host subfolder.
-        if '://' in path:
-            return False
-
-        try:
-            folder = os.path.dirname(path)
-            if folder:
-                os.makedirs(folder, exist_ok=True)
-
-            file = Path(path)
-            file.write_bytes(b'\0' * 1024 * 1024)
-            file.unlink()
-
-            return True
-
-        except PermissionError:
-            logger.debug("Insufficient permissions to write to: %s", path, exc_info=logger.isEnabledFor(logging.DEBUG))
-
-        except OSError:
-            logger.info("Could not create file: %s", path, exc_info=True)
-
-        return False
-
-    @staticmethod
     def _path_can_be_used_for_sqlite(path: str) -> bool:
-        if not SQLiteIndex._path_is_writable(path):
+        # Also creates parent folders if necessary. Returns false if a file already exists.
+        if not ensure_writable_path(path):
             return False
 
-        fileExisted = os.path.isfile(path)
         try:
-            folder = os.path.dirname(path)
-            if folder:
-                os.makedirs(folder, exist_ok=True)
-
             connection = SQLiteIndex._open_sql_db(path)
             connection.executescript('CREATE TABLE "files" ( "path" VARCHAR(65535) NOT NULL );')
             connection.commit()
@@ -729,23 +699,9 @@ class SQLiteIndex:
         except sqlite3.OperationalError:
             logger.debug("Could not create SQLite database at: %s", path, exc_info=True)
         finally:
-            if not fileExisted and os.path.isfile(path):
-                SQLiteIndex._unchecked_remove(path)
+            unchecked_remove(path)
 
         return False
-
-    @staticmethod
-    def _unchecked_remove(path: Optional[AnyStr]):
-        """
-        Often cleanup is good manners but it would only be obnoxious if ratarmount crashed on unnecessary cleanup.
-        """
-        if not path or not os.path.exists(path):
-            return
-
-        try:
-            os.remove(path)
-        except Exception:
-            logger.warning("Could not remove: %s", path, exc_info=logger.isEnabledFor(logging.DEBUG))
 
     @staticmethod
     def _open_sql_db(path: AnyStr, **kwargs) -> sqlite3.Connection:
