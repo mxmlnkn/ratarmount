@@ -449,9 +449,6 @@ class SQLiteIndex:
             if self._try_load_index(indexPath, checkMetadata=checkMetadata):
                 break
 
-    def open_in_memory(self):
-        self.indexFilePath, self.sqlConnection = SQLiteIndex._open_path(':memory:')
-
     def open_writable(self):
         if self.readOnly:
             return
@@ -918,7 +915,7 @@ class SQLiteIndex:
         if writeIndex and (self._requestedIndexFilePath or not isFileObject):
             self.open_writable()
         else:
-            self.open_in_memory()
+            self.indexFilePath, self.sqlConnection = SQLiteIndex._open_path(':memory:')
 
         self.create_index_timed(create_index)
 
