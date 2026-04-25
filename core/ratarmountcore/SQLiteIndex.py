@@ -395,7 +395,7 @@ class SQLiteIndex:
         if indexFilePath == ':memory:':
             return []
 
-        possibleIndexFilePaths = []
+        possibleIndexFilePaths: list[str] = []
         if indexFilePath:
             # Prior versions did simply return indexFilePath as the only possible path if it was specified.
             # This worked well enough because if the path did not exist, it would simply be created.
@@ -441,7 +441,7 @@ class SQLiteIndex:
 
     def clear_indexes(self):
         for indexPath in self.possibleIndexFilePaths:
-            if os.path.isfile(indexPath):
+            if indexPath and os.path.isfile(indexPath):
                 os.remove(indexPath)
 
     def open_existing(self, checkMetadata: Optional[Callable[[dict[str, Any]], None]] = None):
@@ -457,12 +457,12 @@ class SQLiteIndex:
         if self.possibleIndexFilePaths and not self.preferMemory:
             for indexPath in self.possibleIndexFilePaths:
                 if SQLiteIndex._path_can_be_used_for_sqlite(indexPath):
-                    self.indexFilePath, self.sqlConnection = SQLiteIndex._open_path(indexPath)
+                    self.indexFilePath, self.sqlConnection = SQLiteIndex._create_sql_db(indexPath)
                     break
         else:
             if self.preferMemory:
                 logger.debug("Create new index in memory because memory is to be preferred, e.g., for small archives.")
-            self.indexFilePath, self.sqlConnection = SQLiteIndex._open_path(':memory:')
+            self.indexFilePath, self.sqlConnection = SQLiteIndex._create_sql_db(':memory:')
 
         if not self.index_is_loaded():
             raise InvalidIndexError(
@@ -731,7 +731,7 @@ class SQLiteIndex:
         return sqlConnection
 
     @staticmethod
-    def _open_path(indexFilePath: Optional[str]) -> tuple[str, sqlite3.Connection]:
+    def _create_sql_db(indexFilePath: Optional[str]) -> tuple[str, sqlite3.Connection]:
         indexFilePath = indexFilePath or ':memory:'
 
         if logger.isEnabledFor(logging.WARNING):
@@ -871,7 +871,7 @@ class SQLiteIndex:
         if writeIndex and (self._requestedIndexFilePath or not isFileObject):
             self.open_writable()
         else:
-            self.indexFilePath, self.sqlConnection = SQLiteIndex._open_path(':memory:')
+            self.indexFilePath, self.sqlConnection = SQLiteIndex._create_sql_db(':memory:')
 
         self.create_index_timed(create_index)
 
