@@ -232,7 +232,8 @@ class SQLiteIndex:
          * Common keys: tarstats, arguments, isGnuIncremental, backendName */
         CREATE TABLE IF NOT EXISTS "metadata" (
             "key"      VARCHAR(65535) NOT NULL, /* e.g. "tarsize" */
-            "value"    VARCHAR(65535) NOT NULL  /* e.g. size in bytes as integer */
+            "value"    VARCHAR(65535) NOT NULL, /* e.g. size in bytes as integer */
+            PRIMARY KEY (key)
         );
     """
 
@@ -247,7 +248,8 @@ class SQLiteIndex:
              *   PATCH version when you make backwards compatible bug fixes. */
             "major"    INTEGER,
             "minor"    INTEGER,
-            "patch"    INTEGER
+            "patch"    INTEGER,
+            PRIMARY KEY (name)
         );
     """
 
