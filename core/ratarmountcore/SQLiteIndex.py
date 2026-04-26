@@ -555,7 +555,6 @@ class SQLiteIndex:
 
     def store_metadata(self, metadata: AnyStr, filePath: Optional[AnyStr] = None) -> None:
         self._store_versions_metadata()
-        self.store_metadata_key_value('backendName', self.backendName)
         if filePath is not None:
             self._store_file_metadata(filePath)
         elif self.archiveFilePath:
