@@ -494,7 +494,7 @@ class OGGMountSource(SQLiteIndexMountSource):
 
         indexOptions = {
             'archiveFilePath': fileOrPath if isinstance(fileOrPath, str) else None,
-            'backendName': 'PDFMountSource',
+            'backendName': 'OGGMountSource',
         }
         super().__init__(**(options | indexOptions))
 
