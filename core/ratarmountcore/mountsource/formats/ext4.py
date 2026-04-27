@@ -59,7 +59,7 @@ class EXT4MountSource(MountSource):
         return FileInfo(
             size     = inode.i_size,
             mtime    = inode.i_mtime,
-            mode     = inode.i_mode.value,
+            mode     = inode.i_mode.value if hasattr(inode.i_mode, 'value') else inode.i_mode,
             linkname = "",  # TODO I don't see any data for links... in the Inode struct
             uid      = inode.i_uid,
             gid      = inode.i_gid,
@@ -100,7 +100,7 @@ class EXT4MountSource(MountSource):
 
     @overrides(MountSource)
     def list_mode(self, path: str) -> Optional[Union[Iterable[str], dict[str, int]]]:
-        return self._list(path, lambda inode: inode.i_mode.value)
+        return self._list(path, lambda inode: inode.i_mode.value if hasattr(inode.i_mode, 'value') else inode.i_mode)
 
     @overrides(MountSource)
     def lookup(self, path: str, fileVersion: int = 0) -> Optional[FileInfo]:
