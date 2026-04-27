@@ -252,9 +252,7 @@ For further information, see the ReadMe on the project's homepage:
              'to that writable copy. Deleting files or folders will update the hidden metadata database inside '
              'the overlay folder. '
              'If ":temp:" is specified, a temporary directory will be created and used as the overlay. '
-             'This temporary directory will be automatically removed after unmounting. '
-             'If ":memory:" is specified, an in-memory overlay will be used. '
-             'This overlay will not persist after unmounting.')
+             'This temporary directory will be automatically removed after unmounting.')
 
     # Index Options
 
