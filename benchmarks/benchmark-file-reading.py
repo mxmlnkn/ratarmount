@@ -1,8 +1,8 @@
-import time
 import os
 import sys
-from pathlib import Path
+import time
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from pathlib import Path
 
 folder = sys.argv[1]
 
