@@ -7,6 +7,7 @@ experiments/
 miscellaneous/
 *mimi*
 *momo*
+*foo*
 presentation/
 test-scripts/
 issue*
@@ -46,6 +47,8 @@ linuxdeploy
 *.tbz2
 *.tgz
 *.[0-9]
+*.ar
+*.deb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -156,3 +159,4 @@ venv.bak/
 *.index.*
 ratarmount.stdout
 ratarmount.stderr
+weed
