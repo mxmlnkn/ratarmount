@@ -178,8 +178,8 @@ pip install ratarmount
 Or, if you want to test the latest version:
 ```bash
 python3 -m pip install --user --force-reinstall \
-    'git+https://github.com/mxmlnkn/ratarmount.git@develop#egginfo=ratarmountcore&subdirectory=core' \
-    'git+https://github.com/mxmlnkn/ratarmount.git@develop#egginfo=ratarmount'
+    'git+https://github.com/mxmlnkn/ratarmount.git#egginfo=ratarmountcore&subdirectory=core' \
+    'git+https://github.com/mxmlnkn/ratarmount.git#egginfo=ratarmount'
 ```
 
 If there are troubles with the compression backend dependencies, you can try the pip `--no-deps` argument.
