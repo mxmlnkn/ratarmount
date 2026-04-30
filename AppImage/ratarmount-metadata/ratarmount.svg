@@ -1,24 +1,23 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg width="310"
-     height="260"
+<svg width="400"
+     height="400"
      version="1.1"
      id="ratarmount-logo"
-     xmlns:xlink="http://www.w3.org/1999/xlink"
      xmlns="http://www.w3.org/2000/svg"
      xmlns:svg="http://www.w3.org/2000/svg"
 >
-    <g id="ratarmount-icon-face" class="gloweffect" transform="translate(5, 20)" style="
+    <g id="ratarmount-icon-face" transform="translate(50,75)" style="
         fill: none;
         stroke-width: 10;
         stroke-linecap: round;
         stroke-miterlimit: 4;
         stroke-dasharray: none;
-        stroke-opacity:1;">
-        <rect id="background" x="0" y="0" width="300" height="220" ry="60" style="
+        stroke-opacity: 1">
+        <rect id="background" x="0" y="0" width="300" height="250" ry="60" style="
             fill:#000000;
             fill-opacity:1;
             stroke:#aa00cc"/>
-        <g id="face-features" transform="translate(25, 30)">
+        <g id="face-features" transform="translate(25, 45)">
             <g id="ratar" style="stroke: #009900">
                 <g id="r" transform="translate(30, 0)">
                     <path d="m 0,50 c -11,0 -20,9 -20,20 v 30"/>
@@ -28,7 +27,7 @@
                     <path d="m 50,75 v 25" id="a-tail"/>
                 </g>
                 <g id="left-t" transform="translate(125, 0)">
-                    <path d="M 0,10 v 90"/>
+                    <path d="m 0,10 v 90"/>
                 </g>
                 <g id="mirrored-a" transform="translate(150, 0)">
                     <circle id="mirrored-a-ring" cx="25" cy="75" r="25"/>
@@ -38,8 +37,8 @@
                     <path d="m 0,50 c 11,0 20,9 20,20 v 30"/>
                 </g>
             </g>
-            <g id="u" style="stroke: #009900" transform="translate(125, 50)">
-                <path d="m 25,50 v 25 c 0,13.8 -11,25 -25,25 -13.8,0 -25,-11 -25,-25 v -25"/>
+            <g id="u" style="stroke: #009900" transform="translate(125, 75)">
+                <path d="m 25,50 v 5 C 25,68.8 14,80 0,80 -13.8,80 -25,69 -25,55 v -5"/>
             </g>
             <path style="stroke:#009900" d="M 10,30 H 240" id="roof"/>
         </g>
