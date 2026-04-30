@@ -181,7 +181,7 @@ class FuseMount(fuse.Operations):
 
         for path in pathToMount:
             if os.path.realpath(path) != self.mountPoint:
-                # This also will create or load the block offsets for compressed formats
+                # This also will create or load the block offsets for compressed formats.
                 mountSources.append((os.path.basename(path), open_mount_source(path, **options)))
                 continue
 
@@ -284,8 +284,6 @@ class FuseMount(fuse.Operations):
             self.mknod = self.writeOverlay.mknod
 
         self.mountPointInfo = {'st_mode': 0o40770}
-        if not options.get('mount', True):
-            return
 
         # Create mount point if it does not exist
         if mountPoint and not os.path.exists(mountPoint):

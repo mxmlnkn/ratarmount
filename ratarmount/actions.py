@@ -14,7 +14,9 @@ import zipfile
 from pathlib import Path
 
 from ratarmountcore.compressions import compile_suffix_rules, strip_suffix
-from ratarmountcore.utils import RatarmountError, remove_duplicates_stable
+from ratarmountcore.mountsource.compositing.automount import AutoMountLayer
+from ratarmountcore.mountsource.factory import open_mount_source
+from ratarmountcore.utils import RatarmountError, determine_recursion_depth, remove_duplicates_stable
 
 with contextlib.suppress(ImportError):
     import rarfile
@@ -231,12 +233,38 @@ def process_parsed_arguments(args) -> int:
     if args.mount:
         create_fuse_mount(args)  # Throws on errors.
     else:
-        # Import late to avoid recursion and overhead during argcomplete!
-        from .FuseMount import FuseMount  # pylint: disable=import-outside-toplevel
-
         # Simply calling the FuseMount constructor and destructor should create the indexes as a side effect.
-        with FuseMount(**CLIHelpers.parsed_args_to_options(args)):
-            pass
+        # The following code is FuseMount.__init__ with lots of unused code, such as log creation, root file info
+        # statting, overlay folders, the control layer, etc. weeded out. Not much is left over, which makes this
+        # copy-paste worth it and semantically more correct!
+        options = CLIHelpers.parsed_args_to_options(args)
+        # Remove the required arguments from FuseMount.__init__ for exactly mirrored behavior when forwarding options.
+        del options['pathToMount']
+        del options['mountPoint']
+
+        hadPathsToMount = bool(args.mount_source)
+        pathToMount = list(filter(lambda x: os.path.exists(x) or '://' in x, args.mount_source))
+        if hadPathsToMount and not pathToMount:
+            raise ValueError("No paths to mount left over after filtering!")
+
+        # Explicitly enable recursion if it was specified implicitly via recursionDepth.
+        if 'recursive' not in options and determine_recursion_depth(**options) > 0:
+            options['recursive'] = True
+        options['writeIndex'] = True
+
+        # This part slightly diverges from FuseMount.__init__ because it does not evaluate disableUnionMount.
+        # It simply applies recursion to each mount source separately.
+        # Neither SubvolumesMountSource nor UnionMountSource should matter because we are only interested in the
+        # index creation and if that were to depend on the presentation in the mount point, it would be a bug anyway.
+        # The index creation, e.g., the determined index location, should only depend on the archive/source (location).
+        recursive = determine_recursion_depth(**options) > 0 and not options.get('lazyMounting', False)
+        for path in pathToMount:
+            if recursive:
+                with AutoMountLayer(open_mount_source(path, **options), **options):
+                    pass
+            else:
+                with open_mount_source(path, **options):
+                    pass
 
     return 0
 
