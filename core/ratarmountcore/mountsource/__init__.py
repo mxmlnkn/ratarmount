@@ -53,3 +53,5 @@ Example:
 """
 
 from .MountSource import FileInfo, MountSource, create_root_file_info, merge_statfs
+
+__all__ = ["FileInfo", "MountSource", "create_root_file_info", "merge_statfs"]
