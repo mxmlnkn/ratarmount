@@ -570,12 +570,11 @@ class SQLiteIndex:
 
     def try_to_open_first_file(self, openByPath):
         # Get first row that has the regular file bit set in mode (stat.S_IFREG == 32768 == 1<<15).
-        result = self.get_connection().execute(
-            f"""SELECT path,name {SQLiteIndex.FROM_REGULAR_FILES} ORDER BY "offsetheader" ASC LIMIT 1;"""
+        firstFile = (
+            self.get_connection()
+            .execute(f"""SELECT path,name {SQLiteIndex.FROM_REGULAR_FILES} ORDER BY "offsetheader" ASC LIMIT 1;""")
+            .fetchone()
         )
-        if not result:
-            return
-        firstFile = result.fetchone()
         if not firstFile:
             return
 
