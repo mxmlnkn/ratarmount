@@ -1,4 +1,4 @@
-# Version 1.3.0 built on 2026-mm-dd
+# Version 1.3.0 built on 2026-05-10
 
 ## Feature
 
