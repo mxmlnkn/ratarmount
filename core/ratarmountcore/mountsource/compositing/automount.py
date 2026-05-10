@@ -209,6 +209,10 @@ class AutoMountLayer(MountSource):
             if joinedFile:
                 mountSource: MountSource = SingleFileMountSource(os.path.split(mountPoint)[1], joinedFile)
             elif isinstance(deepestMountSource, FolderMountSource):
+                # Remove indexFilePath argument from options because all recursive archives would try to open
+                # the index intended for the parent archive / folder.
+                if 'indexFilePath' in options:
+                    del options['indexFilePath']
                 # Open from file path on host file system in order to write out TAR index files.
                 # Care has to be taken if a folder is bind mounted onto itself because then it can happen that
                 # the file open triggers a recursive FUSE call, which then hangs up everything.
