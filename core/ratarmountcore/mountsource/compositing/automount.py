@@ -210,7 +210,7 @@ class AutoMountLayer(MountSource):
             elif (get_file_path := getattr(deepestMountSource, 'get_file_path', None)) and callable(get_file_path):
                 # Remove indexFilePath argument from options because all recursive archives would try to open
                 # the index intended for the parent archive / folder.
-                if 'indexFilePath' in options:
+                if 'indexFilePath' in options and options['indexFilePath'] != ':memory:':
                     del options['indexFilePath']
                 # Open from file path on host file system in order to write out TAR index files.
                 # Care has to be taken if a folder is bind mounted onto itself because then it can happen that
