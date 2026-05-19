@@ -1,3 +1,10 @@
+# Version 0.11.1 built on 2026-05-19
+
+## Fixes
+
+ - Restore `--index-file :memory:` functionality combined with `--recursive <folder>`.
+
+
 # Version 0.11.0 built on 2026-05-10
 
 ## Feature
