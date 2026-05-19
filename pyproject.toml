@@ -24,13 +24,10 @@ classifiers = [
     "Operating System :: MacOS",
     "Operating System :: Unix",
     "Programming Language :: Python :: 3",
-    # I am unsure about the semantic of these. For actualy compatibility, there is 'requires-python'.
+    # I am unsure about the semantic of these. For actual compatibility, there is 'requires-python'.
     # These are only informational, and therefore I think it should be fine to list older Python versions,
     # which do not work with the current version of this project, but for which there exists older versions
     # of this project that are still installable and usable.
-    "Programming Language :: Python :: 3.6",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
