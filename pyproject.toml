@@ -92,12 +92,14 @@ license-files = ["LICENSE"]
 
 [tool.setuptools.package-data]
 ratarmount = [
-    "widgets/resources/*.svg",
-    "widgets/resources/icons/*.svg",
+    "widgets/resources/*.css",
+    "widgets/resources/*.rcc",
+    "widgets/resources/**/*.svg",
+    "widgets/resources/benchmarks/**",
 ]
 
 [tool.setuptools.packages.find]
-include = ["ratarmount", "ratarmount/.*"]
+include = ["ratarmount", "ratarmount.*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "ratarmount.version.__version__"}
