@@ -15,6 +15,7 @@ from .formats.ogg import OGGMountSource
 from .formats.pdf import PDFMountSource
 from .formats.py7zr import Py7zrMountSource
 from .formats.rar import RarMountSource
+from .formats.sevenzip import SevenZipMountSource
 from .formats.sqlar import SQLARMountSource
 from .formats.squashfs import SquashFSMountSource
 from .formats.tar import SQLiteIndexedTar
@@ -105,6 +106,11 @@ ARCHIVE_BACKENDS: dict[str, ArchiveBackendInfo] = {
     # http://fileformats.archiveteam.org/wiki/LHA
     # > LHA can be identified with high accuracy, but doing so can be laborious,
     # > due to the lack of a signature, and other complicating factors.
+    # Custom 7z backend with real pack offsets for random access. Preferred over libarchive/py7zr
+    # when the archive uses supported codecs (Copy, LZMA, LZMA2, Deflate, BZip2, AES+those).
+    # Exotic multi-coder folders (e.g. BCJ2) still fall through to py7zr/libarchive.
+    # AES needs optional pycryptodomex (Cryptodome); passwords via passwords=/--password.
+    "sevenzip": ArchiveBackendInfo(SevenZipMountSource, {FID.SEVEN_ZIP}, []),
     "libarchive": ArchiveBackendInfo(
         _open_libarchive_mount_source,
         {
@@ -115,6 +121,7 @@ ARCHIVE_BACKENDS: dict[str, ArchiveBackendInfo] = {
             FID.WARC,
             # py7zr cannot handle symbolic links, therefore prefer libarchive!
             # But, libarchive does not support decrpytion.
+            # Custom sevenzip backend is tried first for SEVEN_ZIP when enabled.
             FID.SEVEN_ZIP,
             # Archive formats supported by other backends with higher precedence
             FID.RAR,
