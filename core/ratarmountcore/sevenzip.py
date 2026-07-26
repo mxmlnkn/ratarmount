@@ -893,6 +893,278 @@ def _lzma_decompress_raw(packed: bytes, filters: list[dict], unpack_size: int) -
     return out
 
 
+@dataclasses.dataclass(frozen=True)
+class Lzma2ChunkIndex:
+    """One LZMA2 chunk in a folder's packed stream."""
+
+    index: int
+    packed_offset: int
+    packed_size: int
+    unpacked_offset: int
+    unpacked_size: int
+    control: int
+    is_lzma: bool
+    independent: bool
+
+
+def index_lzma2_chunks(packed: bytes) -> list[Lzma2ChunkIndex]:
+    """Walk an LZMA2 packed stream and record chunk boundaries without decompressing."""
+    pos = 0
+    unpacked_pos = 0
+    chunks: list[Lzma2ChunkIndex] = []
+    need_dict_reset = True
+    chunk_index = 0
+
+    while pos < len(packed):
+        chunk_start = pos
+        control = packed[pos]
+        pos += 1
+        if control == 0:
+            break
+
+        dict_reset = control >= 0xE0 or control == 0x01
+        if not dict_reset and need_dict_reset:
+            raise SevenZipError(f"LZMA2 stream missing dictionary reset at offset {chunk_start}")
+        if dict_reset:
+            need_dict_reset = False
+
+        if control >= 0x80:
+            if pos + 4 > len(packed):
+                raise SevenZipError("Truncated LZMA2 chunk header")
+            unpacked_size = ((control & 0x1F) << 16) + (packed[pos] << 8) + packed[pos + 1] + 1
+            pos += 2
+            compressed_size = (packed[pos] << 8) + packed[pos + 1] + 1
+            pos += 2
+            if control >= 0xC0:
+                pos += 1
+            if pos + compressed_size > len(packed):
+                raise SevenZipError("Truncated LZMA2 compressed data")
+            pos += compressed_size
+            independent = control >= 0xE0 or control == 0x01
+            chunks.append(
+                Lzma2ChunkIndex(
+                    index=chunk_index,
+                    packed_offset=chunk_start,
+                    packed_size=pos - chunk_start,
+                    unpacked_offset=unpacked_pos,
+                    unpacked_size=unpacked_size,
+                    control=control,
+                    is_lzma=True,
+                    independent=independent,
+                )
+            )
+            unpacked_pos += unpacked_size
+        elif control in (1, 2):
+            if pos + 2 > len(packed):
+                raise SevenZipError("Truncated LZMA2 uncompressed chunk header")
+            copy_size = (packed[pos] << 8) + packed[pos + 1] + 1
+            pos += 2
+            if pos + copy_size > len(packed):
+                raise SevenZipError("Truncated LZMA2 uncompressed data")
+            pos += copy_size
+            chunks.append(
+                Lzma2ChunkIndex(
+                    index=chunk_index,
+                    packed_offset=chunk_start,
+                    packed_size=pos - chunk_start,
+                    unpacked_offset=unpacked_pos,
+                    unpacked_size=copy_size,
+                    control=control,
+                    is_lzma=False,
+                    independent=control == 1,
+                )
+            )
+            unpacked_pos += copy_size
+        else:
+            raise SevenZipError(f"Invalid LZMA2 control byte 0x{control:02x} at offset {chunk_start}")
+
+        chunk_index += 1
+
+    return chunks
+
+
+def _lzma2_props_byte_to_filter(props_byte: int) -> dict:
+    lc = props_byte % 9
+    remainder = props_byte // 9
+    lp = remainder % 5
+    pb = remainder // 5
+    return {"id": lzma.FILTER_LZMA2, "lc": lc, "lp": lp, "pb": pb}
+
+
+def _lzma2_chunk_filter(chunk: Lzma2ChunkIndex, packed: bytes, default_filter: dict) -> dict:
+    if chunk.is_lzma and chunk.control >= 0xC0:
+        props_offset = chunk.packed_offset + 5
+        if props_offset >= len(packed):
+            raise SevenZipError("Truncated LZMA2 properties byte")
+        return _lzma2_props_byte_to_filter(packed[props_offset])
+    return default_filter
+
+
+def _lzma2_decompress_stream(packed_stream: bytes, filters: list[dict], max_length: int) -> bytes:
+    decompressor = lzma.LZMADecompressor(format=lzma.FORMAT_RAW, filters=filters)
+    try:
+        out = decompressor.decompress(packed_stream, max_length=max_length)
+    except TypeError:
+        out = decompressor.decompress(packed_stream)
+    if len(out) > max_length:
+        out = out[:max_length]
+    return out
+
+
+class Lzma2RandomAccessDecoder:
+    """Serve random unpacked ranges from an LZMA2 folder using chunk indexing.
+
+    Chunks with a dictionary reset (control >= 0xE0 or copy-with-reset) decode
+    independently. Other chunks decode from the nearest prior reset chunk forward,
+    which matches LZMA2 semantics and avoids full-folder replay on random reads.
+    """
+
+    def __init__(
+        self,
+        folder: Folder,
+        packed: bytes,
+        *,
+        max_cached_chunks: int = 128,
+    ):
+        if not folder.coders or folder.coders[0].method != METHOD_LZMA2:
+            raise SevenZipError("Lzma2RandomAccessDecoder requires an LZMA2 folder")
+        if max_cached_chunks < 1:
+            raise ValueError("max_cached_chunks must be >= 1")
+        self.folder = folder
+        self.packed = packed
+        self.default_filter = _lzma_filter_from_coder(folder.coders[0])
+        self.chunks = index_lzma2_chunks(packed)
+        self.unpack_size = folder.get_unpack_size()
+        self.max_cached_chunks = max_cached_chunks
+        self._decoded: dict[int, bytes] = {}
+        self._chunk_order: list[int] = []
+
+    @staticmethod
+    def _chain_start(chunks: Sequence[Lzma2ChunkIndex], chunk_index: int) -> int:
+        while chunk_index > 0:
+            if chunks[chunk_index].independent:
+                return chunk_index
+            chunk_index -= 1
+        return 0
+
+    def _touch_chunk(self, chunk_index: int) -> None:
+        if chunk_index in self._chunk_order:
+            self._chunk_order.remove(chunk_index)
+        self._chunk_order.append(chunk_index)
+        while len(self._chunk_order) > self.max_cached_chunks:
+            old = self._chunk_order.pop(0)
+            self._decoded.pop(old, None)
+
+    def _store_chunk(self, chunk_index: int, data: bytes) -> None:
+        self._decoded[chunk_index] = data
+        self._touch_chunk(chunk_index)
+
+    def _decode_copy_chunk(self, chunk: Lzma2ChunkIndex) -> bytes:
+        data_start = chunk.packed_offset + 3
+        return self.packed[data_start : data_start + chunk.unpacked_size]
+
+    def _decode_chunk(self, chunk_index: int) -> bytes:
+        cached = self._decoded.get(chunk_index)
+        if cached is not None:
+            self._touch_chunk(chunk_index)
+            return cached
+
+        chunk = self.chunks[chunk_index]
+        if not chunk.is_lzma:
+            data = self._decode_copy_chunk(chunk)
+            self._store_chunk(chunk_index, data)
+            return data
+
+        if chunk.independent:
+            packed_slice = self.packed[chunk.packed_offset : chunk.packed_offset + chunk.packed_size]
+            filt = _lzma2_chunk_filter(chunk, self.packed, self.default_filter)
+            data = _lzma2_decompress_stream(packed_slice + b"\x00", [filt], chunk.unpacked_size)
+            self._store_chunk(chunk_index, data)
+            return data
+
+        chain_start = self._chain_start(self.chunks, chunk_index)
+        chain_packed = b"".join(
+            self.packed[item.packed_offset : item.packed_offset + item.packed_size]
+            for item in self.chunks[chain_start : chunk_index + 1]
+        )
+        start_chunk = self.chunks[chain_start]
+        # Use the folder-level LZMA2 filter for multi-chunk chains. Per-chunk
+        # property bytes are interpreted by the LZMA2 stream itself; applying
+        # _lzma2_chunk_filter on the chain start corrupts long dependent chains.
+        expected = chunk.unpacked_offset + chunk.unpacked_size - start_chunk.unpacked_offset
+        chain_out = _lzma2_decompress_stream(chain_packed + b"\x00", [self.default_filter], expected)
+        offset = 0
+        for item in self.chunks[chain_start : chunk_index + 1]:
+            piece = chain_out[offset : offset + item.unpacked_size]
+            if len(piece) != item.unpacked_size:
+                raise SevenZipError(
+                    f"LZMA2 chain decode short read for chunk {item.index}: "
+                    f"got {len(piece)} expected {item.unpacked_size}"
+                )
+            self._store_chunk(item.index, piece)
+            offset += item.unpacked_size
+        return self._decoded[chunk_index]
+
+    def _chunk_for_offset(self, unpacked_offset: int) -> int:
+        for chunk in self.chunks:
+            if chunk.unpacked_offset <= unpacked_offset < chunk.unpacked_offset + chunk.unpacked_size:
+                return chunk.index
+        raise SevenZipError(f"Unpack offset {unpacked_offset} outside LZMA2 stream")
+
+    def read_range(self, start: int, length: int) -> bytes:
+        if length <= 0 or start >= self.unpack_size:
+            return b""
+        start = max(0, start)
+        end = min(self.unpack_size, start + length)
+        first = self._chunk_for_offset(start)
+        last = self._chunk_for_offset(end - 1 if end > start else start)
+        for chunk_index in range(first, last + 1):
+            self._decode_chunk(chunk_index)
+
+        parts: list[bytes] = []
+        offset = start
+        while offset < end:
+            chunk = self.chunks[self._chunk_for_offset(offset)]
+            data = self._decoded[chunk.index]
+            local = offset - chunk.unpacked_offset
+            take = min(end - offset, len(data) - local)
+            parts.append(data[local : local + take])
+            offset += take
+        return b"".join(parts)
+
+    @property
+    def cached_chunk_count(self) -> int:
+        return len(self._decoded)
+
+    @property
+    def decoded_through(self) -> int:
+        if not self._decoded:
+            return 0
+        return max(
+            chunk.unpacked_offset + len(data)
+            for chunk in self.chunks
+            if (data := self._decoded.get(chunk.index)) is not None
+        )
+
+
+def create_folder_decoder(
+    folder: Folder,
+    packed: bytes,
+    *,
+    chunk_size: int = 1024 * 1024,
+    max_cached_chunks: int = 64,
+) -> Union["Lzma2RandomAccessDecoder", "StreamingFolderDecoder"]:
+    """Return the best random-access decoder for *folder*'s primary codec."""
+    if folder.coders and folder.coders[0].method == METHOD_LZMA2:
+        return Lzma2RandomAccessDecoder(folder, packed, max_cached_chunks=max(max_cached_chunks, 64))
+    return StreamingFolderDecoder(
+        folder,
+        packed,
+        chunk_size=chunk_size,
+        max_cached_chunks=max_cached_chunks,
+    )
+
+
 class StreamingFolderDecoder:
     """Incrementally decompress a 7z folder and serve random ranges via a chunk cache.
 

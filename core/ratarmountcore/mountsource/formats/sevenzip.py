@@ -14,13 +14,16 @@ Open support:
 from __future__ import annotations
 
 import contextlib
+import fcntl
+import hashlib
 import io
 import logging
 import os
 import stat
+import tempfile
 import threading
 from pathlib import Path
-from typing import IO, Optional, Union, cast  # noqa: I001 — Union used for passwords
+from typing import IO, Iterator, Optional, Union, cast  # noqa: I001 — Union used for passwords
 
 from ratarmountcore.mountsource import FileInfo, MountSource
 from ratarmountcore.mountsource.SQLiteIndexMountSource import SQLiteIndexMountSource
@@ -29,6 +32,7 @@ from ratarmountcore.sevenzip import (
     SevenZipError,
     SevenZipFileEntry,
     StreamingFolderDecoder,
+    create_folder_decoder,
     decompress_folder,
     parse_7z_archive,
     prepare_folder_packed,
@@ -43,6 +47,79 @@ logger = logging.getLogger(__name__)
 _DEFAULT_SMALL_FOLDER_THRESHOLD = 4 * 1024 * 1024
 _DEFAULT_CHUNK_SIZE = 1024 * 1024
 _DEFAULT_MAX_CACHED_CHUNKS = 64
+_READ_CHUNK_SIZE = 1024 * 1024
+_NESTED_SPOOL_THRESHOLD = 16 * 1024 * 1024
+_NESTED_SPOOL_MAGIC = b"7z\xbc\xaf\x27\x1c"
+_ORPHAN_TEMP_SPOOLS_PRUNED = False
+_NESTED_SPOOL_GLOBAL_LOCK = threading.Lock()
+_NESTED_SPOOL_MIN_FILES = 50
+
+
+def nested_spool_cache_dir() -> Path:
+    override = os.environ.get("RATARMOUNT_NESTED_7Z_CACHE")
+    if override:
+        return Path(override)
+    xdg = os.environ.get("XDG_CACHE_HOME")
+    if xdg:
+        return Path(xdg) / "ratarmount" / "nested-7z"
+    return Path.home() / ".cache" / "ratarmount" / "nested-7z"
+
+
+def nested_spool_cache_key(tar_file_name: str, archive_size: int) -> str:
+    label = tar_file_name or "nested.7z"
+    return hashlib.sha256(f"{label}:{archive_size}".encode()).hexdigest()
+
+
+def validate_nested_spool_file(path: Path | str, expected_size: int) -> bool:
+    spool_path = Path(path)
+    try:
+        if spool_path.stat().st_size != expected_size:
+            return False
+        with spool_path.open("rb") as handle:
+            if handle.read(len(_NESTED_SPOOL_MAGIC)) != _NESTED_SPOOL_MAGIC:
+                return False
+            handle.seek(0)
+            archive = parse_7z_archive(handle)
+        if not archive.files:
+            return False
+        if expected_size > 100 * 1024 * 1024 and len(archive.files) < _NESTED_SPOOL_MIN_FILES:
+            return False
+        return True
+    except OSError:
+        return False
+    except Exception:
+        return False
+
+
+def prune_orphan_temp_spools() -> int:
+    """Remove legacy incomplete mkstemp spools from the system temp directory."""
+    removed = 0
+    for path in Path(tempfile.gettempdir()).glob("ratarmount-7z-*.7z"):
+        with contextlib.suppress(OSError):
+            path.unlink()
+            removed += 1
+    return removed
+
+
+def read_bytes_at(file: IO[bytes], lock: threading.Lock, offset: int, size: int) -> bytes:
+    """Read exactly *size* bytes at *offset*, tolerating short ``read()`` returns."""
+    if size <= 0:
+        return b""
+    with lock:
+        file.seek(offset)
+        parts: list[bytes] = []
+        remaining = size
+        while remaining > 0:
+            chunk = file.read(min(remaining, _READ_CHUNK_SIZE))
+            if not chunk:
+                got = size - remaining
+                raise SevenZipError(
+                    f"Short read while reading 7z data at offset {offset} "
+                    f"(wanted {size} bytes, got {got})"
+                )
+            parts.append(chunk)
+            remaining -= len(chunk)
+    return b"".join(parts)
 
 
 class SevenZipMemberFile(io.RawIOBase):
@@ -186,10 +263,21 @@ class SevenZipMountSource(SQLiteIndexMountSource):
         self._smallFolderThreshold = int(
             options.get("sevenZipSmallFolderThreshold", _DEFAULT_SMALL_FOLDER_THRESHOLD)
         )
+        self._packedStreamCache: dict[int, bytes] = {}
+        self._packedCacheLock = threading.Lock()
+        self._spool_path: str | None = None
+        self._spool_cached = False
+        self._tarFileName = str(options.get("tarFileName") or "nested.7z")
 
         try:
+            self._maybe_spool_nested_archive()
             self._archive = parse_7z_archive(self.fileObject)
             self._password = self._resolve_password()
+            self._entry_by_offsets: dict[tuple[int, int], SevenZipFileEntry] = {}
+            for entry in self._archive.files:
+                if entry.is_dir or entry.is_empty_stream:
+                    continue
+                self._entry_by_offsets[(entry.pack_offset, entry.unpack_offset)] = entry
         except SevenZipError:
             if not self.isFileObject:
                 self.fileObject.close()
@@ -263,13 +351,145 @@ class SevenZipMountSource(SQLiteIndexMountSource):
             rows.append(self._convert_to_row(entry, index))
         self.index.set_file_infos(rows)
 
-    def _read_packed(self, entry: SevenZipFileEntry) -> bytes:
+    def _nested_stream_size(self) -> int:
         with self.fileObjectLock:
-            self.fileObject.seek(entry.pack_offset)
-            packed = self.fileObject.read(entry.pack_size)
-        if len(packed) != entry.pack_size:
-            raise SevenZipError("Short read while reading 7z pack stream")
+            self.fileObject.seek(0, io.SEEK_END)
+            archive_size = self.fileObject.tell()
+            self.fileObject.seek(0)
+        return archive_size
+
+    @contextlib.contextmanager
+    def _nested_spool_lock(self, lock_path: Path) -> Iterator[None]:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with lock_path.open("w") as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+    def _write_nested_spool(self, archive_size: int, partial_path: Path) -> None:
+        partial_path.parent.mkdir(parents=True, exist_ok=True)
+        with partial_path.open("wb") as out:
+            with self.fileObjectLock:
+                self.fileObject.seek(0)
+                remaining = archive_size
+                while remaining > 0:
+                    chunk = self.fileObject.read(min(remaining, _READ_CHUNK_SIZE))
+                    if not chunk:
+                        raise SevenZipError(
+                            "Short read while spooling nested 7z archive "
+                            f"(got {archive_size - remaining} of {archive_size} bytes)"
+                        )
+                    out.write(chunk)
+                    remaining -= len(chunk)
+            out.flush()
+            os.fsync(out.fileno())
+        if partial_path.stat().st_size != archive_size:
+            raise SevenZipError(
+                f"Nested 7z spool size mismatch: wrote {partial_path.stat().st_size}, "
+                f"expected {archive_size}"
+            )
+        if not validate_nested_spool_file(partial_path, archive_size):
+            raise SevenZipError(
+                f"Nested 7z spool failed validation for {partial_path} ({archive_size} bytes)"
+            )
+
+    def _use_nested_spool_file(self, path: Path) -> None:
+        self._spool_path = str(path)
+        self._spool_cached = True
+        self.fileObject = path.open("rb")
+
+    def _maybe_spool_nested_archive(self) -> None:
+        """Copy nested archive streams to a validated on-disk cache for reliable seeks."""
+        global _ORPHAN_TEMP_SPOOLS_PRUNED  # noqa: PLW0603 — one-time temp cleanup
+        if not self.isFileObject:
+            return
+        if not _ORPHAN_TEMP_SPOOLS_PRUNED:
+            removed = prune_orphan_temp_spools()
+            if removed:
+                logger.info("Removed %d legacy incomplete nested 7z temp spool(s)", removed)
+            _ORPHAN_TEMP_SPOOLS_PRUNED = True
+
+        archive_size = self._nested_stream_size()
+        if archive_size <= _NESTED_SPOOL_THRESHOLD:
+            return
+
+        cache_dir = nested_spool_cache_dir()
+        cache_key = nested_spool_cache_key(self._tarFileName, archive_size)
+        cache_path = cache_dir / f"{cache_key}.7z"
+        lock_path = cache_dir / f"{cache_key}.lock"
+        partial_path = cache_path.with_suffix(".7z.partial")
+
+        if validate_nested_spool_file(cache_path, archive_size):
+            logger.info(
+                "Reusing cached nested 7z spool %s (%d bytes, %s)",
+                cache_path,
+                archive_size,
+                self._tarFileName,
+            )
+            self._use_nested_spool_file(cache_path)
+            return
+
+        with self._nested_spool_lock(lock_path):
+            if validate_nested_spool_file(cache_path, archive_size):
+                logger.info(
+                    "Reusing cached nested 7z spool %s (%d bytes, %s)",
+                    cache_path,
+                    archive_size,
+                    self._tarFileName,
+                )
+                self._use_nested_spool_file(cache_path)
+                return
+
+            for stale in (cache_path, partial_path):
+                if stale.exists() and not validate_nested_spool_file(stale, archive_size):
+                    with contextlib.suppress(OSError):
+                        stale.unlink()
+
+            logger.info(
+                "Spooling nested 7z archive %s (%d bytes) to %s",
+                self._tarFileName,
+                archive_size,
+                cache_path,
+            )
+            try:
+                with _NESTED_SPOOL_GLOBAL_LOCK:
+                    self._write_nested_spool(archive_size, partial_path)
+                partial_path.replace(cache_path)
+            except Exception:
+                with contextlib.suppress(OSError):
+                    partial_path.unlink()
+                raise
+
+        self._use_nested_spool_file(cache_path)
+
+    def _read_at(self, offset: int, size: int) -> bytes:
+        return read_bytes_at(self.fileObject, self.fileObjectLock, offset, size)
+
+    def _representative_entry_for_folder(self, folder_index: int) -> SevenZipFileEntry:
+        assert self._archive is not None
+        for entry in self._archive.files:
+            if entry.folder_index == folder_index and not entry.is_dir and not entry.is_empty_stream:
+                return entry
+        raise SevenZipError(f"No data entry found for 7z folder {folder_index}")
+
+    def _read_packed_for_folder(self, folder_index: int) -> bytes:
+        with self._packedCacheLock:
+            cached = self._packedStreamCache.get(folder_index)
+            if cached is not None:
+                return cached
+
+        entry = self._representative_entry_for_folder(folder_index)
+        packed = self._read_at(entry.pack_offset, entry.pack_size)
+        with self._packedCacheLock:
+            self._packedStreamCache[folder_index] = packed
         return packed
+
+    def _read_packed(self, entry: SevenZipFileEntry) -> bytes:
+        if entry.folder_index is None:
+            return self._read_at(entry.pack_offset, entry.pack_size)
+        return self._read_packed_for_folder(entry.folder_index)
 
     def _read_member_bytes(self, entry: SevenZipFileEntry) -> bytes:
         """Read full member contents (used for symlink targets at index time)."""
@@ -277,9 +497,7 @@ class SevenZipMountSource(SQLiteIndexMountSource):
             return b""
         folder = self._archive.folders[entry.folder_index]  # type: ignore[index]
         if folder.is_copy_only() and not folder.is_encrypted():
-            with self.fileObjectLock:
-                self.fileObject.seek(entry.pack_offset + entry.unpack_offset)
-                return self.fileObject.read(entry.size)
+            return self._read_at(entry.pack_offset + entry.unpack_offset, entry.size)
         # Prefer streaming decoder so large solid folders are not fully loaded for a symlink.
         decoder = self._get_stream_decoder(entry)
         with self._streamDecoderLock:
@@ -333,6 +551,11 @@ class SevenZipMountSource(SQLiteIndexMountSource):
         pack_offset = user_data.offsetheader
         unpack_offset = user_data.offset
 
+        entry = self._entry_by_offsets.get((pack_offset, unpack_offset))
+        if entry is not None:
+            if entry.size == fileInfo.size or (stat.S_ISLNK(fileInfo.mode) and fileInfo.size == 0):
+                return entry
+
         for entry in self._archive.files:
             if entry.is_dir or entry.is_empty_stream:
                 continue
@@ -379,7 +602,7 @@ class SevenZipMountSource(SQLiteIndexMountSource):
         folder = self._archive.folders[entry.folder_index]
         packed = self._read_packed(entry)
         content_folder, content_packed = prepare_folder_packed(folder, packed, password=self._password)
-        decoder = StreamingFolderDecoder(
+        decoder = create_folder_decoder(
             content_folder,
             content_packed,
             chunk_size=self._chunkSize,
@@ -457,8 +680,16 @@ class SevenZipMountSource(SQLiteIndexMountSource):
         super().close()
         with self._folderCacheLock:
             self._folderCache.clear()
+        with self._packedCacheLock:
+            self._packedStreamCache.clear()
         with self._streamDecoderLock:
             self._streamDecoders.clear()
-        if not self.isFileObject and getattr(self, "fileObject", None) is not None:
-            self.fileObject.close()
-            self.fileObject = None  # type: ignore[assignment]
+        if getattr(self, "fileObject", None) is not None:
+            if self._spool_path or not self.isFileObject:
+                self.fileObject.close()
+                self.fileObject = None  # type: ignore[assignment]
+        if self._spool_path and not self._spool_cached:
+            with contextlib.suppress(OSError):
+                os.unlink(self._spool_path)
+        self._spool_path = None
+        self._spool_cached = False

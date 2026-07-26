@@ -1,0 +1,54 @@
+{
+  "source": "synthetic multi-nested 7z fixture (no customer data)",
+  "secondary_files": 80,
+  "secondary_file_bytes": 1048576,
+  "inner_archives": [
+    {
+      "id": "cm-primary",
+      "name": "fixture-support-zip--CM-Primary--10.0.0.1--2026-01-01--00-00-00.7z",
+      "probe_members": [
+        "cmd-top.txt"
+      ],
+      "size_bytes": 533,
+      "sha256": "afbed69621e44a68d8f98b4679963f817ebbf899be2a282800735d944d435871",
+      "staged_file_count": 5
+    },
+    {
+      "id": "cm-secondary",
+      "name": "fixture-support-zip--CM-Secondary--10.0.0.2--2026-01-01--00-00-00.7z",
+      "probe_members": [
+        "home/afa/.fa-distribution-logs.history",
+        "home/afa/.fa-distribution-logs.history.20",
+        "home/afa/monitor.log.10"
+      ],
+      "size_bytes": 1829553,
+      "sha256": "78a184bfd0e7611a918cbaf33373f57da16baf0832aae882921f709399aebb8c",
+      "staged_file_count": 155
+    },
+    {
+      "id": "ra",
+      "name": "fixture-support-zip--RA--10.0.0.3--2026-01-01--00-00-00.7z",
+      "probe_members": [
+        "home/afa/.fa/performance.json"
+      ],
+      "size_bytes": 681,
+      "sha256": "d521d8d3f1a1d6aa0f63ce725af74a250fc9277ed90edbe72469b6e07e1f0f24",
+      "staged_file_count": 4
+    },
+    {
+      "id": "slave",
+      "name": "fixture-support-zip--Slave--10.0.0.4--2026-01-01--00-00-00.7z",
+      "probe_members": [
+        "home/afa/.fa-auto-remove.log.3"
+      ],
+      "size_bytes": 674,
+      "sha256": "8a5058ec385f3c339545cf0eb8aef072f925b43ac9b19b322d36b40765fa4b95",
+      "staged_file_count": 5
+    }
+  ],
+  "files": {
+    "outer_7z": "nested-multi-support.7z",
+    "outer_size_bytes": 1831771,
+    "outer_sha256": "e1442b2a92f717a2ad132a4dff8216ffb902445a3abcf548f53574a6dd6cb7a9"
+  }
+}
