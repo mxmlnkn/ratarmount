@@ -1,3 +1,25 @@
+# Unreleased
+
+## Feature
+
+ - Add custom `SevenZipMountSource` backend (`--use-backend sevenzip`) that parses 7z headers and stores
+   real pack-stream offsets for archive-level random access. Supports Copy, LZMA, LZMA2, Deflate, and BZip2
+   (including solid archives). Encrypted archives still fall back to py7zr. Preferred over libarchive for `.7z`.
+ - Stream-decompress large 7z folders with a bounded chunk cache so mid-file seeks do not require keeping the
+   entire unpacked solid block in RAM (and do not always decompress past the requested range on first touch).
+ - Decrypt AES-256 encrypted 7z content in the custom `sevenzip` backend (SHA-256 key derivation, optional
+   `pycryptodomex`), then stream-decompress so large encrypted members are not fully buffered by py7zr.
+ - Accept py7zr 1.x (not only 1.0.x) for fallback when the custom backend cannot handle a codec.
+
+## Development
+
+ - Add `benchmarks/benchmark-7z-random-access.py` and `tests/create-7z-fixtures.sh` for 7z random-access work.
+ - Add `core/tests/test_sevenzip.py` covering parse, store/LZMA2 open, solid streaming seek, AES passwords,
+   recursive 7z-in-7z (including AutoMountLayer), and on-disk index reload.
+ - Add fixtures: `store-copy-two-files.7z`, `lzma2-two-files-and-medium.7z`, `encrypted-hello.7z`,
+   `nested-inner-hello.7z`, `nested-encrypted-inner.7z`.
+
+
 # Version 0.11.1 built on 2026-05-19
 
 ## Fixes

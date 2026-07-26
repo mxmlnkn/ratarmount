@@ -14,7 +14,8 @@ from ratarmountcore.utils import overrides
 try:
     import py7zr
 
-    if not py7zr.__version__.startswith("1.0"):
+    # Accept any 1.x release; the file-object API used below is available throughout 1.x.
+    if not py7zr.__version__.startswith("1."):
         raise ImportError("Wrong version found!")
 
     from py7zr.io import Py7zIO, WriterFactory
