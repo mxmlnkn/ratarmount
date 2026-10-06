@@ -284,7 +284,7 @@ def find_short_license(distribution) -> str:
                 shortLicense += " OR "
             shortLicense += re.sub(r"([A-Z]+) License", r"\1", value.rsplit("::", 1)[-1].strip())
 
-    # webdav4 only has this License-Expression.
+    # Some packages (e.g. fsspec, urllib3) only have this PEP 639 License-Expression.
     if not shortLicense:
         for key, value in distribution.metadata.items():
             if key == "License-Expression":
