@@ -58,11 +58,6 @@ runs:
       uses: actions/setup-python@v6
       with:
         python-version: ${{ inputs.python-version }}
-        cache: 'pip'
-        cache-dependency-path: |
-          pyproject.toml
-          core/pyproject.toml
-          tests/requirements-tests.txt
 
     - name: Set up uv
       uses: astral-sh/setup-uv@v10.3.0

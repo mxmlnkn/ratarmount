@@ -42,18 +42,16 @@ jobs:
 
     - name: Install pip Dependencies
       run: |
-        uv pip install pytest fsspec ruff~=0.14 black~=26.0 codespell flake8 pylint mypy!=1.20.0
+        uv pip install --group lint --group test
         ( cd core && uv pip install .[full,ext4,fsspec,sqlar] )
         uv pip install .
 
     - name: Style Check With Ruff
-      run: |
-        # I hate when the CI fails after not pushing for a while because ruff has new default rules.
-        ruff check --config tests/.ruff.toml -- $( git ls-tree -r --name-only HEAD | 'grep' -E '[.]py$' | 'grep' -v '/_external/' )
+      run: ruff check -- $( git ls-tree -r --name-only HEAD | 'grep' -E '[.]py$' | 'grep' -v '/_external/' )
 
     - name: Style Check With Black
       run: |
-        black -q --diff --line-length 120 --skip-string-normalization --target-version=py39 \
+        black -q --diff \
             $( git ls-tree -r --name-only HEAD | 'grep' '[.]py$' | 'grep' -v '/_external/' ) > black.diff
         if [ -s black.diff ]; then
             cat black.diff
@@ -61,27 +59,22 @@ jobs:
         fi
 
     - name: Lint With Codespell
-      run: |
-        codespell $( git ls-tree -r --name-only HEAD | 'grep' -E '[.](py|md|txt|sh|yml)$' | 'grep' -v '/_external/' )
+      run: codespell $( git ls-tree -r --name-only HEAD | 'grep' -E '[.](py|md|txt|sh|yml)$' | 'grep' -v '/_external/' )
 
     - name: Lint With Flake8
-      run: |
-        flake8 --config tests/.flake8 {ratarmount,tests}/[^_]*.py core/{ratarmountcore,tests}/[^_]*.py
+      run: flake8 --config tests/.flake8 {ratarmount,tests}/[^_]*.py core/{ratarmountcore,tests}/[^_]*.py
 
     - name: Lint With Pylint
       run: |
         # ubuntu-slim runs on one core, so parallelism with -j would only add overhead.
-        pylint --rcfile tests/.pylintrc ratarmount core/ratarmountcore tests/*.py core/tests/*.py | tee pylint.log
+        pylint ratarmount core/ratarmountcore tests/*.py core/tests/*.py | tee pylint.log
         ! 'egrep' ': E[0-9]{4}: ' pylint.log
 
     - name: Lint With Mypy
-      run: |
-        yes | uv pip install --upgrade types-dataclasses
-        mypy --config-file tests/.mypy.ini ratarmount core/ratarmountcore core/tests
+      run: mypy ratarmount core/ratarmountcore core/tests
 
     - name: Lint With ShellCheck
-      run: |
-        shellcheck -e SC2064 tests/*.sh
+      run: shellcheck -e SC2064 tests/*.sh
 
   Longer-Running-Checks:
     runs-on: ubuntu-latest
@@ -233,7 +226,7 @@ jobs:
     - name: CLI Tests (Linux)
       if: ${{ startsWith( matrix.os, 'ubuntu' ) }}
       run: |
-        uv pip install pytest pytest-order
+        uv pip install --group test
         # First off, n=auto seems to use the physical cores and ignores virtual ones.
         # Secondly, these tests scale much better than the others because most time is spent waiting for
         # the FUSE mount point to appear or disappear, which doesn't seem to be bottlenecked by CPU usage.
@@ -297,7 +290,7 @@ jobs:
 
     - name: Unit Tests
       run: |
-        uv pip install pytest pytest-xdist pytest-order pandas
+        uv pip install --group test
         pytest -rs -v -m 'not parallel' core/tests/test_*.py
         pytest -rs -v -n auto -m parallel core/tests/test_*.py
         pytest -rs -v tests/tests.py
@@ -361,16 +354,13 @@ jobs:
     - name: Test Installation From Source
       # This is still needed because the setup above installs ratarmount without lzo.
       shell: bash
-      run: |
-        uv pip install .[full,ext4,fsspec,lzo,sqlar]
+      run: uv pip install .[full,ext4,fsspec,lzo,sqlar]
 
     - name: Install pip Test Dependencies
-      run: |
-        uv pip install -r tests/requirements-tests.txt
+      run: uv pip install --group test --group test-server
 
     - name: Install Test Dependencies (Linux)
-      run: |
-        sudo bash tests/install-smbd.sh
+      run: sudo bash tests/install-smbd.sh
 
     - name: Regression Tests (FUSE 3)
       if: ${{ matrix.libfuse-version != 'system' }}

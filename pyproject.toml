@@ -86,5 +86,205 @@ license-files = ["LICENSE"]
 # fsspec uses cachable instead of cacheable ...
 ignore-words-list = "fo,Nd,unx,cachable"
 
+[tool.black]
+line-length = 120
+skip-string-normalization = true
+target-version = ["py39"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "A", "B", "E", "F", "G", "I", "W", "N", "ASYNC", "C4", "COM", "FLY", "FURB", "ICN", "INT", "ISC", "LOG",
+    "PERF", "PIE", "PLW", "PT", "PYI", "RET", "RSE", "RUF", "SIM", "TID", "TC", "UP", "YTT"
+]
+ignore = [
+    # Preview. Complaining about spaces (aligned arguments) should be a formatter option, not a linter one!
+    # https://github.com/astral-sh/ruff/issues/2402
+    "E201", "E202", "E203", "E211", "E221", "E226", "E251", "E265", "E266", "E271",
+    "E402",     # There are too many reasons for not putting imports strictly at the top!
+    "E501",     # A linter should lint, not check for line lengths!
+    "F401",     # Wants to from .version import __version__ as __version__ which clashes with pylint errors!
+    "N803",     # Argument names are camelCase instead of snake_case (400+ errors).
+    "N806",     # Variable names are camelCase instead of snake_case (1100+ errors).
+    "N815",     # Class-scope variable names are camelCase instead of snake_case (10 errors).
+    "N816",     # Global variable names are camelCase instead of snake_case (73 errors).
+    "N999",     # Module names are CamelCase like the classes they provide instead of snake_case (11 errors).
+    "COM812",   # Do not force trailing commas where it makes no sense, e.g., function calls for which I'll
+                # never add more arguments.
+    "PERF203",  # Some code parts HAVE to try-except inside loops because only the element should be skipped,
+                # not the whole loop being broken out of. Furthermore, this is a useless micro-optimization,
+                # which is actually removed for Python 3.11+ which introduces zero-cost exceptions.
+    "PLW0603",  # Cannot live without global statements, especially for subprocessing.
+    "PLW2901",  # Only false positives for constructs such as for data in ...: data = data.clean(); process(data)
+    "RUF001",   # Only false positives from tests with Unicode characters.
+    "RUF039",   # https://github.com/astral-sh/ruff/issues/18795
+    "RUF056",   # "options.get('disableUnionMount', False):" Wants me to change False to None,
+                # but it makes no sense semantically (expecting a bool)
+    "RUF100",   # BUG: removes necessary noqa: E402 in tests!
+
+    "SIM115",   # Too many locations where I do not know how to use context managers for files,
+                # which are stored as object members for example!
+    "TC006",    # Wants to quote cast("IO[bytes]", ...) I don't agree with this style choice.
+    "S101", "S110", "S105", "S311", "S324", "S603", "S607", "S608"
+
+    # Bug: SIM118 removes the keys() from row.keys(), which is an sqlite3.Row not a Dict!
+]
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.format]
+line-ending = "lf"
+quote-style = "preserve"
+
+[tool.mypy]
+ignore_missing_imports = true
+disable_error_code = "import-untyped"
+exclude = '''(?x)(
+    /_external/  # files named "one.py"
+  )'''
+
+[[tool.mypy.overrides]]
+module = ["ratarmountcore._external.pyfatfs.*"]
+follow_imports = "skip"
+ignore_errors = true
+
+[tool.pylint.main]
+init-hook = 'import sys; sys.path.append("./core"); sys.path.append("./core/ratarmountcore/_external")'
+# A comma-separated list of package or module names from where C extensions may be loaded. Extensions are loading
+# into the active Python interpreter and may run arbitrary code.
+extension-pkg-allow-list = [
+    "indexed_gzip", "indexed_bzip2", "indexed_zstd", "libarchive", "libarchive.ffi", "lzmaffi",
+    "rapidgzip", "isal", "PySquashfsImage", "PySquashfsImage.compressor", "zstandard", "lz4",
+    "deflate", "pyminizip", "fast_zip_decryption", "asyncssh", "sshfs", "fsspec", "pygit2",
+]
+# Use multiple processes to speed up Pylint. Specifying 0 will auto-detect the number of processors available.
+jobs = 4
+ignore-paths = "^core/ratarmountcore/_external/"
+ignored-modules = ["ratarmountcore._external.pyfatfs"]
+
+[tool.pylint.messages_control]
+# Disable the message, report, category or checker with the given id(s). You can either give multiple identifiers
+# separated by comma (,) or put this option multiple times.
+disable = [
+    "invalid-name",
+    "broad-except",
+    "broad-exception-raised",
+    "chained-comparison",  # Only available since Python 3.8
+    "too-many-arguments",
+    "too-many-boolean-expressions",
+    "too-many-instance-attributes",
+    "too-many-locals",
+    "too-many-lines",
+    "too-many-positional-arguments",
+    "unnecessary-lambda",
+    # I don't need the style checker to bother me with missing docstrings and todos.
+    "missing-class-docstring",
+    "missing-function-docstring",
+    "missing-module-docstring",
+    "fixme",
+    "similarities",
+    "consider-using-with",
+    "import-outside-toplevel",
+    "unused-argument",  # Too many false positives for APIs / overrides
+    "wrong-import-position",
+]
+enable = ["c-extension-no-member"]
+
+[tool.pylint.string]
+# This flag controls whether inconsistent-quotes generates a warning when the character used as a quote delimiter
+# is used inconsistently within a module.
+check-quote-consistency = false
+# This flag controls whether the implicit-str-concat should generate a warning on implicit string concatenation in
+# sequences defined over several lines.
+check-str-concat-over-line-jumps = false
+
+[tool.pylint.design]
+# Maximum number of arguments for function / method.
+max-args = 5
+# Maximum number of attributes for a class (see R0902).
+max-attributes = 7
+# Maximum number of boolean expressions in an if statement (see R0916).
+max-bool-expr = 5
+# Maximum number of branch for function / method body.
+max-branches = 40
+# Maximum number of locals for function / method body.
+max-locals = 15
+# Maximum number of parents for a class (see R0901).
+max-parents = 7
+# Maximum number of public methods for a class (see R0904).
+max-public-methods = 50
+# Maximum number of return / yield for function / method body.
+# The default limit was too low when considering guards as good style.
+max-returns = 20
+# Maximum number of statements in function / method body.
+max-statements = 200
+# Minimum number of public methods for a class (see R0903).
+# Even no public methods make sense when writing pure context managers.
+# Tests also often may have classes with only a single public method.
+min-public-methods = 1
+
+[tool.pylint.format]
+# Maximum number of characters on a single line.
+max-line-length = 120
+
 [tool.setuptools.dynamic]
 version = {attr = "ratarmount.version.__version__"}
+
+# Development dependencies are declared as PEP 735 dependency groups instead of an optional-dependency extra.
+# Unlike extras, groups are not published in the package metadata, do not become part of the public interface,
+# and can be installed without installing the project itself.
+[dependency-groups]
+# Static code checks. Also used by tests/run-style-checkers.sh.
+lint = [
+    "black ~= 26.0; python_version >= '3.10'",
+    "codespell",
+    "flake8",
+    "mypy != 1.20.0",
+    "types-dataclasses",
+    "pylint",
+    "ruff ~= 0.16.0",
+    "yamllint",
+    # Pytype does not support Python 3.13 as of 2025-06.
+    "pytype; python_version < '3.13'",
+]
+test = [
+    "pytest>=8",
+    "pytest-xdist",
+    "pytest-order",
+    "pandas",
+]
+# External servers and tools required by the regression tests, e.g., for the remote backends.
+test-server = [
+    "asyncssh",
+    "impacket",
+    "pyftpdlib",
+    "pyminizip; sys_platform != 'darwin'",
+    "pyopenssl>=23",
+    "rangehttpserver",
+    "boto3",
+    # This constraint is necessary because else boto3 would use a newer version.
+    # https://github.com/boto/botocore/commit/731a4dcfed0858fd519175b909ca3138e4715d1c
+    "botocore < 1.41.6; python_version < '3.10'",
+    "wsgidav",
+    "cheroot",
+    "sqlcipher3-wheels",
+]
+# Many tools such as pytype and twine depend on cryptography, whose source build requires libffi and, on old
+# manylinux images, a Rust toolchain (puccinialin). The original failure logs for manylinux2010 and Python 3.6/3.7
+# are in the git history. Both are unsupported by this project already (requires-python >= 3.9).
+build = [
+    "build",
+    "twine",
+    "wheel",
+]
+# Everything needed for local development and the full regression test suite.
+dev = [
+    {include-group = "lint"},
+    {include-group = "test"},
+    {include-group = "test-server"},
+    {include-group = "build"},
+]

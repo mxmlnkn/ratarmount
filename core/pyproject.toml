@@ -306,8 +306,16 @@ ratar = "ratarmountcore.SQLiteIndexedTarFsspec.SQLiteIndexedTarFileSystem"
 [tool.setuptools]
 license-files = ["LICENSE", "ratarmountcore/_external/pyfatfs/LICENSE"]
 
+# Ship only the package itself instead of relying on auto-discovery, which silently picks up any importable
+# top-level directory. An explicit include list makes it impossible to ship a stray tests package.
+[tool.setuptools.packages.find]
+include = ["ratarmountcore", "ratarmountcore.*"]
+
 [tool.setuptools.package-data]
 ratarmountcore = ["*.sql"]
 
 [tool.setuptools.dynamic]
 version = {attr = "ratarmountcore.version.__version__"}
+
+[tool.pytest.ini_options]
+enable_assertion_pass_hook = true

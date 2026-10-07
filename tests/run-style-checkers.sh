@@ -37,9 +37,9 @@ while read -r file; do
     allPythonFiles+=( "$file" )
 done < <( git ls-tree -r --name-only HEAD | 'grep' '[.]py$' | 'grep' -v '/_external/' )
 
-ruff check --fix --config tests/.ruff.toml -- "${allPythonFiles[@]}"
-#ruff check --fix --unsafe-fixes --config tests/.ruff.toml -- "${allPythonFiles[@]}"
-ruff check --config tests/.ruff.toml -- "${allPythonFiles[@]}" || returnError "$LINENO" 'Ruff check failed!'
+ruff check --fix -- "${allPythonFiles[@]}"
+#ruff check --fix --unsafe-fixes -- "${allPythonFiles[@]}"
+ruff check -- "${allPythonFiles[@]}" || returnError "$LINENO" 'Ruff check failed!'
 
 testFiles=()
 while read -r file; do
@@ -49,7 +49,7 @@ done < <(
 )
 
 # Parallelism with -j 3 does not improve much anymore and anything larger even worsens the runtime!
-pylint --rcfile tests/.pylintrc ratarmount core/ratarmountcore "${testFiles[@]}" | tee pylint.log
+pylint ratarmount core/ratarmountcore "${testFiles[@]}" | tee pylint.log
 if 'grep' -E -q ': E[0-9]{4}: ' pylint.log; then
     echoerr 'There were warnings during the pylint run!'
     exit 1
@@ -65,10 +65,10 @@ codespell "${filesToSpellCheck[@]}"
 
 flake8 --config tests/.flake8 "${files[@]}" "${testFiles[@]}" || returnError "$LINENO" 'Flake8 failed!'
 
-black -q --line-length 120 --skip-string-normalization --target-version=py39 "${allPythonFiles[@]}"
+black -q "${allPythonFiles[@]}"
 
 # No parallelism yet: https://github.com/python/mypy/issues/933
-mypy --config-file tests/.mypy.ini ratarmount core/ratarmountcore core/tests || returnError "$LINENO" 'Mypy failed!'
+mypy ratarmount core/ratarmountcore core/tests || returnError "$LINENO" 'Mypy failed!'
 
 pytype -j auto -d import-error -P"$( cd core && pwd ):$( pwd )" --exclude=core/ratarmountcore/_external \
     ratarmount core/ratarmountcore core/tests || returnError "$LINENO" 'Pytype failed!'

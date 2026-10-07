@@ -81,12 +81,24 @@ jobs:
         sudo apt-get -y update
         sudo apt-get -y install bzip2 pixz zstd unar fuse
 
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v10.3.0
+      with:
+        enable-cache: true
+
     - name: Install pip Test Dependencies
       run: |
-        python3 -m pip install -r tests/requirements-tests.txt
+        # uv does not support --user and --system fails because the runner user cannot write to /usr/local and
+        # --target "$userSite" puts the packages on the system python3's sys.path but left their console scripts
+        # in a bin directory that is not on PATH, so the WebDAV test could not find wsgidav and its mount timed out.
+        # Use an unnecessary virtual environment and put it first on PATH so that both `python3` and the console
+        # scripts of the test tools started by the shell tests (e.g., wsgidav) resolve to it.
+        uv venv --python "$( command -v python3 )" "$HOME/venv"
+        uv pip install --python "$HOME/venv/bin/python" --group dev
         # Explicitly install pygit2 even on Python 3.13+ because we have set up libgit2 manually.
-        python3 -m pip install pygit2
-        python3 -c 'import pygit2'
+        uv pip install --python "$HOME/venv/bin/python" pygit2
+        echo "$HOME/venv/bin" >> "$GITHUB_PATH"
+        "$HOME/venv/bin/python" -c 'import pygit2'
 
     - name: Test Simple Startup
       run: |
