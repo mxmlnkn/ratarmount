@@ -15,6 +15,23 @@ jobs:
 
     steps:
     - uses: actions/checkout@v5
+      with:
+        # Authorship check requires cloning all commits in the branch.
+        fetch-depth: 0
+
+    - name: Check commit attribution
+      if: github.event_name == 'pull_request'
+      env:
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      run: |
+        if git log --format='%H%x09%an%x09%ae%x09%cn%x09%ce%x09%B' "${BASE_SHA}..${HEAD_SHA}" |
+             grep -Eiq '\b(ai|anthropic|openai|chatgpt|copilot|claude|gemini|cursor|cline|windsurf|devin|codex)\b'
+        then
+            echo '::error::AI systems cannot take responsibility for submitted changes.'
+            echo '::error::AI systems, therefore, must not be represented as authors, committers, or co-authors.'
+            exit 1
+        fi
 
     - name: Setup Shared Test Environment
       uses: ./.github/actions/setup-test-env
