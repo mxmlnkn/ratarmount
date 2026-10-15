@@ -611,11 +611,10 @@ Some often-used configuration environment variables are copied here for easier v
    Backend: [fsspec](https://github.com/fsspec/filesystem_spec/blob/master/fsspec/implementations/http.py)
    via [aiohttp](https://github.com/aio-libs/aiohttp)
  - `(ipfs|ipns)://content-identifier`</br>
-   Example: `ipfs daemon & sleep 2 && ratarmount -f ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG mounted`</br>
+   Example: `ipfs daemon & sleep 2 && export IPFS_GATEWAY=http://127.0.0.1:8080 && ratarmount -f ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG mounted`</br>
    Backend: [fsspec/ipfsspec](https://github.com/fsspec/ipfsspec)</br>
-   Tries to connect to running local [`ipfs daemon`](https://github.com/ipfs/kubo) instance by default, which needs to be started beforehand.
-   ~~Alternatively, a (public) gateway can be specified with the environment variable `IPFS_GATEWAY`, e.g., `https://127.0.0.1:8080`.~~
-   Specifying a public gateway does not (yet) work because of [this](https://github.com/fsspec/ipfsspec/issues/39) issue.
+   Requires a running [`ipfs daemon`](https://github.com/ipfs/kubo) instance started beforehand.
+   [`ipfsspec` 0.5.0+](https://github.com/fsspec/ipfsspec/releases/tag/v0.5.0) no longer detects it automatically and instead require the gateway to be configured according to IPIP-280, e.g., via the `IPFS_GATEWAY` environment variable or a `~/.ipfs/gateway` file.
  - `s3://[endpoint-hostname[:port]]/bucket[/single-file.tar[?versionId=some_version_id]]`</br>
    Backend: [fsspec/s3fs](https://github.com/fsspec/s3fs) via [boto3](https://github.com/boto/boto3)</br>
    The URL will default to AWS according to the Boto3 library defaults when no endpoint is specified.
