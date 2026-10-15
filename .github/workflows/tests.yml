@@ -14,7 +14,7 @@ jobs:
       RATARMOUNT_CHECK_OVERRIDES: 1
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
       with:
         # Authorship check requires cloning all commits in the branch.
         fetch-depth: 0
@@ -91,7 +91,7 @@ jobs:
       RATARMOUNT_CHECK_OVERRIDES: 1
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
 
     - name: Setup Shared Test Environment
       uses: ./.github/actions/setup-test-env
@@ -151,7 +151,7 @@ jobs:
       RATARMOUNT_CHECK_OVERRIDES: 1
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
 
     - name: Setup Shared Test Environment
       uses: ./.github/actions/setup-test-env
@@ -282,7 +282,7 @@ jobs:
         shell: bash
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
 
     - name: Setup Shared Test Environment
       uses: ./.github/actions/setup-test-env
@@ -346,7 +346,7 @@ jobs:
       RATARMOUNT_CHECK_OVERRIDES: 1
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
 
     - name: Setup Shared Test Environment
       uses: ./.github/actions/setup-test-env

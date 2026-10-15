@@ -65,7 +65,7 @@ runs:
           tests/requirements-tests.txt
 
     - name: Set up uv
-      uses: astral-sh/setup-uv@v7
+      uses: astral-sh/setup-uv@v10.3.0
       with:
         enable-cache: true
 
