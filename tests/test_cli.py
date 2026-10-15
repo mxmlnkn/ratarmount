@@ -36,12 +36,17 @@ except ImportError:
     sqlcipher3 = None  # type: ignore
 
 
+CREATED_MOUNT_POINTS = []
+
+
 class RunRatarmount:
     def __init__(self, mountPoint, arguments, debug: int = 3):
         self.debug = debug
         # sparse-file-larger-than-8GiB-followed-by-normal-file.tar.zst takes 4.5 s on my system.
         self.timeout = 20 * sum(1 for arg in arguments if not arg.startswith('-'))
         self.mountPoint = mountPoint
+        # Registered so that tests/conftest.py can unmount it if a test is interrupted before unmounting.
+        CREATED_MOUNT_POINTS.append(mountPoint)
         args = ['-f', '-d', str(debug), *arguments, mountPoint]
         self.thread = threading.Thread(target=ratarmountcli, args=(args,))
 
