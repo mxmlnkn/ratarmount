@@ -236,8 +236,7 @@ jobs:
         # And now, with 4 mounts, it simply fails without an error message ... WTF is going on.
         # Remove any multi-threaded execution seems to work, but the error occurred sporadically, so maybe it's that.
         python3 -X dev -W ignore::DeprecationWarning:fuse -u \
-            -c "import pytest, sys; sys.exit(pytest.console_main())" \
-            --disable-warnings -rs -v tests/test_cli.py
+            -m pytest --disable-warnings -rs -v -s tests/test_cli.py
 
 
   Unit-Tests:
