@@ -125,6 +125,17 @@ runs:
         # Add brew installation binary folder to PATH so that command line tools like zstd can be found
         echo PATH="$PATH:/usr/local/bin" >> "$GITHUB_ENV"
 
+    - name: Install Dependencies For Very New Python Versions (MacOS)
+      if: ${{ startsWith(inputs.os, 'macos') && startsWith(inputs.python-version, '3.15') }}
+      shell: bash
+      run: |
+        # pygit2 has no wheels for very new Python versions, so it is built from source and needs libgit2 headers.
+        # Homebrew provides libgit2 1.9.x, which is the version that the current pygit2 expects.
+        brew install -q libgit2
+        # The Python is universal2 but the Homebrew libgit2 is only for the runner architecture, so build the
+        # extensions for that architecture only.
+        echo "ARCHFLAGS=-arch $( uname -m )" >> "$GITHUB_ENV"
+
     - name: Install pip Dependencies
       shell: bash
       run: |
@@ -151,10 +162,11 @@ runs:
         cd ../..
         rm -rf -- "${NAME}"
 
-    - name: Install Dependencies For Unreleased Python Versions (Linux)
-      if: startsWith(inputs.os, 'ubuntu') && startsWith(inputs.python-version, '3.15.0-')
+    - name: Install Dependencies For Very New Python Versions (Linux)
+      if: startsWith(inputs.os, 'ubuntu') && startsWith(inputs.python-version, '3.15')
       shell: bash
       run: |
+        # pygit2 has no wheels for very new Python versions, so it is built from source and needs libgit2 headers.
         #libgit2-dev is too old on Ubuntu 22.04. Leads to error about missing git2/sys/errors.h
         #sudo apt-get -y install libgit2-dev
         sudo apt-get -y install cmake

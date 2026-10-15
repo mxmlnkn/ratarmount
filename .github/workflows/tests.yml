@@ -116,7 +116,7 @@ jobs:
         #   Oldest and newest versions should be enough. Python versions are supported 5 years from release date.
         #   3.n is released October of 2011+n and EOL in 2016+n for n>=8.
         # Supported versions: https://github.com/actions/python-versions/blob/main/versions-manifest.json
-        python-version: ['3.9', '3.12', '3.14']
+        python-version: ['3.9', '3.12', '3.14', '3.15']
         libfuse-version: ['system']
         include:
         - os: ubuntu-latest
@@ -259,7 +259,7 @@ jobs:
         #   Oldest and newest versions should be enough. Python versions are supported 5 years from release date.
         #   3.n is released October of 2011+n and EOL in 2016+n for n>=8.
         # Supported versions: https://github.com/actions/python-versions/blob/main/versions-manifest.json
-        python-version: ['3.9', '3.12', '3.14']
+        python-version: ['3.9', '3.12', '3.14', '3.15']
         include:
         # Windows won't install easily in the full version because python-lzo has been missing Python 3.12+
         # wheels since at least 2025-04: https://github.com/jd-boyd/python-lzo/issues/90
@@ -319,7 +319,7 @@ jobs:
         #   Oldest and newest versions should be enough. Python versions are supported 5 years from release date.
         #   3.n is released October of 2011+n and EOL in 2016+n for n>=8.
         # Supported versions: https://github.com/actions/python-versions/blob/main/versions-manifest.json
-        python-version: ['3.9', '3.10', '3.12', '3.14']
+        python-version: ['3.9', '3.10', '3.12', '3.14', '3.15']
         libfuse-version: ['system']
         parallelization: [1, 2]
         include:
