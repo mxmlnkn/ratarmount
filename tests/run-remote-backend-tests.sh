@@ -582,13 +582,33 @@ checkURLProtocolIPFS()
         ipfs=kubo/ipfs
     fi
 
+    # A leftover daemon owns the ports and the repository, so that content added below might not be served by
+    # the gateway we query. It also caused the spurious "someone else has the lock" message.
+    pkill -f ipfs || true
+    sleep 1
+
+    # Use a dedicated repository so the daemon started here definitely serves the content added below.
+    export IPFS_PATH
+    IPFS_PATH=$( mktemp -d --suffix .ipfs.ratarmount )
+    $ipfs init --profile server >/dev/null
+
     local pid=
-    $ipfs init --profile server
-    if ! pgrep ipfs; then
-        $ipfs daemon &
-        pid=$!
-        sleep 5
-    fi
+    $ipfs daemon &
+    pid=$!
+
+    # Do not poll readiness with `ipfs id`: without a running daemon, that client opens the repository itself in
+    # offline mode and thereby steals the daemon's lock, so the daemon exits with "someone else has the lock" and
+    # no gateway is started. Poll the gateway port instead, which is only bound by the daemon.
+    local i
+    for (( i = 0; i < 30; ++i )); do
+        ( exec 3<>/dev/tcp/127.0.0.1/8080 ) 2>/dev/null && break
+        sleep 1
+    done
+
+    # Since ipfsspec 0.6.0, the local daemon is not auto-detected anymore.
+    # A gateway has to be configured according to IPIP-280. The daemon above serves its local gateway on
+    # 127.0.0.1:8080 as shown by its "Gateway server listening on ..." log line.
+    export IPFS_GATEWAY=http://127.0.0.1:8080
 
     local folder
     folder=$( mktemp -d --suffix .test.ratarmount )
@@ -597,6 +617,13 @@ checkURLProtocolIPFS()
     # These hashes should be reproducible as long as neither the contents nor the file names change!
     #added QmcbpsdbKYMpMjXvoFbr9pUWC3Z7ZQVXuEoPFRHaNukAsX tests/single-file.tar
     #added QmZwm9gKZaayGWqYtMgj6cd4JaNK1Yp2ChYZhXrERGq4Gi tests
+
+    # If the gateway cannot serve the content, it tries to fetch it from the network, which stalls the mount
+    # until the mount point times out. Fail early with a clearer message instead.
+    for cid in QmcbpsdbKYMpMjXvoFbr9pUWC3Z7ZQVXuEoPFRHaNukAsX QmZwm9gKZaayGWqYtMgj6cd4JaNK1Yp2ChYZhXrERGq4Gi; do
+        wget -q --spider "$IPFS_GATEWAY/ipfs/$cid" ||
+            returnError "$LINENO" "The local IPFS gateway cannot serve $cid after adding it!"
+    done
 
     checkFileInTARForeground "ipfs://QmcbpsdbKYMpMjXvoFbr9pUWC3Z7ZQVXuEoPFRHaNukAsX" bar \
         d3b07384d113edec49eaa6238ad5ff00 || returnError "$LINENO" 'Failed to read from IPFS'
