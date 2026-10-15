@@ -78,6 +78,8 @@ runs:
     - uses: msys2/setup-msys2@v2
       if: ${{ startsWith(inputs.os, 'windows') }}
       with:
+        # MSYS2 deprecated the MINGW64 environment in favor of UCRT64.
+        msystem: UCRT64
         install: ${{ inputs.windows-packages }}
 
     - name: Install WinFsp and FUSE compatibility layer (Windows)
