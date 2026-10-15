@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../core')))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../core/tests')))
 
-from helpers import copy_test_file
+from helpers import copy_test_file, copy_test_files
 from ratarmountcore.compressions import libarchive
 from ratarmountcore.mountsource.formats.folder import IndexedFolderMountSource
 from ratarmountcore.utils import ceil_div
@@ -40,7 +40,7 @@ class RunRatarmount:
     def __init__(self, mountPoint, arguments, debug: int = 3):
         self.debug = debug
         # sparse-file-larger-than-8GiB-followed-by-normal-file.tar.zst takes 4.5 s on my system.
-        self.timeout = 20
+        self.timeout = 20 * sum(1 for arg in arguments if not arg.startswith('-'))
         self.mountPoint = mountPoint
         args = ['-f', '-d', str(debug), *arguments, mountPoint]
         self.thread = threading.Thread(target=ratarmountcli, args=(args,))
@@ -55,7 +55,14 @@ class RunRatarmount:
         sys.stderr = io.StringIO()
 
         self.thread.start()
-        self.wait_for_mount_point()
+        try:
+            self.wait_for_mount_point()
+        except Exception:
+            # __exit__ is not called when __enter__ raises, so do not leave the global streams redirected and
+            # the background thread running because that corrupts all following tests.
+            sys.stdout = self._stdout
+            sys.stderr = self._stderr
+            raise
 
         return self
 
@@ -101,6 +108,15 @@ class RunRatarmount:
         while True:
             if os.path.ismount(self.mountPoint):
                 break
+
+            if not self.thread.is_alive():
+                # Invalid CLI arguments or a missing archive make ratarmount exit immediately.
+                # Fail fast instead of pointlessly waiting for the timeout.
+                raise RuntimeError(
+                    "ratarmount exited before the mount point appeared!"
+                    "\n===== stderr =====\n" + self.get_stderr() + "\n===== stdout =====\n" + self.get_stdout()
+                )
+
             if time.time() - t0 > self.timeout:
                 mount_list = "<Unable to run mount command>"
                 try:
@@ -164,6 +180,29 @@ def test_password_list(tmpdir, passwords, compression):
         RunRatarmount(mountPoint, ['--password-file', passwordFile, encryptedFile]),
     ):
         assert os.path.isdir(os.path.join(mountPoint, "foo"))
+
+
+SLOW_ARCHIVES_TO_TEST = {
+    "sparse-file-larger-than-8GiB-followed-by-normal-file.tar.zst": [
+        ("sparse", "cb5d4faf665db396dc34df1689ef1da8"),
+        ("foo", "c157a79031e1c40f85931829bc5fc552"),
+    ]
+}
+
+
+# Test slow archives separately
+@pytest.mark.parametrize("parallelization", [1, 2, 0])
+@pytest.mark.parametrize(("archivePath", "pathsInArchive"), SLOW_ARCHIVES_TO_TEST.items())
+def test_file_in_archive(tmpdir, archivePath, pathsInArchive, parallelization):
+    with copy_test_file(archivePath) as tmpArchive:
+        assert os.path.isfile(tmpArchive)
+        _mount_and_verify(
+            tmpdir,
+            [tmpArchive],
+            parallelization,
+            extraArguments=["--ignore-zeros"],
+            testPathsPerArchive=SLOW_ARCHIVES_TO_TEST,
+        )
 
 
 ARCHIVES_TO_TEST = [
@@ -272,16 +311,6 @@ ARCHIVES_TO_TEST = [
     ("832c78afcb9832e1a21c18212fc6c38b", "gnu-sparse-files.tar", "01.sparse1.bin"),
     ("832c78afcb9832e1a21c18212fc6c38b", "gnu-sparse-files.tar", "02.normal1.bin"),
     ("832c78afcb9832e1a21c18212fc6c38b", "gnu-sparse-files.tar", "03.sparse1.bin"),
-    (
-        "cb5d4faf665db396dc34df1689ef1da8",
-        "sparse-file-larger-than-8GiB-followed-by-normal-file.tar.zst",
-        "sparse",
-    ),
-    (
-        "c157a79031e1c40f85931829bc5fc552",
-        "sparse-file-larger-than-8GiB-followed-by-normal-file.tar.zst",
-        "foo",
-    ),
     ("2709a3348eb2c52302a7606ecf5860bc", "nested-tar.asar", "foo/fighter/ufo"),
     ("2b87e29fca6ee7f1df6c1a76cb58e101", "nested-tar.asar", "foo/lighter.tar/fighter/bar"),
     ("2709a3348eb2c52302a7606ecf5860bc", "nested-tar.sqlar", "foo/fighter/ufo"),
@@ -362,13 +391,40 @@ ARCHIVES_TO_TEST_COLLATED = {
     for archive in dict.fromkeys(values[1] for values in ARCHIVES_TO_TEST)
 }
 
+# Mounting archives together can be faster than one FUSE mount per archive, but the time to build the mount
+# source grows with the number of archives and can exceed the mount timeout.
+RATARMOUNT_TEST_MOUNT_BATCH_SIZE = max(1, int(os.environ.get('RATARMOUNT_TEST_MOUNT_BATCH_SIZE', '1000')))
 
+
+# The compressed .ext4.bz2 files need SQLiteIndexedTar to undo the compression (which is a leftover legacy
+# and architecture design failure) and with --ignore-zeros it would mount the nested TAR in the same step!
+# All other archives need --ignore-zeros to also read data appended after a TAR end-of-archive marker.
+@pytest.mark.parametrize("ignoreZeros", [True, False])
 @pytest.mark.parametrize("parallelization", [1, 2, 0])
-@pytest.mark.parametrize(("archivePath", "checksumPathPairs"), ARCHIVES_TO_TEST_COLLATED.items())
-def test_file_in_archive(archivePath, checksumPathPairs, parallelization):
-    with copy_test_file(archivePath) as tmpArchive:
-        assert os.path.isfile(tmpArchive)
-        mountPoint = os.path.join(os.path.dirname(tmpArchive), "mountPoint")
+def test_archives_in_subvolumes(tmpdir, parallelization, ignoreZeros):
+    # Mount all archives at once with each archive in an equally named subfolder. This exercises all
+    # compressions and archive formats with a handful of FUSE mounts instead of one mount per archive.
+    archive_names = [name for name in ARCHIVES_TO_TEST_COLLATED if ('ext4' in name) == (not ignoreZeros)]
+    if not archive_names:
+        pytest.skip("There are no archives for this combination! Probably ext4 is not available.")
+
+    extra_arguments = ["--ignore-zeros"] if ignoreZeros else []
+
+    with copy_test_files(archive_names) as archivePaths:
+        assert all(os.path.isfile(path) for path in archivePaths)
+        if RATARMOUNT_TEST_MOUNT_BATCH_SIZE > 1:
+            extra_arguments.append("--disable-union-mount")
+
+        for start in range(0, len(archivePaths), RATARMOUNT_TEST_MOUNT_BATCH_SIZE):
+            batch_paths = archivePaths[start : start + RATARMOUNT_TEST_MOUNT_BATCH_SIZE]
+            _mount_and_verify(tmpdir, batch_paths, parallelization, extra_arguments)
+
+
+def _mount_and_verify(tmpdir, archivePaths, parallelization, extraArguments, testPathsPerArchive=None):
+    mountPoint = os.path.join(tmpdir, "mountPoint")
+
+    # Test with forced index recreation first and then with index loading.
+    for forceIndexCreation in [True, False]:
         args = [
             "--index-minimum-file-count",
             "0",
@@ -376,24 +432,18 @@ def test_file_in_archive(archivePath, checksumPathPairs, parallelization):
             str(parallelization),
             "--detect-gnu-incremental",
             "--recursive",
-            tmpArchive,
+            *extraArguments,
+            *archivePaths,
         ]
-
-        # The compressed .ext4.bz2 files need SQLiteIndexedTar to undo the compression (which is a leftover legacy
-        # and architecture design failure) and with --ignore-zeros it would mount the nested TAR int the same step!
-        if 'ext4' not in archivePath:
-            args.insert(0, "--ignore-zeros")
-
-        # Test with forced index recreation first and then with index loading.
-        for forceIndexCreation in [True, False]:
-            testArgs = ["-c", *args] if forceIndexCreation else args
-            with RunRatarmount(mountPoint, testArgs) as ratarmountInstance:
-                for pathInArchive, checksum in checksumPathPairs:
-                    print(
-                        f"ratarmount -P {parallelization} {tmpArchive} mounted at {mountPoint} with index forced: "
-                        f"{forceIndexCreation} -> access: {pathInArchive}"
-                    )
-                    path = Path(mountPoint) / pathInArchive
+        subvolumes = "--disable-union-mount" in args
+        print(f"Mount with {' '.join(args)}")
+        testArgs = ["-c", *args] if forceIndexCreation else args
+        with RunRatarmount(mountPoint, testArgs):
+            for archivePath in archivePaths:
+                archiveName = os.path.basename(archivePath)
+                for pathInArchive, checksum in (testPathsPerArchive or ARCHIVES_TO_TEST_COLLATED)[archiveName]:
+                    subPath = os.path.join(archiveName, pathInArchive) if subvolumes else pathInArchive
+                    path = Path(mountPoint) / subPath
                     assert path.is_file()
                     stats = path.stat()  # implicitly tests that this does not throw
                     assert stats.st_size > 0
@@ -411,21 +461,6 @@ def test_file_in_archive(archivePath, checksumPathPairs, parallelization):
                                 break
                             hash_md5.update(contents)
                     assert hash_md5.hexdigest() == checksum
-
-                    if '.tar' in tmpArchive and '.7z' not in tmpArchive:
-                        output = ratarmountInstance.get_stdout() + ratarmountInstance.get_stderr()
-                        if forceIndexCreation:
-                            if "Creating offset dictionary" not in output:
-                                print(
-                                    "Looks like index was not created while executing: ratarmount "
-                                    + ' '.join([*testArgs, mountPoint])
-                                )
-                        else:
-                            if "Successfully loaded offset dictionary" not in output:
-                                print(
-                                    "Looks like index was not loaded while executing: ratarmount "
-                                    + ' '.join([*testArgs, mountPoint])
-                                )
 
 
 @pytest.mark.parametrize(

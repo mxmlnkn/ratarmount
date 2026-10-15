@@ -15,32 +15,40 @@ def find_test_file(relativePathOrName):
 
 
 @contextlib.contextmanager
-def copy_test_file(relativePathOrName):
+def copy_test_files(relativePathOrNames):
     with tempfile.TemporaryDirectory() as folder:
-        path = os.path.join(folder, os.path.basename(relativePathOrName))
-        if os.path.isfile(find_test_file(relativePathOrName)):
-            shutil.copy(find_test_file(relativePathOrName), path)
-        else:
-            for format_id, format_info in COMPRESSION_FORMATS.items():
-                backend = find_available_backend(format_id)
-                if not backend:
-                    continue
-
-                for extension in format_info.extensions:
-                    found_path = find_test_file(relativePathOrName + '.' + extension)
-                    if not os.path.isfile(found_path):
+        paths = []
+        for relativePathOrName in relativePathOrNames:
+            path = os.path.join(folder, os.path.basename(relativePathOrName))
+            if os.path.isfile(find_test_file(relativePathOrName)):
+                shutil.copy(find_test_file(relativePathOrName), path)
+            else:
+                for format_id, format_info in COMPRESSION_FORMATS.items():
+                    backend = find_available_backend(format_id)
+                    if not backend:
                         continue
 
-                    with (
-                        open(found_path, 'rb') as file,
-                        contextlib.suppress(Exception),
-                        backend.open(file) as decompressed,
-                        open(path, 'wb') as target,
-                    ):
-                        shutil.copyfileobj(decompressed, target)
-                        break
+                    for extension in format_info.extensions:
+                        found_path = find_test_file(relativePathOrName + '.' + extension)
+                        if not os.path.isfile(found_path):
+                            continue
 
-        yield path
+                        with (
+                            open(found_path, 'rb') as file,
+                            contextlib.suppress(Exception),
+                            backend.open(file) as decompressed,
+                            open(path, 'wb') as target,
+                        ):
+                            shutil.copyfileobj(decompressed, target)
+                            break
+            paths.append(path)
+        yield paths
+
+
+@contextlib.contextmanager
+def copy_test_file(relativePathOrName):
+    with copy_test_files([relativePathOrName]) as paths:
+        yield paths[0]
 
 
 @contextlib.contextmanager

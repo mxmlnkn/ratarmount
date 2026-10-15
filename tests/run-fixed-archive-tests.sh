@@ -11,6 +11,64 @@ rm -f tests/*.*.index.*
 parallelization=1
 #checkRemoteSupport
 
+# Mount several archives in a single ratarmount invocation with --disable-union-mount, each in an equally named
+# subfolder, instead of one slow FUSE mount per archive. Set this to 1 to mount each archive on its own again,
+# e.g., to find out which archive is responsible for a failure.
+MOUNT_ARCHIVES_PER_BATCH=${MOUNT_ARCHIVES_PER_BATCH:-100}
+export MOUNT_ARCHIVES_PER_BATCH
+
+# Set by the caller before invoking checkBatchedArchives.
+BATCH_FILES=()
+
+
+# Mounts all archives in BATCH_FILES at once and verifies their expected files and checksums from the global 'tests'
+# triples. A batch containing a single archive is mounted at the root like checkFileInTAR.
+checkBatchedArchives()
+{
+    local mountFolder
+    mountFolder=$( mktemp -d --suffix .test.ratarmount ) || returnError "$LINENO" 'Failed to create temporary directory'
+    MOUNT_POINTS_TO_CLEANUP+=( "$mountFolder" )
+
+    local subvolumes=1
+    if [[ ${#BATCH_FILES[@]} -eq 1 ]]; then subvolumes=0; fi
+
+    local startTime
+    startTime=$( date +%s )
+
+    # Test with forced index recreation first and then with index loading, exactly like checkFileInTAR.
+    local forceIndexCreation
+    for forceIndexCreation in 1 0; do
+        local args=( -P "$parallelization" --detect-gnu-incremental --ignore-zeros --recursive )
+        if [[ $forceIndexCreation -eq 1 ]]; then args+=( -c ); fi
+        if [[ $subvolumes -eq 1 ]]; then args+=( --disable-union-mount ); fi
+        args+=( "${BATCH_FILES[@]}" "$mountFolder" )
+        runAndCheckRatarmount "${args[@]}" ||
+            returnError "$LINENO" "Failed to mount ${#BATCH_FILES[@]} archives: ${RATARMOUNT_CMD} ${args[*]}"
+
+        local file iTest fileInTar mountFolderPrefix
+        for file in "${BATCH_FILES[@]}"; do
+            mountFolderPrefix="$mountFolder"
+            if [[ $subvolumes -eq 1 ]]; then mountFolderPrefix="$mountFolder/$( basename -- "$file" )"; fi
+
+            for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
+                [[ "${tests[iTest+1]}" == "$file" ]] || continue
+                fileInTar="${tests[iTest+2]}"
+                checkStat "$mountFolderPrefix/$fileInTar" ||
+                    returnError "$LINENO" "Could not stat '$fileInTar' in '$file'"
+                verifyCheckSum "$mountFolderPrefix" "$fileInTar" "$file" "${tests[iTest]}" ||
+                    returnError "$LINENO" "Checksum mismatch for '$fileInTar' in '$file'"
+            done
+        done
+
+        funmount "$mountFolder"
+    done
+
+    safeRmdir "$mountFolder"
+
+    echoerr "[${FUNCNAME[0]}] Tested successfully ${#BATCH_FILES[@]} archives in $(( $( date +%s ) - startTime ))s"
+}
+
+
 for parallelization in $PARALLELIZATIONS; do
     echo "== Testing with -P $parallelization =="
     export parallelization
@@ -39,6 +97,8 @@ for parallelization in $PARALLELIZATIONS; do
         fi
     done
 
+    # Recompression and split files involve several files, so test those on their own to keep the batching simple.
+    batchArchives=()
     for tarPath in "${uniqueArchives[@]}"; do
         fileChecks=()
         for (( iTest = 0; iTest < ${#tests[@]}; iTest += 3 )); do
@@ -52,6 +112,8 @@ for parallelization in $PARALLELIZATIONS; do
         # Only test some larger files for all compression backends because most of the files are minimal
         # tests which all have the same size of 20*512B. In the first place, the compression backends
         # should be tested more rigorously inside their respective projects not by ratarmount.
+        # readarray does not work on macOS!
+        #readarray -t files < <( recompressFile "$tarPath" )
         if [[ "$tarPath" =~ 2k-recursive ]]; then
             # readarray does not work on macOS!
             #readarray -t files < <( recompressFile "$tarPath" )
@@ -60,8 +122,11 @@ for parallelization in $PARALLELIZATIONS; do
                 files+=( "$line" )
             done < <( recompressFile "$tarPath" || returnError "$LINENO" 'Something went wrong during recompression.' )
             TMP_FILES_TO_CLEANUP+=( "${files[@]}" )
-        else
+        elif [[ "$tarPath" =~ [.][0-9]+$ ]]; then
             files=( "$tarPath" )
+        else
+            batchArchives+=( "$tarPath" )
+            continue
         fi
 
         for file in "${files[@]}"; do
@@ -74,6 +139,12 @@ for parallelization in $PARALLELIZATIONS; do
         for file in "${files[@]}"; do
             safeRmdir "$( dirname -- "$file" )"
         done
+    done
+
+    for (( start = 0; start < ${#batchArchives[@]}; start += MOUNT_ARCHIVES_PER_BATCH )); do
+        BATCH_FILES=( "${batchArchives[@]:start:MOUNT_ARCHIVES_PER_BATCH}" )
+        nFiles=$(( nFiles + ${#BATCH_FILES[@]} ))
+        checkBatchedArchives
     done
 
     cleanup
