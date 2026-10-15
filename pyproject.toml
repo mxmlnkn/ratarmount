@@ -234,6 +234,11 @@ max-line-length = 120
 [tool.setuptools.dynamic]
 version = {attr = "ratarmount.version.__version__"}
 
+[tool.pytest.ini_options]
+enable_assertion_pass_hook = true
+# Print the slowest tests at the end of every run to spot performance outliers in the CI logs.
+addopts = "--durations=25"
+
 # Development dependencies are declared as PEP 735 dependency groups instead of an optional-dependency extra.
 # Unlike extras, groups are not published in the package metadata, do not become part of the public interface,
 # and can be installed without installing the project itself.

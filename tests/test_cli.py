@@ -438,6 +438,7 @@ def _mount_and_verify(tmpdir, archivePaths, parallelization, extraArguments, tes
         subvolumes = "--disable-union-mount" in args
         print(f"Mount with {' '.join(args)}")
         testArgs = ["-c", *args] if forceIndexCreation else args
+        start = time.perf_counter()
         with RunRatarmount(mountPoint, testArgs):
             for archivePath in archivePaths:
                 archiveName = os.path.basename(archivePath)
@@ -461,6 +462,7 @@ def _mount_and_verify(tmpdir, archivePaths, parallelization, extraArguments, tes
                                 break
                             hash_md5.update(contents)
                     assert hash_md5.hexdigest() == checksum
+        print(f"  Mounting took {time.perf_counter() - start:.2f}s")
 
 
 @pytest.mark.parametrize(

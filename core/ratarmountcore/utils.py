@@ -1,7 +1,9 @@
 import base64
 import collections
 import contextlib
+import functools
 import importlib
+import importlib.metadata
 import io
 import logging
 import math
@@ -235,6 +237,18 @@ def get_module(module: Union[str, types.ModuleType]) -> Optional[types.ModuleTyp
     return sys.modules.get(module, None)
 
 
+@functools.cache
+def _distribution_names_by_top_level_module() -> dict:
+    # packages_distributions has only been added in Python 3.10.
+    getPackagesDistributions = getattr(importlib.metadata, 'packages_distributions', None)
+    return {} if getPackagesDistributions is None else getPackagesDistributions()
+
+
+# The version of an imported module cannot change during the process lifetime, but the fallback for modules without
+# a __version__ attribute used to be costly: it iterated over every installed distribution and all of their files,
+# which takes on the order of a second when many packages are installed. Cache the result because this is otherwise
+# repeated for every archive for which metadata, e.g., an index, is written.
+@functools.cache
 def find_module_version(moduleOrName: Union[str, types.ModuleType]) -> Optional[str]:
     module = get_module(moduleOrName)
     if not module:
@@ -261,11 +275,19 @@ def find_module_version(moduleOrName: Union[str, types.ModuleType]) -> Optional[
     if version:
         return str(version)
 
-    moduleFilePath = getattr(module, '__file__', None)
-    if moduleFilePath:
-        import importlib.metadata as imeta  # Based on -X importtime seems to be pretty slow.
+    # Map the top-level module name to its distribution instead of scanning every file of every installed
+    # distribution, which takes on the order of a second when many packages are installed.
+    topLevelName = getattr(module, '__name__', '').split('.')[0]
+    for distribution in _distribution_names_by_top_level_module().get(topLevelName, []):
+        try:
+            return importlib.metadata.version(distribution)
+        except Exception:
+            pass
 
-        for distribution in imeta.distributions():
+    # Python 3.9 does not have packages_distributions, so fall back to mapping the module file to a distribution.
+    moduleFilePath = getattr(module, '__file__', None)
+    if not getattr(importlib.metadata, 'packages_distributions', None) and moduleFilePath:
+        for distribution in importlib.metadata.distributions():
             try:
                 if distribution_contains_file(distribution, moduleFilePath) and 'Version' in distribution.metadata:
                     return distribution.metadata['Version']
