@@ -2,7 +2,6 @@
 # Disable pylint errors. See https://github.com/fsspec/filesystem_spec/issues/1678
 
 import contextlib
-import http
 import logging
 import os
 import re
@@ -50,7 +49,7 @@ except ImportError:
     FixedSSHFileSystem = None  # type: ignore
 
 try:
-    from webdav4.fsspec import WebdavFileSystem
+    from webdav.fsspec import WebdavFileSystem
 except ImportError:
     WebdavFileSystem = None  # type: ignore
 
@@ -158,11 +157,9 @@ def try_open_url(url) -> Union[MountSource, IO[bytes], str]:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             fileSystem, path = url_to_fs(url)
-    elif protocol == 'webdav':
-        # WebDAV needs special handling because we need to decide between HTTP and HTTPS and because of:
-        # https://github.com/skshetry/webdav4/issues/197
+    elif protocol in ('webdav', 'webdavs'):
         if not WebdavFileSystem:
-            raise RatarmountError(f"Install the webdav4 Python package to mount {protocol}://.")
+            raise RatarmountError(f"Install the webdav-rfc4918 Python package to mount {protocol}://.")
 
         matchedURI = re.match("(?:([^:/]*):([^@/]*)@)?([^/]*)(.*)", splitURI[1])
         if not matchedURI:
@@ -180,16 +177,9 @@ def try_open_url(url) -> Union[MountSource, IO[bytes], str]:
             password = os.environ.get('WEBDAV_PASSWORD')
         auth = None if username is None or password is None else (username, password)
 
-        def check_for_https(url):
-            try:
-                connection = http.client.HTTPSConnection(url, timeout=2)
-                connection.request("HEAD", "/")
-                return bool(connection.getresponse())
-            except Exception as exception:
-                logger.debug("Determined WebDAV URL to not use HTTP instead HTTPS because of: %s", exception)
-                return False
-
-        transportProtocol = "https" if check_for_https(baseURL) else "http"
+        # webdav-rfc4918 registers "webdav://" for plain HTTP and "webdavs://" for HTTPS as two
+        # distinct, explicit protocols, so the transport is known from the URL itself.
+        transportProtocol = "https" if protocol == 'webdavs' else "http"
         fileSystem = WebdavFileSystem(f"{transportProtocol}://{baseURL}", auth=auth)
     elif protocol == 'dropbox':
         # Dropbox needs special handling because there is no way to specify the token and because
