@@ -2,10 +2,11 @@
 # Disable pylint errors. See https://github.com/fsspec/filesystem_spec/issues/1678
 
 import contextlib
-import http
+import http.client
 import logging
 import os
 import re
+import ssl
 import stat
 import sys
 import warnings
@@ -128,6 +129,39 @@ def _open_sshfs_mount_source(url: str) -> Union[MountSource, IO[bytes], str]:
     return fs.open(path) if fs.isfile(path) else FSSpecMountSource(fs, path)
 
 
+def _webdav_transport_protocol(protocol: str, host: str) -> str:
+    """
+    Return "https" or "http" for a webdav:// or webdavs:// URL. Only called for these two protocols.
+
+    webdavs:// is HTTPS, no questions asked. webdav:// does not say, so HTTPS is tried first and HTTP is the fallback.
+    A fallback must not hide an attack: a server that does speak TLS but presents an invalid certificate is an error,
+    not a reason to send the credentials in clear text. Any other failure to connect over HTTPS falls back to HTTP,
+    but loudly. Use webdavs:// to never fall back.
+    """
+    if protocol == 'webdavs':
+        return "https"
+
+    try:
+        connection = http.client.HTTPSConnection(host, timeout=2)
+        try:
+            connection.request("HEAD", "/")
+            connection.getresponse()
+        finally:
+            connection.close()
+        return "https"
+    except ssl.SSLCertVerificationError as exception:
+        raise RatarmountError(
+            f"Not falling back to unencrypted HTTP for {host} because its TLS certificate is invalid: {exception}"
+        ) from exception
+    except Exception as exception:
+        logger.debug("Could not connect to %s via HTTPS: %s", host, exception)
+
+    logger.warning(
+        "Could not connect to %s via HTTPS. Falling back to unencrypted HTTP! Use webdavs:// to require HTTPS.", host
+    )
+    return "http"
+
+
 def try_open_url(url) -> Union[MountSource, IO[bytes], str]:
     splitURI = url.split('://', 1)
     protocol = splitURI[0] if len(splitURI) > 1 else ''
@@ -158,7 +192,7 @@ def try_open_url(url) -> Union[MountSource, IO[bytes], str]:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             fileSystem, path = url_to_fs(url)
-    elif protocol == 'webdav':
+    elif protocol in ('webdav', 'webdavs'):
         # WebDAV needs special handling because we need to decide between HTTP and HTTPS and because of:
         # https://github.com/skshetry/webdav4/issues/197
         if not WebdavFileSystem:
@@ -167,7 +201,7 @@ def try_open_url(url) -> Union[MountSource, IO[bytes], str]:
         matchedURI = re.match("(?:([^:/]*):([^@/]*)@)?([^/]*)(.*)", splitURI[1])
         if not matchedURI:
             raise RatarmountError(
-                "Failed to match WebDAV URI of the format webdav://[user:password@]host[:port][/path]\n"
+                "Failed to match WebDAV URI of the format (webdav|webdavs)://[user:password@]host[:port][/path]\n"
                 "If your user name or password contains special characters such as ':/@', then use the environment "
                 "variables WEBDAV_USER and WEBDAV_PASSWORD to specify them."
             )
@@ -180,16 +214,7 @@ def try_open_url(url) -> Union[MountSource, IO[bytes], str]:
             password = os.environ.get('WEBDAV_PASSWORD')
         auth = None if username is None or password is None else (username, password)
 
-        def check_for_https(url):
-            try:
-                connection = http.client.HTTPSConnection(url, timeout=2)
-                connection.request("HEAD", "/")
-                return bool(connection.getresponse())
-            except Exception as exception:
-                logger.debug("Determined WebDAV URL to not use HTTP instead HTTPS because of: %s", exception)
-                return False
-
-        transportProtocol = "https" if check_for_https(baseURL) else "http"
+        transportProtocol = _webdav_transport_protocol(protocol, baseURL)
         fileSystem = WebdavFileSystem(f"{transportProtocol}://{baseURL}", auth=auth)
     elif protocol == 'dropbox':
         # Dropbox needs special handling because there is no way to specify the token and because

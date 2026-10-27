@@ -631,7 +631,9 @@ Some often-used configuration environment variables are copied here for easier v
    via [asyncssh](https://github.com/ronf/asyncssh)</br>
    The usual configuration via [`~/.ssh/config`](https://linux.die.net/man/5/ssh_config) is supported.
  - `smb://[workgroup;][user:password@]server[:port]/share/folder/file.tar`
- - `webdav://[user:password@]host[:port][/path]`</br>
+ - `(webdav|webdavs)://[user:password@]host[:port][/path]`</br>
+   `webdavs://` always uses HTTPS. `webdav://` tries HTTPS first and falls back to HTTP with a warning,
+   unless the TLS certificate is invalid. Use `webdavs://` to never fall back.</br>
    Backend: [webdav4](https://github.com/skshetry/webdav4) via [httpx](https://github.com/encode/httpx)</br>
    Environment variables: `WEBDAV_USER`, `WEBDAV_PASSWORD`
  - `dropbox://path`</br>

@@ -2,8 +2,14 @@
 # pylint: disable=protected-access
 
 import bz2
+import logging
 import os
+import shutil
+import socket
+import ssl
+import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -11,9 +17,10 @@ from helpers import change_working_directory, find_test_file
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ratarmountcore.mountsource.factory import open_mount_source
+from ratarmountcore.mountsource.factory import _webdav_transport_protocol, open_mount_source
 from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar
 from ratarmountcore.mountsource.formats.zip import ZipMountSource
+from ratarmountcore.utils import RatarmountError
 
 
 @pytest.mark.order(-1)
@@ -162,3 +169,72 @@ class TestOpenMountSource:
             assert indexPath.exists()
 
         indexPath.unlink()
+
+
+class TestWebDAVTransportProtocol:
+    @staticmethod
+    def _fail_probe_with(monkeypatch, exception):
+        class FailingConnection:
+            def __init__(self, *_args, **_kwargs):
+                pass
+
+            def request(self, *_args, **_kwargs):
+                raise exception
+
+            def close(self):
+                pass
+
+        monkeypatch.setattr("ratarmountcore.mountsource.factory.http.client.HTTPSConnection", FailingConnection)
+
+    @staticmethod
+    def test_webdavs_is_https_without_probing(monkeypatch):
+        TestWebDAVTransportProtocol._fail_probe_with(monkeypatch, AssertionError("must not probe"))
+        assert _webdav_transport_protocol("webdavs", "127.0.0.1:1") == "https"
+
+    @staticmethod
+    @pytest.mark.parametrize("exception", [ConnectionRefusedError(), TimeoutError(), ssl.SSLError("wrong version")])
+    def test_webdav_falls_back_to_http_with_a_warning(monkeypatch, caplog, exception):
+        TestWebDAVTransportProtocol._fail_probe_with(monkeypatch, exception)
+        with caplog.at_level(logging.WARNING):
+            assert _webdav_transport_protocol("webdav", "127.0.0.1:1") == "http"
+        assert "webdavs://" in caplog.text
+
+    @staticmethod
+    def test_webdav_does_not_fall_back_on_an_invalid_certificate(monkeypatch):
+        TestWebDAVTransportProtocol._fail_probe_with(monkeypatch, ssl.SSLCertVerificationError("self-signed"))
+        with pytest.raises(RatarmountError, match="invalid"):
+            _webdav_transport_protocol("webdav", "127.0.0.1:1")
+
+    @staticmethod
+    def test_webdav_does_not_fall_back_for_a_real_self_signed_server(tmp_path):
+        if not shutil.which("openssl"):
+            pytest.skip("openssl is required to create a self-signed certificate")
+        # fmt: off
+        subprocess.run(
+            [
+                "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj", "/CN=localhost",
+                "-addext", "subjectAltName=DNS:localhost,IP:127.0.0.1",
+                "-keyout", str(tmp_path / "key.pem"), "-out", str(tmp_path / "cert.pem")
+            ],
+            check=True,
+            capture_output=True,
+        )
+        # fmt: on
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(str(tmp_path / "cert.pem"), str(tmp_path / "key.pem"))
+        with socket.socket() as server:
+            server.bind(("127.0.0.1", 0))
+            server.listen()
+
+            def serve():
+                try:
+                    with context.wrap_socket(server.accept()[0], server_side=True) as connection:
+                        connection.recv(1)
+                except (OSError, ssl.SSLError):
+                    pass  # The client aborts the handshake because it does not trust the certificate.
+
+            thread = threading.Thread(target=serve, daemon=True)
+            thread.start()
+            with pytest.raises(RatarmountError, match="invalid"):
+                _webdav_transport_protocol("webdav", f"127.0.0.1:{server.getsockname()[1]}")
+            thread.join(timeout=5)
