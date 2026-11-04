@@ -22,7 +22,8 @@ function installSystemRequirements()
     yum -y install epel-release
     # We need to install development dependencies to build Python packages from source and we also need
     # to install libraries such as libarchive in order to copy them into the AppImage.
-    yum install -y fuse fakeroot patchelf fuse-libs libsqlite3x strace desktop-file-utils libzstd-devel
+    # librsvg2-tools provides rsvg-convert, which creates the PNG .DirIcon required by recent appimagetool versions.
+    yum install -y fuse fakeroot patchelf fuse-libs libsqlite3x strace desktop-file-utils libzstd-devel librsvg2-tools
     if [[ "$APPIMAGE_VARIANT" != 'slim' ]]; then
         yum install -y libarchive libarchive-devel lzop lzo lzo-devel
     fi
@@ -436,15 +437,25 @@ fi
 echo "Install AppImage Tooling"
 installAppImageTools
 
-echo "Build Base Python AppImage With Ratarmount Metadata"
+echo "Build Base AppDir With Ratarmount Metadata"
 python3 -m pip install --upgrade python_appimage
-python3 -m python_appimage build app -l "$APPIMAGE_PLATFORM" -p "$APP_PYTHON_VERSION" ratarmount-metadata/ ||
-    exit 1
+# Do not let python-appimage package the AppDir itself. Its temporary AppDir has 0700 directories, which recent
+# appimagetool versions reject. Building only the AppDir lets us fix the permissions and icon before packaging:
+# https://github.com/niess/python-appimage/issues/101
+'rm' -rf "ratarmount-$APPIMAGE_ARCH"
+python3 -m python_appimage build app --no-packaging \
+    -l "$APPIMAGE_PLATFORM" -p "$APP_PYTHON_VERSION" ratarmount-metadata/ || exit 1
 
-echo "Extract AppImage to AppDir for Further Modification"
-./"ratarmount-$APPIMAGE_ARCH.AppImage" --appimage-extract > /dev/null
-'rm' -rf "$APP_DIR" ./"ratarmount-$APPIMAGE_ARCH.AppImage"
-mv squashfs-root/ "$APP_DIR"
+echo "Move AppDir and Fix Icon"
+'rm' -rf "$APP_DIR"
+mv "ratarmount-$APPIMAGE_ARCH" "$APP_DIR"
+
+# Recent appimagetool versions require .DirIcon to be a PNG. It is a dangling symlink because python-appimage
+# replaces python.png with our SVG icon, so create a PNG from the SVG for the AppImage icon.
+if commandExists rsvg-convert; then
+    rsvg-convert -w 256 -h 256 ratarmount-metadata/ratarmount.svg -o "$APP_DIR/ratarmount.png"
+    ln -sfn ratarmount.png "$APP_DIR/.DirIcon"
+fi
 
 echo "Install Ratarmount into AppDir"
 installAppImagePythonPackages
@@ -456,6 +467,8 @@ echo "Clean up Unnecessary Files from AppDir"
 trimAppImage
 
 echo "Create AppImage from Modified AppDir"
+# Recent appimagetool versions require the AppDir to be readable and executable by other users.
+chmod -R a+rX "$APP_DIR"
 # times and sizes for ratarmount.AppImage --help on T14: --comp gzip: 1.6s, 12.50 MB, --comp xz: 3.0s, 12.88 MB
 # times and sizes for ratarmount.AppImage --help on Ryzen 3900X: --comp gzip: 1.2s, 15.09 MB, --comp xz: 2.2s, 14.59 MB
 # times for ratarmount --help without AppImage on Ryzen 3900X: 0.155s
