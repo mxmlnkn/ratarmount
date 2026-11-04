@@ -21,7 +21,10 @@ inputs:
     # zstd, may also call external binaries depending on how libarchive was compiled!
     # https://github.com/libarchive/libarchive/blob/ad5a0b542c027883d7069f6844045e6788c7d70c/libarchive/
     #   archive_read_support_filter_lrzip.c#L68
-    default: 'libfuse2 fuse3 bzip2 pbzip2 pixz zstd unar lrzip lzop gcc liblzo2-dev ruby-webrick liblzma-dev'
+    # attr provides setfattr and getfattr for the extended attribute tests. It used to be installed implicitly
+    # because samba, which is installed for the SMB tests, had it as a Recommends on Ubuntu 24.04. Ubuntu 26.04
+    # demoted it to a Suggests, which apt does not install by default.
+    default: 'libfuse2 fuse3 bzip2 pbzip2 pixz zstd unar lrzip lzop gcc liblzo2-dev ruby-webrick liblzma-dev attr'
   macos-packages:
     description: Space-separated Homebrew packages to install
     required: false
