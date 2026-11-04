@@ -631,8 +631,8 @@ Some often-used configuration environment variables are copied here for easier v
    via [asyncssh](https://github.com/ronf/asyncssh)</br>
    The usual configuration via [`~/.ssh/config`](https://linux.die.net/man/5/ssh_config) is supported.
  - `smb://[workgroup;][user:password@]server[:port]/share/folder/file.tar`
- - `webdav://[user:password@]host[:port][/path]`</br>
-   Backend: [webdav4](https://github.com/skshetry/webdav4) via [httpx](https://github.com/encode/httpx)</br>
+ - `(webdav|webdavs)://[user:password@]host[:port][/path]`</br>
+   Backend: [webdav-rfc4918](https://github.com/manfred-kaiser/webdav-rfc4918)</br>
    Environment variables: `WEBDAV_USER`, `WEBDAV_PASSWORD`
  - `dropbox://path`</br>
    Backend: [fsspec/dropboxdrivefs](https://github.com/fsspec/dropboxdrivefs) via [dropbox-sdk-python](https://github.com/dropbox/dropbox-sdk-python)</br>

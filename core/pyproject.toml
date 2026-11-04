@@ -104,7 +104,7 @@ file = "README.md"
 content-type = "text/markdown"
 
 [project.urls]
-Homepage = "https://github.com/mxmlnkn/ratarmount/ratarmountcore"
+Homepage = "https://github.com/mxmlnkn/ratarmount"
 
 [project.optional-dependencies]
 # https://peps.python.org/pep-0508/ Dependency specification for Python Software Packages
@@ -147,7 +147,7 @@ full = [
     "fsspec",
     "ipfsspec",
     "s3fs",
-    "webdav4",
+    "webdav-rfc4918[fsspec]",
     #"gcsfs",  # untested
     #"adlfs",  # untested. build error in Python 3.13
     "pypdf[image]",
@@ -173,7 +173,7 @@ fsspec-backends = [
     "fsspec",
     "ipfsspec",
     "s3fs",
-    "webdav4",
+    "webdav-rfc4918[fsspec]",
     #"gcsfs",  # untested
     #"adlfs",  # untested. build error in Python 3.13
     # "dask", "distributed" : ~34 MB, ~10 MB gzip-compressed

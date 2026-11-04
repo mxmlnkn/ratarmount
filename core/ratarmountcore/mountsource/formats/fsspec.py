@@ -24,11 +24,6 @@ except ImportError:
     GithubFileSystem = None  # type: ignore
 
 try:
-    from webdav4.fsspec import WebdavFileSystem
-except ImportError:
-    WebdavFileSystem = None  # type: ignore
-
-try:
     from dropboxdrivefs import DropboxDriveFileSystem
 except ImportError:
     DropboxDriveFileSystem = None  # type: ignore
@@ -90,10 +85,7 @@ class FSSpecMountSource(MountSource):
         # protocol while other filesystem implementations are fine with only the path.
         #  - https://github.com/ray-project/ray/issues/26423#issuecomment-1179561181
         #  - https://github.com/fsspec/filesystem_spec/issues/1713
-        #  - https://github.com/skshetry/webdav4/issues/198
         self._pathsRequireQuoting = HTTPFileSystem is not None and isinstance(self.fileSystem, HTTPFileSystem)
-        if WebdavFileSystem:
-            self._pathsRequireQuoting = self._pathsRequireQuoting or isinstance(self.fileSystem, WebdavFileSystem)
         self.prefix = prefix.rstrip("/") if prefix and prefix.strip("/") and self.fileSystem.isdir(prefix) else None
         self._pathsWithoutLeadingSlash = GithubFileSystem is not None and isinstance(self.fileSystem, GithubFileSystem)
 
