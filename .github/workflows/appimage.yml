@@ -48,7 +48,7 @@ jobs:
 
     strategy:
       matrix:
-        os: ['ubuntu-latest']
+        os: ['ubuntu-24.04']
         arch: ['x86_64']
         parallelization: [0, 1, 2]
         include:

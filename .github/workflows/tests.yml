@@ -107,7 +107,7 @@ jobs:
 
     strategy:
       matrix:
-        os: ['ubuntu-latest']
+        os: ['ubuntu-24.04']
         # ubuntu-slim does not work because the simple startup tests require FUSE.
         # macos-13 / macos-latest does not work anymore because the dependencies don't have any wheels,
         # probably because it is M1 based.
@@ -119,7 +119,7 @@ jobs:
         python-version: ['3.9', '3.12', '3.14', '3.15']
         libfuse-version: ['system']
         include:
-        - os: ubuntu-latest
+        - os: ubuntu-24.04
           python-version: '3.12'
           libfuse-version: '3.17.2'
         # Windows won't install easily in the full version because python-lzo has been missing Python 3.12+
@@ -250,7 +250,7 @@ jobs:
       # notice the error on the next CI run.
       fail-fast: false
       matrix:
-        os: ['macos-15-intel', 'ubuntu-latest']
+        os: ['macos-15-intel', 'ubuntu-24.04']
         # ubuntu-slim is limited to 15 min jobs, which is insufficient for Python 3.9 and 3.14 tests.
         #   The Python 3.12 tests only need ~12.5 min for some reason.
         # macos-13 / macos-latest does not work anymore because the dependencies don't have any wheels,
@@ -312,7 +312,7 @@ jobs:
       # notice the error on the next CI run.
       fail-fast: false
       matrix:
-        os: ['ubuntu-latest']
+        os: ['ubuntu-24.04']
         # macos-13 / macos-latest does not work anymore because the dependencies don't have any wheels,
         # probably because it is M1 based and because of FUSE permissions lockdown.
         # https://endoflife.date/python
