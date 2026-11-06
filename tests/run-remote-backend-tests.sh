@@ -32,7 +32,8 @@ checkFileInTARForeground()
     #      in FuseMount.init.
     local archive="$1"; shift
     local fileInTar="$1"; shift
-    local correctChecksum="$1"
+    local correctChecksum="$1"; shift
+    local expectedWarnings="${1:-}"
 
     rm -f ratarmount.{stdout,stderr}.log
 
@@ -45,8 +46,14 @@ checkFileInTARForeground()
     waitForMountpoint "$mountFolder" || returnError 'Waiting for mountpoint timed out!'
     # Beware with matching because the randomly-generated temporary file name did already
     # lead to a false positive for: /tmp/tmp.lq1FWaRnWe, which contains "WaRn"!
-    ! 'grep' -C 5 -E '(warning|error|Warning|Error|WARNING|ERROR)' ratarmount.stdout.log ratarmount.stderr.log ||
-        returnError "$LINENO" "Found warnings while executing: $RATARMOUNT_CMD $*"
+    # Extract only the matching lines first, so that optional expected warnings can be filtered
+    # without their multi-line log context keeping the check from passing.
+    local warnings
+    warnings=$( 'grep' -hE '(warning|error|Warning|Error|WARNING|ERROR)' ratarmount.stdout.log ratarmount.stderr.log || true )
+    if [[ -n "$expectedWarnings" ]]; then
+        warnings=$( 'grep' -vE "$expectedWarnings" <<<"$warnings" || true )
+    fi
+    [[ -z "$warnings" ]] || returnError "$LINENO" "Found warnings while executing: $RATARMOUNT_CMD $archive: $warnings"
 
     echo "Check access to $archive"
     verifyCheckSum "$mountFolder" "$fileInTar" "$archive" "$correctChecksum" || returnError "$LINENO" 'Checksum mismatches!'
@@ -642,6 +649,8 @@ checkURLProtocolWebDAV()
     fi
 
     local port=8047
+    # The test server is plain HTTP, so webdav:// probes HTTPS, logs the fallback warning, and uses HTTP.
+    local expectedWarning='ratarmountcore\.mountsource\.factory: Could not connect'
     # BEWARE OF LOOP MOUNTS when testing locally!
     # It will time out, when trying to expose PWD via WebDAV while mounting into PWD/mounted.
     wsgidav --host=127.0.0.1 --port=$port --root="$PWD/tests" --auth=anonymous &
@@ -649,9 +658,9 @@ checkURLProtocolWebDAV()
     sleep 5
 
     checkFileInTARForeground "webdav://127.0.0.1:$port/single-file.tar" bar \
-        d3b07384d113edec49eaa6238ad5ff00 || returnError "$LINENO" 'Failed to read from WebDAV server'
+        d3b07384d113edec49eaa6238ad5ff00 "$expectedWarning" || returnError "$LINENO" 'Failed to read from WebDAV server'
     checkFileInTARForeground "webdav://127.0.0.1:$port" single-file.tar \
-        1a28538854d1884e4415cb9bfb7a2ad8 || returnError "$LINENO" 'Failed to read from WebDAV server'
+        1a28538854d1884e4415cb9bfb7a2ad8 "$expectedWarning" || returnError "$LINENO" 'Failed to read from WebDAV server'
 
     kill "$pid"
 
@@ -680,16 +689,16 @@ EOF
     sleep 5
 
     checkFileInTARForeground "webdav://$user:$password@127.0.0.1:$port/single-file.tar" bar \
-        d3b07384d113edec49eaa6238ad5ff00 || returnError "$LINENO" 'Failed to read from WebDAV server'
+        d3b07384d113edec49eaa6238ad5ff00 "$expectedWarning" || returnError "$LINENO" 'Failed to read from WebDAV server'
     checkFileInTARForeground "webdav://$user:$password@127.0.0.1:$port" single-file.tar \
-        1a28538854d1884e4415cb9bfb7a2ad8 || returnError "$LINENO" 'Failed to read from WebDAV server'
+        1a28538854d1884e4415cb9bfb7a2ad8 "$expectedWarning" || returnError "$LINENO" 'Failed to read from WebDAV server'
 
     export WEBDAV_USER=$user
     export WEBDAV_PASSWORD=$password
     checkFileInTARForeground "webdav://127.0.0.1:$port/single-file.tar" bar \
-        d3b07384d113edec49eaa6238ad5ff00 || returnError "$LINENO" 'Failed to read from WebDAV server'
+        d3b07384d113edec49eaa6238ad5ff00 "$expectedWarning" || returnError "$LINENO" 'Failed to read from WebDAV server'
     checkFileInTARForeground "webdav://127.0.0.1:$port" single-file.tar \
-        1a28538854d1884e4415cb9bfb7a2ad8 || returnError "$LINENO" 'Failed to read from WebDAV server'
+        1a28538854d1884e4415cb9bfb7a2ad8 "$expectedWarning" || returnError "$LINENO" 'Failed to read from WebDAV server'
     unset WEBDAV_USER
     unset WEBDAV_PASSWORD
 
