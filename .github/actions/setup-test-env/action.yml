@@ -156,7 +156,7 @@ runs:
         cd -- "${NAME}"
         mkdir -p build
         cd build
-        sudo apt-get -y install meson python*-pytest
+        sudo apt-get -y install meson
         meson ..
         ninja
         #sudo python3 -m pytest test/
