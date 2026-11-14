@@ -8,6 +8,7 @@ import hashlib
 import os
 import shutil
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
@@ -101,6 +102,23 @@ class TestZipMountSource:
                     # Contents of symlink is the symlink destination itself.
                     # This behavior is not consistent with other MountSources and therefore subject to change!
                     assert file.read() == b'fighter'
+
+    @staticmethod
+    def test_modification_time():
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "times.zip")
+            date_time = (2026, 11, 15, 3, 18, 38)
+            with zipfile.ZipFile(path, 'w') as archive:
+                # DOS date and time only: local time
+                archive.writestr(zipfile.ZipInfo("local", date_time), b"a")
+                # With an extended timestamp extra field: UTC
+                info = zipfile.ZipInfo("utc", date_time)
+                info.extra = struct.pack('<HHBI', 0x5455, 5, 1, 1_000_000_000)
+                archive.writestr(info, b"b")
+
+            with ZipMountSource(path) as mountSource:
+                assert mountSource.lookup("/local").mtime == time.mktime((*date_time, 0, 0, -1))
+                assert mountSource.lookup("/utc").mtime == 1_000_000_000
 
     @staticmethod
     def test_transform():
