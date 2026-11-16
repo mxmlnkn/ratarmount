@@ -1,3 +1,4 @@
+import calendar
 import stat
 import time
 import urllib.parse
@@ -133,7 +134,8 @@ class FSSpecMountSource(MountSource):
             return mtime.timestamp() if hasattr(mtime, 'timestamp') else mtime
         modify = entry.get('modify', None)
         if isinstance(modify, str):
-            return time.mktime(time.strptime(modify, "%Y%m%d%H%M%S"))
+            # MLSD time values are always in UTC: https://datatracker.ietf.org/doc/html/rfc3659#section-2.3
+            return calendar.timegm(time.strptime(modify, "%Y%m%d%H%M%S"))
         return 0
 
     @staticmethod
