@@ -693,3 +693,10 @@ mkdir -p pkgroot/usr/share/doc/testpkg
 touch pkgroot/usr/share/doc/testpkg/empty
 chmod 755 pkgroot/DEBIAN/control
 dpkg-deb --build pkgroot testpkg_0.0.1_all.deb
+
+# 'local' only has the DOS time, which is local time. 'utc' also has the extended timestamp extra field in UTC.
+printf a > local
+printf b > utc
+TZ=UTC-2 touch -d '2026-11-15 03:18:38' local utc
+TZ=UTC-2 zip -X dos-and-utc-mtime.zip local
+TZ=UTC-2 zip dos-and-utc-mtime.zip utc

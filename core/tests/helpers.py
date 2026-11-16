@@ -2,7 +2,9 @@ import contextlib
 import os
 import shutil
 import tempfile
+import time
 
+import pytest
 from ratarmountcore.compressions import COMPRESSION_FORMATS, find_available_backend
 
 
@@ -59,3 +61,20 @@ def change_working_directory(path):
         yield
     finally:
         os.chdir(old_path)
+
+
+@contextlib.contextmanager
+def change_timezone(timezone):
+    if not hasattr(time, 'tzset'):
+        pytest.skip("Changing the local time zone requires time.tzset.")
+    old_timezone = os.environ.get('TZ')
+    os.environ['TZ'] = timezone
+    time.tzset()
+    try:
+        yield
+    finally:
+        if old_timezone is None:
+            del os.environ['TZ']
+        else:
+            os.environ['TZ'] = old_timezone
+        time.tzset()

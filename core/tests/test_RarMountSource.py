@@ -2,13 +2,16 @@
 # pylint: disable=wrong-import-position
 # pylint: disable=protected-access
 
+import calendar
 import os
 import stat
 import sys
 
+import rarfile
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from helpers import find_test_file
+from helpers import change_timezone, find_test_file
 from ratarmountcore.mountsource.formats.rar import RarMountSource
 
 
@@ -43,5 +46,16 @@ class TestRarMountSource:
                 with mountSource.open(mountSource.lookup(linkPath)) as file:
                     # Contents of symlink is the symlink destination itself.
                     assert file.read() == b'fighter'
+
+    @staticmethod
+    def test_modification_time():
+        # Both archives were created in UTC+2 from the same files. RAR5 stores UTC, RAR4 stores local time.
+        expected = calendar.timegm((2019, 5, 5, 11, 10, 46))
+        with change_timezone('UTC-2'):
+            for name in ['encrypted-nested-tar.rar', 'encrypted-nested-tar-rar4.rar']:
+                # Read the headers directly: checking the password of an encrypted RAR4 needs unrar or 7z.
+                with rarfile.RarFile(find_test_file(name)) as archive:
+                    info = archive.getinfo('foo/fighter/ufo')
+                assert RarMountSource._convert_to_file_info('/foo/fighter/ufo', info).mtime == expected, name
 
     # TODO 'transform' does not work. Could be made to work easily when refactoring it to use SQLiteIndex

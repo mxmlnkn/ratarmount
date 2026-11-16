@@ -4,6 +4,7 @@
 # pylint: disable=wrong-import-position
 # pylint: disable=protected-access
 
+import calendar
 import hashlib
 import os
 import shutil
@@ -17,7 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from helpers import find_test_file
+from helpers import change_timezone, find_test_file
 from ratarmountcore.mountsource.formats.zip import ZipMountSource
 
 try:
@@ -101,6 +102,15 @@ class TestZipMountSource:
                     # Contents of symlink is the symlink destination itself.
                     # This behavior is not consistent with other MountSources and therefore subject to change!
                     assert file.read() == b'fighter'
+
+    @staticmethod
+    def test_modification_time():
+        # Both files were archived in UTC+2 with the DOS time 2026-11-15 03:18:38, i.e., 01:18:38 UTC.
+        # 'local' only has the DOS time. 'utc' also has the extended timestamp extra field, which is in UTC.
+        # In UTC-5 (POSIX TZ 'UTC+5'), the DOS time 03:18:38 is 08:18:38 UTC.
+        with change_timezone('UTC+5'), ZipMountSource(find_test_file('dos-and-utc-mtime.zip')) as mountSource:
+            assert mountSource.lookup("/local").mtime == calendar.timegm((2026, 11, 15, 8, 18, 38))
+            assert mountSource.lookup("/utc").mtime == calendar.timegm((2026, 11, 15, 1, 18, 38))
 
     @staticmethod
     def test_transform():

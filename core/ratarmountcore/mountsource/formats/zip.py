@@ -1,8 +1,9 @@
 import contextlib
-import datetime
 import logging
 import stat
+import struct
 import sys
+import time
 import zipfile
 from pathlib import Path
 from typing import IO, Optional, Union
@@ -44,8 +45,21 @@ class ZipMountSource(SQLiteIndexMountSource):
             lambda: self.index.set_file_infos([self._convert_to_row(info) for info in self.fileObject.infolist()])
         )
 
+    @staticmethod
+    def _modification_time(info: "zipfile.ZipInfo") -> float:
+        # The extended timestamp extra field (0x5455) holds the modification time in UTC.
+        extra = info.extra
+        while len(extra) >= 4:
+            header_id, size = struct.unpack('<HH', extra[:4])
+            data = extra[4 : 4 + size]
+            if header_id == 0x5455 and len(data) >= 5 and data[0] & 1:
+                return struct.unpack('<I', data[1:5])[0]
+            extra = extra[4 + size :]
+        # Otherwise only the DOS date and time are stored, which are local time.
+        return time.mktime((*info.date_time, 0, 0, -1)) if info.date_time else 0
+
     def _convert_to_row(self, info: "zipfile.ZipInfo") -> tuple:
-        mtime = datetime.datetime(*info.date_time, tzinfo=datetime.timezone.utc).timestamp() if info.date_time else 0
+        mtime = ZipMountSource._modification_time(info)
 
         # According to section 4.5.7 in the .ZIP file format specification, links are supported:
         # https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
