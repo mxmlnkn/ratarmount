@@ -93,10 +93,12 @@ class RarMountSource(MountSource):
 
     @staticmethod
     def _convert_to_file_info(normalizedPath: str, info: "rarfile.RarInfo") -> FileInfo:
-        if info.date_time:
-            dtime = datetime.datetime(*info.date_time)
-            dtime = dtime.replace(tzinfo=datetime.timezone.utc)
-            mtime = dtime.timestamp() if info.date_time else 0
+        # RAR5 stores UTC, for which rarfile returns an aware datetime. RAR4 stores local time, for which
+        # rarfile returns a naive datetime or, without the extended time field, only date_time.
+        if info.mtime:
+            mtime = info.mtime.timestamp()
+        elif info.date_time:
+            mtime = datetime.datetime(*info.date_time).timestamp()
         else:
             mtime = 0
 
