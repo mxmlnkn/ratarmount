@@ -4,11 +4,11 @@
 # pylint: disable=wrong-import-position
 # pylint: disable=protected-access
 
+import calendar
 import hashlib
 import os
 import shutil
 import stat
-import struct
 import subprocess
 import sys
 import tempfile
@@ -18,7 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from helpers import find_test_file
+from helpers import change_timezone, find_test_file
 from ratarmountcore.mountsource.formats.zip import ZipMountSource
 
 try:
@@ -105,20 +105,12 @@ class TestZipMountSource:
 
     @staticmethod
     def test_modification_time():
-        with tempfile.TemporaryDirectory() as folder:
-            path = os.path.join(folder, "times.zip")
-            date_time = (2026, 11, 15, 3, 18, 38)
-            with zipfile.ZipFile(path, 'w') as archive:
-                # DOS date and time only: local time
-                archive.writestr(zipfile.ZipInfo("local", date_time), b"a")
-                # With an extended timestamp extra field: UTC
-                info = zipfile.ZipInfo("utc", date_time)
-                info.extra = struct.pack('<HHBI', 0x5455, 5, 1, 1_000_000_000)
-                archive.writestr(info, b"b")
-
-            with ZipMountSource(path) as mountSource:
-                assert mountSource.lookup("/local").mtime == time.mktime((*date_time, 0, 0, -1))
-                assert mountSource.lookup("/utc").mtime == 1_000_000_000
+        # Both files were archived in UTC+2 with the DOS time 2026-11-15 03:18:38, i.e., 01:18:38 UTC.
+        # 'local' only has the DOS time. 'utc' also has the extended timestamp extra field, which is in UTC.
+        # In UTC-5 (POSIX TZ 'UTC+5'), the DOS time 03:18:38 is 08:18:38 UTC.
+        with change_timezone('UTC+5'), ZipMountSource(find_test_file('dos-and-utc-mtime.zip')) as mountSource:
+            assert mountSource.lookup("/local").mtime == calendar.timegm((2026, 11, 15, 8, 18, 38))
+            assert mountSource.lookup("/utc").mtime == calendar.timegm((2026, 11, 15, 1, 18, 38))
 
     @staticmethod
     def test_transform():
