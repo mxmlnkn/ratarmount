@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 import pytest
 from ratarmountcore.mountsource.compositing.union import UnionMountSource
+from ratarmountcore.mountsource.compositing.versioning import FileVersionLayer
 from ratarmountcore.mountsource.formats.folder import FolderMountSource
 from ratarmountcore.mountsource.formats.tar import SQLiteIndexedTar
 
@@ -230,3 +231,22 @@ class TestUnionMountSource:
             result = union.get_mount_source(fileInfo)
             fileInfo.userdata.pop()
             assert result == ("/", archive, fileInfo)
+
+    @staticmethod
+    def test_hard_link_with_dot_prefix(tmp_path):
+        # 'tar -C src .' stores './a.txt' as a hard link to './hard.txt'.
+        tarPath = tmp_path / "links.tar"
+        with tarfile.open(name=tarPath, mode="w") as tarFile:
+            _make_folder(tarFile, "./")
+            _make_folder(tarFile, "./dir/")
+            _create_file(tarFile, "./hard.txt", b"hello\n")
+            link = tarfile.TarInfo("./a.txt")
+            link.type = tarfile.LNKTYPE
+            link.linkname = "./hard.txt"
+            tarFile.addfile(link)
+        (tmp_path / "folder").mkdir()
+
+        union = FileVersionLayer(
+            UnionMountSource([FolderMountSource(str(tmp_path / "folder")), SQLiteIndexedTar(str(tarPath))])
+        )
+        TestUnionMountSource._check_file(union, "/a.txt", 0, b"hello\n")
