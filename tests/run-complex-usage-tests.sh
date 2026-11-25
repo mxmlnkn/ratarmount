@@ -928,6 +928,13 @@ checkWriteOverlayWithArchivedFiles()
     verifyCheckSum "$mountFolder" 'foo/fighter/ufo' '[write overlay]' 2709a3348eb2c52302a7606ecf5860bc ||
         returnError "$LINENO" 'Mismatching checksum'
 
+    ## Rename archive folder
+
+    'mv' "$mountFolder/foo/fighter" "$mountFolder/foo/fighter2"
+    if [[ -e "$mountFolder/foo/fighter" ]]; then returnError "$LINENO" 'Folder should have been renamed'; fi
+    verifyCheckSum "$mountFolder" 'foo/fighter2/ufo' '[write overlay]' 2709a3348eb2c52302a7606ecf5860bc ||
+        returnError "$LINENO" 'Mismatching checksum'
+
 
     echoerr "[${FUNCNAME[0]}] Tested successfully file modifications for archive files using the overlay."
 
