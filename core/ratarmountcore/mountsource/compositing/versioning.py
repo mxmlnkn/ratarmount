@@ -1,6 +1,7 @@
 import builtins
 import enum
 import os
+import posixpath
 import stat
 from collections.abc import Iterable
 from typing import IO, Any, Optional, Union
@@ -115,7 +116,8 @@ class FileVersionLayer(MountSource):
             # get that using the full path instead of calling lookup on the deepest mount source.
             mountPoint, _, _ = mountSource.get_mount_source(fileInfo)
 
-            resolvedPath = os.path.join(mountPoint, resolvedPath.lstrip('/'))
+            # Normalize link names like './hard.txt' to match the union mount's cached paths, inside this archive.
+            resolvedPath = os.path.join(mountPoint, posixpath.normpath(resolvedPath).lstrip('/'))
 
             if resolvedPath != path:  # noqa: SIM108
                 # The file version is only of importance to resolve self-references.
