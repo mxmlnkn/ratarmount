@@ -325,6 +325,21 @@ class WritableFolderMountSource(fuse.Operations):
         if not self.mountSource.exists(old) or self.is_deleted(old):
             raise fuse.FuseOSError(errno.ENOENT)
 
+        inOverlay = os.path.lexists(self._realpath(old))
+        fileInfo = self.mountSource.lookup(old)
+        if fileInfo is None:
+            raise fuse.FuseOSError(errno.ENOENT)
+        # Only a regular file's contents can be copied into the overlay here. For a directory the
+        # archive still provides, or an archived symlink, EXDEV makes mv copy and delete instead,
+        # as with overlayfs.
+        if stat.S_ISDIR(fileInfo.mode):
+            if self.mountSource.versions(old) > (1 if inOverlay else 0):
+                raise fuse.FuseOSError(errno.EXDEV)
+        elif not inOverlay and not stat.S_ISREG(fileInfo.mode):
+            raise fuse.FuseOSError(errno.EXDEV)
+        if inOverlay:
+            fileInfo = None
+
         folder, name = self._split_path(new)
 
         # Delete target path from metadata database to avoid uniqueness restraint being invalidated
@@ -332,13 +347,9 @@ class WritableFolderMountSource(fuse.Operations):
         self._set_file_metadata(old, lambda p: None, {'path': folder, 'name': name})
 
         self._ensure_parent_exists(new)
-        if os.path.lexists(self._realpath(old)):
+        if fileInfo is None:
             os.rename(self._realpath(old), self._realpath(new))
         else:
-            fileInfo = self.mountSource.lookup(old)
-            if fileInfo is None:
-                raise fuse.FuseOSError(errno.ENOENT)
-
             with self.mountSource.open(fileInfo) as sourceObject, open(self._realpath(new), 'wb') as targetObject:
                 shutil.copyfileobj(sourceObject, targetObject)
 
